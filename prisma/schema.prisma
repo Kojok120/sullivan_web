@@ -1,0 +1,165 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Subject {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  icon      String?
+  order     Int
+  units     Unit[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Unit {
+  id           String        @id @default(cuid())
+  name         String
+  order        Int
+  subjectId    String
+  subject      Subject       @relation(fields: [subjectId], references: [id])
+  coreProblems CoreProblem[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model CoreProblem {
+  id             String    @id @default(cuid())
+  name           String
+  description    String?
+  unitId         String
+  unit           Unit      @relation(fields: [unitId], references: [id])
+  problems       Problem[]
+  order          Int
+  sharedVideoUrl String? // 共通解説動画
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+enum ProblemType {
+  NORMAL
+  PREREQ
+}
+
+model Problem {
+  id               String             @id @default(cuid())
+  question         String
+  answer           String
+  acceptedAnswers  String[]           @default([]) // 許容解答（複数）
+  difficulty       Int?               // 難易度
+  tags             String[]           @default([]) // タグ
+  type             ProblemType        @default(NORMAL)
+  coreProblemId    String
+  coreProblem      CoreProblem        @relation(fields: [coreProblemId], references: [id])
+  order            Int // Chain order
+  videoUrl         String? // For C/D feedback
+  aiGradingEnabled Boolean            @default(false)
+  histories        LearningHistory[]
+  userStates       UserProblemState[]
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+}
+
+enum Role {
+  STUDENT
+  TEACHER
+  PARENT
+  ADMIN
+}
+
+model Group {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  users       User[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model User {
+  id        String   @id @default(cuid())
+  loginId   String   @unique // Auto-generated ID (e.g., S0001)
+  password  String   // Hashed password
+  role      Role     @default(STUDENT)
+  name      String?
+  groupId   String?
+  group     Group?   @relation(fields: [groupId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  learningHistory   LearningHistory[]
+  userProblemStates UserProblemState[]
+
+  // Teacher specific fields
+  bio               String?   // 生徒プロフィール（部活、志望校など）
+  notes             String?   // 講師用メモ（性格、特記事項など）
+  birthday          DateTime? // 生年月日
+  classroom         String?   // 教室
+  school            String?   // 学校
+  phoneNumber       String?   // 電話番号
+  email             String?   // メールアドレス
+  guidanceRecords   GuidanceRecord[] @relation("StudentGuidance")
+  createdGuidance   GuidanceRecord[] @relation("TeacherGuidance")
+}
+
+enum GuidanceType {
+  INTERVIEW // 面談
+  GUIDANCE  // 指導
+  OTHER     // その他
+}
+
+model GuidanceRecord {
+  id        String       @id @default(cuid())
+  studentId String
+  student   User         @relation("StudentGuidance", fields: [studentId], references: [id])
+  teacherId String
+  teacher   User         @relation("TeacherGuidance", fields: [teacherId], references: [id])
+  date      DateTime     @default(now())
+  content   String
+  type      GuidanceType @default(GUIDANCE)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+}
+
+model LearningHistory {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  problemId   String
+  problem     Problem  @relation(fields: [problemId], references: [id])
+  evaluation  String // A, B, C, D
+  userAnswer  String? // User's text answer
+  feedback    String? // AI feedback
+  answeredAt  DateTime @default(now())
+}
+
+model UserProblemState {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  problemId      String
+  problem        Problem  @relation(fields: [problemId], references: [id])
+  priority       Int      @default(0)
+  lastAnsweredAt DateTime?
+  isCleared      Boolean  @default(false)
+  
+  @@unique([userId, problemId])
+}
+
+model SystemSettings {
+  id                    String   @id @default(cuid())
+  priorityInitial       Int      @default(50)
+  priorityAdjustmentA   Int      @default(-30)
+  priorityAdjustmentB   Int      @default(-10)
+  priorityAdjustmentC   Int      @default(10)
+  priorityAdjustmentD   Int      @default(30)
+  forgettingCurveRate   Float    @default(5.0)
+  aiGradingEnabled      Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}

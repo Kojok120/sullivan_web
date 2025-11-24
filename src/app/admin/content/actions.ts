@@ -1,0 +1,33 @@
+'use server';
+
+import { prisma } from '@/lib/prisma';
+import { revalidatePath } from 'next/cache';
+import { ProblemType } from '@prisma/client';
+
+export async function updateCoreProblemVideo(id: string, sharedVideoUrl: string | null) {
+    try {
+        await prisma.coreProblem.update({
+            where: { id },
+            data: { sharedVideoUrl },
+        });
+        revalidatePath('/admin/content');
+        return { success: true };
+    } catch (error) {
+        console.error('Failed to update video:', error);
+        return { success: false, error: '動画URLの更新に失敗しました' };
+    }
+}
+
+export async function updateProblemType(id: string, type: ProblemType) {
+    try {
+        await prisma.problem.update({
+            where: { id },
+            data: { type },
+        });
+        revalidatePath('/admin/content');
+        return { success: true };
+    } catch (error) {
+        console.error('Failed to update problem type:', error);
+        return { success: false, error: '問題タイプの更新に失敗しました' };
+    }
+}

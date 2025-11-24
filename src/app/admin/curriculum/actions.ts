@@ -1,0 +1,189 @@
+'use server';
+
+import { prisma } from '@/lib/prisma';
+import { revalidatePath } from 'next/cache';
+import { ProblemType } from '@prisma/client';
+
+// --- Subjects ---
+export async function getSubjects() {
+    try {
+        const { fetchSubjects } = await import('@/lib/curriculum-service');
+        const subjects = await fetchSubjects({ includeUnits: true, includeCoreProblems: true });
+        return { success: true, subjects };
+    } catch (error) {
+        console.error('Failed to fetch subjects:', error);
+        return { error: '科目の取得に失敗しました' };
+    }
+}
+
+// --- Units ---
+export async function createUnit(data: { name: string; subjectId: string; order: number }) {
+    try {
+        const unit = await prisma.unit.create({
+            data: {
+                name: data.name,
+                subjectId: data.subjectId,
+                order: data.order,
+            },
+        });
+        revalidatePath('/admin/curriculum');
+        return { success: true, unit };
+    } catch (error) {
+        console.error('Failed to create unit:', error);
+        return { error: 'Unitの作成に失敗しました' };
+    }
+}
+
+export async function updateUnit(id: string, data: { name?: string; order?: number }) {
+    try {
+        const unit = await prisma.unit.update({
+            where: { id },
+            data,
+        });
+        revalidatePath('/admin/curriculum');
+        return { success: true, unit };
+    } catch (error) {
+        console.error('Failed to update unit:', error);
+        return { error: 'Unitの更新に失敗しました' };
+    }
+}
+
+export async function deleteUnit(id: string) {
+    try {
+        await prisma.unit.delete({ where: { id } });
+        revalidatePath('/admin/curriculum');
+        return { success: true };
+    } catch (error) {
+        console.error('Failed to delete unit:', error);
+        return { error: 'Unitの削除に失敗しました' };
+    }
+}
+
+// --- CoreProblems ---
+export async function createCoreProblem(data: { name: string; unitId: string; order: number; description?: string; sharedVideoUrl?: string }) {
+    try {
+        const coreProblem = await prisma.coreProblem.create({
+            data: {
+                name: data.name,
+                unitId: data.unitId,
+                order: data.order,
+                description: data.description,
+                sharedVideoUrl: data.sharedVideoUrl,
+            },
+        });
+        revalidatePath('/admin/curriculum');
+        return { success: true, coreProblem };
+    } catch (error) {
+        console.error('Failed to create core problem:', error);
+        return { error: 'CoreProblemの作成に失敗しました' };
+    }
+}
+
+export async function updateCoreProblem(id: string, data: { name?: string; order?: number; description?: string; sharedVideoUrl?: string }) {
+    try {
+        const coreProblem = await prisma.coreProblem.update({
+            where: { id },
+            data,
+        });
+        revalidatePath('/admin/curriculum');
+        return { success: true, coreProblem };
+    } catch (error) {
+        console.error('Failed to update core problem:', error);
+        return { error: 'CoreProblemの更新に失敗しました' };
+    }
+}
+
+export async function deleteCoreProblem(id: string) {
+    try {
+        await prisma.coreProblem.delete({ where: { id } });
+        revalidatePath('/admin/curriculum');
+        return { success: true };
+    } catch (error) {
+        console.error('Failed to delete core problem:', error);
+        return { error: 'CoreProblemの削除に失敗しました' };
+    }
+}
+
+// --- Problems ---
+export async function getProblemsByCoreProblem(coreProblemId: string) {
+    try {
+        const problems = await prisma.problem.findMany({
+            where: { coreProblemId },
+            orderBy: { order: 'asc' },
+        });
+        return { success: true, problems };
+    } catch (error) {
+        console.error('Failed to fetch problems:', error);
+        return { error: '問題の取得に失敗しました' };
+    }
+}
+
+export async function createProblem(data: {
+    question: string;
+    answer: string;
+    coreProblemId: string;
+    order: number;
+    type?: ProblemType;
+    videoUrl?: string;
+    acceptedAnswers?: string[];
+    difficulty?: number;
+    tags?: string[];
+    aiGradingEnabled?: boolean;
+}) {
+    try {
+        const problem = await prisma.problem.create({
+            data: {
+                question: data.question,
+                answer: data.answer,
+                coreProblemId: data.coreProblemId,
+                order: data.order,
+                type: data.type || 'NORMAL',
+                videoUrl: data.videoUrl,
+                acceptedAnswers: data.acceptedAnswers || [],
+                difficulty: data.difficulty,
+                tags: data.tags || [],
+                aiGradingEnabled: data.aiGradingEnabled || false,
+            },
+        });
+        revalidatePath('/admin/curriculum');
+        return { success: true, problem };
+    } catch (error) {
+        console.error('Failed to create problem:', error);
+        return { error: '問題の作成に失敗しました' };
+    }
+}
+
+export async function updateProblem(id: string, data: {
+    question?: string;
+    answer?: string;
+    order?: number;
+    type?: ProblemType;
+    videoUrl?: string;
+    acceptedAnswers?: string[];
+    difficulty?: number;
+    tags?: string[];
+    aiGradingEnabled?: boolean;
+}) {
+    try {
+        const problem = await prisma.problem.update({
+            where: { id },
+            data,
+        });
+        revalidatePath('/admin/curriculum');
+        return { success: true, problem };
+    } catch (error) {
+        console.error('Failed to update problem:', error);
+        return { error: '問題の更新に失敗しました' };
+    }
+}
+
+export async function deleteProblem(id: string) {
+    try {
+        await prisma.problem.delete({ where: { id } });
+        revalidatePath('/admin/curriculum');
+        return { success: true };
+    } catch (error) {
+        console.error('Failed to delete problem:', error);
+        return { error: '問題の削除に失敗しました' };
+    }
+}
