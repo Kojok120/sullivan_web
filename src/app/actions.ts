@@ -20,6 +20,20 @@ export async function getSubjects() {
 export async function getSubject(id: string) {
     return await prisma.subject.findUnique({
         where: { id },
+        include: {
+            units: {
+                orderBy: { order: 'asc' },
+                include: {
+                    coreProblems: {
+                        orderBy: { order: 'asc' },
+                        select: {
+                            id: true,
+                            name: true,
+                        },
+                    },
+                },
+            },
+        },
     });
 }
 
@@ -45,6 +59,63 @@ async function requireAuth() {
         throw new Error('Unauthorized');
     }
     return session;
+}
+
+// Helper to record history and update priority
+async function recordProblemResult(
+    userId: string,
+    problemId: string,
+    evaluation: "A" | "B" | "C" | "D",
+    userAnswer?: string,
+    feedback?: string
+) {
+    // 1. Record History
+    await prisma.learningHistory.create({
+        data: {
+            userId,
+            problemId,
+            evaluation,
+            userAnswer,
+            feedback,
+        },
+    });
+
+    // 2. Update UserProblemState
+    const currentState = await prisma.userProblemState.findUnique({
+        where: {
+            userId_problemId: {
+                userId,
+                problemId,
+            },
+        },
+    });
+
+    const currentPriority = currentState?.priority || 0;
+
+    // 3. Fetch system config
+    const config = await getSystemConfig();
+
+    // 4. Calculate new base priority using the unified logic with config
+    const newPriority = calculateNewPriority(currentPriority, evaluation, config);
+
+    await prisma.userProblemState.upsert({
+        where: {
+            userId_problemId: {
+                userId,
+                problemId,
+            },
+        },
+        update: {
+            priority: newPriority,
+            lastAnsweredAt: new Date(),
+        },
+        create: {
+            userId,
+            problemId,
+            priority: newPriority,
+            lastAnsweredAt: new Date(),
+        },
+    });
 }
 
 export async function getNextProblem(userId: string, coreProblemId: string): Promise<ProblemData | null> {
@@ -161,51 +232,7 @@ export async function submitEvaluation(
         throw new Error('Unauthorized');
     }
 
-    // 1. Record History
-    await prisma.learningHistory.create({
-        data: {
-            userId,
-            problemId,
-            evaluation,
-        },
-    });
-
-    // 2. Update UserProblemState
-    const currentState = await prisma.userProblemState.findUnique({
-        where: {
-            userId_problemId: {
-                userId,
-                problemId,
-            },
-        },
-    });
-
-    const currentPriority = currentState?.priority || 0;
-
-    // 3. Fetch system config
-    const config = await getSystemConfig();
-
-    // 4. Calculate new base priority using the unified logic with config
-    const newPriority = calculateNewPriority(currentPriority, evaluation, config);
-
-    await prisma.userProblemState.upsert({
-        where: {
-            userId_problemId: {
-                userId,
-                problemId,
-            },
-        },
-        update: {
-            priority: newPriority,
-            lastAnsweredAt: new Date(),
-        },
-        create: {
-            userId,
-            problemId,
-            priority: newPriority,
-            lastAnsweredAt: new Date(),
-        },
-    });
+    await recordProblemResult(userId, problemId, evaluation);
 }
 
 import { gradeAnswer } from "@/lib/gemini";
@@ -239,48 +266,7 @@ export async function submitAnswerWithAI(
         feedback = result.feedback;
     }
 
-    // 2. Record History
-    await prisma.learningHistory.create({
-        data: {
-            userId,
-            problemId,
-            evaluation,
-            userAnswer,
-            feedback,
-        },
-    });
-
-    // 3. Update UserProblemState
-    const currentState = await prisma.userProblemState.findUnique({
-        where: {
-            userId_problemId: {
-                userId,
-                problemId,
-            },
-        },
-    });
-
-    const currentPriority = currentState?.priority || 0;
-    const newPriority = calculateNewPriority(currentPriority, evaluation, config);
-
-    await prisma.userProblemState.upsert({
-        where: {
-            userId_problemId: {
-                userId,
-                problemId,
-            },
-        },
-        update: {
-            priority: newPriority,
-            lastAnsweredAt: new Date(),
-        },
-        create: {
-            userId,
-            problemId,
-            priority: newPriority,
-            lastAnsweredAt: new Date(),
-        },
-    });
+    await recordProblemResult(userId, problemId, evaluation, userAnswer, feedback);
 
     if (!isAiEnabledSystem) {
         return { aiGraded: false };

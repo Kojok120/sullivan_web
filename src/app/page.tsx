@@ -60,8 +60,8 @@ export default async function Home({
   }
 
   // If subject is selected, show units and core problems
-  const units = await getUnitsBySubject(selectedSubjectId);
   const currentSubject = await getSubject(selectedSubjectId);
+  const units = currentSubject?.units || [];
 
   return (
     <div className="min-h-screen bg-background">
