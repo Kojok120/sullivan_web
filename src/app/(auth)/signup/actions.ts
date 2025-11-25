@@ -4,26 +4,51 @@ import { prisma } from '@/lib/prisma';
 import { hashPassword } from '@/lib/auth';
 import { Role } from '@prisma/client';
 
-export async function signupAction(prevState: any, formData: FormData) {
-    const name = formData.get('name') as string;
-    const password = formData.get('password') as string;
-    const role = formData.get('role') as Role;
+import { z } from 'zod';
 
-    if (!name || !password || !role) {
-        return { error: 'すべての項目を入力してください' };
+const signupSchema = z.object({
+    name: z.string().min(1, '名前を入力してください'),
+    password: z.string().min(8, 'パスワードは8文字以上で入力してください'),
+    role: z.nativeEnum(Role),
+});
+
+export async function signupAction(prevState: any, formData: FormData) {
+    const rawData = {
+        name: formData.get('name') as string,
+        password: formData.get('password') as string,
+        role: formData.get('role') as Role,
+    };
+
+    const result = signupSchema.safeParse(rawData);
+
+    if (!result.success) {
+        return { error: result.error.errors[0].message };
     }
 
-    try {
-        const { createUser } = await import('@/lib/user-service');
-        const user = await createUser({
-            name,
-            role,
-            password,
-        });
+    const { name, password } = result.data;
 
-        return { success: true, loginId: user.loginId };
-    } catch (e) {
-        console.error(e);
-        return { error: '登録に失敗しました。もう一度お試しください。' };
+    const role = Role.STUDENT; // Force role to STUDENT for public signup
+
+    // 2. Hash password
+    const hashedPassword = await hashPassword(password);
+
+    // 3. Create user
+    try {
+        // Generate a simple loginId for now, e.g., based on name or a UUID
+        // For a real application, ensure loginId is unique and properly generated.
+        const loginId = name.toLowerCase().replace(/\s/g, '') + Math.random().toString(36).substring(2, 8);
+
+        await prisma.user.create({
+            data: {
+                loginId,
+                password: hashedPassword,
+                name,
+                role,
+            },
+        });
+        return { success: true, loginId };
+    } catch (error) {
+        console.error(error);
+        return { error: 'ユーザー作成に失敗しました。もう一度お試しください。' };
     }
 }

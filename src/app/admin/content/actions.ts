@@ -3,8 +3,17 @@
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { ProblemType } from '@prisma/client';
+import { getSession } from '@/lib/auth';
+
+async function requireAdmin() {
+    const session = await getSession();
+    if (!session || session.role !== 'ADMIN') {
+        throw new Error('Unauthorized');
+    }
+}
 
 export async function updateCoreProblemVideo(id: string, sharedVideoUrl: string | null) {
+    await requireAdmin();
     try {
         await prisma.coreProblem.update({
             where: { id },
@@ -19,6 +28,7 @@ export async function updateCoreProblemVideo(id: string, sharedVideoUrl: string 
 }
 
 export async function updateProblemType(id: string, type: ProblemType) {
+    await requireAdmin();
     try {
         await prisma.problem.update({
             where: { id },

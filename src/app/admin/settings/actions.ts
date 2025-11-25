@@ -16,7 +16,17 @@ const settingsSchema = z.object({
 
 export type SettingsData = z.infer<typeof settingsSchema>;
 
+import { getSession } from '@/lib/auth';
+
+async function requireAdmin() {
+    const session = await getSession();
+    if (!session || session.role !== 'ADMIN') {
+        throw new Error('Unauthorized');
+    }
+}
+
 export async function getSystemSettings() {
+    await requireAdmin();
     const settings = await prisma.systemSettings.findFirst();
     if (!settings) {
         return await prisma.systemSettings.create({
@@ -36,6 +46,7 @@ export async function getSystemSettings() {
 }
 
 export async function updateSystemSettings(data: SettingsData) {
+    await requireAdmin();
     const parsed = settingsSchema.safeParse(data);
     if (!parsed.success) {
         return { success: false, error: "Invalid data" };

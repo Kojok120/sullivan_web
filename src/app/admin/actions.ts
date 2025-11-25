@@ -1,19 +1,27 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import { hashPassword } from '@/lib/auth';
-import { Role } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
+import { Role } from '@prisma/client';
+import { hashPassword, getSession } from '@/lib/auth';
+
+async function requireAdmin() {
+    const session = await getSession();
+    if (!session || session.role !== 'ADMIN') {
+        throw new Error('Unauthorized');
+    }
+}
 
 export async function getUsers(
-    query?: string,
     page: number = 1,
-    limit: number = 50,
+    limit: number = 10,
+    query: string = '',
     sortBy: string = 'createdAt',
     sortOrder: 'asc' | 'desc' = 'desc',
-    role?: Role,
-    groupId?: string
+    roleFilter?: Role,
+    groupIdFilter?: string
 ) {
+    await requireAdmin();
     try {
         const where: any = {};
 
@@ -24,12 +32,12 @@ export async function getUsers(
             ];
         }
 
-        if (role) {
-            where.role = role;
+        if (roleFilter) {
+            where.role = roleFilter;
         }
 
-        if (groupId) {
-            where.groupId = groupId;
+        if (groupIdFilter && groupIdFilter !== 'ALL') {
+            where.groupId = groupIdFilter;
         }
 
         const skip = (page - 1) * limit;
@@ -59,15 +67,32 @@ export async function getUsers(
     }
 }
 
+import { z } from 'zod';
+
+const createUserSchema = z.object({
+    name: z.string().min(1, '名前を入力してください'),
+    role: z.nativeEnum(Role),
+    password: z.string().optional(),
+    groupId: z.string().optional(),
+});
+
+const updateUserSchema = z.object({
+    name: z.string().optional(),
+    role: z.nativeEnum(Role).optional(),
+    password: z.string().optional(),
+    groupId: z.string().optional(),
+});
+
 export async function createUser(data: { name: string; role: Role; password?: string; groupId?: string }) {
+    const result = createUserSchema.safeParse(data);
+
+    if (!result.success) {
+        return { error: result.error.errors[0].message };
+    }
+
     try {
         const { createUser: createUserService } = await import('@/lib/user-service');
-        const user = await createUserService({
-            name: data.name,
-            role: data.role,
-            password: data.password,
-            groupId: data.groupId,
-        });
+        const user = await createUserService(result.data as any);
 
         revalidatePath('/admin/users');
         return { success: true, user };
@@ -78,10 +103,11 @@ export async function createUser(data: { name: string; role: Role; password?: st
 }
 
 export async function updateUser(id: string, data: { name?: string; role?: Role; password?: string; groupId?: string }) {
+    await requireAdmin();
     try {
         const updateData: any = { ...data };
-        if (data.password) {
-            updateData.password = await hashPassword(data.password);
+        if (updateData.password) {
+            updateData.password = await hashPassword(updateData.password);
         } else {
             delete updateData.password;
         }
@@ -100,6 +126,7 @@ export async function updateUser(id: string, data: { name?: string; role?: Role;
 }
 
 export async function deleteUser(id: string) {
+    await requireAdmin();
     try {
         await prisma.user.delete({
             where: { id },
@@ -114,6 +141,7 @@ export async function deleteUser(id: string) {
 }
 
 export async function getGroups() {
+    await requireAdmin();
     try {
         const groups = await prisma.group.findMany({
             orderBy: { name: 'asc' },

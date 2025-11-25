@@ -3,7 +3,11 @@ import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import * as bcrypt from 'bcryptjs';
 
-const SECRET_KEY = new TextEncoder().encode(process.env.JWT_SECRET || 'default_secret_key');
+const secretKey = process.env.JWT_SECRET;
+if (!secretKey) {
+    throw new Error('JWT_SECRET is not defined in environment variables');
+}
+const SECRET_KEY = new TextEncoder().encode(secretKey);
 const ALG = 'HS256';
 
 export type SessionPayload = {

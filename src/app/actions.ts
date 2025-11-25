@@ -39,7 +39,23 @@ export async function getUnitsBySubject(subjectId: string) {
     });
 }
 
+async function requireAuth() {
+    const session = await getSession();
+    if (!session) {
+        throw new Error('Unauthorized');
+    }
+    return session;
+}
+
 export async function getNextProblem(userId: string, coreProblemId: string): Promise<ProblemData | null> {
+    const session = await requireAuth();
+    if (session.userId !== userId && session.role !== 'ADMIN' && session.role !== 'TEACHER') {
+        // Basic protection: users can only fetch their own problems unless admin/teacher
+        // But for now, just ensuring they are logged in is a good start.
+        // Let's enforce userId match if not admin/teacher
+        throw new Error('Unauthorized access to other user data');
+    }
+
     const config = await getSystemConfig();
 
     // 1. まだ回答していない問題をDB側で最小カラムだけ取得（最優先はチェーン順）
@@ -140,6 +156,11 @@ export async function submitEvaluation(
     problemId: string,
     evaluation: "A" | "B" | "C" | "D"
 ): Promise<void> {
+    const session = await requireAuth();
+    if (session.userId !== userId) {
+        throw new Error('Unauthorized');
+    }
+
     // 1. Record History
     await prisma.learningHistory.create({
         data: {
@@ -193,8 +214,7 @@ export async function submitAnswerWithAI(
     problemId: string,
     userAnswer: string
 ) {
-    const session = await getSession();
-    if (!session) throw new Error("Unauthorized");
+    const session = await requireAuth();
     const userId = session.userId;
 
     // 1. Fetch problem and system settings

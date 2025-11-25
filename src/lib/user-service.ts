@@ -31,7 +31,11 @@ export async function createUser({
     }
 
     const loginId = `${prefix}${nextNum.toString().padStart(4, '0')}`;
-    const hashedPassword = await hash(password || 'password', 10);
+
+    if (!password) {
+        throw new Error('Password is required');
+    }
+    const hashedPassword = await hash(password, 10);
 
     const user = await prisma.user.create({
         data: {

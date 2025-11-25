@@ -27,7 +27,7 @@ export default async function UsersPage({
     const roleEnum = role && ['STUDENT', 'TEACHER', 'PARENT', 'ADMIN'].includes(role) ? role as any : undefined;
 
     const [usersData, groupsData] = await Promise.all([
-        getUsers(query, currentPage, limit, currentSortBy, currentSortOrder, roleEnum, groupId),
+        getUsers(currentPage, limit, query, currentSortBy, currentSortOrder, roleEnum, groupId),
         getGroups(),
     ]);
 

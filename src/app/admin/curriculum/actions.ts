@@ -3,9 +3,18 @@
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { ProblemType } from '@prisma/client';
+import { getSession } from '@/lib/auth';
+
+async function requireAdmin() {
+    const session = await getSession();
+    if (!session || session.role !== 'ADMIN') {
+        throw new Error('Unauthorized');
+    }
+}
 
 // --- Subjects ---
 export async function getSubjects() {
+    await requireAdmin();
     try {
         const { fetchSubjects } = await import('@/lib/curriculum-service');
         const subjects = await fetchSubjects({ includeUnits: true, includeCoreProblems: true });
@@ -18,6 +27,7 @@ export async function getSubjects() {
 
 // --- Units ---
 export async function createUnit(data: { name: string; subjectId: string; order: number }) {
+    await requireAdmin();
     try {
         const unit = await prisma.unit.create({
             data: {
@@ -35,6 +45,7 @@ export async function createUnit(data: { name: string; subjectId: string; order:
 }
 
 export async function updateUnit(id: string, data: { name?: string; order?: number }) {
+    await requireAdmin();
     try {
         const unit = await prisma.unit.update({
             where: { id },
@@ -49,6 +60,7 @@ export async function updateUnit(id: string, data: { name?: string; order?: numb
 }
 
 export async function deleteUnit(id: string) {
+    await requireAdmin();
     try {
         await prisma.unit.delete({ where: { id } });
         revalidatePath('/admin/curriculum');
@@ -61,6 +73,7 @@ export async function deleteUnit(id: string) {
 
 // --- CoreProblems ---
 export async function createCoreProblem(data: { name: string; unitId: string; order: number; description?: string; sharedVideoUrl?: string }) {
+    await requireAdmin();
     try {
         const coreProblem = await prisma.coreProblem.create({
             data: {
@@ -80,6 +93,7 @@ export async function createCoreProblem(data: { name: string; unitId: string; or
 }
 
 export async function updateCoreProblem(id: string, data: { name?: string; order?: number; description?: string; sharedVideoUrl?: string }) {
+    await requireAdmin();
     try {
         const coreProblem = await prisma.coreProblem.update({
             where: { id },
@@ -94,6 +108,7 @@ export async function updateCoreProblem(id: string, data: { name?: string; order
 }
 
 export async function deleteCoreProblem(id: string) {
+    await requireAdmin();
     try {
         await prisma.coreProblem.delete({ where: { id } });
         revalidatePath('/admin/curriculum');
@@ -106,6 +121,7 @@ export async function deleteCoreProblem(id: string) {
 
 // --- Problems ---
 export async function getProblemsByCoreProblem(coreProblemId: string) {
+    await requireAdmin();
     try {
         const problems = await prisma.problem.findMany({
             where: { coreProblemId },
@@ -129,6 +145,7 @@ export async function createProblem(data: {
     difficulty?: number;
     tags?: string[];
 }) {
+    await requireAdmin();
     try {
         const problem = await prisma.problem.create({
             data: {
@@ -161,6 +178,7 @@ export async function updateProblem(id: string, data: {
     difficulty?: number;
     tags?: string[];
 }) {
+    await requireAdmin();
     try {
         const problem = await prisma.problem.update({
             where: { id },
@@ -175,6 +193,7 @@ export async function updateProblem(id: string, data: {
 }
 
 export async function deleteProblem(id: string) {
+    await requireAdmin();
     try {
         await prisma.problem.delete({ where: { id } });
         revalidatePath('/admin/curriculum');
