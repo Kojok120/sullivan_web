@@ -149,7 +149,7 @@ export function LearningSession({ initialProblem, onEvaluate }: LearningSessionP
             <div className="flex justify-between items-center text-sm text-slate-500">
                 <span>{problem.unitName}</span>
                 <Badge variant="outline" className="gap-1">
-                    {problem.aiGradingEnabled && <Sparkles className="h-3 w-3 text-yellow-500" />}
+                    <Sparkles className="h-3 w-3 text-yellow-500" />
                     {problem.coreProblemName}
                 </Badge>
             </div>
@@ -176,7 +176,8 @@ export function LearningSession({ initialProblem, onEvaluate }: LearningSessionP
                                 {problem.question}
                             </p>
 
-                            {problem.aiGradingEnabled && !showAnswer && !aiFeedback && (
+                            {/* Always show input unless answer is shown */}
+                            {!showAnswer && !aiFeedback && (
                                 <div className="w-full max-w-lg space-y-4 animate-in fade-in slide-in-from-bottom-4">
                                     <Textarea
                                         placeholder="回答を入力してください..."
@@ -238,15 +239,7 @@ export function LearningSession({ initialProblem, onEvaluate }: LearningSessionP
                         </AnimatePresence>
 
                         <CardFooter className="flex flex-col gap-4 p-6 bg-muted/30">
-                            {!showAnswer && !aiFeedback && !problem.aiGradingEnabled ? (
-                                <Button
-                                    size="lg"
-                                    className="w-full text-lg h-14 shadow-md hover:shadow-lg transition-all"
-                                    onClick={() => setShowAnswer(true)}
-                                >
-                                    答え合わせ
-                                </Button>
-                            ) : (showAnswer || aiFeedback) && (
+                            {(showAnswer || aiFeedback) && (
                                 <div className="w-full space-y-6">
                                     <p className="text-center text-muted-foreground text-sm font-medium">自己評価を選択して次へ</p>
                                     <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">

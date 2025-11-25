@@ -101,7 +101,7 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
                         <div className="space-y-0.5">
                             <Label htmlFor="aiGradingEnabled">AI採点機能</Label>
                             <p className="text-sm text-muted-foreground">
-                                記述式問題のAIによる自動採点を有効にします（現在はプレースホルダー）
+                                記述式問題のAIによる自動採点を有効にします。
                             </p>
                         </div>
                         <Switch

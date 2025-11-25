@@ -10,8 +10,7 @@ import {
     BookOpen,
     Video,
     Settings,
-    LogOut,
-    ArrowLeft
+    LogOut
 } from "lucide-react";
 import { logoutAction } from "@/app/actions";
 
@@ -72,12 +71,6 @@ export function AdminNav() {
                 ))}
             </div>
             <div className="p-4 border-t space-y-2">
-                <Button variant="outline" className="w-full justify-start" asChild>
-                    <Link href="/">
-                        <ArrowLeft className="mr-2 h-4 w-4" />
-                        学習画面へ戻る
-                    </Link>
-                </Button>
                 <form action={logoutAction}>
                     <Button variant="ghost" className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50">
                         <LogOut className="mr-2 h-4 w-4" />

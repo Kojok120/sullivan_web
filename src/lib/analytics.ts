@@ -34,8 +34,54 @@ export async function getStudentStats(userId: string): Promise<StudentStats> {
         }),
     ]);
 
-    // Streak calculation is still simplified but we avoid the heavy query for now as per review
-    const currentStreak = 0;
+    // Streak calculation
+    const activityDates = await prisma.learningHistory.findMany({
+        where: { userId },
+        select: { answeredAt: true },
+        orderBy: { answeredAt: 'desc' },
+    });
+
+    const uniqueDates = new Set<string>();
+    activityDates.forEach(log => {
+        uniqueDates.add(log.answeredAt.toISOString().split('T')[0]);
+    });
+
+    let currentStreak = 0;
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+    // If no activity today or yesterday, streak is broken (0), unless we want to be lenient.
+    // Usually, if you haven't done it today yet, but did it yesterday, streak is kept.
+    // If you missed yesterday, streak is 0.
+
+    if (uniqueDates.has(todayStr)) {
+        currentStreak = 1;
+        let checkDate = new Date(today);
+        while (true) {
+            checkDate.setDate(checkDate.getDate() - 1);
+            const dateStr = checkDate.toISOString().split('T')[0];
+            if (uniqueDates.has(dateStr)) {
+                currentStreak++;
+            } else {
+                break;
+            }
+        }
+    } else if (uniqueDates.has(yesterdayStr)) {
+        currentStreak = 1;
+        let checkDate = new Date(yesterday);
+        while (true) {
+            checkDate.setDate(checkDate.getDate() - 1);
+            const dateStr = checkDate.toISOString().split('T')[0];
+            if (uniqueDates.has(dateStr)) {
+                currentStreak++;
+            } else {
+                break;
+            }
+        }
+    }
 
     return {
         totalProblemsSolved: historyCount,

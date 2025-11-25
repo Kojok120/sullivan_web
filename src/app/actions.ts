@@ -212,19 +212,11 @@ export async function submitAnswerWithAI(
     let evaluation: "A" | "B" | "C" | "D" = "C"; // Default
     let feedback = "";
 
-    if (problem.aiGradingEnabled && isAiEnabledSystem) {
+    if (isAiEnabledSystem) {
         // AI Grading
         const result = await gradeAnswer(problem.question, problem.answer, userAnswer);
         evaluation = result.evaluation;
         feedback = result.feedback;
-    } else {
-        // Fallback or manual only (shouldn't happen if UI logic is correct, but safe to handle)
-        // If not AI graded, we might just save the answer and let user self-evaluate?
-        // But this function implies "submit answer" which usually means getting a grade.
-        // For now, let's assume if AI is off, we return a neutral state or error?
-        // Or maybe this function is ONLY for AI grading.
-        // Let's return a special status if AI is disabled, so client knows to ask for self-eval.
-        return { aiGraded: false };
     }
 
     // 2. Record History
@@ -269,6 +261,10 @@ export async function submitAnswerWithAI(
             lastAnsweredAt: new Date(),
         },
     });
+
+    if (!isAiEnabledSystem) {
+        return { aiGraded: false };
+    }
 
     return { aiGraded: true, evaluation, feedback };
 }

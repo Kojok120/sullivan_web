@@ -34,7 +34,6 @@ export function ProblemList({ coreProblemId }: ProblemListProps) {
     const [answer, setAnswer] = useState('');
     const [videoUrl, setVideoUrl] = useState('');
     const [difficulty, setDifficulty] = useState(1);
-    const [aiGrading, setAiGrading] = useState(false);
 
     const fetchProblems = async () => {
         setLoading(true);
@@ -55,7 +54,6 @@ export function ProblemList({ coreProblemId }: ProblemListProps) {
         setAnswer('');
         setVideoUrl('');
         setDifficulty(1);
-        setAiGrading(false);
         setIsDialogOpen(true);
     };
 
@@ -65,7 +63,6 @@ export function ProblemList({ coreProblemId }: ProblemListProps) {
         setAnswer(problem.answer);
         setVideoUrl(problem.videoUrl || '');
         setDifficulty(problem.difficulty || 1);
-        setAiGrading(problem.aiGradingEnabled || false);
         setIsDialogOpen(true);
     };
 
@@ -82,7 +79,6 @@ export function ProblemList({ coreProblemId }: ProblemListProps) {
                 answer,
                 videoUrl,
                 difficulty,
-                aiGradingEnabled: aiGrading,
             });
             if (result.success) {
                 toast.success('問題を更新しました');
@@ -100,7 +96,6 @@ export function ProblemList({ coreProblemId }: ProblemListProps) {
                 answer,
                 videoUrl,
                 difficulty,
-                aiGradingEnabled: aiGrading,
                 order: maxOrder + 1,
             });
             if (result.success) {
@@ -143,17 +138,6 @@ export function ProblemList({ coreProblemId }: ProblemListProps) {
                                 {problem.videoUrl && (
                                     <div className="flex items-center text-xs text-blue-600">
                                         <Video className="h-3 w-3 mr-1" /> 動画あり
-                                    </div>
-                                )}
-                                {problem.aiGradingEnabled && (
-                                    <div className="flex items-center text-xs text-green-600">
-                                        <Checkbox
-                                            id={`aiGrading-${problem.id}`}
-                                            checked={problem.aiGradingEnabled}
-                                            disabled // Display only, not editable from list
-                                            className="h-3 w-3 mr-1"
-                                        />
-                                        <Label htmlFor={`aiGrading-${problem.id}`} className="text-xs font-normal">AI採点有効</Label>
                                     </div>
                                 )}
                             </div>
@@ -213,14 +197,6 @@ export function ProblemList({ coreProblemId }: ProblemListProps) {
                                     value={difficulty}
                                     onChange={(e) => setDifficulty(parseInt(e.target.value))}
                                 />
-                            </div>
-                            <div className="flex items-center gap-2 pt-8">
-                                <Switch
-                                    id="aiGrading"
-                                    checked={aiGrading}
-                                    onCheckedChange={setAiGrading}
-                                />
-                                <Label htmlFor="aiGrading">AI採点を有効にする</Label>
                             </div>
                         </div>
                     </div>

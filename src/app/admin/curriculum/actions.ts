@@ -9,7 +9,7 @@ export async function getSubjects() {
     try {
         const { fetchSubjects } = await import('@/lib/curriculum-service');
         const subjects = await fetchSubjects({ includeUnits: true, includeCoreProblems: true });
-        return { success: true, subjects };
+        return { success: true, subjects: subjects as any };
     } catch (error) {
         console.error('Failed to fetch subjects:', error);
         return { error: '科目の取得に失敗しました' };
@@ -128,7 +128,6 @@ export async function createProblem(data: {
     acceptedAnswers?: string[];
     difficulty?: number;
     tags?: string[];
-    aiGradingEnabled?: boolean;
 }) {
     try {
         const problem = await prisma.problem.create({
@@ -142,7 +141,6 @@ export async function createProblem(data: {
                 acceptedAnswers: data.acceptedAnswers || [],
                 difficulty: data.difficulty,
                 tags: data.tags || [],
-                aiGradingEnabled: data.aiGradingEnabled || false,
             },
         });
         revalidatePath('/admin/curriculum');
@@ -162,7 +160,6 @@ export async function updateProblem(id: string, data: {
     acceptedAnswers?: string[];
     difficulty?: number;
     tags?: string[];
-    aiGradingEnabled?: boolean;
 }) {
     try {
         const problem = await prisma.problem.update({

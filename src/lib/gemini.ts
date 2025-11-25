@@ -49,7 +49,7 @@ Feedback: [Message]
         const text = response.text();
 
         const evaluationMatch = text.match(/Evaluation:\s*([ABCD])/i);
-        const feedbackMatch = text.match(/Feedback:\s*(.*)/s);
+        const feedbackMatch = text.match(/Feedback:\s*([\s\S]*)/i);
 
         const evaluation = (evaluationMatch ? evaluationMatch[1].toUpperCase() : "C") as "A" | "B" | "C" | "D";
         const feedback = feedbackMatch ? feedbackMatch[1].trim() : "フィードバックを取得できませんでした。";
