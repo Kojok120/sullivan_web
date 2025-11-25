@@ -84,6 +84,7 @@ const updateUserSchema = z.object({
 });
 
 export async function createUser(data: { name: string; role: Role; password?: string; groupId?: string }) {
+    await requireAdmin();
     const result = createUserSchema.safeParse(data);
 
     if (!result.success) {
