@@ -5,19 +5,26 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { User, Calendar, MapPin, School, Phone, Mail } from 'lucide-react';
 import { updateStudentProfile } from './actions';
 import { toast } from 'sonner';
+
+interface Classroom {
+    id: string;
+    name: string;
+}
 
 interface ProfileCardProps {
     userId: string;
     initialBio: string | null;
     initialNotes: string | null;
     initialBirthday: Date | null;
-    initialClassroom: string | null;
+    initialClassroomId: string | null;
     initialSchool: string | null;
     initialPhoneNumber: string | null;
     initialEmail: string | null;
+    classrooms: Classroom[];
 }
 
 export function ProfileCard({
@@ -25,10 +32,11 @@ export function ProfileCard({
     initialBio,
     initialNotes,
     initialBirthday,
-    initialClassroom,
+    initialClassroomId,
     initialSchool,
     initialPhoneNumber,
-    initialEmail
+    initialEmail,
+    classrooms
 }: ProfileCardProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -45,6 +53,8 @@ export function ProfileCard({
             setIsEditing(false);
         }
     }
+
+    const currentClassroomName = classrooms.find(c => c.id === initialClassroomId)?.name || '未設定';
 
     if (isEditing) {
         return (
@@ -68,11 +78,19 @@ export function ProfileCard({
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">教室</label>
-                                <Input
-                                    name="classroom"
-                                    defaultValue={initialClassroom || ''}
-                                    placeholder="例: 渋谷校"
-                                />
+                                <Select name="classroomId" defaultValue={initialClassroomId || ''}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="教室を選択" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="unselected">未設定</SelectItem>
+                                        {classrooms.map((c) => (
+                                            <SelectItem key={c.id} value={c.id}>
+                                                {c.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">学校</label>
@@ -157,7 +175,7 @@ export function ProfileCard({
                     <div className="flex items-center gap-2">
                         <MapPin className="h-4 w-4 text-muted-foreground" />
                         <span className="text-muted-foreground">教室:</span>
-                        <span>{initialClassroom || '未設定'}</span>
+                        <span>{currentClassroomName}</span>
                     </div>
                     <div className="flex items-center gap-2">
                         <School className="h-4 w-4 text-muted-foreground" />

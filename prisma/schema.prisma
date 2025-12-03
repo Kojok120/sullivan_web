@@ -99,12 +99,22 @@ model User {
   bio               String?   // 生徒プロフィール（部活、志望校など）
   notes             String?   // 講師用メモ（性格、特記事項など）
   birthday          DateTime? // 生年月日
-  classroom         String?   // 教室
+  classroom         String?   // 教室 (Legacy field, to be migrated)
+  classroomId       String?
+  classroomRef      Classroom? @relation(fields: [classroomId], references: [id])
   school            String?   // 学校
   phoneNumber       String?   // 電話番号
   email             String?   // メールアドレス
   guidanceRecords   GuidanceRecord[] @relation("StudentGuidance")
   createdGuidance   GuidanceRecord[] @relation("TeacherGuidance")
+}
+
+model Classroom {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  users     User[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 enum GuidanceType {
