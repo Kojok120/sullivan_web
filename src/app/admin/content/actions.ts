@@ -12,20 +12,7 @@ async function requireAdmin() {
     }
 }
 
-export async function updateCoreProblemVideo(id: string, sharedVideoUrl: string | null) {
-    await requireAdmin();
-    try {
-        await prisma.coreProblem.update({
-            where: { id },
-            data: { sharedVideoUrl },
-        });
-        revalidatePath('/admin/content');
-        return { success: true };
-    } catch (error) {
-        console.error('Failed to update video:', error);
-        return { success: false, error: '動画URLの更新に失敗しました' };
-    }
-}
+
 
 export async function updateProblemType(id: string, type: ProblemType) {
     await requireAdmin();

@@ -72,7 +72,7 @@ export async function deleteUnit(id: string) {
 }
 
 // --- CoreProblems ---
-export async function createCoreProblem(data: { name: string; unitId: string; order: number; description?: string; sharedVideoUrl?: string }) {
+export async function createCoreProblem(data: { name: string; unitId: string; order: number }) {
     await requireAdmin();
     try {
         const coreProblem = await prisma.coreProblem.create({
@@ -80,8 +80,6 @@ export async function createCoreProblem(data: { name: string; unitId: string; or
                 name: data.name,
                 unitId: data.unitId,
                 order: data.order,
-                description: data.description,
-                sharedVideoUrl: data.sharedVideoUrl,
             },
         });
         revalidatePath('/admin/curriculum');
@@ -92,7 +90,7 @@ export async function createCoreProblem(data: { name: string; unitId: string; or
     }
 }
 
-export async function updateCoreProblem(id: string, data: { name?: string; order?: number; description?: string; sharedVideoUrl?: string }) {
+export async function updateCoreProblem(id: string, data: { name?: string; order?: number }) {
     await requireAdmin();
     try {
         const coreProblem = await prisma.coreProblem.update({
@@ -201,5 +199,47 @@ export async function deleteProblem(id: string) {
     } catch (error) {
         console.error('Failed to delete problem:', error);
         return { error: '問題の削除に失敗しました' };
+    }
+}
+
+export async function bulkCreateProblems(coreProblemId: string, problems: {
+    question: string;
+    answer: string;
+    videoUrl?: string;
+    difficulty?: number;
+}[]) {
+    await requireAdmin();
+    try {
+        // Get current max order
+        const currentProblems = await prisma.problem.findMany({
+            where: { coreProblemId },
+            select: { order: true },
+            orderBy: { order: 'desc' },
+            take: 1,
+        });
+        let startOrder = (currentProblems[0]?.order || 0) + 1;
+
+        // Create problems in transaction
+        await prisma.$transaction(
+            problems.map((p, index) =>
+                prisma.problem.create({
+                    data: {
+                        coreProblemId,
+                        question: p.question,
+                        answer: p.answer,
+                        videoUrl: p.videoUrl,
+                        difficulty: p.difficulty || 1,
+                        order: startOrder + index,
+                        type: 'NORMAL',
+                    },
+                })
+            )
+        );
+
+        revalidatePath('/admin/curriculum');
+        return { success: true };
+    } catch (error) {
+        console.error('Failed to bulk create problems:', error);
+        return { error: '一括登録に失敗しました' };
     }
 }

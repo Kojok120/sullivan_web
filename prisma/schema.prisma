@@ -31,12 +31,10 @@ model Unit {
 model CoreProblem {
   id             String    @id @default(cuid())
   name           String
-  description    String?
   unitId         String
   unit           Unit      @relation(fields: [unitId], references: [id])
   problems       Problem[]
   order          Int
-  sharedVideoUrl String? // 共通解説動画
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 }

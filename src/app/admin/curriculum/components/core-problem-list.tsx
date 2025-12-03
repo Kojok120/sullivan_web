@@ -23,8 +23,6 @@ interface CoreProblemListProps {
 export function CoreProblemList({ unitId, coreProblems }: CoreProblemListProps) {
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [newName, setNewName] = useState('');
-    const [description, setDescription] = useState('');
-    const [sharedVideoUrl, setSharedVideoUrl] = useState('');
     const router = useRouter();
 
     const handleCreate = async () => {
@@ -35,16 +33,12 @@ export function CoreProblemList({ unitId, coreProblems }: CoreProblemListProps) 
             name: newName,
             unitId,
             order: maxOrder + 1,
-            description,
-            sharedVideoUrl,
         });
 
         if (result.success) {
             toast.success('CoreProblemを作成しました');
             setIsCreateOpen(false);
             setNewName('');
-            setDescription('');
-            setSharedVideoUrl('');
             router.refresh();
         } else {
             toast.error('エラー', { description: result.error });
@@ -71,25 +65,6 @@ export function CoreProblemList({ unitId, coreProblems }: CoreProblemListProps) 
                                     value={newName}
                                     onChange={(e) => setNewName(e.target.value)}
                                     className="col-span-3"
-                                />
-                            </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="cp-desc" className="text-right">説明</Label>
-                                <Textarea
-                                    id="cp-desc"
-                                    value={description}
-                                    onChange={(e) => setDescription(e.target.value)}
-                                    className="col-span-3"
-                                />
-                            </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="cp-video" className="text-right">共有動画URL</Label>
-                                <Input
-                                    id="cp-video"
-                                    value={sharedVideoUrl}
-                                    onChange={(e) => setSharedVideoUrl(e.target.value)}
-                                    className="col-span-3"
-                                    placeholder="https://youtube.com/..."
                                 />
                             </div>
                         </div>

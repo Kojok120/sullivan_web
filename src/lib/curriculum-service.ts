@@ -12,6 +12,15 @@ export async function fetchSubjects(options?: { includeUnits?: boolean; includeC
                 include: includeCoreProblems ? {
                     coreProblems: {
                         orderBy: { order: 'asc' },
+                        select: {
+                            id: true,
+                            name: true,
+                            unitId: true,
+                            order: true,
+                            createdAt: true,
+                            updatedAt: true,
+                            // Explicitly excluding description and sharedVideoUrl by not selecting them
+                        }
                     }
                 } : undefined
             }

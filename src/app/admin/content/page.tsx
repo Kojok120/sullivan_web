@@ -2,28 +2,11 @@ import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { VideoManager } from './video-manager';
 import { PrereqManager } from './prereq-manager';
 
 export default async function ContentManagementPage() {
     const session = await getSession();
     if (!session || session.role !== 'ADMIN') redirect('/login');
-
-    // Fetch CoreProblems for Video Manager
-    const coreProblems = await prisma.coreProblem.findMany({
-        include: {
-            unit: {
-                include: {
-                    subject: true,
-                },
-            },
-        },
-        orderBy: [
-            { unit: { subject: { order: 'asc' } } },
-            { unit: { order: 'asc' } },
-            { order: 'asc' },
-        ],
-    });
 
     // Fetch Problems for Prereq Manager
     const problems = await prisma.problem.findMany({
@@ -50,15 +33,10 @@ export default async function ContentManagementPage() {
         <div className="container mx-auto py-8 px-4">
             <h1 className="text-3xl font-bold mb-8">コンテンツ管理</h1>
 
-            <Tabs defaultValue="videos" className="space-y-6">
+            <Tabs defaultValue="prereqs" className="space-y-6">
                 <TabsList>
-                    <TabsTrigger value="videos">解説動画管理</TabsTrigger>
                     <TabsTrigger value="prereqs">Prereq管理</TabsTrigger>
                 </TabsList>
-
-                <TabsContent value="videos">
-                    <VideoManager coreProblems={coreProblems} />
-                </TabsContent>
 
                 <TabsContent value="prereqs">
                     <PrereqManager problems={problems} />

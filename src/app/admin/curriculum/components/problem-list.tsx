@@ -4,9 +4,10 @@ import { Problem } from '@prisma/client';
 import { useState, useEffect } from 'react';
 import { getProblemsByCoreProblem, createProblem, updateProblem, deleteProblem } from '../actions';
 import { Button } from '@/components/ui/button';
-import { Plus, Pencil, Trash2, Video } from 'lucide-react';
+import { Plus, Pencil, Trash2, Video, FileSpreadsheet } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { BulkProblemAddDialog } from './bulk-problem-add-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -27,6 +28,7 @@ export function ProblemList({ coreProblemId }: ProblemListProps) {
 
     // Create/Edit State
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [isBulkOpen, setIsBulkOpen] = useState(false);
     const [editingProblem, setEditingProblem] = useState<Problem | null>(null);
 
     // Form State
@@ -125,7 +127,14 @@ export function ProblemList({ coreProblemId }: ProblemListProps) {
         <div className="space-y-4 pl-4 border-l-2 border-muted">
             <div className="flex justify-between items-center">
                 <h5 className="text-xs font-semibold text-muted-foreground uppercase">Problems</h5>
-                <Button size="sm" variant="outline" onClick={openCreate}><Plus className="mr-2 h-3 w-3" /> 問題追加</Button>
+                <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => setIsBulkOpen(true)}>
+                        <FileSpreadsheet className="mr-2 h-3 w-3" /> 一括追加
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={openCreate}>
+                        <Plus className="mr-2 h-3 w-3" /> 問題追加
+                    </Button>
+                </div>
             </div>
 
             <div className="grid gap-4">
@@ -205,6 +214,13 @@ export function ProblemList({ coreProblemId }: ProblemListProps) {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <BulkProblemAddDialog
+                isOpen={isBulkOpen}
+                onClose={() => setIsBulkOpen(false)}
+                coreProblemId={coreProblemId}
+                onSuccess={fetchProblems}
+            />
         </div>
     );
 }

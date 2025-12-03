@@ -22,8 +22,6 @@ interface CoreProblemItemProps {
 export function CoreProblemItem({ coreProblem }: CoreProblemItemProps) {
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [editName, setEditName] = useState(coreProblem.name);
-    const [editDesc, setEditDesc] = useState(coreProblem.description || '');
-    const [editVideo, setEditVideo] = useState(coreProblem.sharedVideoUrl || '');
     const router = useRouter();
 
     const handleDelete = async (e: React.MouseEvent) => {
@@ -42,8 +40,6 @@ export function CoreProblemItem({ coreProblem }: CoreProblemItemProps) {
     const handleUpdate = async () => {
         const result = await updateCoreProblem(coreProblem.id, {
             name: editName,
-            description: editDesc,
-            sharedVideoUrl: editVideo,
         });
         if (result.success) {
             toast.success('CoreProblemを更新しました');
@@ -60,7 +56,6 @@ export function CoreProblemItem({ coreProblem }: CoreProblemItemProps) {
                 <AccordionTrigger className="hover:no-underline py-2">
                     <div className="flex items-center gap-4 w-full pr-4">
                         <span className="font-medium text-sm">{coreProblem.name}</span>
-                        {coreProblem.sharedVideoUrl && <Video className="h-4 w-4 text-blue-500" />}
                         <div className="ml-auto flex gap-2">
                             <Button
                                 size="icon"
@@ -82,9 +77,6 @@ export function CoreProblemItem({ coreProblem }: CoreProblemItemProps) {
                     </div>
                 </AccordionTrigger>
                 <AccordionContent className="pt-4">
-                    <div className="mb-4 text-sm text-muted-foreground">
-                        {coreProblem.description}
-                    </div>
                     <ProblemList coreProblemId={coreProblem.id} />
                 </AccordionContent>
             </AccordionItem>
@@ -101,24 +93,6 @@ export function CoreProblemItem({ coreProblem }: CoreProblemItemProps) {
                                 id="edit-cp-name"
                                 value={editName}
                                 onChange={(e) => setEditName(e.target.value)}
-                                className="col-span-3"
-                            />
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="edit-cp-desc" className="text-right">説明</Label>
-                            <Textarea
-                                id="edit-cp-desc"
-                                value={editDesc}
-                                onChange={(e) => setEditDesc(e.target.value)}
-                                className="col-span-3"
-                            />
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="edit-cp-video" className="text-right">共有動画URL</Label>
-                            <Input
-                                id="edit-cp-video"
-                                value={editVideo}
-                                onChange={(e) => setEditVideo(e.target.value)}
                                 className="col-span-3"
                             />
                         </div>
