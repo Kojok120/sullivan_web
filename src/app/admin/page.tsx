@@ -2,7 +2,7 @@ import { getSession, logout } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Users, BookOpen, Video, Settings } from "lucide-react";
+import { Users, BookOpen, Video, Settings, School } from "lucide-react";
 
 export default async function AdminDashboard() {
     const session = await getSession();
@@ -15,6 +15,20 @@ export default async function AdminDashboard() {
             icon: Users,
             href: '/admin/users',
             color: 'text-blue-600',
+        },
+        {
+            title: '教室管理',
+            description: '教室の追加・削除',
+            icon: School,
+            href: '/admin/classrooms',
+            color: 'text-indigo-600',
+        },
+        {
+            title: 'グループ管理',
+            description: 'グループの追加・削除',
+            icon: Users,
+            href: '/admin/groups',
+            color: 'text-cyan-600',
         },
         {
             title: 'カリキュラム管理',

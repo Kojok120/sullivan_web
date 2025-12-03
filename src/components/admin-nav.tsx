@@ -10,7 +10,8 @@ import {
     BookOpen,
     Video,
     Settings,
-    LogOut
+    LogOut,
+    School
 } from "lucide-react";
 import { logoutAction } from "@/app/actions";
 
@@ -23,6 +24,16 @@ const navItems = [
     {
         title: "ユーザー管理",
         href: "/admin/users",
+        icon: Users,
+    },
+    {
+        title: "教室管理",
+        href: "/admin/classrooms",
+        icon: School,
+    },
+    {
+        title: "グループ管理",
+        href: "/admin/groups",
         icon: Users,
     },
     {

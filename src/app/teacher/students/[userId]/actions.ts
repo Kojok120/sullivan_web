@@ -15,6 +15,7 @@ export async function updateStudentProfile(userId: string, formData: FormData) {
     const notes = formData.get('notes') as string;
     const birthdayStr = formData.get('birthday') as string;
     const classroomId = formData.get('classroomId') as string;
+    const groupId = formData.get('groupId') as string;
     const school = formData.get('school') as string;
     const phoneNumber = formData.get('phoneNumber') as string;
     const email = formData.get('email') as string;
@@ -35,6 +36,7 @@ export async function updateStudentProfile(userId: string, formData: FormData) {
                 birthday: birthdayStr ? new Date(birthdayStr) : null,
                 classroomId: classroomId || null,
                 classroom: classroomName, // Sync legacy field
+                groupId: groupId || null,
                 school,
                 phoneNumber,
                 email,

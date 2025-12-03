@@ -6,11 +6,16 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { User, Calendar, MapPin, School, Phone, Mail } from 'lucide-react';
+import { User, Calendar, MapPin, School, Phone, Mail, Users } from 'lucide-react';
 import { updateStudentProfile } from './actions';
 import { toast } from 'sonner';
 
 interface Classroom {
+    id: string;
+    name: string;
+}
+
+interface Group {
     id: string;
     name: string;
 }
@@ -21,10 +26,12 @@ interface ProfileCardProps {
     initialNotes: string | null;
     initialBirthday: Date | null;
     initialClassroomId: string | null;
+    initialGroupId: string | null;
     initialSchool: string | null;
     initialPhoneNumber: string | null;
     initialEmail: string | null;
     classrooms: Classroom[];
+    groups: Group[];
 }
 
 export function ProfileCard({
@@ -33,10 +40,12 @@ export function ProfileCard({
     initialNotes,
     initialBirthday,
     initialClassroomId,
+    initialGroupId,
     initialSchool,
     initialPhoneNumber,
     initialEmail,
-    classrooms
+    classrooms,
+    groups
 }: ProfileCardProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -55,6 +64,7 @@ export function ProfileCard({
     }
 
     const currentClassroomName = classrooms.find(c => c.id === initialClassroomId)?.name || '未設定';
+    const currentGroupName = groups.find(g => g.id === initialGroupId)?.name || '未設定';
 
     if (isEditing) {
         return (
@@ -87,6 +97,22 @@ export function ProfileCard({
                                         {classrooms.map((c) => (
                                             <SelectItem key={c.id} value={c.id}>
                                                 {c.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">グループ</label>
+                                <Select name="groupId" defaultValue={initialGroupId || ''}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="グループを選択" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="unselected">未設定</SelectItem>
+                                        {groups.map((g) => (
+                                            <SelectItem key={g.id} value={g.id}>
+                                                {g.name}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
@@ -176,6 +202,11 @@ export function ProfileCard({
                         <MapPin className="h-4 w-4 text-muted-foreground" />
                         <span className="text-muted-foreground">教室:</span>
                         <span>{currentClassroomName}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">グループ:</span>
+                        <span>{currentGroupName}</span>
                     </div>
                     <div className="flex items-center gap-2">
                         <School className="h-4 w-4 text-muted-foreground" />

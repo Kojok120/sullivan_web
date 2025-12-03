@@ -23,7 +23,7 @@ export default async function TeacherStudentDetailPage({
 
     const { userId } = await params;
 
-    const [student, stats, unitProgress, dailyActivity, weaknesses, recentHistory, classrooms] = await Promise.all([
+    const [student, stats, unitProgress, dailyActivity, weaknesses, recentHistory, classrooms, groups] = await Promise.all([
         prisma.user.findUnique({
             where: { id: userId },
             include: {
@@ -53,6 +53,9 @@ export default async function TeacherStudentDetailPage({
             }
         }),
         prisma.classroom.findMany({
+            orderBy: { createdAt: 'asc' }
+        }),
+        prisma.group.findMany({
             orderBy: { createdAt: 'asc' }
         })
     ]);
@@ -272,10 +275,12 @@ export default async function TeacherStudentDetailPage({
                             initialNotes={student.notes}
                             initialBirthday={student.birthday}
                             initialClassroomId={student.classroomId}
+                            initialGroupId={student.groupId}
                             initialSchool={student.school}
                             initialPhoneNumber={student.phoneNumber}
                             initialEmail={student.email}
                             classrooms={classrooms}
+                            groups={groups}
                         />
                         <GuidanceList
                             userId={student.id}
