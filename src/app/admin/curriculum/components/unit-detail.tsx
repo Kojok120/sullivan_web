@@ -14,9 +14,10 @@ import { Label } from '@/components/ui/label';
 
 interface UnitDetailProps {
     unit: Unit & { coreProblems: CoreProblem[] };
+    subjectName: string;
 }
 
-export function UnitDetail({ unit }: UnitDetailProps) {
+export function UnitDetail({ unit, subjectName }: UnitDetailProps) {
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [editName, setEditName] = useState(unit.name);
     const router = useRouter();
@@ -68,7 +69,7 @@ export function UnitDetail({ unit }: UnitDetailProps) {
                 </div>
             </div>
 
-            <CoreProblemList unitId={unit.id} coreProblems={unit.coreProblems} />
+            <CoreProblemList unitId={unit.id} coreProblems={unit.coreProblems} subjectName={subjectName} />
 
             <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
                 <DialogContent>

@@ -23,11 +23,10 @@ export default async function TeacherStudentDetailPage({
 
     const { userId } = await params;
 
-    const [student, stats, unitProgress, dailyActivity, weaknesses, recentHistory, classrooms, groups] = await Promise.all([
+    const [student, stats, unitProgress, dailyActivity, weaknesses, recentHistory, classrooms] = await Promise.all([
         prisma.user.findUnique({
             where: { id: userId },
             include: {
-                group: true,
                 guidanceRecords: {
                     include: { teacher: { select: { name: true } } },
                     orderBy: { date: 'desc' }
@@ -46,16 +45,17 @@ export default async function TeacherStudentDetailPage({
                 problem: {
                     include: {
                         coreProblem: {
-                            include: { unit: true }
+                            select: {
+                                id: true,
+                                name: true,
+                                unit: true
+                            }
                         }
                     }
                 }
             }
         }),
         prisma.classroom.findMany({
-            orderBy: { createdAt: 'asc' }
-        }),
-        prisma.group.findMany({
             orderBy: { createdAt: 'asc' }
         })
     ]);
@@ -82,7 +82,7 @@ export default async function TeacherStudentDetailPage({
                 <div>
                     <h1 className="text-3xl font-bold flex items-center gap-3">
                         {student.name || student.loginId}
-                        {student.group && <Badge variant="outline">{student.group.name}</Badge>}
+                        {student.group && <Badge variant="outline">{student.group}</Badge>}
                     </h1>
                     <p className="text-muted-foreground">生徒詳細データ</p>
                 </div>
@@ -275,12 +275,11 @@ export default async function TeacherStudentDetailPage({
                             initialNotes={student.notes}
                             initialBirthday={student.birthday}
                             initialClassroomId={student.classroomId}
-                            initialGroupId={student.groupId}
+                            initialGroupId={student.group}
                             initialSchool={student.school}
                             initialPhoneNumber={student.phoneNumber}
                             initialEmail={student.email}
                             classrooms={classrooms}
-                            groups={groups}
                         />
                         <GuidanceList
                             userId={student.id}

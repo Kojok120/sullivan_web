@@ -50,6 +50,7 @@ model Problem {
   answer           String
   acceptedAnswers  String[]           @default([]) // 許容解答（複数）
   difficulty       Int?               // 難易度
+  grade            String?            // 学年 (e.g., "中1", "高2")
   tags             String[]           @default([]) // タグ
   type             ProblemType        @default(NORMAL)
   coreProblemId    String
@@ -57,6 +58,7 @@ model Problem {
   order            Int // Chain order
   videoUrl         String? // For C/D feedback
   aiGradingEnabled Boolean            @default(false)
+  attributes       Json?              // Subject-specific attributes (e.g., English grammar)
   histories        LearningHistory[]
   userStates       UserProblemState[]
   createdAt        DateTime           @default(now())
@@ -70,23 +72,13 @@ enum Role {
   ADMIN
 }
 
-model Group {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  users       User[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
-
 model User {
   id        String   @id @default(cuid())
   loginId   String   @unique // Auto-generated ID (e.g., S0001)
   password  String   // Hashed password
   role      Role     @default(STUDENT)
   name      String?
-  groupId   String?
-  group     Group?   @relation(fields: [groupId], references: [id])
+  group     String?  // 所属グループ名 (e.g., "月曜")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -110,6 +102,7 @@ model User {
 model Classroom {
   id        String   @id @default(cuid())
   name      String   @unique
+  groups    String[] @default([]) // 教室内のグループ（曜日など）
   users     User[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

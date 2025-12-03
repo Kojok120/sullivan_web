@@ -17,9 +17,10 @@ import { useRouter } from 'next/navigation';
 
 interface CoreProblemItemProps {
     coreProblem: CoreProblem;
+    subjectName: string;
 }
 
-export function CoreProblemItem({ coreProblem }: CoreProblemItemProps) {
+export function CoreProblemItem({ coreProblem, subjectName }: CoreProblemItemProps) {
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [editName, setEditName] = useState(coreProblem.name);
     const router = useRouter();
@@ -58,26 +59,32 @@ export function CoreProblemItem({ coreProblem }: CoreProblemItemProps) {
                         <span className="font-medium text-sm">{coreProblem.name}</span>
                         <div className="ml-auto flex gap-2">
                             <Button
+                                asChild
                                 size="icon"
                                 variant="ghost"
-                                className="h-8 w-8"
+                                className="h-8 w-8 cursor-pointer"
                                 onClick={(e) => { e.stopPropagation(); setIsEditOpen(true); }}
                             >
-                                <Pencil className="h-4 w-4" />
+                                <div role="button" tabIndex={0}>
+                                    <Pencil className="h-4 w-4" />
+                                </div>
                             </Button>
                             <Button
+                                asChild
                                 size="icon"
                                 variant="ghost"
-                                className="h-8 w-8 text-red-500 hover:text-red-600"
+                                className="h-8 w-8 text-red-500 hover:text-red-600 cursor-pointer"
                                 onClick={handleDelete}
                             >
-                                <Trash2 className="h-4 w-4" />
+                                <div role="button" tabIndex={0}>
+                                    <Trash2 className="h-4 w-4" />
+                                </div>
                             </Button>
                         </div>
                     </div>
                 </AccordionTrigger>
                 <AccordionContent className="pt-4">
-                    <ProblemList coreProblemId={coreProblem.id} />
+                    <ProblemList coreProblemId={coreProblem.id} subjectName={subjectName} />
                 </AccordionContent>
             </AccordionItem>
 

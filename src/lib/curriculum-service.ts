@@ -9,8 +9,9 @@ export async function fetchSubjects(options?: { includeUnits?: boolean; includeC
         include: includeUnits ? {
             units: {
                 orderBy: { order: 'asc' },
-                include: includeCoreProblems ? {
-                    coreProblems: {
+                include: {
+                    subject: true,
+                    coreProblems: includeCoreProblems ? {
                         orderBy: { order: 'asc' },
                         select: {
                             id: true,
@@ -21,8 +22,8 @@ export async function fetchSubjects(options?: { includeUnits?: boolean; includeC
                             updatedAt: true,
                             // Explicitly excluding description and sharedVideoUrl by not selecting them
                         }
-                    }
-                } : undefined
+                    } : undefined
+                }
             }
         } : undefined
     });

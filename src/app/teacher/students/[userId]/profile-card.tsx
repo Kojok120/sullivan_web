@@ -13,11 +13,7 @@ import { toast } from 'sonner';
 interface Classroom {
     id: string;
     name: string;
-}
-
-interface Group {
-    id: string;
-    name: string;
+    groups: string[];
 }
 
 interface ProfileCardProps {
@@ -31,7 +27,6 @@ interface ProfileCardProps {
     initialPhoneNumber: string | null;
     initialEmail: string | null;
     classrooms: Classroom[];
-    groups: Group[];
 }
 
 export function ProfileCard({
@@ -45,10 +40,11 @@ export function ProfileCard({
     initialPhoneNumber,
     initialEmail,
     classrooms,
-    groups
 }: ProfileCardProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+
+    const [selectedClassroomId, setSelectedClassroomId] = useState<string>(initialClassroomId || 'unselected');
 
     async function handleSubmit(formData: FormData) {
         setIsSaving(true);
@@ -63,8 +59,13 @@ export function ProfileCard({
         }
     }
 
-    const currentClassroomName = classrooms.find(c => c.id === initialClassroomId)?.name || '未設定';
-    const currentGroupName = groups.find(g => g.id === initialGroupId)?.name || '未設定';
+    const currentClassroom = classrooms.find(c => c.id === initialClassroomId);
+    const currentClassroomName = currentClassroom?.name || '未設定';
+    const currentGroupName = initialGroupId || '未設定';
+
+    // Get groups for the currently selected classroom in the form
+    const selectedClassroom = classrooms.find(c => c.id === selectedClassroomId);
+    const availableGroups = selectedClassroom?.groups || [];
 
     if (isEditing) {
         return (
@@ -88,7 +89,11 @@ export function ProfileCard({
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">教室</label>
-                                <Select name="classroomId" defaultValue={initialClassroomId || ''}>
+                                <Select
+                                    name="classroomId"
+                                    defaultValue={initialClassroomId || ''}
+                                    onValueChange={(value) => setSelectedClassroomId(value)}
+                                >
                                     <SelectTrigger>
                                         <SelectValue placeholder="教室を選択" />
                                     </SelectTrigger>
@@ -104,15 +109,15 @@ export function ProfileCard({
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">グループ</label>
-                                <Select name="groupId" defaultValue={initialGroupId || ''}>
+                                <Select name="groupId" defaultValue={initialGroupId || ''} disabled={availableGroups.length === 0}>
                                     <SelectTrigger>
                                         <SelectValue placeholder="グループを選択" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="unselected">未設定</SelectItem>
-                                        {groups.map((g) => (
-                                            <SelectItem key={g.id} value={g.id}>
-                                                {g.name}
+                                        {availableGroups.map((g) => (
+                                            <SelectItem key={g} value={g}>
+                                                {g}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>

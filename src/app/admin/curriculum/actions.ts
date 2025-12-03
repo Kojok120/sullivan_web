@@ -141,7 +141,9 @@ export async function createProblem(data: {
     videoUrl?: string;
     acceptedAnswers?: string[];
     difficulty?: number;
+    grade?: string;
     tags?: string[];
+    attributes?: any;
 }) {
     await requireAdmin();
     try {
@@ -155,7 +157,9 @@ export async function createProblem(data: {
                 videoUrl: data.videoUrl,
                 acceptedAnswers: data.acceptedAnswers || [],
                 difficulty: data.difficulty,
+                grade: data.grade,
                 tags: data.tags || [],
+                attributes: data.attributes || undefined,
             },
         });
         revalidatePath('/admin/curriculum');
@@ -174,7 +178,9 @@ export async function updateProblem(id: string, data: {
     videoUrl?: string;
     acceptedAnswers?: string[];
     difficulty?: number;
+    grade?: string;
     tags?: string[];
+    attributes?: any;
 }) {
     await requireAdmin();
     try {
@@ -207,6 +213,8 @@ export async function bulkCreateProblems(coreProblemId: string, problems: {
     answer: string;
     videoUrl?: string;
     difficulty?: number;
+    grade?: string;
+    attributes?: any;
 }[]) {
     await requireAdmin();
     try {
@@ -229,8 +237,10 @@ export async function bulkCreateProblems(coreProblemId: string, problems: {
                         answer: p.answer,
                         videoUrl: p.videoUrl,
                         difficulty: p.difficulty || 1,
+                        grade: p.grade,
                         order: startOrder + index,
                         type: 'NORMAL',
+                        attributes: p.attributes || undefined,
                     },
                 })
             )

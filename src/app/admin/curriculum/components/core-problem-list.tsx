@@ -18,9 +18,10 @@ import { useRouter } from 'next/navigation';
 interface CoreProblemListProps {
     unitId: string;
     coreProblems: CoreProblem[];
+    subjectName: string;
 }
 
-export function CoreProblemList({ unitId, coreProblems }: CoreProblemListProps) {
+export function CoreProblemList({ unitId, coreProblems, subjectName }: CoreProblemListProps) {
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [newName, setNewName] = useState('');
     const router = useRouter();
@@ -77,7 +78,7 @@ export function CoreProblemList({ unitId, coreProblems }: CoreProblemListProps) 
 
             <Accordion type="single" collapsible className="space-y-2">
                 {coreProblems.map((cp) => (
-                    <CoreProblemItem key={cp.id} coreProblem={cp} />
+                    <CoreProblemItem key={cp.id} coreProblem={cp} subjectName={subjectName} />
                 ))}
             </Accordion>
         </div>

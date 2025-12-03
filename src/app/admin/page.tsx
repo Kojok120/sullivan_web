@@ -23,13 +23,7 @@ export default async function AdminDashboard() {
             href: '/admin/classrooms',
             color: 'text-indigo-600',
         },
-        {
-            title: 'グループ管理',
-            description: 'グループの追加・削除',
-            icon: Users,
-            href: '/admin/groups',
-            color: 'text-cyan-600',
-        },
+
         {
             title: 'カリキュラム管理',
             description: 'Unit、CoreProblem、Problemの管理',

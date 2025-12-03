@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Plus, Pencil, Trash2, Video, FileSpreadsheet } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { BulkProblemAddDialog } from './bulk-problem-add-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -19,16 +18,16 @@ import { useRouter } from 'next/navigation';
 
 interface ProblemListProps {
     coreProblemId: string;
+    subjectName: string;
 }
 
-export function ProblemList({ coreProblemId }: ProblemListProps) {
+export function ProblemList({ coreProblemId, subjectName }: ProblemListProps) {
     const [problems, setProblems] = useState<Problem[]>([]);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
 
     // Create/Edit State
     const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const [isBulkOpen, setIsBulkOpen] = useState(false);
     const [editingProblem, setEditingProblem] = useState<Problem | null>(null);
 
     // Form State
@@ -36,6 +35,16 @@ export function ProblemList({ coreProblemId }: ProblemListProps) {
     const [answer, setAnswer] = useState('');
     const [videoUrl, setVideoUrl] = useState('');
     const [difficulty, setDifficulty] = useState(1);
+    const [grade, setGrade] = useState('');
+
+    // English Attributes State
+    const [sentenceType, setSentenceType] = useState('');
+    const [verbSystem, setVerbSystem] = useState('');
+    const [grammarElement, setGrammarElement] = useState('');
+    const [structure, setStructure] = useState('');
+    const [additionalElement, setAdditionalElement] = useState('');
+
+    const isEnglish = subjectName === '英語';
 
     const fetchProblems = async () => {
         setLoading(true);
@@ -56,6 +65,12 @@ export function ProblemList({ coreProblemId }: ProblemListProps) {
         setAnswer('');
         setVideoUrl('');
         setDifficulty(1);
+        setGrade('');
+        setSentenceType('');
+        setVerbSystem('');
+        setGrammarElement('');
+        setStructure('');
+        setAdditionalElement('');
         setIsDialogOpen(true);
     };
 
@@ -65,6 +80,15 @@ export function ProblemList({ coreProblemId }: ProblemListProps) {
         setAnswer(problem.answer);
         setVideoUrl(problem.videoUrl || '');
         setDifficulty(problem.difficulty || 1);
+        setGrade((problem as any).grade || '');
+
+        const attrs = (problem as any).attributes || {};
+        setSentenceType(attrs.sentenceType || '');
+        setVerbSystem(attrs.verbSystem || '');
+        setGrammarElement(attrs.grammarElement || '');
+        setStructure(attrs.structure || '');
+        setAdditionalElement(attrs.additionalElement || '');
+
         setIsDialogOpen(true);
     };
 
@@ -81,6 +105,14 @@ export function ProblemList({ coreProblemId }: ProblemListProps) {
                 answer,
                 videoUrl,
                 difficulty,
+                grade,
+                attributes: isEnglish ? {
+                    sentenceType,
+                    verbSystem,
+                    grammarElement,
+                    structure,
+                    additionalElement,
+                } : undefined,
             });
             if (result.success) {
                 toast.success('問題を更新しました');
@@ -98,7 +130,15 @@ export function ProblemList({ coreProblemId }: ProblemListProps) {
                 answer,
                 videoUrl,
                 difficulty,
+                grade,
                 order: maxOrder + 1,
+                attributes: isEnglish ? {
+                    sentenceType,
+                    verbSystem,
+                    grammarElement,
+                    structure,
+                    additionalElement,
+                } : undefined,
             });
             if (result.success) {
                 toast.success('問題を作成しました');
@@ -128,8 +168,10 @@ export function ProblemList({ coreProblemId }: ProblemListProps) {
             <div className="flex justify-between items-center">
                 <h5 className="text-xs font-semibold text-muted-foreground uppercase">Problems</h5>
                 <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => setIsBulkOpen(true)}>
-                        <FileSpreadsheet className="mr-2 h-3 w-3" /> 一括追加
+                    <Button size="sm" variant="outline" asChild>
+                        <a href={`/admin/curriculum/${coreProblemId}/bulk-add`}>
+                            <FileSpreadsheet className="mr-2 h-3 w-3" /> 一括追加
+                        </a>
                     </Button>
                     <Button size="sm" variant="outline" onClick={openCreate}>
                         <Plus className="mr-2 h-3 w-3" /> 問題追加
@@ -207,7 +249,42 @@ export function ProblemList({ coreProblemId }: ProblemListProps) {
                                     onChange={(e) => setDifficulty(parseInt(e.target.value))}
                                 />
                             </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="grade">学年</Label>
+                                <Input
+                                    id="grade"
+                                    value={grade}
+                                    onChange={(e) => setGrade(e.target.value)}
+                                    placeholder="例: 中1, 高2"
+                                />
+                            </div>
                         </div>
+
+                        {isEnglish && (
+                            <div className="grid grid-cols-2 gap-4 border-t pt-4 mt-2">
+                                <div className="col-span-2 text-sm font-medium text-muted-foreground mb-2">英語属性</div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="sentenceType">文種</Label>
+                                    <Input id="sentenceType" value={sentenceType} onChange={(e) => setSentenceType(e.target.value)} />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="verbSystem">動詞システム</Label>
+                                    <Input id="verbSystem" value={verbSystem} onChange={(e) => setVerbSystem(e.target.value)} />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="grammarElement">文法要素</Label>
+                                    <Input id="grammarElement" value={grammarElement} onChange={(e) => setGrammarElement(e.target.value)} />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="structure">構文</Label>
+                                    <Input id="structure" value={structure} onChange={(e) => setStructure(e.target.value)} />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="additionalElement">付加要素</Label>
+                                    <Input id="additionalElement" value={additionalElement} onChange={(e) => setAdditionalElement(e.target.value)} />
+                                </div>
+                            </div>
+                        )}
                     </div>
                     <DialogFooter>
                         <Button onClick={handleSave}>保存</Button>
@@ -215,12 +292,7 @@ export function ProblemList({ coreProblemId }: ProblemListProps) {
                 </DialogContent>
             </Dialog>
 
-            <BulkProblemAddDialog
-                isOpen={isBulkOpen}
-                onClose={() => setIsBulkOpen(false)}
-                coreProblemId={coreProblemId}
-                onSuccess={fetchProblems}
-            />
+
         </div>
     );
 }

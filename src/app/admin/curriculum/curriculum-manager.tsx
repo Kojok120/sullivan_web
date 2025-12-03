@@ -12,6 +12,7 @@ import { Plus } from 'lucide-react';
 export type SubjectWithRelations = Subject & {
     units: (Unit & {
         coreProblems: CoreProblem[];
+        subject: Subject;
     })[];
 };
 
@@ -26,7 +27,7 @@ export function CurriculumManager({ initialSubjects }: CurriculumManagerProps) {
     const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
 
     // Find selected unit
-    let selectedUnit: (Unit & { coreProblems: CoreProblem[] }) | null = null;
+    let selectedUnit: (Unit & { coreProblems: CoreProblem[]; subject: Subject }) | null = null;
     if (selectedUnitId) {
         for (const subject of subjects) {
             const unit = subject.units.find(u => u.id === selectedUnitId);
@@ -60,7 +61,7 @@ export function CurriculumManager({ initialSubjects }: CurriculumManagerProps) {
             {/* Main Content */}
             <div className="col-span-8 overflow-y-auto pl-2">
                 {selectedUnit ? (
-                    <UnitDetail unit={selectedUnit} />
+                    <UnitDetail unit={selectedUnit} subjectName={selectedUnit.subject.name} />
                 ) : (
                     <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                         <p>左側のメニューからUnitを選択してください</p>
