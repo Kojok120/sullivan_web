@@ -164,6 +164,9 @@ export async function getStudentsWithStats(query?: string) {
         if (stats.totalProblemsSolved > 0) {
             stats.accuracy = Math.round((stats.totalCorrect / stats.totalProblemsSolved) * 100);
         }
+        // Streak is too expensive to calculate in bulk for the list view.
+        // We leave it as 0. If needed, we should fetch it individually or use a materialized view.
+        stats.currentStreak = 0;
     });
 
     return students.map(student => ({

@@ -48,17 +48,7 @@ export function calculateEffectivePriority(
     return basePriority + timeAdjustment;
 }
 
-/**
- * Deprecated: Use calculateNewPriority or calculateEffectivePriority instead.
- */
-export function calculateNextPriority(
-    currentPriority: number,
-    evaluation: Evaluation,
-    lastAnsweredAt: Date | null
-): number {
-    const base = calculateNewPriority(currentPriority, evaluation);
-    return calculateEffectivePriority(base, lastAnsweredAt);
-}
+
 
 /**
  * Logic to select the next problem.

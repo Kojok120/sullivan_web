@@ -22,7 +22,6 @@ export default async function StudentAnalyticsPage({ params }: PageProps) {
 
     const student = await prisma.user.findUnique({
         where: { id: userId },
-        include: { group: true },
     });
 
     if (!student) return <div>生徒が見つかりません</div>;
@@ -58,7 +57,7 @@ export default async function StudentAnalyticsPage({ params }: PageProps) {
             <div className="mb-8">
                 <h1 className="text-3xl font-bold">{student.name || student.loginId} の学習状況</h1>
                 <p className="text-muted-foreground">
-                    {student.group?.name || 'グループなし'} | {student.role}
+                    {student.group || 'グループなし'} | {student.role}
                 </p>
             </div>
 

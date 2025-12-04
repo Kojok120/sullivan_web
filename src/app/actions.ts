@@ -205,9 +205,17 @@ export async function submitAnswerWithAI(
         const result = await gradeAnswer(problem.question, problem.answer, userAnswer);
         evaluation = result.evaluation;
         feedback = result.feedback;
+
+        // Optional: If we want AI to auto-record, we can do it here.
+        // But per review, we should avoid double recording. 
+        // If the UI submits evaluation separately, we should just return the feedback here.
+        // For now, let's NOT record here and let the user confirm/submit.
+        // Or if the UI expects this to record, we need to coordinate.
+        // The review says "User evaluation button creates another record".
+        // So we should just return the feedback.
     }
 
-    await recordProblemResult(userId, problemId, evaluation, userAnswer, feedback);
+    // await recordProblemResult(userId, problemId, evaluation, userAnswer, feedback);
 
     if (!isAiEnabledSystem) {
         return { aiGraded: false };

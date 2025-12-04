@@ -39,7 +39,7 @@ export default async function AdminAnalyticsPage() {
                             {studentStats.map((student) => (
                                 <TableRow key={student.id}>
                                     <TableCell className="font-medium">{student.name || student.loginId}</TableCell>
-                                    <TableCell>{student.group?.name || '-'}</TableCell>
+                                    <TableCell>{student.group || '-'}</TableCell>
                                     <TableCell className="text-right">{student.stats.totalProblemsSolved}問</TableCell>
                                     <TableCell className="text-right">{student.stats.accuracy}%</TableCell>
                                     <TableCell className="text-right">{student.stats.currentStreak}日</TableCell>

@@ -153,15 +153,4 @@ model UserProblemState {
   @@unique([userId, problemId])
 }
 
-model SystemSettings {
-  id                    String   @id @default(cuid())
-  priorityInitial       Int      @default(50)
-  priorityAdjustmentA   Int      @default(-30)
-  priorityAdjustmentB   Int      @default(-10)
-  priorityAdjustmentC   Int      @default(10)
-  priorityAdjustmentD   Int      @default(30)
-  forgettingCurveRate   Float    @default(5.0)
-  aiGradingEnabled      Boolean  @default(false)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-}
+

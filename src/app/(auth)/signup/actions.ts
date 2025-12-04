@@ -25,28 +25,17 @@ export async function signupAction(prevState: any, formData: FormData) {
         return { error: result.error.errors[0].message };
     }
 
-    const { name, password } = result.data;
+    const { name, password, role } = result.data;
 
-    const role = Role.STUDENT; // Force role to STUDENT for public signup
-
-    // 2. Hash password
-    const hashedPassword = await hashPassword(password);
-
-    // 3. Create user
+    // 3. Create user using service to ensure consistent ID generation
     try {
-        // Generate a simple loginId for now, e.g., based on name or a UUID
-        // For a real application, ensure loginId is unique and properly generated.
-        const loginId = name.toLowerCase().replace(/\s/g, '') + Math.random().toString(36).substring(2, 8);
-
-        await prisma.user.create({
-            data: {
-                loginId,
-                password: hashedPassword,
-                name,
-                role,
-            },
+        const { createUser } = await import('@/lib/user-service');
+        const user = await createUser({
+            name,
+            password,
+            role, // Use the role selected in UI
         });
-        return { success: true, loginId };
+        return { success: true, loginId: user.loginId };
     } catch (error) {
         console.error(error);
         return { error: 'ユーザー作成に失敗しました。もう一度お試しください。' };
