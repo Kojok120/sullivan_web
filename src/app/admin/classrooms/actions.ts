@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
+import { revalidatePath } from 'next/cache';
 
 export async function getClassrooms(query?: string) {
     const session = await getSession();

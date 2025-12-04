@@ -12,6 +12,7 @@ import { getStudentStats, getUnitProgress, getDailyActivity, getStudentWeaknesse
 import { ActivityChart } from '@/app/dashboard/activity-chart';
 import { ProfileCard } from './profile-card';
 import { GuidanceList } from './guidance-list';
+import { PrintProblemCard } from './print-problem-card';
 
 export default async function TeacherStudentDetailPage({
     params,
@@ -23,7 +24,7 @@ export default async function TeacherStudentDetailPage({
 
     const { userId } = await params;
 
-    const [student, stats, unitProgress, dailyActivity, weaknesses, recentHistory, classrooms] = await Promise.all([
+    const [student, stats, unitProgress, dailyActivity, weaknesses, recentHistory, classrooms, subjects] = await Promise.all([
         prisma.user.findUnique({
             where: { id: userId },
             include: {
@@ -57,6 +58,9 @@ export default async function TeacherStudentDetailPage({
         }),
         prisma.classroom.findMany({
             orderBy: { createdAt: 'asc' }
+        }),
+        prisma.subject.findMany({
+            orderBy: { order: 'asc' }
         })
     ]);
 
@@ -98,18 +102,7 @@ export default async function TeacherStudentDetailPage({
                 <TabsContent value="overview" className="space-y-4">
                     {/* Overview Stats */}
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">問題印刷</CardTitle>
-                                <Printer className="h-4 w-4 text-muted-foreground" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold text-muted-foreground text-base">準備中</div>
-                                <p className="text-xs text-muted-foreground">
-                                    生徒用問題セットを出力
-                                </p>
-                            </CardContent>
-                        </Card>
+                        <PrintProblemCard userId={student.id} subjects={subjects} />
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                 <CardTitle className="text-sm font-medium">正答率</CardTitle>

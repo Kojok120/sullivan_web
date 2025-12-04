@@ -147,6 +147,34 @@ export async function createProblem(data: {
 }) {
     await requireAdmin();
     try {
+        // 1. Fetch Subject info to determine prefix
+        const coreProblem = await prisma.coreProblem.findUnique({
+            where: { id: data.coreProblemId },
+            include: { unit: { include: { subject: true } } }
+        });
+
+        if (!coreProblem) throw new Error('CoreProblem not found');
+
+        const subject = coreProblem.unit.subject;
+        let prefix = '';
+        if (subject.name.includes('英語')) prefix = 'E';
+        else if (subject.name.includes('国語')) prefix = 'J';
+        else if (subject.name.includes('数学')) prefix = 'S';
+        else prefix = subject.name.charAt(0).toUpperCase();
+
+        // 2. Count existing problems for this subject to determine next number
+        // Note: This is not race-condition safe but sufficient for this scale.
+        const count = await prisma.problem.count({
+            where: {
+                coreProblem: {
+                    unit: {
+                        subjectId: subject.id
+                    }
+                }
+            }
+        });
+        const customId = `${prefix}-${count + 1}`;
+
         const problem = await prisma.problem.create({
             data: {
                 question: data.question,
@@ -160,6 +188,7 @@ export async function createProblem(data: {
                 grade: data.grade,
                 tags: data.tags || [],
                 attributes: data.attributes || undefined,
+                customId,
             },
         });
         revalidatePath('/admin/curriculum');
@@ -225,6 +254,32 @@ export async function bulkCreateProblems(coreProblemId: string, problems: {
 }[]) {
     await requireAdmin();
     try {
+        // 1. Fetch Subject info
+        const coreProblem = await prisma.coreProblem.findUnique({
+            where: { id: coreProblemId },
+            include: { unit: { include: { subject: true } } }
+        });
+
+        if (!coreProblem) throw new Error('CoreProblem not found');
+
+        const subject = coreProblem.unit.subject;
+        let prefix = '';
+        if (subject.name.includes('英語')) prefix = 'E';
+        else if (subject.name.includes('国語')) prefix = 'J';
+        else if (subject.name.includes('数学')) prefix = 'S';
+        else prefix = subject.name.charAt(0).toUpperCase();
+
+        // 2. Count existing problems
+        const currentCount = await prisma.problem.count({
+            where: {
+                coreProblem: {
+                    unit: {
+                        subjectId: subject.id
+                    }
+                }
+            }
+        });
+
         // Get current max order
         const currentProblems = await prisma.problem.findMany({
             where: { coreProblemId },
@@ -249,6 +304,7 @@ export async function bulkCreateProblems(coreProblemId: string, problems: {
                         order: startOrder + index,
                         type: 'NORMAL',
                         attributes: p.attributes || undefined,
+                        customId: `${prefix}-${currentCount + index + 1}`,
                     },
                 })
             )

@@ -5,6 +5,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog"
 import { Trash2, Plus, School, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { createClassroom, deleteClassroom } from './actions';
@@ -27,6 +36,7 @@ export function ClassroomList({ initialClassrooms, searchQuery }: ClassroomListP
     const router = useRouter();
     const pathname = usePathname();
     const [isCreating, setIsCreating] = useState(false);
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [query, setQuery] = useState(searchQuery);
 
     async function handleCreate(formData: FormData) {
@@ -38,8 +48,7 @@ export function ClassroomList({ initialClassrooms, searchQuery }: ClassroomListP
             toast.error(result.error);
         } else {
             toast.success('教室を追加しました');
-            const form = document.getElementById('create-classroom-form') as HTMLFormElement;
-            form.reset();
+            setIsDialogOpen(false);
             router.refresh();
         }
     }
@@ -83,52 +92,52 @@ export function ClassroomList({ initialClassrooms, searchQuery }: ClassroomListP
                 </form>
             </div>
 
-            <div className="grid gap-6 md:grid-cols-2">
+            <div className="grid gap-6">
                 <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Plus className="h-5 w-5" />
-                            新規教室追加
-                        </CardTitle>
-                        <CardDescription>
-                            新しい教室を追加します。グループはカンマ区切りで入力してください。
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <form id="create-classroom-form" action={handleCreate} className="space-y-4">
-                            <div className="grid gap-2">
-                                <Label htmlFor="name">教室名</Label>
-                                <Input
-                                    id="name"
-                                    name="name"
-                                    placeholder="例: 足立校"
-                                    required
-                                />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="groups">グループ (カンマ区切り)</Label>
-                                <Input
-                                    id="groups"
-                                    name="groups"
-                                    placeholder="例: 月曜, 火曜, 水曜"
-                                />
-                            </div>
-                            <Button type="submit" disabled={isCreating} className="w-full">
-                                {isCreating ? '追加中...' : '追加'}
-                            </Button>
-                        </form>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <School className="h-5 w-5" />
-                            教室一覧
-                        </CardTitle>
-                        <CardDescription>
-                            登録済みの教室一覧です。クリックして詳細を確認できます。
-                        </CardDescription>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <div className="space-y-1">
+                            <CardTitle className="flex items-center gap-2">
+                                <School className="h-5 w-5" />
+                                教室一覧
+                            </CardTitle>
+                            <CardDescription>
+                                登録済みの教室一覧です。クリックして詳細を確認できます。
+                            </CardDescription>
+                        </div>
+                        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                            <DialogTrigger asChild>
+                                <Button size="sm" className="h-8 gap-1">
+                                    <Plus className="h-3.5 w-3.5" />
+                                    <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                                        追加
+                                    </span>
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>新規教室追加</DialogTitle>
+                                    <DialogDescription>
+                                        新しい教室を追加します。
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <form action={handleCreate} className="space-y-4">
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="name">教室名</Label>
+                                        <Input
+                                            id="name"
+                                            name="name"
+                                            placeholder="例: 足立校"
+                                            required
+                                        />
+                                    </div>
+                                    <DialogFooter>
+                                        <Button type="submit" disabled={isCreating}>
+                                            {isCreating ? '追加中...' : '追加'}
+                                        </Button>
+                                    </DialogFooter>
+                                </form>
+                            </DialogContent>
+                        </Dialog>
                     </CardHeader>
                     <CardContent>
                         {initialClassrooms.length === 0 ? (

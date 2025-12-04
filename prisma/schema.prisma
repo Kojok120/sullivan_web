@@ -48,6 +48,7 @@ model Problem {
   id               String             @id @default(cuid())
   question         String
   answer           String
+  customId         String?            @unique // Custom ID (e.g., E-1, S-10)
   acceptedAnswers  String[]           @default([]) // 許容解答（複数）
   difficulty       Int?               // 難易度
   grade            String?            // 学年 (e.g., "中1", "高2")
