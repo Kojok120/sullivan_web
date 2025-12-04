@@ -199,7 +199,13 @@ export async function updateProblem(id: string, data: {
 export async function deleteProblem(id: string) {
     await requireAdmin();
     try {
-        await prisma.problem.delete({ where: { id } });
+        await prisma.$transaction([
+            // Delete related records first
+            prisma.learningHistory.deleteMany({ where: { problemId: id } }),
+            prisma.userProblemState.deleteMany({ where: { problemId: id } }),
+            // Finally delete the problem
+            prisma.problem.delete({ where: { id } }),
+        ]);
         revalidatePath('/admin/curriculum');
         return { success: true };
     } catch (error) {
@@ -214,6 +220,7 @@ export async function bulkCreateProblems(coreProblemId: string, problems: {
     videoUrl?: string;
     difficulty?: number;
     grade?: string;
+    acceptedAnswers?: string[];
     attributes?: any;
 }[]) {
     await requireAdmin();
@@ -238,6 +245,7 @@ export async function bulkCreateProblems(coreProblemId: string, problems: {
                         videoUrl: p.videoUrl,
                         difficulty: p.difficulty || 1,
                         grade: p.grade,
+                        acceptedAnswers: p.acceptedAnswers || [],
                         order: startOrder + index,
                         type: 'NORMAL',
                         attributes: p.attributes || undefined,

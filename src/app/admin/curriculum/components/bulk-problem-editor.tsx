@@ -20,8 +20,8 @@ interface BulkProblemEditorProps {
 interface ParsedProblem {
     question: string;
     answer: string;
+    acceptedAnswers?: string; // Comma separated string for editing
     videoUrl?: string;
-    difficulty?: number;
     grade?: string;
     attributes?: any;
 }
@@ -52,11 +52,23 @@ export function BulkProblemEditor({ coreProblemId, subjectName }: BulkProblemEdi
                 for (const row of data) {
                     if (row.length < 2) continue;
 
-                    const question = row[0]?.trim() || '';
-                    const answer = row[1]?.trim() || '';
-                    const videoUrl = row[2]?.trim() || undefined;
-                    const difficulty = row[3]?.trim() ? parseInt(row[3].trim()) : undefined;
-                    const grade = row[4]?.trim() || undefined;
+                    // New Order:
+                    // 0: Grade
+                    // 1: Question
+                    // 2: Answer
+                    // 3: Accepted Answers (comma separated)
+                    // 4: Video URL
+                    // 5: Sentence Type
+                    // 6: Verb System
+                    // 7: Grammar Element
+                    // 8: Syntax (Structure)
+                    // 9: Additional Element
+
+                    const grade = row[0]?.trim() || undefined;
+                    const question = row[1]?.trim() || '';
+                    const answer = row[2]?.trim() || '';
+                    const acceptedAnswers = row[3]?.trim() || undefined;
+                    const videoUrl = row[4]?.trim() || undefined;
 
                     let attributes: any = undefined;
                     if (isEnglish) {
@@ -72,8 +84,8 @@ export function BulkProblemEditor({ coreProblemId, subjectName }: BulkProblemEdi
                     parsed.push({
                         question,
                         answer,
+                        acceptedAnswers,
                         videoUrl,
-                        difficulty,
                         grade,
                         attributes,
                     });
@@ -96,7 +108,16 @@ export function BulkProblemEditor({ coreProblemId, subjectName }: BulkProblemEdi
 
     const handleSave = async () => {
         setIsSaving(true);
-        const result = await bulkCreateProblems(coreProblemId, parsedData);
+        // Convert acceptedAnswers string to array
+        const problemsToSave = parsedData.map(p => ({
+            ...p,
+            acceptedAnswers: p.acceptedAnswers
+                ? p.acceptedAnswers.split(',').map(s => s.trim()).filter(s => s !== '')
+                : [],
+            difficulty: 1 // Default difficulty
+        }));
+
+        const result = await bulkCreateProblems(coreProblemId, problemsToSave);
         setIsSaving(false);
 
         if (result.success) {
@@ -142,11 +163,11 @@ export function BulkProblemEditor({ coreProblemId, subjectName }: BulkProblemEdi
                         <p className="font-medium">入力フォーマット（タブ区切り）:</p>
                         {isEnglish ? (
                             <code className="block bg-background p-2 rounded border">
-                                問題文 [TAB] 解答 [TAB] 動画URL [TAB] 難易度 [TAB] 学年 [TAB] 文種 [TAB] 動詞システム [TAB] 文法要素 [TAB] 構文 [TAB] 付加要素
+                                学年 [TAB] 問題文 [TAB] 正答 [TAB] 別解(カンマ区切り) [TAB] 動画URL [TAB] 文種 [TAB] 動詞システム(複数可) [TAB] 文法要素(複数可) [TAB] 構文 [TAB] 付加要素(複数可)
                             </code>
                         ) : (
                             <code className="block bg-background p-2 rounded border">
-                                問題文 [TAB] 解答 [TAB] 動画URL [TAB] 難易度 [TAB] 学年
+                                学年 [TAB] 問題文 [TAB] 正答 [TAB] 別解(カンマ区切り) [TAB] 動画URL
                             </code>
                         )}
                         <p className="text-muted-foreground text-xs">
@@ -176,11 +197,11 @@ export function BulkProblemEditor({ coreProblemId, subjectName }: BulkProblemEdi
                             <TableHeader>
                                 <TableRow>
                                     <TableHead className="w-[50px]">#</TableHead>
-                                    <TableHead className="min-w-[200px]">問題</TableHead>
-                                    <TableHead className="min-w-[150px]">解答</TableHead>
-                                    <TableHead className="min-w-[150px]">動画URL</TableHead>
-                                    <TableHead className="w-[80px]">難易度</TableHead>
                                     <TableHead className="w-[80px]">学年</TableHead>
+                                    <TableHead className="min-w-[200px]">問題</TableHead>
+                                    <TableHead className="min-w-[150px]">正答</TableHead>
+                                    <TableHead className="min-w-[150px]">別解</TableHead>
+                                    <TableHead className="min-w-[150px]">動画URL</TableHead>
                                     {isEnglish && (
                                         <>
                                             <TableHead className="min-w-[100px]">文種</TableHead>
@@ -197,6 +218,13 @@ export function BulkProblemEditor({ coreProblemId, subjectName }: BulkProblemEdi
                                     <TableRow key={i}>
                                         <TableCell>{i + 1}</TableCell>
                                         <TableCell>
+                                            <Input
+                                                value={p.grade || ''}
+                                                onChange={(e) => updateCell(i, 'grade', e.target.value)}
+                                                className="w-16"
+                                            />
+                                        </TableCell>
+                                        <TableCell>
                                             <Textarea
                                                 value={p.question}
                                                 onChange={(e) => updateCell(i, 'question', e.target.value)}
@@ -211,24 +239,16 @@ export function BulkProblemEditor({ coreProblemId, subjectName }: BulkProblemEdi
                                         </TableCell>
                                         <TableCell>
                                             <Input
+                                                value={p.acceptedAnswers || ''}
+                                                onChange={(e) => updateCell(i, 'acceptedAnswers', e.target.value)}
+                                                placeholder="カンマ区切り"
+                                            />
+                                        </TableCell>
+                                        <TableCell>
+                                            <Input
                                                 value={p.videoUrl || ''}
                                                 onChange={(e) => updateCell(i, 'videoUrl', e.target.value)}
                                                 placeholder="https://..."
-                                            />
-                                        </TableCell>
-                                        <TableCell>
-                                            <Input
-                                                type="number"
-                                                value={p.difficulty || ''}
-                                                onChange={(e) => updateCell(i, 'difficulty', parseInt(e.target.value))}
-                                                className="w-16"
-                                            />
-                                        </TableCell>
-                                        <TableCell>
-                                            <Input
-                                                value={p.grade || ''}
-                                                onChange={(e) => updateCell(i, 'grade', e.target.value)}
-                                                className="w-16"
                                             />
                                         </TableCell>
                                         {isEnglish && (
