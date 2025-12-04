@@ -101,10 +101,9 @@ export async function getStudentsWithStats(query?: string) {
             OR: query ? [
                 { name: { contains: query, mode: 'insensitive' } },
                 { loginId: { contains: query, mode: 'insensitive' } },
-                { group: { name: { contains: query, mode: 'insensitive' } } },
+                { group: { contains: query, mode: 'insensitive' } },
             ] : undefined,
         },
-        include: { group: true },
         orderBy: { name: 'asc' },
     });
 

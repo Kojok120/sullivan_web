@@ -1,6 +1,7 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
+import { getSession } from '@/lib/auth';
 
 export async function getClassrooms(query?: string) {
     const session = await getSession();

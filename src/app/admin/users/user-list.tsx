@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { User, Role, Group } from '@prisma/client';
+import { User, Role } from '@prisma/client';
 import { createUser, updateUser, deleteUser } from '../actions';
 import { Button } from '@/components/ui/button';
 import {
@@ -50,7 +50,12 @@ import {
 import { MoreHorizontal, Plus, Pencil, Trash2, Loader2, ArrowUpDown, Filter } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
-type UserWithGroup = User & { group: Group | null };
+type UserWithGroup = User; // Group is now just a string field on User
+
+interface Group {
+    id: string;
+    name: string;
+}
 
 interface UserListProps {
     initialUsers: UserWithGroup[];
@@ -91,6 +96,7 @@ export function UserList({
         name: '',
         role: 'STUDENT' as Role,
         password: '',
+        groupId: '',
     });
 
     // Search state
@@ -149,11 +155,12 @@ export function UserList({
                 name: formData.name,
                 role: formData.role,
                 password: formData.password || undefined,
+                groupId: formData.groupId || undefined,
             });
 
             if (result.success) {
                 setIsAddOpen(false);
-                setFormData({ name: '', role: 'STUDENT', password: '' });
+                setFormData({ name: '', role: 'STUDENT', password: '', groupId: '' });
                 router.refresh();
             } else {
                 alert(result.error);
@@ -168,12 +175,13 @@ export function UserList({
                 name: formData.name,
                 role: formData.role,
                 password: formData.password || undefined,
+                groupId: formData.groupId || undefined,
             });
 
             if (result.success) {
                 setIsEditOpen(false);
                 setSelectedUser(null);
-                setFormData({ name: '', role: 'STUDENT', password: '' });
+                setFormData({ name: '', role: 'STUDENT', password: '', groupId: '' });
                 router.refresh();
             } else {
                 alert(result.error);
@@ -201,6 +209,7 @@ export function UserList({
             name: user.name || '',
             role: user.role,
             password: '',
+            groupId: user.group || '',
         });
         setIsEditOpen(true);
     };
@@ -319,7 +328,7 @@ export function UserList({
                                         {user.role}
                                     </span>
                                 </TableCell>
-                                <TableCell>{user.group?.name || '-'}</TableCell>
+                                <TableCell>{user.group || '-'}</TableCell>
                                 <TableCell>{new Date(user.createdAt).toLocaleDateString()}</TableCell>
                                 <TableCell className="text-right">
                                     <DropdownMenu>
@@ -425,6 +434,27 @@ export function UserList({
                                 className="col-span-3"
                             />
                         </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="groupId" className="text-right">
+                                グループ
+                            </Label>
+                            <Select
+                                value={formData.groupId}
+                                onValueChange={(value) => setFormData({ ...formData, groupId: value })}
+                            >
+                                <SelectTrigger className="col-span-3">
+                                    <SelectValue placeholder="グループを選択 (任意)" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value=" ">なし</SelectItem>
+                                    {groups.map((group) => (
+                                        <SelectItem key={group.id} value={group.id}>
+                                            {group.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsAddOpen(false)}>キャンセル</Button>
@@ -488,6 +518,27 @@ export function UserList({
                                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                                 className="col-span-3"
                             />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="edit-groupId" className="text-right">
+                                グループ
+                            </Label>
+                            <Select
+                                value={formData.groupId}
+                                onValueChange={(value) => setFormData({ ...formData, groupId: value })}
+                            >
+                                <SelectTrigger className="col-span-3">
+                                    <SelectValue placeholder="グループを選択 (任意)" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value=" ">なし</SelectItem>
+                                    {groups.map((group) => (
+                                        <SelectItem key={group.id} value={group.id}>
+                                            {group.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
                     </div>
                     <DialogFooter>

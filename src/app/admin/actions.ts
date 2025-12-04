@@ -53,7 +53,6 @@ export async function getUsers(
             prisma.user.findMany({
                 where,
                 orderBy,
-                include: { group: true },
                 skip,
                 take: limit,
             }),
@@ -93,7 +92,10 @@ export async function createUser(data: { name: string; role: Role; password?: st
 
     try {
         const { createUser: createUserService } = await import('@/lib/user-service');
-        const user = await createUserService(result.data as any);
+        const user = await createUserService({
+            ...result.data,
+            group: result.data.groupId // Map groupId to group string
+        } as any);
 
         revalidatePath('/admin/users');
         return { success: true, user };
@@ -106,12 +108,18 @@ export async function createUser(data: { name: string; role: Role; password?: st
 export async function updateUser(id: string, data: { name?: string; role?: Role; password?: string; groupId?: string }) {
     await requireAdmin();
     try {
-        const updateData: any = { ...data };
-        if (updateData.password) {
-            updateData.password = await hashPassword(updateData.password);
-        } else {
-            delete updateData.password;
+        const updateData: any = {
+            name: data.name,
+            role: data.role,
+            group: data.groupId // Map groupId to group string
+        };
+
+        if (data.password) {
+            updateData.password = await hashPassword(data.password);
         }
+
+        // Remove undefined fields
+        Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
 
         const user = await prisma.user.update({
             where: { id },
@@ -144,9 +152,17 @@ export async function deleteUser(id: string) {
 export async function getGroups() {
     await requireAdmin();
     try {
-        const groups = await prisma.group.findMany({
-            orderBy: { name: 'asc' },
+        // Fetch all classrooms to get their groups
+        const classrooms = await prisma.classroom.findMany({
+            select: { groups: true }
         });
+
+        // Flatten and unique
+        const allGroups = Array.from(new Set(classrooms.flatMap(c => c.groups)));
+
+        // Return as objects to match expected interface
+        const groups = allGroups.map(g => ({ id: g, name: g })).sort((a, b) => a.name.localeCompare(b.name));
+
         return { success: true, groups };
     } catch (error) {
         console.error('Failed to fetch groups:', error);

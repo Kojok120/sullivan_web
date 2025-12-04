@@ -181,7 +181,11 @@ export function ProblemList({ coreProblemId, subjectName }: ProblemListProps) {
 
             <div className="grid gap-4">
                 {problems.map((problem) => (
-                    <Card key={problem.id} className="bg-muted/50">
+                    <Card
+                        key={problem.id}
+                        className="bg-muted/50 hover:bg-muted/80 transition-colors cursor-pointer"
+                        onClick={() => openEdit(problem)}
+                    >
                         <CardContent className="p-4 flex items-start gap-4">
                             <div className="flex-1 space-y-2">
                                 <div className="font-medium text-sm">{problem.question}</div>
@@ -193,10 +197,15 @@ export function ProblemList({ coreProblemId, subjectName }: ProblemListProps) {
                                 )}
                             </div>
                             <div className="flex flex-col gap-2">
-                                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => openEdit(problem)}>
-                                    <Pencil className="h-3 w-3" />
-                                </Button>
-                                <Button size="icon" variant="ghost" className="h-6 w-6 text-red-500" onClick={() => handleDelete(problem.id)}>
+                                <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-6 w-6 text-red-500 hover:text-red-700 hover:bg-red-100"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDelete(problem.id);
+                                    }}
+                                >
                                     <Trash2 className="h-3 w-3" />
                                 </Button>
                             </div>
