@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { calculateNewPriority, calculateEffectivePriority } from "@/lib/priority-algo";
 import { ProblemData } from "@/components/learning-session";
-import { getSystemConfig } from "@/lib/system-settings";
+
 
 export async function logoutAction() {
     await logout();
@@ -92,11 +92,8 @@ async function recordProblemResult(
 
     const currentPriority = currentState?.priority || 0;
 
-    // 3. Fetch system config
-    const config = await getSystemConfig();
-
-    // 4. Calculate new base priority using the unified logic with config
-    const newPriority = calculateNewPriority(currentPriority, evaluation, config);
+    // 3. Calculate new base priority using the unified logic (using default config)
+    const newPriority = calculateNewPriority(currentPriority, evaluation);
 
     await prisma.userProblemState.upsert({
         where: {
@@ -121,13 +118,8 @@ async function recordProblemResult(
 export async function getNextProblem(userId: string, coreProblemId: string): Promise<ProblemData | null> {
     const session = await requireAuth();
     if (session.userId !== userId && session.role !== 'ADMIN' && session.role !== 'TEACHER') {
-        // Basic protection: users can only fetch their own problems unless admin/teacher
-        // But for now, just ensuring they are logged in is a good start.
-        // Let's enforce userId match if not admin/teacher
         throw new Error('Unauthorized access to other user data');
     }
-
-    const config = await getSystemConfig();
 
     const { selectNextProblem } = await import("@/lib/priority-algo");
 
@@ -154,8 +146,8 @@ export async function getNextProblem(userId: string, coreProblemId: string): Pro
         },
     });
 
-    // 3. Use shared logic to select
-    const selected = selectNextProblem(problems, userStates, config);
+    // 3. Use shared logic to select (using default config)
+    const selected = selectNextProblem(problems, userStates);
 
     if (!selected) return null;
 
@@ -196,15 +188,12 @@ export async function submitAnswerWithAI(
     const session = await requireAuth();
     const userId = session.userId;
 
-    // 1. Fetch problem and system settings
+    // 1. Fetch problem
     const problem = await prisma.problem.findUnique({ where: { id: problemId } });
 
-    const settings = await prisma.systemSettings.findFirst();
-    const isAiEnabledSystem = settings?.aiGradingEnabled ?? false;
-
-    // Derive config from settings or use default
-    const { toPriorityConfig } = await import("@/lib/system-settings");
-    const config = toPriorityConfig(settings);
+    // AI Grading is disabled by default as settings are removed. 
+    // If needed, we can enable it via environment variable or hardcode.
+    const isAiEnabledSystem = false;
 
     if (!problem) throw new Error("Problem not found");
 

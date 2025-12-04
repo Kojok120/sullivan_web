@@ -12,22 +12,21 @@ export type Evaluation = "A" | "B" | "C" | "D";
  */
 export function calculateNewPriority(
     currentPriority: number,
-    evaluation: Evaluation,
-    config: PriorityConfig = DEFAULT_CONFIG
+    evaluation: Evaluation
 ): number {
     let adjustment = 0;
     switch (evaluation) {
         case "A":
-            adjustment = config.priorityAdjustmentA;
+            adjustment = DEFAULT_CONFIG.priorityAdjustmentA;
             break;
         case "B":
-            adjustment = config.priorityAdjustmentB;
+            adjustment = DEFAULT_CONFIG.priorityAdjustmentB;
             break;
         case "C":
-            adjustment = config.priorityAdjustmentC;
+            adjustment = DEFAULT_CONFIG.priorityAdjustmentC;
             break;
         case "D":
-            adjustment = config.priorityAdjustmentD;
+            adjustment = DEFAULT_CONFIG.priorityAdjustmentD;
             break;
     }
     return currentPriority + adjustment;
@@ -39,8 +38,7 @@ export function calculateNewPriority(
  */
 export function calculateEffectivePriority(
     basePriority: number,
-    lastAnsweredAt: Date | null,
-    config: PriorityConfig = DEFAULT_CONFIG
+    lastAnsweredAt: Date | null
 ): number {
     let timeAdjustment = 0;
     if (lastAnsweredAt) {
@@ -48,7 +46,7 @@ export function calculateEffectivePriority(
         const diffMs = now.getTime() - lastAnsweredAt.getTime();
         const diffDays = diffMs / (1000 * 60 * 60 * 24);
         // Forgetting curve: +rate priority per day
-        timeAdjustment = Math.floor(diffDays * config.forgettingCurveRate);
+        timeAdjustment = Math.floor(diffDays * DEFAULT_CONFIG.forgettingCurveRate);
     }
     return basePriority + timeAdjustment;
 }
@@ -74,8 +72,7 @@ export function calculateNextPriority(
  */
 export function selectNextProblem(
     problems: Problem[],
-    userStates: UserProblemState[],
-    config: PriorityConfig = DEFAULT_CONFIG
+    userStates: UserProblemState[]
 ): Problem | null {
     if (problems.length === 0) return null;
 
@@ -101,7 +98,7 @@ export function selectNextProblem(
         const state = stateMap.get(problem.id);
         if (state) {
             // Calculate dynamic priority including time
-            const effectivePriority = calculateEffectivePriority(state.priority, state.lastAnsweredAt, config);
+            const effectivePriority = calculateEffectivePriority(state.priority, state.lastAnsweredAt);
 
             if (effectivePriority > maxPriority) {
                 maxPriority = effectivePriority;
