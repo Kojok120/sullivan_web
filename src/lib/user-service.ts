@@ -5,12 +5,12 @@ import { Role } from '@prisma/client';
 export async function createUser({
     name,
     role = 'STUDENT',
-    groupId,
+    group,
     password, // Optional, defaults to 'password' if not provided (for bulk import etc)
 }: {
     name: string;
     role?: Role;
-    groupId?: string;
+    group?: string;
     password?: string;
 }) {
     // Generate Login ID (S0001, T0001, etc.)
@@ -43,7 +43,7 @@ export async function createUser({
             loginId,
             password: hashedPassword,
             role,
-            groupId,
+            group,
         },
     });
 

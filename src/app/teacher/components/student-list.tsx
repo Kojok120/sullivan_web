@@ -3,10 +3,10 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useRouter } from 'next/navigation';
 import { StudentStats } from '@/lib/analytics';
-import { User, Group } from '@prisma/client';
+import { User } from '@prisma/client';
 
 type StudentWithStats = User & {
-    group: Group | null;
+    group: string | null;
     stats: StudentStats;
 };
 
@@ -40,7 +40,7 @@ export function StudentList({ students }: StudentListProps) {
                             <div>{student.name || '未設定'}</div>
                             <div className="text-xs text-muted-foreground">{student.loginId}</div>
                         </TableCell>
-                        <TableCell>{student.group?.name || '-'}</TableCell>
+                        <TableCell>{student.group || '-'}</TableCell>
                         <TableCell className="text-right">{student.stats.totalProblemsSolved}問</TableCell>
                         <TableCell className="text-right">
                             <span className={

@@ -19,7 +19,7 @@ export async function getUsers(
     sortBy: string = 'createdAt',
     sortOrder: 'asc' | 'desc' = 'desc',
     roleFilter?: Role,
-    groupIdFilter?: string
+    groupFilter?: string
 ) {
     await requireAdmin();
     try {
@@ -36,15 +36,15 @@ export async function getUsers(
             where.role = roleFilter;
         }
 
-        if (groupIdFilter && groupIdFilter !== 'ALL') {
-            where.groupId = groupIdFilter;
+        if (groupFilter && groupFilter !== 'ALL') {
+            where.group = groupFilter;
         }
 
         const skip = (page - 1) * limit;
 
         const orderBy: any = {};
         if (sortBy === 'group') {
-            orderBy.group = { name: sortOrder };
+            orderBy.group = sortOrder;
         } else {
             orderBy[sortBy] = sortOrder;
         }
@@ -72,17 +72,17 @@ const createUserSchema = z.object({
     name: z.string().min(1, '名前を入力してください'),
     role: z.nativeEnum(Role),
     password: z.string().optional(),
-    groupId: z.string().optional(),
+    group: z.string().optional(),
 });
 
 const updateUserSchema = z.object({
     name: z.string().optional(),
     role: z.nativeEnum(Role).optional(),
     password: z.string().optional(),
-    groupId: z.string().optional(),
+    group: z.string().optional(),
 });
 
-export async function createUser(data: { name: string; role: Role; password?: string; groupId?: string }) {
+export async function createUser(data: { name: string; role: Role; password?: string; group?: string }) {
     await requireAdmin();
     const result = createUserSchema.safeParse(data);
 
@@ -94,7 +94,7 @@ export async function createUser(data: { name: string; role: Role; password?: st
         const { createUser: createUserService } = await import('@/lib/user-service');
         const user = await createUserService({
             ...result.data,
-            group: result.data.groupId // Map groupId to group string
+            group: result.data.group
         } as any);
 
         revalidatePath('/admin/users');
@@ -105,13 +105,13 @@ export async function createUser(data: { name: string; role: Role; password?: st
     }
 }
 
-export async function updateUser(id: string, data: { name?: string; role?: Role; password?: string; groupId?: string }) {
+export async function updateUser(id: string, data: { name?: string; role?: Role; password?: string; group?: string }) {
     await requireAdmin();
     try {
         const updateData: any = {
             name: data.name,
             role: data.role,
-            group: data.groupId // Map groupId to group string
+            group: data.group
         };
 
         if (data.password) {

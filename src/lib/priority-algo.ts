@@ -5,9 +5,6 @@ export type Evaluation = "A" | "B" | "C" | "D";
 
 /**
  * Calculates the new base priority based on the evaluation.
-
-/**
- * Calculates the new base priority based on the evaluation.
  * This is used when updating the database after a user answers.
  */
 export function calculateNewPriority(

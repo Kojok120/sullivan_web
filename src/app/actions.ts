@@ -3,7 +3,7 @@
 import { getSession, logout } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { calculateNewPriority, calculateEffectivePriority } from "@/lib/priority-algo";
+import { calculateNewPriority } from "@/lib/priority-algo";
 import { ProblemData } from "@/components/learning-session";
 
 
