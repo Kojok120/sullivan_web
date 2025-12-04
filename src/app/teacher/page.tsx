@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import Link from 'next/link';
 import { getStudentsWithStats } from '@/lib/analytics';
 import { Search } from 'lucide-react';
+import { StudentList } from './components/student-list';
 
 export default async function TeacherDashboardPage({
     searchParams,
@@ -55,57 +56,7 @@ export default async function TeacherDashboardPage({
                     <CardTitle>生徒一覧 ({studentStats.length}名)</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>名前</TableHead>
-                                <TableHead>グループ</TableHead>
-                                <TableHead className="text-right">総回答数</TableHead>
-                                <TableHead className="text-right">正答率</TableHead>
-                                <TableHead className="text-right">連続学習</TableHead>
-                                <TableHead className="text-right">最終学習日</TableHead>
-                                <TableHead className="text-right">詳細</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {studentStats.map((student) => (
-                                <TableRow key={student.id}>
-                                    <TableCell className="font-medium">
-                                        <div>{student.name || '未設定'}</div>
-                                        <div className="text-xs text-muted-foreground">{student.loginId}</div>
-                                    </TableCell>
-                                    <TableCell>{student.group?.name || '-'}</TableCell>
-                                    <TableCell className="text-right">{student.stats.totalProblemsSolved}問</TableCell>
-                                    <TableCell className="text-right">
-                                        <span className={
-                                            student.stats.accuracy >= 80 ? 'text-green-600 font-bold' :
-                                                student.stats.accuracy < 50 ? 'text-red-500 font-bold' : ''
-                                        }>
-                                            {student.stats.accuracy}%
-                                        </span>
-                                    </TableCell>
-                                    <TableCell className="text-right">{student.stats.currentStreak}日</TableCell>
-                                    <TableCell className="text-right">
-                                        {student.stats.lastActivity ? new Date(student.stats.lastActivity).toLocaleDateString() : '-'}
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        <Button asChild variant="outline" size="sm">
-                                            <Link href={`/teacher/students/${student.id}`}>
-                                                詳細
-                                            </Link>
-                                        </Button>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                            {studentStats.length === 0 && (
-                                <TableRow>
-                                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                                        条件に一致する生徒が見つかりません
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
+                    <StudentList students={studentStats} />
                 </CardContent>
             </Card>
         </div>
