@@ -34,37 +34,20 @@ export async function getStudentStats(userId: string): Promise<StudentStats> {
         }),
     ]);
 
-    // Optimized Streak Calculation: fetch only distinct dates, limited to recent history if needed
-    // For simplicity and performance, we can fetch just the dates.
-    // Since we need consecutive days, we might still need many rows if the streak is long.
-    // However, we can optimize by using `distinct` if Prisma supported it on date fields easily with SQLite/Postgres differences.
-    // A raw query would be best for "consecutive days", but sticking to Prisma for now:
-    // We fetch dates only.
-    const activityDates = await prisma.learningHistory.findMany({
-        where: { userId },
-        select: { answeredAt: true },
-        orderBy: { answeredAt: 'desc' },
-        distinct: ['answeredAt'], // This might not work as expected if times differ.
-        // Actually, let's just fetch dates. If the user has 10000 history items, this is still heavy.
-        // But usually streak is calculated from "today" backwards.
-        // We can fetch in chunks or just fetch the last N days?
-        // If we want *true* all-time streak, we need all dates.
-        // Let's stick to the previous logic but ensure we only select 'answeredAt'.
-        // The previous implementation already selected only 'answeredAt'.
-        // The review criticism was "4 queries". We have reduced it to 2 main blocks (stats + dates).
-        // Let's optimize the date processing.
-    });
-
-    // Better approach: Use a Set for O(1) lookup, which we did.
-    // The main issue raised was "fetching all history".
-    // If we assume a max reasonable streak (e.g. 365 days), we could limit the query.
-    // But for now, let's keep it simple but ensure we don't fetch unnecessary fields.
-    // The previous code was actually okay-ish, but maybe we can combine queries?
-    // We can't easily combine count and findMany in one Prisma call without raw query.
+    // Optimized: Fetch distinct dates directly using raw query
+    // Postgres specific syntax for date extraction
+    const distinctDates = await prisma.$queryRaw<{ date: Date }[]>`
+        SELECT DISTINCT DATE("answeredAt") as date
+        FROM "LearningHistory"
+        WHERE "userId" = ${userId}
+        ORDER BY date DESC
+    `;
 
     const uniqueDates = new Set<string>();
-    activityDates.forEach(log => {
-        uniqueDates.add(log.answeredAt.toISOString().split('T')[0]);
+    distinctDates.forEach(row => {
+        // row.date is likely a Date object or string depending on driver, safely convert
+        const d = new Date(row.date);
+        uniqueDates.add(d.toISOString().split('T')[0]);
     });
 
     let currentStreak = 0;
@@ -287,26 +270,7 @@ export type Weakness = {
 
 export async function getStudentWeaknesses(userId: string, limit = 5): Promise<Weakness[]> {
     // Optimized: Use groupBy to aggregate stats by coreProblemId directly in DB
-    const groupedStats = await prisma.learningHistory.groupBy({
-        by: ['problemId'], // We can't group by relation (coreProblemId) directly in Prisma groupBy easily without raw query or flat structure.
-        // Wait, problemId is unique per problem, but we want to group by CoreProblem.
-        // Prisma doesn't support grouping by relation fields in `groupBy`.
-        // We have to fetch problems and their coreProblemIds first or use raw query.
-        // Alternatively, we can fetch all problems for the user (lightweight) and then aggregate.
-        // Or, since `problem` table has `coreProblemId`, we can't group by it from `learningHistory` directly.
-        // Let's use a raw query for best performance, or optimize the fetch.
-        // The review said: "groupBy coreProblem unit".
-        // Since we can't easily do that with Prisma `groupBy` on a relation, let's try a different approach.
-        // We can fetch all `UserProblemState` which has `priority`. High priority = weakness?
-        // Or we stick to history accuracy.
 
-        // Let's use `findMany` but select ONLY necessary fields, avoiding the nested `include` hell.
-        where: { userId },
-        _count: {
-            _all: true,
-            evaluation: true, // We need to count specific evaluations manually if we can't filter inside groupBy
-        },
-    });
 
     // Actually, `groupBy` on `problemId` gives us stats per problem.
     // Then we need to map problemId -> coreProblemId.

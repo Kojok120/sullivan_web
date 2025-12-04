@@ -129,21 +129,12 @@ export async function getNextProblem(userId: string, coreProblemId: string): Pro
 
     const config = await getSystemConfig();
 
-    // 1. まだ回答していない問題をDB側で最小カラムだけ取得（最優先はチェーン順）
-    const unanswered = await prisma.problem.findFirst({
-        where: {
-            coreProblemId,
-            userStates: { none: { userId } },
-        },
-        orderBy: { order: "asc" },
-        select: {
-            id: true,
-            question: true,
-            answer: true,
-            coreProblemId: true,
-            videoUrl: true,
-            difficulty: true,
-            aiGradingEnabled: true,
+    const { selectNextProblem } = await import("@/lib/priority-algo");
+
+    // 1. Fetch all problems for this CoreProblem (lightweight)
+    const problems = await prisma.problem.findMany({
+        where: { coreProblemId },
+        include: {
             coreProblem: {
                 select: {
                     name: true,
@@ -153,70 +144,31 @@ export async function getNextProblem(userId: string, coreProblemId: string): Pro
         },
     });
 
-    if (unanswered) {
-        return {
-            id: unanswered.id,
-            question: unanswered.question,
-            answer: unanswered.answer,
-            coreProblemId: unanswered.coreProblemId,
-            videoUrl: unanswered.videoUrl,
-            difficulty: unanswered.difficulty ?? undefined,
-            aiGradingEnabled: unanswered.aiGradingEnabled,
-            coreProblemName: unanswered.coreProblem.name,
-            unitName: unanswered.coreProblem.unit.name,
-        };
-    }
+    if (problems.length === 0) return null;
 
-    // 2. 全て回答済みなら、回答済み問題のみを取得して優先度計算
-    const answeredStates = await prisma.userProblemState.findMany({
+    // 2. Fetch user states for these problems
+    const userStates = await prisma.userProblemState.findMany({
         where: {
             userId,
-            problem: { coreProblemId },
-        },
-        include: {
-            problem: {
-                select: {
-                    id: true,
-                    question: true,
-                    answer: true,
-                    coreProblemId: true,
-                    videoUrl: true,
-                    difficulty: true,
-                    aiGradingEnabled: true,
-                    order: true,
-                    coreProblem: {
-                        select: {
-                            name: true,
-                            unit: { select: { name: true } },
-                        },
-                    },
-                },
-            },
+            problemId: { in: problems.map(p => p.id) },
         },
     });
 
-    if (answeredStates.length === 0) return null;
-
-    // 記憶効果込みの優先度が最も高いものを選ぶ
-    const selected = answeredStates.reduce<typeof answeredStates[number] | null>((best, current) => {
-        const currentPriority = calculateEffectivePriority(current.priority, current.lastAnsweredAt, config);
-        if (!best) return current;
-        const bestPriority = calculateEffectivePriority(best.priority, best.lastAnsweredAt, config);
-        return currentPriority > bestPriority ? current : best;
-    }, null);
+    // 3. Use shared logic to select
+    const selected = selectNextProblem(problems, userStates, config);
 
     if (!selected) return null;
 
     return {
-        id: selected.problem.id,
-        question: selected.problem.question,
-        answer: selected.problem.answer,
-        coreProblemId: selected.problem.coreProblemId,
-        videoUrl: selected.problem.videoUrl,
-        difficulty: selected.problem.difficulty ?? undefined,
-        aiGradingEnabled: selected.problem.aiGradingEnabled,
-        coreProblemName: selected.problem.coreProblem.name,
-        unitName: selected.problem.coreProblem.unit.name,
+        id: selected.id,
+        question: selected.question,
+        answer: selected.answer,
+        coreProblemId: selected.coreProblemId,
+        videoUrl: selected.videoUrl,
+        difficulty: selected.difficulty ?? undefined,
+        aiGradingEnabled: selected.aiGradingEnabled,
+        coreProblemName: (selected as any).coreProblem.name,
+        unitName: (selected as any).coreProblem.unit.name,
     };
 }
 

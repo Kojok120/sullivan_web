@@ -1,10 +1,6 @@
 'use server';
 
-import { PrismaClient } from '@prisma/client';
-import { revalidatePath } from 'next/cache';
-import { getSession } from '@/lib/auth';
-
-const prisma = new PrismaClient();
+import { prisma } from '@/lib/prisma';
 
 export async function getClassrooms(query?: string) {
     const session = await getSession();
