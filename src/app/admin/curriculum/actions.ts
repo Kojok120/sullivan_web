@@ -156,24 +156,10 @@ export async function createProblem(data: {
         if (!coreProblem) throw new Error('CoreProblem not found');
 
         const subject = coreProblem.unit.subject;
-        let prefix = '';
-        if (subject.name.includes('英語')) prefix = 'E';
-        else if (subject.name.includes('国語')) prefix = 'J';
-        else if (subject.name.includes('数学')) prefix = 'S';
-        else prefix = subject.name.charAt(0).toUpperCase();
 
-        // 2. Count existing problems for this subject to determine next number
-        // Note: This is not race-condition safe but sufficient for this scale.
-        const count = await prisma.problem.count({
-            where: {
-                coreProblem: {
-                    unit: {
-                        subjectId: subject.id
-                    }
-                }
-            }
-        });
-        const customId = `${prefix}-${count + 1}`;
+        // 2. Generate Custom ID
+        const { generateCustomId } = await import('@/lib/curriculum-service');
+        const customId = await generateCustomId(subject.id);
 
         const problem = await prisma.problem.create({
             data: {
@@ -263,22 +249,13 @@ export async function bulkCreateProblems(coreProblemId: string, problems: {
         if (!coreProblem) throw new Error('CoreProblem not found');
 
         const subject = coreProblem.unit.subject;
-        let prefix = '';
-        if (subject.name.includes('英語')) prefix = 'E';
-        else if (subject.name.includes('国語')) prefix = 'J';
-        else if (subject.name.includes('数学')) prefix = 'S';
-        else prefix = subject.name.charAt(0).toUpperCase();
 
-        // 2. Count existing problems
-        const currentCount = await prisma.problem.count({
-            where: {
-                coreProblem: {
-                    unit: {
-                        subjectId: subject.id
-                    }
-                }
-            }
-        });
+        // 2. Generate Custom IDs
+        const { generateCustomId } = await import('@/lib/curriculum-service');
+        // We need to generate a base ID and then increment manually for the batch, 
+        // OR call generateCustomId for each (inefficient query-wise but safe), 
+        // OR update generateCustomId to accept an offset.
+        // I updated generateCustomId to accept an offset.
 
         // Get current max order
         const currentProblems = await prisma.problem.findMany({
@@ -290,8 +267,31 @@ export async function bulkCreateProblems(coreProblemId: string, problems: {
         let startOrder = (currentProblems[0]?.order || 0) + 1;
 
         // Create problems in transaction
+        // We need to fetch the base count once to avoid race conditions within the loop if we used DB count each time.
+        // generateCustomId uses DB count.
+        // Let's manually calculate the IDs here using the helper's logic but optimized for batch?
+        // Or just use the helper with offset.
+
+        // Pre-fetch the base ID parts to avoid N queries?
+        // Actually, generateCustomId does a count query. Doing it N times is bad.
+        // Let's use the helper to get the *first* ID, then increment manually?
+        // But the helper returns a string "E-10". Parsing it back is annoying.
+        // Better: The helper logic is simple. Let's just use the helper's logic *conceptually* but implemented efficiently here?
+        // NO, the goal is to deduplicate code.
+        // I should use the helper. But calling it N times inside a map is async and might be slow.
+        // But `problems` array is usually small (10-50). It's probably fine.
+        // Wait, `generateCustomId` counts *existing* problems. If I call it in parallel, they all see the same count.
+        // I must pass an offset.
+
+        // Pre-calculate IDs to avoid async issues inside transaction
+        const problemsWithIds = await Promise.all(problems.map(async (p, index) => {
+            const customId = await generateCustomId(subject.id, index);
+            return { ...p, customId, order: startOrder + index };
+        }));
+
+        // Create problems in transaction
         await prisma.$transaction(
-            problems.map((p, index) =>
+            problemsWithIds.map(p =>
                 prisma.problem.create({
                     data: {
                         coreProblemId,
@@ -301,10 +301,10 @@ export async function bulkCreateProblems(coreProblemId: string, problems: {
                         difficulty: p.difficulty || 1,
                         grade: p.grade,
                         acceptedAnswers: p.acceptedAnswers || [],
-                        order: startOrder + index,
+                        order: p.order,
                         type: 'NORMAL',
                         attributes: p.attributes || undefined,
-                        customId: `${prefix}-${currentCount + index + 1}`,
+                        customId: p.customId,
                     },
                 })
             )

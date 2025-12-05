@@ -9,7 +9,7 @@ import { useEffect, useState, useRef, useLayoutEffect } from 'react';
 interface PrintLayoutProps {
     studentName: string;
     subjectName: string;
-    problems: Problem[];
+    problems: (Problem & { customId?: string | null })[];
 }
 
 // A4 height is 297mm. 
@@ -74,11 +74,11 @@ export function PrintLayout({ studentName, subjectName, problems }: PrintLayoutP
     const finalProblems = paginatedProblems.flat();
 
     return (
-        <div className="min-h-screen bg-gray-100 p-8 print:p-0 print:bg-white">
+        <div className="min-h-screen bg-gray-100 p-8 print:p-0 print:bg-white print:min-h-0 print:h-auto">
             {/* Hidden Measurement Container */}
             <div
                 ref={measureRef}
-                className="absolute top-0 left-0 -z-50 opacity-0 pointer-events-none w-[210mm] p-[15mm]"
+                className="absolute top-0 left-0 -z-50 opacity-0 pointer-events-none w-[210mm] p-[15mm] print:hidden"
                 aria-hidden="true"
             >
                 {problems.map((problem, index) => (
@@ -145,13 +145,12 @@ export function PrintLayout({ studentName, subjectName, problems }: PrintLayoutP
                     <div className="print-page p-[15mm] relative flex flex-col break-before-page">
                         <Header studentName={studentName} subjectName={subjectName} date={dateStr} pageNum={3} totalPages={3} type="解答用紙" />
                         <div className="flex-1 mt-6">
-                            <div className="grid grid-cols-2 gap-x-12 gap-y-6">
+                            <div className="flex flex-col gap-8">
                                 {finalProblems.map((problem, index) => (
-                                    <div key={problem.id} className="flex gap-2 items-start break-inside-avoid">
-                                        <div className="font-bold w-12 text-right text-lg pt-2">{problem.customId || index + 1}.</div>
-                                        <div className="flex-1 h-24 border-2 border-gray-300 rounded-md">
-                                            {/* Empty box for student answer */}
-                                        </div>
+                                    <div key={problem.id} className="flex gap-4 items-end break-inside-avoid">
+                                        <div className="font-bold w-16 text-right text-xl">{problem.customId || index + 1}.</div>
+                                        <div className="text-xl font-bold mb-1">A.</div>
+                                        <div className="flex-1 border-b-2 border-gray-800 mb-1"></div>
                                     </div>
                                 ))}
                             </div>

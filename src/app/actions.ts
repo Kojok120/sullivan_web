@@ -195,6 +195,10 @@ export async function submitAnswerWithAI(
     // If needed, we can enable it via environment variable or hardcode.
     const isAiEnabledSystem = false;
 
+    if (!isAiEnabledSystem) {
+        return { aiGraded: false };
+    }
+
     if (!problem) throw new Error("Problem not found");
 
     let evaluation: "A" | "B" | "C" | "D" = "C"; // Default

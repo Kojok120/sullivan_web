@@ -24,9 +24,18 @@ export type DailyActivity = {
 };
 
 export async function getStudentStats(userId: string): Promise<StudentStats> {
-    const [historyCount, correctCount, lastActivity] = await Promise.all([
-        prisma.learningHistory.count({ where: { userId } }),
-        prisma.learningHistory.count({ where: { userId, evaluation: { in: ['A', 'B'] } } }),
+    // Optimized: Fetch counts and last activity in parallel, but combine distinct date query if possible.
+    // Actually, we can just fetch history and process it if it's not too huge.
+    // But for scalability, let's keep counts separate.
+
+    // 1. Get Aggregates
+    const [aggregates, lastActivity] = await Promise.all([
+        prisma.learningHistory.aggregate({
+            where: { userId },
+            _count: {
+                id: true, // Total
+            },
+        }),
         prisma.learningHistory.findFirst({
             where: { userId },
             orderBy: { answeredAt: 'desc' },
@@ -34,8 +43,15 @@ export async function getStudentStats(userId: string): Promise<StudentStats> {
         }),
     ]);
 
-    // Optimized: Fetch distinct dates directly using raw query
-    // Postgres specific syntax for date extraction
+    const historyCount = aggregates._count.id;
+
+    // 2. Get Correct Count (separate query needed for conditional count in Prisma < 5.x or standard usage)
+    const correctCount = await prisma.learningHistory.count({
+        where: { userId, evaluation: { in: ['A', 'B'] } }
+    });
+
+    // 3. Get Distinct Dates for Streak
+    // We only need the dates, not the full objects.
     const distinctDates = await prisma.$queryRaw<{ date: Date }[]>`
         SELECT DISTINCT DATE("answeredAt") as date
         FROM "LearningHistory"
@@ -45,11 +61,11 @@ export async function getStudentStats(userId: string): Promise<StudentStats> {
 
     const uniqueDates = new Set<string>();
     distinctDates.forEach(row => {
-        // row.date is likely a Date object or string depending on driver, safely convert
         const d = new Date(row.date);
         uniqueDates.add(d.toISOString().split('T')[0]);
     });
 
+    // Calculate Streak
     let currentStreak = 0;
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
@@ -57,26 +73,17 @@ export async function getStudentStats(userId: string): Promise<StudentStats> {
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = yesterday.toISOString().split('T')[0];
 
-    if (uniqueDates.has(todayStr)) {
-        currentStreak = 1;
-        let checkDate = new Date(today);
+    // Check if streak is active (today or yesterday has activity)
+    let checkDate = uniqueDates.has(todayStr) ? today : (uniqueDates.has(yesterdayStr) ? yesterday : null);
+
+    if (checkDate) {
+        currentStreak = 0;
+        // Iterate backwards from the active date
         while (true) {
-            checkDate.setDate(checkDate.getDate() - 1);
-            const dateStr = checkDate.toISOString().split('T')[0];
+            const dateStr = checkDate!.toISOString().split('T')[0];
             if (uniqueDates.has(dateStr)) {
                 currentStreak++;
-            } else {
-                break;
-            }
-        }
-    } else if (uniqueDates.has(yesterdayStr)) {
-        currentStreak = 1;
-        let checkDate = new Date(yesterday);
-        while (true) {
-            checkDate.setDate(checkDate.getDate() - 1);
-            const dateStr = checkDate.toISOString().split('T')[0];
-            if (uniqueDates.has(dateStr)) {
-                currentStreak++;
+                checkDate!.setDate(checkDate!.getDate() - 1);
             } else {
                 break;
             }
