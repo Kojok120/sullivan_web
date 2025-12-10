@@ -148,9 +148,9 @@ export function PrintLayout({ studentName, subjectName, problems, qrCodeDataUrl 
                     <div className="print-page p-[15mm] relative flex flex-col break-before-page">
                         <Header studentName={studentName} subjectName={subjectName} date={dateStr} pageNum={3} totalPages={3} type="解答用紙" />
 
-                        {/* Single QR Code at Top Right */}
+                        {/* Single QR Code at Top Right - Adjusted position */}
                         {qrCodeDataUrl && (
-                            <div className="absolute top-[15mm] right-[15mm] w-24 h-24">
+                            <div className="absolute top-[10mm] right-[10mm] w-24 h-24">
                                 <img src={qrCodeDataUrl} alt="QR" className="w-full h-full" />
                             </div>
                         )}
@@ -229,10 +229,10 @@ function Header({ studentName, subjectName, date, pageNum, totalPages, type }: {
         <div className="border-b-2 border-gray-800 pb-2 flex justify-between items-end">
             <div className="flex gap-8 items-end">
                 <h1 className="text-2xl font-bold">{subjectName} {type}</h1>
-                <div className="text-2xl font-bold">氏名：{studentName}</div>
+                <div className="text-xl font-bold">氏名：{studentName}</div>
+                <div className="text-sm font-medium mb-1">実施日: {date}</div>
             </div>
             <div className="flex gap-6 text-sm font-medium">
-                <div>実施日: {date}</div>
                 <div>{pageNum} / {totalPages}</div>
             </div>
         </div>
