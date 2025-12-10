@@ -66,6 +66,7 @@ const createUserSchema = z.object({
     role: z.nativeEnum(Role),
     password: z.string().optional(),
     group: z.string().optional(),
+    classroomId: z.string().optional(),
 });
 
 const updateUserSchema = z.object({
@@ -73,9 +74,10 @@ const updateUserSchema = z.object({
     role: z.nativeEnum(Role).optional(),
     password: z.string().optional(),
     group: z.string().optional(),
+    classroomId: z.string().optional(),
 });
 
-export async function createUser(data: { name: string; role: Role; password?: string; group?: string }) {
+export async function createUser(data: { name: string; role: Role; password?: string; group?: string; classroomId?: string }) {
     await requireAdmin();
     const result = createUserSchema.safeParse(data);
 
@@ -87,7 +89,8 @@ export async function createUser(data: { name: string; role: Role; password?: st
         const { createUser: createUserService } = await import('@/lib/user-service');
         const user = await createUserService({
             ...result.data,
-            group: result.data.group
+            group: result.data.group,
+            classroomId: result.data.classroomId
         } as any);
 
         revalidatePath('/admin/users');
@@ -98,13 +101,14 @@ export async function createUser(data: { name: string; role: Role; password?: st
     }
 }
 
-export async function updateUser(id: string, data: { name?: string; role?: Role; password?: string; group?: string }) {
+export async function updateUser(id: string, data: { name?: string; role?: Role; password?: string; group?: string; classroomId?: string }) {
     await requireAdmin();
     try {
         const updateData: any = {
             name: data.name,
             role: data.role,
-            group: data.group
+            group: data.group,
+            classroomId: data.classroomId
         };
 
         if (data.password) {
@@ -139,6 +143,20 @@ export async function deleteUser(id: string) {
     } catch (error) {
         console.error('Failed to delete user:', error);
         return { error: 'ユーザーの削除に失敗しました' };
+    }
+}
+
+export async function getClassrooms() {
+    await requireAdmin();
+    try {
+        const classrooms = await prisma.classroom.findMany({
+            orderBy: { name: 'asc' },
+            select: { id: true, name: true }
+        });
+        return { success: true, classrooms };
+    } catch (error) {
+        console.error('Failed to fetch classrooms:', error);
+        return { error: '教室の取得に失敗しました' };
     }
 }
 

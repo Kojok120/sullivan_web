@@ -68,6 +68,7 @@ interface UserListProps {
     roleFilter?: Role;
     groupIdFilter?: string;
     groups: Group[];
+    classrooms: { id: string; name: string; }[];
 }
 
 export function UserList({
@@ -80,7 +81,8 @@ export function UserList({
     sortOrder,
     roleFilter,
     groupIdFilter,
-    groups
+    groups,
+    classrooms
 }: UserListProps) {
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
@@ -97,6 +99,7 @@ export function UserList({
         role: 'STUDENT' as Role,
         password: '',
         groupId: '',
+        classroomId: '',
     });
 
     // Search state
@@ -156,11 +159,12 @@ export function UserList({
                 role: formData.role,
                 password: formData.password || undefined,
                 group: formData.groupId || undefined,
+                classroomId: formData.classroomId || undefined,
             });
 
             if (result.success) {
                 setIsAddOpen(false);
-                setFormData({ name: '', role: 'STUDENT', password: '', groupId: '' });
+                setFormData({ name: '', role: 'STUDENT', password: '', groupId: '', classroomId: '' });
                 router.refresh();
             } else {
                 alert(result.error);
@@ -176,12 +180,13 @@ export function UserList({
                 role: formData.role,
                 password: formData.password || undefined,
                 group: formData.groupId || undefined,
+                classroomId: formData.classroomId || undefined,
             });
 
             if (result.success) {
                 setIsEditOpen(false);
                 setSelectedUser(null);
-                setFormData({ name: '', role: 'STUDENT', password: '', groupId: '' });
+                setFormData({ name: '', role: 'STUDENT', password: '', groupId: '', classroomId: '' });
                 router.refresh();
             } else {
                 alert(result.error);
@@ -210,6 +215,7 @@ export function UserList({
             role: user.role,
             password: '',
             groupId: user.group || '',
+            classroomId: user.classroomId || '',
         });
         setIsEditOpen(true);
     };
@@ -435,6 +441,27 @@ export function UserList({
                             />
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="classroomId" className="text-right">
+                                教室
+                            </Label>
+                            <Select
+                                value={formData.classroomId}
+                                onValueChange={(value) => setFormData({ ...formData, classroomId: value })}
+                            >
+                                <SelectTrigger className="col-span-3">
+                                    <SelectValue placeholder="教室を選択 (任意)" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value=" ">なし</SelectItem>
+                                    {classrooms.map((c) => (
+                                        <SelectItem key={c.id} value={c.id}>
+                                            {c.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="groupId" className="text-right">
                                 グループ
                             </Label>
@@ -518,6 +545,27 @@ export function UserList({
                                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                                 className="col-span-3"
                             />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="edit-classroomId" className="text-right">
+                                教室
+                            </Label>
+                            <Select
+                                value={formData.classroomId}
+                                onValueChange={(value) => setFormData({ ...formData, classroomId: value })}
+                            >
+                                <SelectTrigger className="col-span-3">
+                                    <SelectValue placeholder="教室を選択 (任意)" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value=" ">なし</SelectItem>
+                                    {classrooms.map((c) => (
+                                        <SelectItem key={c.id} value={c.id}>
+                                            {c.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="edit-groupId" className="text-right">

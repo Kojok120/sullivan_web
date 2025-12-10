@@ -71,7 +71,7 @@ model User {
   notes           String? // 講師用メモ（性格、特記事項など）
   birthday        DateTime? // 生年月日
   classroomId     String?
-  classroomRef    Classroom?       @relation(fields: [classroomId], references: [id])
+  classroom       Classroom?       @relation(fields: [classroomId], references: [id])
   school          String? // 学校
   phoneNumber     String? // 電話番号
   email           String? // メールアドレス

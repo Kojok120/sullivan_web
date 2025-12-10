@@ -166,9 +166,9 @@ async function archiveProcessedFile(fileId: string, studentId: string, date: Dat
         // 1. Get Classroom Name
         const user = await prisma.user.findUnique({
             where: { id: studentId },
-            include: { classroomRef: true }
+            include: { classroom: true }
         });
-        const classroomName = user?.classroomRef?.name || '未所属';
+        const classroomName = user?.classroom?.name || '未所属';
 
         // 2. Build Path Components
         const year = date.getFullYear().toString() + '年';

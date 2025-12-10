@@ -1,4 +1,4 @@
-import { getUsers, getGroups } from '../actions';
+import { getUsers, getGroups, getClassrooms } from '../actions';
 import { UserList } from './user-list';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -26,13 +26,15 @@ export default async function UsersPage({
     // Validate role
     const roleEnum = role && ['STUDENT', 'TEACHER', 'PARENT', 'ADMIN'].includes(role) ? role as any : undefined;
 
-    const [usersData, groupsData] = await Promise.all([
+    const [usersData, groupsData, classroomsData] = await Promise.all([
         getUsers(currentPage, limit, query, currentSortBy, currentSortOrder, roleEnum, groupId),
         getGroups(),
+        getClassrooms(),
     ]);
 
     const { users, total, error } = usersData;
     const groups = groupsData.groups || [];
+    const classrooms = classroomsData.classrooms || [];
 
     if (error || !users) {
         return (
@@ -57,6 +59,7 @@ export default async function UsersPage({
                         roleFilter={roleEnum}
                         groupIdFilter={groupId}
                         groups={groups}
+                        classrooms={classrooms}
                     />
                 </div>
             </div>
