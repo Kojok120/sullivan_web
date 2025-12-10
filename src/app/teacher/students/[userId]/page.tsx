@@ -8,7 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Link from 'next/link';
 import { ArrowLeft, AlertTriangle, Clock, Target, Trophy, Activity, Printer } from 'lucide-react';
-import { getStudentStats, getUnitProgress, getDailyActivity, getStudentWeaknesses } from '@/lib/analytics';
+import { getStudentStats, getSubjectProgress, getDailyActivity, getStudentWeaknesses } from '@/lib/analytics';
 import { ActivityChart } from '@/app/dashboard/activity-chart';
 import { ProfileCard } from './profile-card';
 import { GuidanceList } from './guidance-list';
@@ -24,7 +24,7 @@ export default async function TeacherStudentDetailPage({
 
     const { userId } = await params;
 
-    const [student, stats, unitProgress, dailyActivity, weaknesses, recentHistory, classrooms, subjects] = await Promise.all([
+    const [student, stats, subjectProgress, dailyActivity, weaknesses, recentHistory, classrooms, subjects] = await Promise.all([
         prisma.user.findUnique({
             where: { id: userId },
             include: {
@@ -35,7 +35,7 @@ export default async function TeacherStudentDetailPage({
             },
         }),
         getStudentStats(userId),
-        getUnitProgress(userId),
+        getSubjectProgress(userId),
         getDailyActivity(userId),
         getStudentWeaknesses(userId),
         prisma.learningHistory.findMany({
@@ -45,11 +45,11 @@ export default async function TeacherStudentDetailPage({
             include: {
                 problem: {
                     include: {
-                        coreProblem: {
+                        coreProblems: {
                             select: {
                                 id: true,
                                 name: true,
-                                unit: true
+                                subject: true
                             }
                         }
                     }
@@ -164,7 +164,7 @@ export default async function TeacherStudentDetailPage({
                                             <div key={w.coreProblemId} className="flex items-center justify-between border-b pb-2 last:border-0">
                                                 <div className="space-y-1">
                                                     <p className="font-medium text-sm">{w.coreProblemName}</p>
-                                                    <p className="text-xs text-muted-foreground">{w.unitName}</p>
+                                                    <p className="text-xs text-muted-foreground">{w.subjectName}</p>
                                                 </div>
                                                 <div className="text-right">
                                                     <span className="text-red-500 font-bold text-lg">{w.accuracy}%</span>
@@ -192,24 +192,23 @@ export default async function TeacherStudentDetailPage({
                         </Card>
                     </div>
 
-                    {/* Unit Progress */}
+                    {/* Subject Progress */}
                     <Card>
                         <CardHeader>
-                            <CardTitle>単元別進捗状況</CardTitle>
+                            <CardTitle>科目別進捗状況</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-8">
-                            {unitProgress.map((unit) => (
-                                <div key={unit.unitId} className="space-y-2">
+                            {subjectProgress.map((subject) => (
+                                <div key={subject.subjectId} className="space-y-2">
                                     <div className="flex items-center justify-between">
                                         <div className="space-y-0.5">
-                                            <div className="font-medium">{unit.unitName}</div>
-                                            <div className="text-xs text-muted-foreground">{unit.subjectName}</div>
+                                            <div className="font-medium">{subject.subjectName}</div>
                                         </div>
                                         <div className="text-sm text-muted-foreground">
-                                            {unit.clearedCoreProblems} / {unit.totalCoreProblems} クリア
+                                            {subject.clearedCoreProblems} / {subject.totalCoreProblems} クリア
                                         </div>
                                     </div>
-                                    <Progress value={unit.progressPercentage} className="h-2" />
+                                    <Progress value={subject.progressPercentage} className="h-2" />
                                 </div>
                             ))}
                         </CardContent>
@@ -227,9 +226,9 @@ export default async function TeacherStudentDetailPage({
                                     <div key={history.id} className="flex flex-col space-y-2 border-b pb-4 last:border-0">
                                         <div className="flex items-center justify-between">
                                             <div className="font-medium text-sm">
-                                                {history.problem.coreProblem.name}
+                                                {history.problem.coreProblems[0]?.name || 'Unknown CoreProblem'}
                                                 <span className="ml-2 text-xs font-normal text-muted-foreground">
-                                                    ({history.problem.coreProblem.unit.name})
+                                                    ({history.problem.coreProblems[0]?.subject.name || 'Unknown Subject'})
                                                 </span>
                                             </div>
                                             <div className="text-xs text-muted-foreground">

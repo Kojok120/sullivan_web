@@ -8,62 +8,41 @@ datasource db {
 }
 
 model Subject {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  icon      String?
-  order     Int
-  units     Unit[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Unit {
   id           String        @id @default(cuid())
-  name         String
+  name         String        @unique
+  icon         String?
   order        Int
-  subjectId    String
-  subject      Subject       @relation(fields: [subjectId], references: [id])
   coreProblems CoreProblem[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 }
 
 model CoreProblem {
-  id             String    @id @default(cuid())
+  id             String                 @id @default(cuid())
   name           String
-  unitId         String
-  unit           Unit      @relation(fields: [unitId], references: [id])
+  subjectId      String
+  subject        Subject                @relation(fields: [subjectId], references: [id])
   problems       Problem[]
+  userStates     UserCoreProblemState[]
   order          Int
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-}
-
-enum ProblemType {
-  NORMAL
-  PREREQ
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
 }
 
 model Problem {
-  id               String             @id @default(cuid())
-  question         String
-  answer           String
-  customId         String?            @unique // Custom ID (e.g., E-1, S-10)
-  acceptedAnswers  String[]           @default([]) // 許容解答（複数）
-  difficulty       Int?               // 難易度
-  grade            String?            // 学年 (e.g., "中1", "高2")
-  tags             String[]           @default([]) // タグ
-  type             ProblemType        @default(NORMAL)
-  coreProblemId    String
-  coreProblem      CoreProblem        @relation(fields: [coreProblemId], references: [id])
-  order            Int // Chain order
-  videoUrl         String? // For C/D feedback
-  aiGradingEnabled Boolean            @default(false)
-  attributes       Json?              // Subject-specific attributes (e.g., English grammar)
-  histories        LearningHistory[]
-  userStates       UserProblemState[]
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
+  id              String             @id @default(cuid())
+  question        String
+  answer          String
+  customId        String?            @unique // Custom ID (e.g., E-1, S-10)
+  acceptedAnswers String[]           @default([]) // 許容解答（複数）
+  grade           String?            // 学年 (e.g., "中1", "高2")
+  coreProblems    CoreProblem[]
+  order           Int // Chain order
+  videoUrl        String? // For C/D feedback
+  histories       LearningHistory[]
+  userStates      UserProblemState[]
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
 }
 
 enum Role {
@@ -83,21 +62,21 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  learningHistory   LearningHistory[]
-  userProblemStates UserProblemState[]
+  learningHistory       LearningHistory[]
+  userProblemStates     UserProblemState[]
+  userCoreProblemStates UserCoreProblemState[]
 
   // Teacher specific fields
-  bio               String?   // 生徒プロフィール（部活、志望校など）
-  notes             String?   // 講師用メモ（性格、特記事項など）
-  birthday          DateTime? // 生年月日
-  classroom         String?   // 教室 (Legacy field, to be migrated)
-  classroomId       String?
-  classroomRef      Classroom? @relation(fields: [classroomId], references: [id])
-  school            String?   // 学校
-  phoneNumber       String?   // 電話番号
-  email             String?   // メールアドレス
-  guidanceRecords   GuidanceRecord[] @relation("StudentGuidance")
-  createdGuidance   GuidanceRecord[] @relation("TeacherGuidance")
+  bio             String? // 生徒プロフィール（部活、志望校など）
+  notes           String? // 講師用メモ（性格、特記事項など）
+  birthday        DateTime? // 生年月日
+  classroomId     String?
+  classroomRef    Classroom?       @relation(fields: [classroomId], references: [id])
+  school          String? // 学校
+  phoneNumber     String? // 電話番号
+  email           String? // メールアドレス
+  guidanceRecords GuidanceRecord[] @relation("StudentGuidance")
+  createdGuidance GuidanceRecord[] @relation("TeacherGuidance")
 }
 
 model Classroom {
@@ -111,8 +90,8 @@ model Classroom {
 
 enum GuidanceType {
   INTERVIEW // 面談
-  GUIDANCE  // 指導
-  OTHER     // その他
+  GUIDANCE // 指導
+  OTHER // その他
 }
 
 model GuidanceRecord {
@@ -129,28 +108,38 @@ model GuidanceRecord {
 }
 
 model LearningHistory {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  problemId   String
-  problem     Problem  @relation(fields: [problemId], references: [id])
-  evaluation  String // A, B, C, D
-  userAnswer  String? // User's text answer
-  feedback    String? // AI feedback
-  answeredAt  DateTime @default(now())
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  problemId  String
+  problem    Problem  @relation(fields: [problemId], references: [id])
+  evaluation String // A, B, C, D
+  userAnswer String? // User's text answer
+  feedback   String? // AI feedback
+  answeredAt DateTime @default(now())
 }
 
 model UserProblemState {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   userId         String
-  user           User     @relation(fields: [userId], references: [id])
+  user           User      @relation(fields: [userId], references: [id])
   problemId      String
-  problem        Problem  @relation(fields: [problemId], references: [id])
-  priority       Int      @default(0)
+  problem        Problem   @relation(fields: [problemId], references: [id])
+  priority       Int       @default(0)
   lastAnsweredAt DateTime?
-  isCleared      Boolean  @default(false)
-  
+  isCleared      Boolean   @default(false)
+
   @@unique([userId, problemId])
 }
 
+model UserCoreProblemState {
+  id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id])
+  coreProblemId String
+  coreProblem   CoreProblem @relation(fields: [coreProblemId], references: [id])
+  priority      Int         @default(0) // ポイント
+  isUnlocked    Boolean     @default(false)
 
+  @@unique([userId, coreProblemId])
+}

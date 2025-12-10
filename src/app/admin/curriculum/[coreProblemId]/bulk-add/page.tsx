@@ -16,11 +16,7 @@ export default async function BulkAddPage({
     const coreProblem = await prisma.coreProblem.findUnique({
         where: { id: coreProblemId },
         include: {
-            unit: {
-                include: {
-                    subject: true
-                }
-            }
+            subject: true
         }
     });
 
@@ -32,7 +28,7 @@ export default async function BulkAddPage({
         <div className="container mx-auto py-10 px-4">
             <BulkProblemEditor
                 coreProblemId={coreProblem.id}
-                subjectName={coreProblem.unit.subject.name}
+                subjectName={coreProblem.subject.name}
             />
         </div>
     );

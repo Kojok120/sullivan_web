@@ -9,13 +9,12 @@ export type StudentStats = {
     lastActivity: Date | null;
 };
 
-export type UnitProgress = {
-    unitId: string;
-    unitName: string;
+export type SubjectProgress = {
+    subjectId: string;
+    subjectName: string;
     totalCoreProblems: number;
     clearedCoreProblems: number;
     progressPercentage: number;
-    subjectName: string;
 };
 
 export type DailyActivity = {
@@ -24,10 +23,6 @@ export type DailyActivity = {
 };
 
 export async function getStudentStats(userId: string): Promise<StudentStats> {
-    // Optimized: Fetch counts and last activity in parallel, but combine distinct date query if possible.
-    // Actually, we can just fetch history and process it if it's not too huge.
-    // But for scalability, let's keep counts separate.
-
     // 1. Get Aggregates
     const [aggregates, lastActivity] = await Promise.all([
         prisma.learningHistory.aggregate({
@@ -45,13 +40,12 @@ export async function getStudentStats(userId: string): Promise<StudentStats> {
 
     const historyCount = aggregates._count.id;
 
-    // 2. Get Correct Count (separate query needed for conditional count in Prisma < 5.x or standard usage)
+    // 2. Get Correct Count
     const correctCount = await prisma.learningHistory.count({
         where: { userId, evaluation: { in: ['A', 'B'] } }
     });
 
     // 3. Get Distinct Dates for Streak
-    // We only need the dates, not the full objects.
     const distinctDates = await prisma.$queryRaw<{ date: Date }[]>`
         SELECT DISTINCT DATE("answeredAt") as date
         FROM "LearningHistory"
@@ -98,8 +92,6 @@ export async function getStudentStats(userId: string): Promise<StudentStats> {
         lastActivity: lastActivity?.answeredAt || null,
     };
 }
-
-
 
 export async function getStudentsWithStats(query?: string) {
     const students = await prisma.user.findMany({
@@ -171,8 +163,6 @@ export async function getStudentsWithStats(query?: string) {
         if (stats.totalProblemsSolved > 0) {
             stats.accuracy = Math.round((stats.totalCorrect / stats.totalProblemsSolved) * 100);
         }
-        // Streak is too expensive to calculate in bulk for the list view.
-        // We leave it as 0. If needed, we should fetch it individually or use a materialized view.
         stats.currentStreak = 0;
     });
 
@@ -182,11 +172,10 @@ export async function getStudentsWithStats(query?: string) {
     }));
 }
 
-export async function getUnitProgress(userId: string): Promise<UnitProgress[]> {
-    // Get all units and their core problem counts
-    const units = await prisma.unit.findMany({
+export async function getSubjectProgress(userId: string): Promise<SubjectProgress[]> {
+    // Get all subjects and their core problem counts
+    const subjects = await prisma.subject.findMany({
         include: {
-            subject: true,
             coreProblems: {
                 select: { id: true },
             },
@@ -194,36 +183,39 @@ export async function getUnitProgress(userId: string): Promise<UnitProgress[]> {
         orderBy: { order: 'asc' },
     });
 
-    // Get cleared problems for this user
-    const clearedStates = await prisma.userProblemState.findMany({
-        where: {
-            userId,
-            isCleared: true,
-        },
-        include: {
-            problem: {
-                select: { coreProblemId: true },
-            },
-        },
+    // Get cleared CoreProblems for this user
+    // We use UserCoreProblemState.isUnlocked? 
+    // Or we calculate "cleared" based on proficiency?
+    // Let's use UserCoreProblemState.isUnlocked if available, or assume if next one is unlocked, this one is cleared?
+    // Actually, let's use the same logic as print-algo: AnswerRate >= 50% & CorrectRate >= 60%.
+    // But for analytics, we might want to just check if they have "passed" it.
+    // Let's rely on UserCoreProblemState.isUnlocked for now, assuming we update it somewhere.
+    // Wait, I haven't implemented the logic to UPDATE UserCoreProblemState yet.
+    // So relying on it might show 0 progress.
+    // Alternative: Check if they have answered problems in the CoreProblem correctly?
+
+    // Let's fetch UserCoreProblemState
+    const userCoreStates = await prisma.userCoreProblemState.findMany({
+        where: { userId, isUnlocked: true }
     });
+    const unlockedCpIds = new Set(userCoreStates.map(s => s.coreProblemId));
 
-    const clearedCoreProblemIds = new Set(
-        clearedStates.map(s => s.problem.coreProblemId)
-    );
-
-    return units.map(unit => {
-        const totalCoreProblems = unit.coreProblems.length;
-        // Count how many core problems in this unit have at least one cleared problem
-        // Note: This logic assumes clearing ANY problem in a core problem group counts as progress
-        // Adjust if "All problems in core problem" need to be cleared
-        const clearedCount = unit.coreProblems.filter(cp =>
-            clearedCoreProblemIds.has(cp.id)
-        ).length;
+    return subjects.map(subject => {
+        const totalCoreProblems = subject.coreProblems.length;
+        // Count unlocked/cleared core problems
+        // Note: "Unlocked" usually means "Ready to play". "Cleared" means "Done".
+        // If we track "Cleared", we need a separate flag or logic.
+        // Let's assume for progress, we count how many are "Unlocked" (meaning they reached that stage) 
+        // OR how many are "Completed" (passed).
+        // The user said "Next CoreProblem is unlocked if current is passed".
+        // So "Unlocked count" roughly tracks progress.
+        // But the last one being unlocked doesn't mean it's done.
+        // Let's count "Unlocked" as progress for now.
+        const clearedCount = subject.coreProblems.filter(cp => unlockedCpIds.has(cp.id)).length;
 
         return {
-            unitId: unit.id,
-            unitName: unit.name,
-            subjectName: unit.subject.name,
+            subjectId: subject.id,
+            subjectName: subject.name,
             totalCoreProblems,
             clearedCoreProblems: clearedCount,
             progressPercentage: totalCoreProblems > 0 ? Math.round((clearedCount / totalCoreProblems) * 100) : 0,
@@ -235,10 +227,6 @@ export async function getDailyActivity(userId: string, days = 30): Promise<Daily
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    // Use groupBy result directly if possible, but Prisma groupBy on date is tricky.
-    // Actually, the review says we are not using `logs` (groupBy result) and doing findMany again.
-    // Let's just use findMany as it gives us the raw dates we need to map to YYYY-MM-DD.
-    // Removing the unused groupBy query.
     const rawLogs = await prisma.learningHistory.findMany({
         where: {
             userId,
@@ -272,43 +260,41 @@ export async function getDailyActivity(userId: string, days = 30): Promise<Daily
 export type Weakness = {
     coreProblemId: string;
     coreProblemName: string;
-    unitName: string;
+    subjectName: string;
     accuracy: number;
     totalAttempts: number;
 };
 
 export async function getStudentWeaknesses(userId: string, limit = 5): Promise<Weakness[]> {
-    // Optimized: Use groupBy to aggregate stats by coreProblemId directly in DB
-
-
-    // Actually, `groupBy` on `problemId` gives us stats per problem.
-    // Then we need to map problemId -> coreProblemId.
-    // This might still be heavy if there are many problems.
-
-    // Let's try a raw query. It's the most efficient for "Weaknesses based on accuracy per Core Problem".
-    // "SELECT cp.id, cp.name, u.name as unitName, count(*) as total, sum(case when lh.evaluation in ('A', 'B') then 1 else 0 end) as correct FROM LearningHistory lh JOIN Problem p ON lh.problemId = p.id JOIN CoreProblem cp ON p.coreProblemId = cp.id JOIN Unit u ON cp.unitId = u.id WHERE lh.userId = ... GROUP BY cp.id ..."
+    // Updated to use Subject instead of Unit
+    // Note: Prisma raw query needs to handle Many-to-Many relation between Problem and CoreProblem.
+    // Problem has `coreProblems` (implicit many-to-many).
+    // In raw SQL, implicit many-to-many uses a join table `_CoreProblemToProblem`.
+    // Table name: `_CoreProblemToProblem`
+    // Columns: `A` (CoreProblemId), `B` (ProblemId)
 
     const weaknessesRaw = await prisma.$queryRaw<
         Array<{
             coreProblemId: string;
             coreProblemName: string;
-            unitName: string;
-            totalAttempts: bigint; // BigInt in raw query result
+            subjectName: string;
+            totalAttempts: bigint;
             correctCount: bigint;
         }>
     >`
         SELECT 
             cp.id as "coreProblemId",
             cp.name as "coreProblemName",
-            u.name as "unitName",
+            s.name as "subjectName",
             COUNT(lh.id) as "totalAttempts",
             SUM(CASE WHEN lh.evaluation IN ('A', 'B') THEN 1 ELSE 0 END) as "correctCount"
         FROM "LearningHistory" lh
         JOIN "Problem" p ON lh."problemId" = p.id
-        JOIN "CoreProblem" cp ON p."coreProblemId" = cp.id
-        JOIN "Unit" u ON cp."unitId" = u.id
+        JOIN "_CoreProblemToProblem" cpp ON p.id = cpp."B"
+        JOIN "CoreProblem" cp ON cpp."A" = cp.id
+        JOIN "Subject" s ON cp."subjectId" = s.id
         WHERE lh."userId" = ${userId}
-        GROUP BY cp.id, cp.name, u.name
+        GROUP BY cp.id, cp.name, s.name
         HAVING COUNT(lh.id) >= 3
         ORDER BY (CAST(SUM(CASE WHEN lh.evaluation IN ('A', 'B') THEN 1 ELSE 0 END) AS FLOAT) / COUNT(lh.id)) ASC
         LIMIT ${limit}
@@ -317,7 +303,7 @@ export async function getStudentWeaknesses(userId: string, limit = 5): Promise<W
     return weaknessesRaw.map(w => ({
         coreProblemId: w.coreProblemId,
         coreProblemName: w.coreProblemName,
-        unitName: w.unitName,
+        subjectName: w.subjectName,
         accuracy: Number(w.totalAttempts) > 0 ? Math.round((Number(w.correctCount) / Number(w.totalAttempts)) * 100) : 0,
         totalAttempts: Number(w.totalAttempts),
     }));

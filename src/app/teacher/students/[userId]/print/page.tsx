@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { selectProblemsForPrint } from '@/lib/print-algo';
 import { PrintLayout } from './print-layout';
+import { generateQRCode } from '@/lib/grading-service';
 
 export default async function PrintPage({
     params,
@@ -30,18 +31,24 @@ export default async function PrintPage({
             where: { id: subjectId },
             select: { name: true }
         }),
-        selectProblemsForPrint(userId, subjectId) // Use default count
+        selectProblemsForPrint(userId, subjectId)
     ]);
 
     if (!student || !subject) {
         return <div>Data not found</div>;
     }
 
+    // Generate QR Codes
+    const problemsWithQR = await Promise.all(problems.map(async (p) => ({
+        ...p,
+        qrCodeDataUrl: await generateQRCode(userId, p.id)
+    })));
+
     return (
         <PrintLayout
             studentName={student.name || student.loginId}
             subjectName={subject.name}
-            problems={problems}
+            problems={problemsWithQR}
         />
     );
 }

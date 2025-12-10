@@ -1,31 +1,22 @@
 import { prisma } from '@/lib/prisma';
 
-export async function fetchSubjects(options?: { includeUnits?: boolean; includeCoreProblems?: boolean }) {
-    const includeUnits = options?.includeUnits ?? false;
+export async function fetchSubjects(options?: { includeCoreProblems?: boolean }) {
     const includeCoreProblems = options?.includeCoreProblems ?? false;
 
     return await prisma.subject.findMany({
         orderBy: { order: 'asc' },
-        include: includeUnits ? {
-            units: {
+        include: {
+            coreProblems: includeCoreProblems ? {
                 orderBy: { order: 'asc' },
-                include: {
-                    subject: true,
-                    coreProblems: includeCoreProblems ? {
-                        orderBy: { order: 'asc' },
-                        select: {
-                            id: true,
-                            name: true,
-                            unitId: true,
-                            order: true,
-                            createdAt: true,
-                            updatedAt: true,
-                            // Explicitly excluding description and sharedVideoUrl by not selecting them
-                        }
-                    } : undefined
+                select: {
+                    id: true,
+                    name: true,
+                    order: true,
+                    createdAt: true,
+                    updatedAt: true,
                 }
-            }
-        } : undefined
+            } : undefined
+        }
     });
 }
 
@@ -40,11 +31,10 @@ export async function generateCustomId(subjectId: string, offset: number = 0): P
     else prefix = subject.name.charAt(0).toUpperCase();
 
     // Count existing problems
-    // Note: This is not race-condition safe but sufficient for this scale.
     const count = await prisma.problem.count({
         where: {
-            coreProblem: {
-                unit: {
+            coreProblems: {
+                some: {
                     subjectId: subject.id
                 }
             }

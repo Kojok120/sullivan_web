@@ -9,7 +9,7 @@ import { useEffect, useState, useRef, useLayoutEffect } from 'react';
 interface PrintLayoutProps {
     studentName: string;
     subjectName: string;
-    problems: (Problem & { customId?: string | null })[];
+    problems: (Problem & { customId?: string | null; qrCodeDataUrl?: string })[];
 }
 
 // A4 height is 297mm. 
@@ -23,7 +23,7 @@ export function PrintLayout({ studentName, subjectName, problems }: PrintLayoutP
 
     console.log('PrintLayout received problems:', problems);
 
-    const [paginatedProblems, setPaginatedProblems] = useState<Problem[][]>([]);
+    const [paginatedProblems, setPaginatedProblems] = useState<(Problem & { customId?: string | null; qrCodeDataUrl?: string })[][]>([]);
     const [isCalculating, setIsCalculating] = useState(true);
     const measureRef = useRef<HTMLDivElement>(null);
 
@@ -31,8 +31,8 @@ export function PrintLayout({ studentName, subjectName, problems }: PrintLayoutP
         if (!measureRef.current) return;
 
         const problemNodes = measureRef.current.children;
-        const pages: Problem[][] = [];
-        let currentPage: Problem[] = [];
+        const pages: (Problem & { customId?: string | null; qrCodeDataUrl?: string })[][] = [];
+        let currentPage: (Problem & { customId?: string | null; qrCodeDataUrl?: string })[] = [];
         let currentHeight = 0;
 
         // We only want 2 pages of questions max
@@ -149,6 +149,12 @@ export function PrintLayout({ studentName, subjectName, problems }: PrintLayoutP
                                 {finalProblems.map((problem, index) => (
                                     <div key={problem.id} className="flex gap-4 items-end break-inside-avoid">
                                         <div className="font-bold w-16 text-right text-xl">{problem.customId || index + 1}.</div>
+                                        {/* QR Code */}
+                                        {problem.qrCodeDataUrl && (
+                                            <div className="mb-1">
+                                                <img src={problem.qrCodeDataUrl} alt="QR" className="w-16 h-16" />
+                                            </div>
+                                        )}
                                         <div className="text-xl font-bold mb-1">A.</div>
                                         <div className="flex-1 border-b-2 border-gray-800 mb-1"></div>
                                     </div>
