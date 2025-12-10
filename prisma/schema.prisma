@@ -117,6 +117,10 @@ model LearningHistory {
   userAnswer String? // User's text answer
   feedback   String? // AI feedback
   answeredAt DateTime @default(now())
+  
+  // Grouping & Video Logic
+  groupId        String?   // UUID for batch grouping
+  isVideoWatched Boolean   @default(false)
 }
 
 model UserProblemState {

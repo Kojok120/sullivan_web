@@ -29,3 +29,25 @@ export async function getSubject(id: string) {
         },
     });
 }
+
+export async function markVideoWatched(historyId: string) {
+    const session = await getSession();
+    if (!session) throw new Error("Unauthorized");
+
+    // Verify ownership
+    const record = await prisma.learningHistory.findUnique({
+        where: { id: historyId },
+    });
+
+    if (!record || record.userId !== session.userId) {
+        throw new Error("Not found or access denied");
+    }
+
+    await prisma.learningHistory.update({
+        where: { id: historyId },
+        data: { isVideoWatched: true },
+    });
+
+    // Revalidate relevant paths if needed, e.g. dashboard
+    // revalidatePath('/dashboard');
+}

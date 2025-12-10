@@ -403,3 +403,79 @@ export async function getAllSubjects() {
         orderBy: { order: 'asc' }
     });
 }
+
+export type LearningSession = {
+    groupId: string;
+    date: Date;
+    subjectName: string;
+    totalProblems: number;
+    correctCount: number;
+};
+
+// Group history by groupId
+export async function getLearningSessions(userId: string, limit = 10): Promise<LearningSession[]> {
+    // We can't easily group by groupId and join relations in Prisma (it requires raw SQL or post-processing).
+    // Let's use Raw SQL for performance grouping.
+
+    const sessions = await prisma.$queryRaw<Array<{
+        groupId: string;
+        date: Date;
+        subjectName: string;
+        total: bigint;
+        correct: bigint;
+    }>>`
+        SELECT 
+            lh."groupId",
+            MAX(lh."answeredAt") as "date",
+            MAX(s.name) as "subjectName",
+            COUNT(*) as "total",
+            SUM(CASE WHEN lh.evaluation IN ('A', 'B') THEN 1 ELSE 0 END) as "correct"
+        FROM "LearningHistory" lh
+        JOIN "Problem" p ON lh."problemId" = p.id
+        -- We join CoreProblem -> Subject.
+        -- Problem has many CoreProblems. We pick the first one roughly (MAX/MIN).
+        JOIN "_CoreProblemToProblem" cpp ON p.id = cpp."B"
+        JOIN "CoreProblem" cp ON cpp."A" = cp.id
+        JOIN "Subject" s ON cp."subjectId" = s.id
+        WHERE lh."userId" = ${userId} AND lh."groupId" IS NOT NULL
+        GROUP BY lh."groupId"
+        ORDER BY "date" DESC
+        LIMIT ${limit}
+    `;
+
+    return sessions.map(s => ({
+        groupId: s.groupId,
+        date: s.date,
+        subjectName: s.subjectName || "不明な教科",
+        totalProblems: Number(s.total),
+        correctCount: Number(s.correct)
+    }));
+}
+
+export async function getSessionDetails(groupId: string) {
+    return await prisma.learningHistory.findMany({
+        where: { groupId },
+        include: {
+            problem: {
+                include: {
+                    coreProblems: { include: { subject: true } }
+                }
+            }
+        },
+        orderBy: { problem: { order: 'asc' } } // or custom order logic
+    });
+}
+
+export async function getUnwatchedCount(userId: string): Promise<number> {
+    const count = await prisma.learningHistory.count({
+        where: {
+            userId,
+            isVideoWatched: false,
+            evaluation: { in: ['C', 'D'] }, // Only count incorrect ones
+            problem: {
+                videoUrl: { not: null } // Only if video exists
+            }
+        }
+    });
+    return count;
+}

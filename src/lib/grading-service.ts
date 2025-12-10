@@ -119,10 +119,21 @@ async function processFile(fileId: string, fileName: string) {
 
         await new Promise((resolve, reject) => {
             res.data
-                .on('end', () => resolve(true))
                 .on('error', (err: any) => reject(err))
-                .pipe(dest);
+                .pipe(dest)
+                .on('error', (err: any) => reject(err))
+                .on('finish', () => resolve(true));
         });
+
+        const stats = await fs.promises.stat(destPath);
+        console.log(`Downloaded ${fileName}: ${stats.size} bytes`);
+
+        // Read header
+        const fd = await fs.promises.open(destPath, 'r');
+        const buffer = Buffer.alloc(8);
+        await fd.read(buffer, 0, 8, 0);
+        await fd.close();
+        console.log(`File Header: ${buffer.toString('hex')}`);
 
         // Read QR and Grade using Gemini
         const results = await gradeWithGemini(destPath);
@@ -131,7 +142,8 @@ async function processFile(fileId: string, fileName: string) {
         if (results && results.length > 0) {
             await recordGradingResults(results);
             // Archive the file (using the first result's studentId)
-            await archiveProcessedFile(fileId, results[0].studentId, new Date());
+            const problemIdForContext = results[0].problemId;
+            await archiveProcessedFile(fileId, results[0].studentId, problemIdForContext, new Date(), fileName);
             console.log(`Archived file ${fileName}`);
         } else {
             await renameFile(fileId, `[ERROR] ${fileName}`);
@@ -159,21 +171,51 @@ async function renameFile(fileId: string, newName: string) {
 }
 
 // Archive Logic
-async function archiveProcessedFile(fileId: string, studentId: string, date: Date) {
+async function archiveProcessedFile(fileId: string, studentId: string, problemId: string, date: Date, originalFileName: string = 'file.pdf') {
     try {
-        // 1. Get Classroom Name
+        // 1. Get Classroom Name and Student Name
         const user = await prisma.user.findUnique({
             where: { id: studentId },
             include: { classroom: true }
         });
         const classroomName = (user as any)?.classroom?.name || '未所属';
+        const studentName = user?.name || user?.loginId || '不明な生徒';
 
-        // 2. Build Path Components
-        const year = date.getFullYear().toString() + '年';
-        const month = (date.getMonth() + 1).toString() + '月';
-        const day = date.getDate().toString() + '日';
+        // 2. Get Subject Name via Problem
+        const problem = await prisma.problem.findUnique({
+            where: { id: problemId },
+            include: { coreProblems: { include: { subject: true } } }
+        });
 
-        // 3. Resolve/Create Folders
+        // Try to find the subject. Problems can have multiple CoreProblems, but usually same Subject.
+        let subjectName = '不明な教科';
+        if (problem && problem.coreProblems.length > 0) {
+            subjectName = problem.coreProblems[0].subject.name;
+            // Clean subject name if needed (remove special chars?)
+        }
+
+        // 3. Build New Filename: 教室名_生徒名_科目_採点時間.pdf
+        const ext = path.extname(originalFileName) || '.pdf';
+        const timeStr = date.toISOString().replace(/T/, '_').replace(/:/g, '').split('.')[0];
+        // ISO: 2023-10-10T10:10:10.000Z -> 2023-10-10_101010
+        // User requested: 採点時間. Format YYYYMMDD-HHMMSS? 
+        // Let's use YYYYMMDD-HHMMSS
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        const h = String(date.getHours()).padStart(2, '0');
+        const min = String(date.getMinutes()).padStart(2, '0');
+        const s = String(date.getSeconds()).padStart(2, '0');
+        const timestamp = `${y}${m}${d}-${h}${min}${s}`;
+
+        const newFileName = `${classroomName}_${studentName}_${subjectName}_${timestamp}${ext}`;
+
+        // 4. Build Path Components for Folders
+        const year = y + '年';
+        const month = String(date.getMonth() + 1) + '月';
+        const day = String(date.getDate()) + '日';
+
+        // 5. Resolve/Create Folders
         // Root: "採点済" inside DRIVE_FOLDER_ID
         const rootId = await ensureFolder('採点済', DRIVE_FOLDER_ID);
         const classId = await ensureFolder(classroomName, rootId);
@@ -181,7 +223,7 @@ async function archiveProcessedFile(fileId: string, studentId: string, date: Dat
         const monthId = await ensureFolder(month, yearId);
         const dayId = await ensureFolder(day, monthId);
 
-        // 4. Move File
+        // 6. Move & Rename File
         const driveClient = getDrive();
         // We need to retrieve the current parents to remove them
         const file = await driveClient.files.get({ fileId, fields: 'parents' });
@@ -191,8 +233,10 @@ async function archiveProcessedFile(fileId: string, studentId: string, date: Dat
             fileId,
             addParents: dayId,
             removeParents: previousParents,
-            fields: 'id, parents'
+            requestBody: { name: newFileName },
+            fields: 'id, parents, name'
         });
+        console.log(`Moved and Renamed file to: ${newFileName}`);
 
     } catch (error) {
         console.error('Error archiving file:', error);
@@ -269,24 +313,33 @@ async function readQRCodeLocally(filePath: string): Promise<QRData | null> {
 
         if (!metadata.width || !metadata.height) return null;
 
-        // Ensure image is processed (e.g. grayscale for better QR detection)
+        console.log(`Local QR Read: Image size ${metadata.width}x${metadata.height}`);
+
+        // Resize if too large (jsQR is faster/better with reasonable sizes ~1000-2000px)
+        if (metadata.width > 2000) {
+            image.resize(2000);
+        }
+
+        // Ensure image is processed (grayscale + normalize might help)
         const { data, info } = await image
-            .ensureAlpha()
+            .grayscale() // Convert to grayscale
+            .normalize() // Improve contrast
             .raw()
             .toBuffer({ resolveWithObject: true });
 
-        // jsQR expects Uint8ClampedArray, but Buffer is Uint8Array. 
-        // It usually works, or we convert.
         const code = jsQR(new Uint8ClampedArray(data), info.width, info.height);
 
         if (code) {
             try {
-                return JSON.parse(code.data) as QRData;
+                const json = JSON.parse(code.data) as QRData;
+                console.log("Local QR Read Success:", json);
+                return json;
             } catch (e) {
                 console.error("Failed to parse QR JSON:", code.data);
                 return null;
             }
         }
+        console.log("Local QR Read Failed (jsQR returned null)");
         return null; // QR not found
     } catch (error) {
         console.error("Local QR Read Error:", error);
@@ -296,22 +349,54 @@ async function readQRCodeLocally(filePath: string): Promise<QRData | null> {
 
 async function gradeWithGemini(filePath: string): Promise<GradingResult[] | null> {
     try {
-        const model = getGenAI().getGenerativeModel({ model: "gemini-1.5-flash" });
+        const modelName = process.env.GEMINI_MODEL || "gemini-1.5-flash";
+        console.log("Using Gemini Model:", modelName);
+        const model = getGenAI().getGenerativeModel({ model: modelName });
 
-        // 1. Local QR Reading
-        const qrData = await readQRCodeLocally(filePath);
+        // 1. Read header to check actual file type (Magic Bytes)
+        const fd = await fs.promises.open(filePath, 'r');
+        const headerBuffer = Buffer.alloc(4);
+        await fd.read(headerBuffer, 0, 4, 0);
+        await fd.close();
+
+        const isPdfHeader = headerBuffer.toString('hex') === '25504446'; // %PDF
+        const mimeType = isPdfHeader ? 'application/pdf' : (filePath.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
+        console.log(`Detected MIME Type: ${mimeType} (Header: ${headerBuffer.toString('hex')})`);
+
+        // 2. Read Full File for Gemini
+        const fileBuffer = await fs.promises.readFile(filePath);
+        const base64Data = fileBuffer.toString('base64');
+
+        // 3. Local QR Reading (Try first)
+        let qrData: QRData | null = null;
+        if (!isPdfHeader) {
+            qrData = await readQRCodeLocally(filePath);
+        } else {
+            console.log("Skipping local QR read for PDF file.");
+        }
+
+        // 4. Fallback: Ask Gemini to read QR validation
+        if (!qrData || !qrData.sid) {
+            console.log("Local QR read failed/skipped. Attempting to scan QR with Gemini...");
+            qrData = await scanQRWithGemini(model, base64Data, mimeType);
+        }
+
         if (!qrData || !qrData.sid || !qrData.pids || !Array.isArray(qrData.pids)) {
-            console.error("Failed to extract QR data locally from", filePath);
+            console.error("Failed to extract QR data (Local & AI) from", filePath);
             return null;
         }
 
         console.log(`QR Found: Student=${qrData.sid}, Problems=${qrData.pids.length}`);
 
-        // 2. Fetch Full Problem Context from DB
-        // Remove duplicates and clean
+        // 5. Fetch Full Problem Context from DB
         const uniquePids = Array.from(new Set(qrData.pids.filter((p: any) => typeof p === 'string')));
         const problems = await prisma.problem.findMany({
-            where: { id: { in: uniquePids as string[] } },
+            where: {
+                OR: [
+                    { id: { in: uniquePids as string[] } },
+                    { customId: { in: uniquePids as string[] } }
+                ]
+            },
             include: { coreProblems: true } // Include CoreProblems for context
         });
 
@@ -329,18 +414,14 @@ async function gradeWithGemini(filePath: string): Promise<GradingResult[] | null
             coreProblems: p.coreProblems.map(cp => ({ id: cp.id, name: cp.name }))
         }));
 
-        // 3. Prepare Image for Gemini (Transcription & Grading)
-        const fileBuffer = await fs.promises.readFile(filePath);
-        const base64Data = fileBuffer.toString('base64');
-
-        // 4. Construct Prompt with FULL Context
+        // 6. Construct Prompt with FULL Context
         const gradingPrompt = `
         You are an expert teacher grading a student's answer sheet.
         
         **Student ID**: ${qrData.sid}
         
         **Task**:
-        1.  Analyze the image of the answer sheet.
+        1.  Analyze the image/document of the answer sheet.
         2.  Identify the student's handwritten answer for EACH of the following problems.
         3.  Grade each answer based on the provided "Correct Answer" and "Accepted Answers".
         4.  Provide a specific, helpful feedback in Japanese.
@@ -368,13 +449,13 @@ async function gradeWithGemini(filePath: string): Promise<GradingResult[] | null
             {
                 inlineData: {
                     data: base64Data,
-                    mimeType: "image/jpeg"
+                    mimeType: mimeType
                 }
             }
         ]);
 
         const text = result.response.text();
-        console.log("Gemini Response:", text);
+        console.log("Gemini Grading Response:", text);
 
         const resultsJson = parseJSON(text);
 
@@ -400,6 +481,49 @@ async function gradeWithGemini(filePath: string): Promise<GradingResult[] | null
     }
 }
 
+// Helper: Scan QR with Gemini
+async function scanQRWithGemini(model: any, base64Data: string, mimeType: string): Promise<QRData | null> {
+    try {
+        const prompt = `
+        Analyze this document. There is a QR code on it containing JSON data.
+        1. Decode the QR code.
+        2. Inspect the decoded JSON for "sid".
+        3. If identifying from text, look for a string starting with "cmiz" followed by alphanumeric characters (approx 25 chars).
+
+        The expected JSON structure:
+        {
+            "sid": "student_id",
+            "pids": ["problem_id_1", "problem_id_2", ...]
+        }
+
+        PRIORITY RULES:
+        - If you find a string like "cmizbu15r0000jaw8k1aze4bn", USE IT as "sid".
+        - Do NOT use "生徒1" or Japanese names as "sid" if a CUID/UUID is present.
+        - The "sid" MUST be the ID, not the Name.
+        
+        Return ONLY the JSON object.
+        `;
+        // ...
+
+        const result = await model.generateContent([
+            prompt,
+            {
+                inlineData: {
+                    data: base64Data,
+                    mimeType: mimeType
+                }
+            }
+        ]);
+        const text = result.response.text();
+        console.log("Gemini QR Scan Response:", text);
+        return parseJSON(text);
+
+    } catch (e) {
+        console.error("Gemini QR Scan Error:", e);
+        return null;
+    }
+}
+
 function parseJSON(text: string): any {
     try {
         // Clean markdown code blocks
@@ -421,6 +545,9 @@ export async function recordGradingResults(results: GradingResult[]) {
     const userId = results[0].studentId; // Assumes all results are for same student (which is true per file)
     const problemIds = results.map(r => r.problemId);
 
+    // Generate Group ID for this batch
+    const groupId = crypto.randomUUID();
+
     // 1. Record History (Batch)
     await prisma.learningHistory.createMany({
         data: results.map(r => ({
@@ -429,7 +556,9 @@ export async function recordGradingResults(results: GradingResult[]) {
             evaluation: r.evaluation,
             userAnswer: r.userAnswer || '',
             feedback: r.feedback || '',
-            answeredAt: new Date()
+            answeredAt: new Date(),
+            groupId, // Link to batch
+            isVideoWatched: false // Default
         }))
     });
 
