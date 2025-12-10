@@ -536,43 +536,48 @@ function parseJSON(text: string): any {
 
 // 5. Save Result (Unified)
 // Unified Grading Logic (Batch)
+// 5. Save Result (Unified)
+// Unified Grading Logic (Batch)
 export async function recordGradingResults(results: GradingResult[]) {
     if (results.length === 0) return;
 
-    const userId = results[0].studentId; // Assumes all results are for same student (which is true per file)
+    const userId = results[0].studentId; // Assumes all results are for same student
     const problemIds = results.map(r => r.problemId);
 
     // Generate Group ID for this batch
     const groupId = crypto.randomUUID();
 
-    // 1. Record History (Batch)
-    await prisma.learningHistory.createMany({
-        data: results.map(r => ({
-            userId,
-            problemId: r.problemId,
-            evaluation: r.evaluation,
-            userAnswer: r.userAnswer || '',
-            feedback: r.feedback || '',
-            answeredAt: new Date(),
-            groupId, // Link to batch
-            isVideoWatched: false // Default
-        }))
-    });
+    // WRAP EVERYTHING IN A SINGLE TRANSACTION
+    await prisma.$transaction(async (tx) => {
+        // 1. Record History (Batch)
+        // Note: createMany is not supported in interactive transactions for SQLite/some adapters if using executeRaw, 
+        // but typically supported in modern Prisma client (tx.learningHistory.createMany).
+        await tx.learningHistory.createMany({
+            data: results.map(r => ({
+                userId,
+                problemId: r.problemId,
+                evaluation: r.evaluation,
+                userAnswer: r.userAnswer || '',
+                feedback: r.feedback || '',
+                answeredAt: new Date(),
+                groupId,
+                isVideoWatched: false
+            }))
+        });
 
-    // 2. Update UserProblemState (Batch)
-    // Fetch current states
-    const currentStates = await prisma.userProblemState.findMany({
-        where: { userId, problemId: { in: problemIds } }
-    });
-    const stateMap = new Map(currentStates.map(s => [s.problemId, s]));
+        // 2. Update UserProblemState (Batch)
+        // Fetch current states using TX
+        const currentStates = await tx.userProblemState.findMany({
+            where: { userId, problemId: { in: problemIds } }
+        });
+        const stateMap = new Map(currentStates.map(s => [s.problemId, s]));
 
-    await prisma.$transaction(
-        results.map(r => {
+        for (const r of results) {
             const currentState = stateMap.get(r.problemId);
             const currentPriority = currentState?.priority || 0;
             const newPriority = calculateNewPriority(currentPriority, r.evaluation);
 
-            return prisma.userProblemState.upsert({
+            await tx.userProblemState.upsert({
                 where: { userId_problemId: { userId, problemId: r.problemId } },
                 create: {
                     userId,
@@ -587,138 +592,160 @@ export async function recordGradingResults(results: GradingResult[]) {
                     priority: newPriority
                 }
             });
-        })
-    );
+        }
 
-    // 3. Update UserCoreProblemState (Batch / Aggregated)
-    // Fetch problems to get coreProblems
-    const problems = await prisma.problem.findMany({
-        where: { id: { in: problemIds } },
-        include: { coreProblems: true }
-    });
-    const problemMap = new Map(problems.map(p => [p.id, p]));
+        // 3. Update UserCoreProblemState (Batch / Aggregated)
+        const problems = await tx.problem.findMany({
+            where: { id: { in: problemIds } },
+            include: { coreProblems: true }
+        });
+        const problemMap = new Map(problems.map(p => [p.id, p]));
 
-    // Aggregate Deltas per CoreProblem
-    const cpDeltas = new Map<string, number>();
-    const involvedCpIds = new Set<string>();
+        const cpDeltas = new Map<string, number>();
+        const involvedCpIds = new Set<string>();
 
-    for (const r of results) {
-        const problem = problemMap.get(r.problemId);
-        if (!problem) continue;
+        for (const r of results) {
+            const problem = problemMap.get(r.problemId);
+            if (!problem) continue;
 
-        if (r.isCorrect) {
-            // Correct: -5 for ALL CoreProblems
-            for (const cp of problem.coreProblems) {
-                const current = cpDeltas.get(cp.id) || 0;
-                cpDeltas.set(cp.id, current - 5);
-                involvedCpIds.add(cp.id);
-            }
-        } else {
-            // Incorrect: +5 for BAD CoreProblems
-            if (r.badCoreProblemIds && r.badCoreProblemIds.length > 0) {
-                for (const cpId of r.badCoreProblemIds) {
-                    // Verify linkage
-                    if (problem.coreProblems.some(cp => cp.id === cpId)) {
-                        const current = cpDeltas.get(cpId) || 0;
-                        cpDeltas.set(cpId, current + 5);
-                        involvedCpIds.add(cpId);
+            if (r.isCorrect) {
+                // Correct: -5 for ALL CoreProblems
+                for (const cp of problem.coreProblems) {
+                    const current = cpDeltas.get(cp.id) || 0;
+                    cpDeltas.set(cp.id, current - 5);
+                    involvedCpIds.add(cp.id);
+                }
+            } else {
+                // Incorrect: +5 for BAD CoreProblems
+                if (r.badCoreProblemIds && r.badCoreProblemIds.length > 0) {
+                    for (const cpId of r.badCoreProblemIds) {
+                        if (problem.coreProblems.some(cp => cp.id === cpId)) {
+                            const current = cpDeltas.get(cpId) || 0;
+                            cpDeltas.set(cpId, current + 5);
+                            involvedCpIds.add(cpId);
+                        }
                     }
                 }
             }
         }
-    }
 
-    // Apply Deltas (Transaction)
-    if (cpDeltas.size > 0) {
-        await prisma.$transaction(
-            Array.from(cpDeltas.entries()).map(([cpId, delta]) => {
-                return prisma.userCoreProblemState.upsert({
-                    where: { userId_coreProblemId: { userId, coreProblemId: cpId } },
-                    create: {
-                        userId,
-                        coreProblemId: cpId,
-                        priority: delta,
-                        isUnlocked: true // Assume unlocked if graded
-                    },
-                    update: { priority: { increment: delta } }
-                });
-            })
-        );
-    }
+        for (const [cpId, delta] of cpDeltas.entries()) {
+            await tx.userCoreProblemState.upsert({
+                where: { userId_coreProblemId: { userId, coreProblemId: cpId } },
+                create: {
+                    userId,
+                    coreProblemId: cpId,
+                    priority: delta,
+                    isUnlocked: true // Assume unlocked if graded
+                },
+                update: { priority: { increment: delta } }
+            });
+        }
 
-    // 4. Batch Unlock Check
-    // We check all involved CoreProblems to see if they are now "Passed".
-    // If passed, we unlock the NEXT CoreProblem.
-    // To do this efficiently, we need:
-    // - Stats for involved CPs (Total Problems, Answered, Correct).
-    // - Next CP info for each involved CP.
+        // Pass involved CpIds out or call check function? 
+        // We can't easily call checkProgressAndUnlock inside here if it uses `prisma` global.
+        // We should move the check LOGIC to use `tx` or call it AFTER transaction.
+        // But if check fails (crash), transaction is committed. That's actually OK. 
+        // Unlock failure is less critical than Data Consistency.
+        // However, we need to export the involved IPs to run the check AFTER.
+        // But interactive transaction returns result.
+        return involvedCpIds;
+    })
+        .then(async (involvedCpIds) => {
+            // 4. Batch Unlock Check (Outside Transaction, but consistent data ensures reliable check)
+            // If this fails, we can retry it; data is safe.
+            await checkProgressAndUnlock(userId, Array.from(involvedCpIds));
+        });
+}
 
-    if (involvedCpIds.size > 0) {
-        const cpIdsToCheck = Array.from(involvedCpIds);
+export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: string[]) {
+    if (cpIdsToCheck.length === 0) return;
 
-        // Fetch CP Details (Total Count & Next CP Candidate)
-        const cpDetails = await prisma.coreProblem.findMany({
-            where: { id: { in: cpIdsToCheck } },
-            include: {
-                problems: { select: { id: true } }, // To count total and get IDs
-                subject: {
-                    include: {
-                        coreProblems: {
-                            select: { id: true, order: true, name: true }, // Min selection for next finder
-                            orderBy: { order: 'asc' }
-                        }
+    // Fetch unlocked CoreProblems for this user to check accessibility
+    const unlockedStates = await prisma.userCoreProblemState.findMany({
+        where: { userId, isUnlocked: true },
+        select: { coreProblemId: true }
+    });
+    const unlockedCpIds = new Set(unlockedStates.map(s => s.coreProblemId));
+
+    // Fetch CP Details (Total Count & Next CP Candidate)
+    const cpDetails = await prisma.coreProblem.findMany({
+        where: { id: { in: cpIdsToCheck } },
+        include: {
+            problems: {
+                include: { coreProblems: { select: { id: true } } } // Need dependencies
+            },
+            subject: {
+                include: {
+                    coreProblems: {
+                        select: { id: true, order: true, name: true }, // Min selection for next finder
+                        orderBy: { order: 'asc' }
                     }
                 }
             }
+        }
+    });
+
+    // Loop through each checked CP
+    for (const cp of cpDetails) {
+        // Filter: Count ONLY problems where ALL associated CoreProblems are unlocked
+        const validProblems = cp.problems.filter(p => {
+            // A problem is valid if every CP it belongs to is currently unlocked for the user.
+            return p.coreProblems.every(relatedCp => unlockedCpIds.has(relatedCp.id));
         });
 
-        // Loop through each checked CP
-        for (const cp of cpDetails) {
-            const totalProblems = cp.problems.length;
-            const problemIds = cp.problems.map(p => p.id);
+        const totalProblems = validProblems.length;
+        const validProblemIds = new Set(validProblems.map(p => p.id));
 
-            // Fetch User States for this CP's problems
-            const userStates = await prisma.userProblemState.findMany({
-                where: {
-                    userId,
-                    problemId: { in: problemIds }
-                }
-            });
+        // Fetch User States for this CP's problems
+        const userStates = await prisma.userProblemState.findMany({
+            where: {
+                userId,
+                problemId: { in: Array.from(validProblemIds) }
+            }
+        });
 
-            const answeredCount = userStates.length;
-            const correctCount = userStates.filter(s => s.isCleared).length;
+        const answeredCount = userStates.length;
+        const correctCount = userStates.filter(s => s.isCleared).length;
 
-            const { isPassed } = calculateCoreProblemStatus(totalProblems, answeredCount, correctCount);
+        console.log(`Checking CP ${cp.name}: Valid/Total=${validProblems.length}/${cp.problems.length}, Answered=${answeredCount}`);
 
-            if (isPassed) {
-                // Find Next CP
-                // We have the subject's CPs sorted.
-                const subjectCps = cp.subject.coreProblems;
-                // Find current index
-                const currentIndex = subjectCps.findIndex(c => c.id === cp.id);
-                if (currentIndex !== -1 && currentIndex < subjectCps.length - 1) {
-                    const nextCp = subjectCps[currentIndex + 1];
+        const status = calculateCoreProblemStatus(totalProblems, answeredCount, correctCount);
+        console.log(`  -> Status: isPassed=${status.isPassed}, AR=${status.answerRate}, CR=${status.correctRate}`);
+        console.log(`  -> Counts: Total=${totalProblems}, Ans=${answeredCount}, Corr=${correctCount}`);
 
-                    // Unlock Next CP
-                    await prisma.userCoreProblemState.upsert({
-                        where: {
-                            userId_coreProblemId: {
-                                userId,
-                                coreProblemId: nextCp.id
-                            }
-                        },
-                        create: {
+        if (status.isPassed) {
+            // Find Next CP
+            // We have the subject's CPs sorted.
+            const subjectCps = cp.subject.coreProblems;
+            // Find current index
+            const currentIndex = subjectCps.findIndex(c => c.id === cp.id);
+            console.log(`  -> Index: ${currentIndex} / ${subjectCps.length}`);
+
+            if (currentIndex !== -1 && currentIndex < subjectCps.length - 1) {
+                const nextCp = subjectCps[currentIndex + 1];
+
+                // Unlock Next CP
+                await prisma.userCoreProblemState.upsert({
+                    where: {
+                        userId_coreProblemId: {
                             userId,
-                            coreProblemId: nextCp.id,
-                            isUnlocked: true,
-                            priority: 0
-                        },
-                        update: {
-                            isUnlocked: true
+                            coreProblemId: nextCp.id
                         }
-                    });
-                    console.log(`Unlocked CoreProblem ${nextCp.name} for user ${userId}`);
-                }
+                    },
+                    create: {
+                        userId,
+                        coreProblemId: nextCp.id,
+                        isUnlocked: true,
+                        priority: 0
+                    },
+                    update: {
+                        isUnlocked: true
+                    }
+                });
+                console.log(`Unlocked CoreProblem ${nextCp.name} for user ${userId}`);
+            } else {
+                console.log(`  -> No next CP found (or is last).`);
             }
         }
     }
@@ -745,7 +772,7 @@ export async function gradeTextAnswer(problemId: string, studentAnswer: string):
 
     Evaluate the student's answer.
     1. Determine if it is Correct (A), Mostly Correct (B), Partially Correct (C), or Incorrect (D).
-    2. Provide a short, encouraging feedback in Japanese.
+    2. Provide a encouraging feedback in Japanese.
 
     Return ONLY a JSON object:
     {
