@@ -332,6 +332,12 @@ async function readQRCodeLocally(filePath: string): Promise<QRData | null> {
         if (code) {
             try {
                 const json = JSON.parse(code.data) as QRData;
+
+                // Sanitize PIDs: Remove ".A" suffix if present (common OCR noise from "Q. ... A. ...")
+                if (json.pids && Array.isArray(json.pids)) {
+                    json.pids = json.pids.map((pid: string) => pid.replace(/\.A$/, ''));
+                }
+
                 console.log("Local QR Read Success:", json);
                 return json;
             } catch (e) {
