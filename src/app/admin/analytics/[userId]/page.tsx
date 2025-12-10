@@ -1,7 +1,7 @@
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import { getStudentStats, getUnitProgress, getDailyActivity } from '@/lib/analytics';
+import { getStudentStats, getSubjectProgress, getDailyActivity } from '@/lib/analytics';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { ActivityChart } from '@/app/dashboard/activity-chart';
@@ -26,11 +26,11 @@ export default async function StudentAnalyticsPage({ params }: PageProps) {
 
     if (!student) return <div>生徒が見つかりません</div>;
 
-    let stats, unitProgress, dailyActivity, recentHistory;
+    let stats, subjectProgress, dailyActivity, recentHistory;
     try {
-        [stats, unitProgress, dailyActivity, recentHistory] = await Promise.all([
+        [stats, subjectProgress, dailyActivity, recentHistory] = await Promise.all([
             getStudentStats(student.id),
-            getUnitProgress(student.id),
+            getSubjectProgress(student.id),
             getDailyActivity(student.id),
             prisma.learningHistory.findMany({
                 where: { userId: student.id },
@@ -39,8 +39,8 @@ export default async function StudentAnalyticsPage({ params }: PageProps) {
                 include: {
                     problem: {
                         include: {
-                            coreProblem: {
-                                include: { unit: { include: { subject: true } } }
+                            coreProblems: {
+                                include: { subject: true }
                             }
                         }
                     }
@@ -89,20 +89,20 @@ export default async function StudentAnalyticsPage({ params }: PageProps) {
                     </CardContent>
                 </Card>
 
-                {/* Unit Progress */}
+                {/* Subject Progress */}
                 <Card className="col-span-3">
                     <CardHeader>
-                        <CardTitle>単元別進捗</CardTitle>
+                        <CardTitle>教科別進捗</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-6 max-h-[350px] overflow-y-auto pr-2">
-                            {unitProgress.map((unit) => (
-                                <div key={unit.unitId} className="space-y-2">
+                            {subjectProgress.map((subject) => (
+                                <div key={subject.subjectId} className="space-y-2">
                                     <div className="flex items-center justify-between text-sm">
-                                        <div className="font-medium">{unit.subjectName} - {unit.unitName}</div>
-                                        <div className="text-muted-foreground">{unit.progressPercentage}%</div>
+                                        <div className="font-medium">{subject.subjectName}</div>
+                                        <div className="text-muted-foreground">{subject.progressPercentage}%</div>
                                     </div>
-                                    <Progress value={unit.progressPercentage} />
+                                    <Progress value={subject.progressPercentage} />
                                 </div>
                             ))}
                         </div>
@@ -133,8 +133,12 @@ export default async function StudentAnalyticsPage({ params }: PageProps) {
                                         {new Date(history.answeredAt).toLocaleString('ja-JP')}
                                     </TableCell>
                                     <TableCell>
-                                        <div className="text-sm font-medium">{history.problem.coreProblem.unit.subject.name}</div>
-                                        <div className="text-xs text-muted-foreground">{history.problem.coreProblem.unit.name}</div>
+                                        <div className="text-sm font-medium">
+                                            {history.problem.coreProblems[0]?.subject.name || '-'}
+                                        </div>
+                                        <div className="text-xs text-muted-foreground">
+                                            {history.problem.coreProblems[0]?.name || '-'}
+                                        </div>
                                     </TableCell>
                                     <TableCell className="max-w-[300px] truncate" title={history.problem.question}>
                                         {history.problem.question}

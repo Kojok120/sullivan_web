@@ -163,7 +163,6 @@ export async function getStudentsWithStats(query?: string) {
         if (stats.totalProblemsSolved > 0) {
             stats.accuracy = Math.round((stats.totalCorrect / stats.totalProblemsSolved) * 100);
         }
-        stats.currentStreak = 0;
     });
 
     return students.map(student => ({

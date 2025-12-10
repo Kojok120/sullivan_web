@@ -1,6 +1,6 @@
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { getStudentStats, getUnitProgress, getDailyActivity } from '@/lib/analytics';
+import { getStudentStats, getSubjectProgress, getDailyActivity } from '@/lib/analytics';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Activity, Trophy, Target, Clock } from 'lucide-react';
@@ -10,9 +10,9 @@ export default async function DashboardPage() {
     const session = await getSession();
     if (!session) redirect('/login');
 
-    const [stats, unitProgress, dailyActivity] = await Promise.all([
+    const [stats, subjectProgress, dailyActivity] = await Promise.all([
         getStudentStats(session.userId),
-        getUnitProgress(session.userId),
+        getSubjectProgress(session.userId),
         getDailyActivity(session.userId),
     ]);
 
@@ -52,7 +52,6 @@ export default async function DashboardPage() {
                         <p className="text-xs text-muted-foreground">継続は力なり！</p>
                     </CardContent>
                 </Card>
-
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
@@ -66,23 +65,23 @@ export default async function DashboardPage() {
                     </CardContent>
                 </Card>
 
-                {/* Unit Progress */}
+                {/* Subject Progress */}
                 <Card className="col-span-3">
                     <CardHeader>
-                        <CardTitle>単元別進捗</CardTitle>
+                        <CardTitle>教科別進捗</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-8">
-                            {unitProgress.map((unit) => (
-                                <div key={unit.unitId} className="space-y-2">
+                            {subjectProgress.map((subject) => (
+                                <div key={subject.subjectId} className="space-y-2">
                                     <div className="flex items-center justify-between text-sm">
-                                        <div className="font-medium">{unit.subjectName} - {unit.unitName}</div>
-                                        <div className="text-muted-foreground">{unit.progressPercentage}%</div>
+                                        <div className="font-medium">{subject.subjectName}</div>
+                                        <div className="text-muted-foreground">{subject.progressPercentage}%</div>
                                     </div>
-                                    <Progress value={unit.progressPercentage} />
+                                    <Progress value={subject.progressPercentage} />
                                 </div>
                             ))}
-                            {unitProgress.length === 0 && (
+                            {subjectProgress.length === 0 && (
                                 <div className="text-sm text-muted-foreground text-center py-4">
                                     まだ学習データがありません
                                 </div>

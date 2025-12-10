@@ -80,119 +80,82 @@ async function main() {
 
     console.log(`Created subjects: ${english.name}, ${math.name}, ${japanese.name}`);
 
-    // Create Units for English
-    // Create Units for English
-    let unit1 = await prisma.unit.findFirst({
-        where: {
-            name: 'Unit 1: be動詞',
+    // Create CoreProblems for English
+    // Unit 1: be動詞 -> CoreProblem Group 1
+    const cp1 = await prisma.coreProblem.create({
+        data: {
+            name: 'be動詞の肯定文',
+            order: 1,
             subjectId: english.id,
+            problems: {
+                create: [
+                    {
+                        question: 'I ( ) a student.',
+                        answer: 'am',
+                        order: 1,
+                        videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ', // Placeholder
+                    },
+                    {
+                        question: 'You ( ) a teacher.',
+                        answer: 'are',
+                        order: 2,
+                        videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+                    },
+                    {
+                        question: 'He ( ) my friend.',
+                        answer: 'is',
+                        order: 3,
+                        videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+                    },
+                ],
+            },
         },
     });
 
-    if (!unit1) {
-        unit1 = await prisma.unit.create({
-            data: {
-                name: 'Unit 1: be動詞',
-                order: 1,
-                subjectId: english.id,
-                coreProblems: {
-                    create: [
-                        {
-                            name: 'be動詞の肯定文',
-                            order: 1,
-                            problems: {
-                                create: [
-                                    {
-                                        question: 'I ( ) a student.',
-                                        answer: 'am',
-                                        order: 1,
-                                        type: 'NORMAL',
-                                        videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ', // Placeholder
-                                    },
-                                    {
-                                        question: 'You ( ) a teacher.',
-                                        answer: 'are',
-                                        order: 2,
-                                        type: 'NORMAL',
-                                        videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-                                    },
-                                    {
-                                        question: 'He ( ) my friend.',
-                                        answer: 'is',
-                                        order: 3,
-                                        type: 'NORMAL',
-                                        videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-                                    },
-                                ],
-                            },
-                        },
-                        {
-                            name: 'be動詞の否定文',
-                            order: 2,
-                            problems: {
-                                create: [
-                                    {
-                                        question: 'I ( ) not a doctor.',
-                                        answer: 'am',
-                                        order: 1,
-                                        type: 'NORMAL',
-                                    },
-                                    {
-                                        question: 'She ( ) not happy.',
-                                        answer: 'is',
-                                        order: 2,
-                                        type: 'NORMAL',
-                                    },
-                                ],
-                            },
-                        },
-                    ],
-                },
-            },
-        });
-    }
-
-    let unit2 = await prisma.unit.findFirst({
-        where: {
-            name: 'Unit 2: 一般動詞',
+    const cp2 = await prisma.coreProblem.create({
+        data: {
+            name: 'be動詞の否定文',
+            order: 2,
             subjectId: english.id,
+            problems: {
+                create: [
+                    {
+                        question: 'I ( ) not a doctor.',
+                        answer: 'am',
+                        order: 1,
+                    },
+                    {
+                        question: 'She ( ) not happy.',
+                        answer: 'is',
+                        order: 2,
+                    },
+                ],
+            },
         },
     });
 
-    if (!unit2) {
-        unit2 = await prisma.unit.create({
-            data: {
-                name: 'Unit 2: 一般動詞',
-                order: 2,
-                subjectId: english.id,
-                coreProblems: {
-                    create: [
-                        {
-                            name: '一般動詞の肯定文',
-                            order: 1,
-                            problems: {
-                                create: [
-                                    {
-                                        question: 'I ( ) tennis.',
-                                        answer: 'play',
-                                        order: 1,
-                                        type: 'NORMAL',
-                                    },
-                                    {
-                                        question: 'He ( ) soccer.',
-                                        answer: 'plays',
-                                        order: 2,
-                                        type: 'NORMAL',
-                                    },
-                                ],
-                            },
-                        },
-                    ],
-                },
+    // Unit 2: 一般動詞 -> CoreProblem Group 2
+    const cp3 = await prisma.coreProblem.create({
+        data: {
+            name: '一般動詞の肯定文',
+            order: 3,
+            subjectId: english.id,
+            problems: {
+                create: [
+                    {
+                        question: 'I ( ) tennis.',
+                        answer: 'play',
+                        order: 1,
+                    },
+                    {
+                        question: 'He ( ) soccer.',
+                        answer: 'plays',
+                        order: 2,
+                    },
+                ],
             },
-        });
-    }
-
+        },
+    });
 
     console.log('Seeding finished.');
 }

@@ -39,11 +39,6 @@ const navItems = [
         icon: BookOpen,
     },
     {
-        title: "コンテンツ管理",
-        href: "/admin/content",
-        icon: Video,
-    },
-    {
         title: "システム設定",
         href: "/admin/settings",
         icon: Settings,

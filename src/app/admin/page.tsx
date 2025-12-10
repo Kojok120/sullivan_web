@@ -32,13 +32,6 @@ export default async function AdminDashboard() {
             color: 'text-green-600',
         },
         {
-            title: 'コンテンツ管理',
-            description: '解説動画とPrereqの管理',
-            icon: Video,
-            href: '/admin/content',
-            color: 'text-purple-600',
-        },
-        {
             title: 'システム設定',
             description: '出題ロジックとパラメータの設定',
             icon: Settings,
