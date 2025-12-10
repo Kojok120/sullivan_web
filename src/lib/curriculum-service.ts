@@ -69,21 +69,4 @@ export async function getNextCustomId(subjectId: string, tx?: any): Promise<stri
 
 // Deprecated wrapper for backward compatibility if widely used, 
 // but we should aim to migrate to getNextCustomId.
-export async function generateCustomId(subjectId: string, offset: number = 0): Promise<string> {
-    // This old signature doesn't quite fit the new "max+1" logic perfectly if offset was "count + offset".
-    // But typically offset was 0.
-    // If we want simply "next ID", we call getNextCustomId.
-    // If offset > 0 is needed (e.g. bulk generation reserving N IDs), we can handle that.
 
-    // For single generation (offset=0):
-    if (offset === 0) {
-        return getNextCustomId(subjectId);
-    }
-
-    // For bulk reservation logic, we might need to know the base.
-    // Let's rely on the caller to loop if they need multiple, or handle it inside `getNextCustomId`?
-    // Actually, `getNextCustomId` just gives THE next one.
-    // If bulk creation needs 5 IDs, it should probably calculate current Max, then generate Max+1, Max+2...
-    // Let's keep this simple for now and expect migration.
-    return getNextCustomId(subjectId);
-}

@@ -438,6 +438,190 @@ export async function getSessionDetails(groupId: string) {
     });
 }
 
+// Consolidated Dashboard Data Fetcher
+export async function getStudentDashboardData(userId: string) {
+    // 1. Fetch all necessary data in parallel
+    const [
+        history,
+        userCoreStates,
+        subjects,
+        user
+    ] = await Promise.all([
+        prisma.learningHistory.findMany({
+            where: { userId },
+            select: {
+                id: true,
+                evaluation: true,
+                answeredAt: true,
+                userAnswer: true,
+                feedback: true,
+                problem: {
+                    select: {
+                        id: true,
+                        question: true,
+                        coreProblems: {
+                            select: {
+                                id: true,
+                                name: true,
+                                subject: {
+                                    select: {
+                                        id: true,
+                                        name: true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            orderBy: { answeredAt: 'desc' }
+        }),
+        prisma.userCoreProblemState.findMany({
+            where: { userId, isUnlocked: true }
+        }),
+        prisma.subject.findMany({
+            include: {
+                coreProblems: {
+                    select: { id: true }
+                }
+            },
+            orderBy: { order: 'asc' }
+        }),
+        prisma.user.findUnique({
+            where: { id: userId },
+            include: {
+                guidanceRecords: {
+                    include: { teacher: { select: { name: true } } },
+                    orderBy: { date: 'desc' }
+                },
+                classroom: true
+            }
+        })
+    ]);
+
+    if (!user) return null;
+
+    // 2. Process Stats (In-Memory)
+    const totalProblemsSolved = history.length;
+    const correctCount = history.filter(h => h.evaluation === 'A' || h.evaluation === 'B').length;
+    const accuracy = totalProblemsSolved > 0 ? Math.round((correctCount / totalProblemsSolved) * 100) : 0;
+    const lastActivity = history.length > 0 ? history[0].answeredAt : null;
+
+    // Calculate Streak
+    const uniqueDates = new Set(history.map(h => {
+        const d = new Date(h.answeredAt);
+        return d.toISOString().split('T')[0];
+    }));
+    const currentStreak = calculateStreak(uniqueDates);
+
+    const stats: StudentStats = {
+        totalProblemsSolved,
+        totalCorrect: correctCount,
+        accuracy,
+        currentStreak,
+        lastActivity
+    };
+
+    // 3. Process Daily Activity (Last 30 days)
+    const activityMap = new Map<string, number>();
+    const now = new Date();
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(now.getDate() - 30);
+
+    history.forEach(h => {
+        const d = new Date(h.answeredAt);
+        if (d >= thirtyDaysAgo) {
+            const dateStr = d.toISOString().split('T')[0];
+            activityMap.set(dateStr, (activityMap.get(dateStr) || 0) + 1);
+        }
+    });
+
+    const dailyActivity: DailyActivity[] = [];
+    for (let i = 0; i < 30; i++) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const dateStr = d.toISOString().split('T')[0];
+        dailyActivity.push({
+            date: dateStr,
+            count: activityMap.get(dateStr) || 0
+        });
+    }
+    dailyActivity.reverse();
+
+    // 4. Process Subject Progress
+    const unlockedCpIds = new Set(userCoreStates.map(s => s.coreProblemId));
+    const subjectProgress: SubjectProgress[] = subjects.map(s => {
+        const total = s.coreProblems.length;
+        const cleared = s.coreProblems.filter(cp => unlockedCpIds.has(cp.id)).length;
+        return {
+            subjectId: s.id,
+            subjectName: s.name,
+            totalCoreProblems: total,
+            clearedCoreProblems: cleared,
+            progressPercentage: total > 0 ? Math.round((cleared / total) * 100) : 0
+        };
+    });
+
+    // 5. Process Weaknesses
+    // Group by CoreProblem
+    const cpStats = new Map<string, {
+        name: string,
+        subjectName: string,
+        attempts: number,
+        correct: number
+    }>();
+
+    history.forEach(h => {
+        h.problem.coreProblems.forEach(cp => {
+            if (!cpStats.has(cp.id)) {
+                cpStats.set(cp.id, {
+                    name: cp.name,
+                    subjectName: cp.subject.name,
+                    attempts: 0,
+                    correct: 0
+                });
+            }
+            const s = cpStats.get(cp.id)!;
+            s.attempts++;
+            if (h.evaluation === 'A' || h.evaluation === 'B') {
+                s.correct++;
+            }
+        });
+    });
+
+    const weaknesses: Weakness[] = Array.from(cpStats.entries())
+        .map(([id, s]) => ({
+            coreProblemId: id,
+            coreProblemName: s.name,
+            subjectName: s.subjectName,
+            accuracy: s.attempts > 0 ? Math.round((s.correct / s.attempts) * 100) : 0,
+            totalAttempts: s.attempts
+        }))
+        .filter(w => w.totalAttempts >= 3)
+        .sort((a, b) => a.accuracy - b.accuracy)
+        .slice(0, 5);
+
+    // 6. Recent History (Formatted for UI)
+    const recentHistory = history.slice(0, 50).map(h => ({
+        id: h.id,
+        answeredAt: h.answeredAt,
+        evaluation: h.evaluation,
+        userAnswer: h.userAnswer,
+        feedback: h.feedback,
+        problem: h.problem
+    }));
+
+    return {
+        student: user,
+        stats,
+        dailyActivity,
+        subjectProgress,
+        weaknesses,
+        recentHistory,
+        subjects // Return full subjects list for print card if needed
+    };
+}
+
 export async function getUnwatchedCount(userId: string): Promise<number> {
     const count = await prisma.learningHistory.count({
         where: {

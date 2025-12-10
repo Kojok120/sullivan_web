@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { Problem, UserProblemState, CoreProblem, UserCoreProblemState } from "@prisma/client";
 
-import { UNLOCK_ANSWER_RATE, UNLOCK_CORRECT_RATE, calculateCoreProblemStatus } from "@/lib/progression";
+import { calculateCoreProblemStatus } from "@/lib/progression";
 
 export const PRINT_CONFIG = {
     // Weights for scoring
@@ -12,10 +12,6 @@ export const PRINT_CONFIG = {
 
     // Forgetting curve settings
     FORGETTING_RATE: 5.0,   // Points per day elapsed
-
-    // Unlock thresholds
-    UNLOCK_ANSWER_RATE,
-    UNLOCK_CORRECT_RATE
 };
 
 // Shared Helper is now in @/lib/progression
@@ -62,15 +58,6 @@ export async function selectProblemsForPrint(
         where: {
             userId,
             problemId: { in: allProblemIds }
-        },
-        include: {
-            problem: {
-                select: {
-                    coreProblems: {
-                        select: { id: true }
-                    }
-                }
-            }
         }
     });
 
@@ -90,8 +77,6 @@ export async function selectProblemsForPrint(
         const answeredCount = cpProblemIds.filter(pid => problemStateMap.has(pid)).length;
 
         // Correct count: "正解したユニークな問題数"
-        // We assume isCleared in UserProblemState means "Correct at least once" or we check evaluation history.
-        // The current UserProblemState has isCleared. Let's use that.
         const correctCount = cpProblemIds.filter(pid => problemStateMap.get(pid)?.isCleared).length;
 
         const { isPassed, answerRate, correctRate } = calculateCoreProblemStatus(totalProblems, answeredCount, correctCount);
@@ -105,7 +90,6 @@ export async function selectProblemsForPrint(
     // CoreProblem N is unlocked if CoreProblem N-1 is cleared.
     const unlockedCoreProblemIds = new Set<string>();
 
-    // Sort coreProblems by order just to be safe (already sorted in query)
     for (let i = 0; i < coreProblems.length; i++) {
         const cp = coreProblems[i];
         if (i === 0) {
@@ -116,12 +100,6 @@ export async function selectProblemsForPrint(
             if (prevStats && prevStats.isCleared) {
                 unlockedCoreProblemIds.add(cp.id);
             } else {
-                // If previous not cleared, this one and subsequent ones are locked.
-                // Exception: If we want to allow "skipping" if manually unlocked? 
-                // Requirement says "アンロック形式...次のCoreProblemがアンロックされる". Implies strict chain.
-                // But we also have `UserCoreProblemState.isUnlocked`. Should we respect that?
-                // "CoreProblemには... userStates...".
-                // If the user manually unlocked it (e.g. teacher override), we should respect it.
                 const userState = cp.userStates[0]; // Since we filtered by userId
                 if (userState?.isUnlocked) {
                     unlockedCoreProblemIds.add(cp.id);
@@ -133,14 +111,6 @@ export async function selectProblemsForPrint(
     }
 
     // 3. Fetch Candidate Problems
-    // Fetch problems that belong to Unlocked CoreProblems.
-    // "問題に複数のCoreProblemが含まれている場合、全てアンロックされているCoreProblemでないと、出題はされない。"
-
-    // We need to fetch problems with their CoreProblems to check this condition.
-    // We can fetch all problems for the subject again, or filter the ones we already know about?
-    // We only have IDs from the first query. Let's fetch full problem details for candidate CoreProblems.
-
-    // Optimization: Only fetch problems where at least one CoreProblem is unlocked, then filter in memory.
     const candidateProblems = await prisma.problem.findMany({
         where: {
             coreProblems: {
@@ -151,7 +121,6 @@ export async function selectProblemsForPrint(
         },
         include: {
             coreProblems: true
-            // userStates removed - we use problemStateMap
         }
     });
 
@@ -162,28 +131,25 @@ export async function selectProblemsForPrint(
 
     if (validProblems.length === 0) return [];
 
+    // Optimization: Pre-calculate CP Priorities to Map
+    const cpPriorityMap = new Map<string, number>();
+    for (const cp of coreProblems) {
+        const cpState = cp.userStates[0];
+        if (cpState) {
+            cpPriorityMap.set(cp.id, cpState.priority);
+        }
+    }
+
     // 4. Calculate Score
     const scoredProblems: ScoredProblem[] = validProblems.map(problem => {
-        // Use map instead of problem.userStates[0]
         const state = problemStateMap.get(problem.id);
         let score = 0;
-        let reason: 'forgetting' | 'weakness' | 'new' | 'priority' = 'new';
 
         // Base Score: CoreProblem Priorities
-        // "CoreProblem+忘却曲線の合算ポイント"
-        // "CoreProblem6,7のポイントが5上がる"
-        // We need the UserCoreProblemState priority for each CP associated with this problem.
-        // We need to fetch UserCoreProblemStates for all relevant CPs.
-        // We loaded `userStates` in `coreProblems` query, let's map it.
-
         let cpPrioritySum = 0;
         for (const cp of problem.coreProblems) {
-            // Find the CP in our initial list to get the userState
-            const cpRef = coreProblems.find(c => c.id === cp.id);
-            const cpState = cpRef?.userStates[0];
-            if (cpState) {
-                cpPrioritySum += cpState.priority;
-            }
+            const priority = cpPriorityMap.get(cp.id) || 0;
+            cpPrioritySum += priority;
         }
 
         const priorityScore = cpPrioritySum * PRINT_CONFIG.WEIGHT_CORE_PRIORITY;
@@ -193,8 +159,6 @@ export async function selectProblemsForPrint(
             // Unanswered
             score += 100 * PRINT_CONFIG.WEIGHT_UNANSWERED;
             score -= problem.order * 0.1; // Slight preference for order
-            if (score > priorityScore) reason = 'new';
-            else reason = 'priority';
         } else {
             // Answered
             const now = new Date();
@@ -203,24 +167,11 @@ export async function selectProblemsForPrint(
             const diffDays = diffMs / (1000 * 60 * 60 * 24);
 
             const timeScore = diffDays * PRINT_CONFIG.FORGETTING_RATE * PRINT_CONFIG.WEIGHT_TIME;
-
-            // Add priority from problem state (if any remaining logic uses it, though requirement emphasizes CP priority)
-            // "CoreProblem+忘却曲線の合算ポイント" -> Doesn't mention individual problem weakness explicitly, 
-            // but usually we want to review mistakes.
-            // "CoreProblem6,7のポイントが5上がる" -> This handles the "mistake" feedback loop.
-            // So maybe we don't need `state.priority`? 
-            // But `UserProblemState` still has `priority`.
-            // Let's include it as a minor factor or ignore if CP priority is the main driver.
-            // Requirement: "CoreProblem+忘却曲線の合算ポイント"
-            // Let's stick to that.
-
             score += timeScore;
-
-            if (timeScore > priorityScore) reason = 'forgetting';
-            else reason = 'priority';
         }
 
-        return { problem, score, reason };
+        // reason not used anymore
+        return { problem, score, reason: 'new' };
     });
 
     // 5. Sort by score descending

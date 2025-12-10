@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Printer, ArrowLeft, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useRef, useLayoutEffect } from 'react';
+import { PrintProblemItem } from './print-problem-item';
 
 interface PrintLayoutProps {
     studentName: string;
@@ -38,20 +39,16 @@ export function PrintLayout({ studentName, subjectName, problems, qrCodeDataUrl 
         let currentPage: (Problem & { customId?: string | null })[] = [];
         let currentHeight = 0;
 
-        // We only want 2 pages of questions max
-        const MAX_PAGES = 2;
+        // Dynamic Max Pages if needed, or keep limit but allow dynamic count up to limit
+        // Current requirement: "1〜2 ページしかない場合でも1/3...実数に合わせる"
+        // So we should calculate total pages based on content.
 
         for (let i = 0; i < problemNodes.length; i++) {
-            if (pages.length >= MAX_PAGES) break;
-
             const node = problemNodes[i] as HTMLElement;
             const height = node.offsetHeight;
 
-            // If a single problem is too huge, we might have issues, but assuming it fits on a page.
             if (currentHeight + height > MAX_PAGE_HEIGHT_PX) {
-                // Push current page
                 pages.push(currentPage);
-                // Start new page
                 currentPage = [problems[i]];
                 currentHeight = height;
             } else {
@@ -60,8 +57,7 @@ export function PrintLayout({ studentName, subjectName, problems, qrCodeDataUrl 
             }
         }
 
-        // Push the last page if it has content and we haven't reached limit
-        if (currentPage.length > 0 && pages.length < MAX_PAGES) {
+        if (currentPage.length > 0) {
             pages.push(currentPage);
         }
 
@@ -73,8 +69,9 @@ export function PrintLayout({ studentName, subjectName, problems, qrCodeDataUrl 
         window.print();
     };
 
-    // Flatten paginated problems to get the list for the answer sheet
     const finalProblems = paginatedProblems.flat();
+    // Total pages = Question Pages + 1 Answer Sheet
+    const totalPages = paginatedProblems.length + 1;
 
     return (
         <div className="min-h-screen bg-gray-100 p-8 print:p-0 print:bg-white print:min-h-0 print:h-auto">
@@ -85,12 +82,13 @@ export function PrintLayout({ studentName, subjectName, problems, qrCodeDataUrl 
                 aria-hidden="true"
             >
                 {problems.map((problem, index) => (
-                    <div key={problem.id} className="flex gap-4 pb-4">
-                        <div className="font-bold w-12 text-right">{problem.customId || index + 1}.</div>
-                        <div className="flex-1 pt-0.5 text-lg leading-relaxed border-b border-gray-200 whitespace-pre-wrap">
-                            {problem.question}
-                        </div>
-                    </div>
+                    <PrintProblemItem
+                        key={problem.id}
+                        problem={problem}
+                        index={index}
+                        customId={problem.customId}
+                        isMeasurement={true}
+                    />
                 ))}
             </div>
 
@@ -116,7 +114,6 @@ export function PrintLayout({ studentName, subjectName, problems, qrCodeDataUrl 
 
                     {/* Question Pages */}
                     {paginatedProblems.map((pageProblems, pageIndex) => {
-                        // Calculate starting index for this page
                         const startIndex = paginatedProblems.slice(0, pageIndex).reduce((acc, p) => acc + p.length, 0);
 
                         return (
@@ -126,17 +123,17 @@ export function PrintLayout({ studentName, subjectName, problems, qrCodeDataUrl 
                                     subjectName={subjectName}
                                     date={dateStr}
                                     pageNum={pageIndex + 1}
-                                    totalPages={3}
+                                    totalPages={totalPages}
                                     type="問題"
                                 />
                                 <div className="flex-1 mt-6 space-y-6">
                                     {pageProblems.map((problem, i) => (
-                                        <div key={problem.id} className="flex gap-4 break-inside-avoid">
-                                            <div className="font-bold w-12 text-right">{problem.customId || startIndex + i + 1}.</div>
-                                            <div className="flex-1 pt-0.5 text-lg leading-relaxed border-b border-gray-200 pb-4 whitespace-pre-wrap">
-                                                {problem.question}
-                                            </div>
-                                        </div>
+                                        <PrintProblemItem
+                                            key={problem.id}
+                                            problem={problem}
+                                            index={startIndex + i}
+                                            customId={problem.customId}
+                                        />
                                     ))}
                                 </div>
                                 <Footer />
@@ -144,11 +141,10 @@ export function PrintLayout({ studentName, subjectName, problems, qrCodeDataUrl 
                         );
                     })}
 
-                    {/* Answer Sheet Page (Always Page 3) */}
+                    {/* Answer Sheet Page (Always Last Page) */}
                     <div className="print-page p-[15mm] relative flex flex-col break-before-page">
-                        <Header studentName={studentName} subjectName={subjectName} date={dateStr} pageNum={3} totalPages={3} type="解答用紙" />
+                        <Header studentName={studentName} subjectName={subjectName} date={dateStr} pageNum={totalPages} totalPages={totalPages} type="解答用紙" />
 
-                        {/* Single QR Code at Top Right - Adjusted position */}
                         {qrCodeDataUrl && (
                             <div className="absolute top-[10mm] right-[10mm] w-24 h-24">
                                 <img src={qrCodeDataUrl} alt="QR" className="w-full h-full" />
@@ -160,7 +156,6 @@ export function PrintLayout({ studentName, subjectName, problems, qrCodeDataUrl 
                                 {finalProblems.map((problem, index) => (
                                     <div key={problem.id} className="flex gap-4 items-end break-inside-avoid">
                                         <div className="font-bold w-16 text-right text-xl">{problem.customId || index + 1}.</div>
-                                        {/* Removed per-problem QR Code */}
                                         <div className="text-xl font-bold mb-1">A.</div>
                                         <div className="flex-1 border-b-2 border-gray-800 mb-1"></div>
                                     </div>

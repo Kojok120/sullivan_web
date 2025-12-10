@@ -8,7 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Link from 'next/link';
 import { ArrowLeft, AlertTriangle, Clock, Target, Trophy } from 'lucide-react';
-import { getStudentStats, getSubjectProgress, getDailyActivity, getStudentWeaknesses } from '@/lib/analytics';
+import { getStudentDashboardData } from '@/lib/analytics'; // Removed individual functions
 import { ActivityChart } from '@/app/dashboard/activity-chart';
 import { ProfileCard } from './profile-card';
 import { GuidanceList } from './guidance-list';
@@ -24,45 +24,21 @@ export default async function TeacherStudentDetailPage({
 
     const { userId } = await params;
 
-    const [student, stats, subjectProgress, dailyActivity, weaknesses, recentHistory, classrooms, subjects] = await Promise.all([
-        prisma.user.findUnique({
-            where: { id: userId },
-            include: {
-                guidanceRecords: {
-                    include: { teacher: { select: { name: true } } },
-                    orderBy: { date: 'desc' }
-                }
-            },
-        }),
-        getStudentStats(userId),
-        getSubjectProgress(userId),
-        getDailyActivity(userId),
-        getStudentWeaknesses(userId),
-        prisma.learningHistory.findMany({
-            where: { userId },
-            take: 50,
-            orderBy: { answeredAt: 'desc' },
-            include: {
-                problem: {
-                    include: {
-                        coreProblems: {
-                            select: {
-                                id: true,
-                                name: true,
-                                subject: true
-                            }
-                        }
-                    }
-                }
-            }
-        }),
-        prisma.classroom.findMany({
-            orderBy: { createdAt: 'asc' }
-        }),
-        prisma.subject.findMany({
-            orderBy: { order: 'asc' }
-        })
-    ]);
+    const dashboardData = await getStudentDashboardData(userId);
+
+    if (!dashboardData || !dashboardData.student) {
+        return (
+            <div className="container mx-auto py-8 px-4 text-center">
+                <h1 className="text-2xl font-bold">生徒が見つかりません</h1>
+                <Button asChild className="mt-4">
+                    <Link href="/teacher">一覧に戻る</Link>
+                </Button>
+            </div>
+        );
+    }
+
+    const { student, stats, subjectProgress, dailyActivity, weaknesses, recentHistory, subjects } = dashboardData;
+    const classrooms = await prisma.classroom.findMany({ orderBy: { createdAt: 'asc' } });
 
     if (!student) {
         return (

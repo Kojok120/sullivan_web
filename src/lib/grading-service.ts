@@ -4,7 +4,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { prisma } from '@/lib/prisma';
 import fs from 'fs';
 import path from 'path';
-import { UNLOCK_ANSWER_RATE, UNLOCK_CORRECT_RATE, calculateCoreProblemStatus } from '@/lib/progression';
+import { calculateCoreProblemStatus } from '@/lib/progression';
 import { calculateNewPriority } from '@/lib/priority-algo';
 
 // Configuration
