@@ -149,11 +149,15 @@ export async function deleteUser(id: string) {
 export async function getClassrooms() {
     await requireAdmin();
     try {
-        const classrooms = await prisma.classroom.findMany({
-            orderBy: { name: 'asc' },
-            select: { id: true, name: true }
-        });
-        return { success: true, classrooms };
+        const { fetchClassrooms } = await import('@/lib/classroom-service');
+        const classrooms = await fetchClassrooms({ orderBy: 'name' });
+        // Select only necessary fields if needed, but the service returns all. 
+        // The original returned { id, name }. We can map if strict, but returning full object is usually fine.
+        // To be safe with payload size:
+        return {
+            success: true,
+            classrooms: classrooms.map(c => ({ id: c.id, name: c.name }))
+        };
     } catch (error) {
         console.error('Failed to fetch classrooms:', error);
         return { error: '教室の取得に失敗しました' };

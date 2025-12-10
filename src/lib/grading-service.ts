@@ -4,7 +4,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { prisma } from '@/lib/prisma';
 import fs from 'fs';
 import path from 'path';
-import { UNLOCK_ANSWER_RATE, UNLOCK_CORRECT_RATE, isCoreProblemPassed } from '@/lib/print-algo';
+import { UNLOCK_ANSWER_RATE, UNLOCK_CORRECT_RATE, calculateCoreProblemStatus } from '@/lib/progression';
 import { calculateNewPriority } from '@/lib/priority-algo';
 
 // Configuration
@@ -603,6 +603,7 @@ export async function recordGradingResults(results: GradingResult[]) {
 
     // Aggregate Deltas per CoreProblem
     const cpDeltas = new Map<string, number>();
+    const involvedCpIds = new Set<string>();
 
     for (const r of results) {
         const problem = problemMap.get(r.problemId);
@@ -613,6 +614,7 @@ export async function recordGradingResults(results: GradingResult[]) {
             for (const cp of problem.coreProblems) {
                 const current = cpDeltas.get(cp.id) || 0;
                 cpDeltas.set(cp.id, current - 5);
+                involvedCpIds.add(cp.id);
             }
         } else {
             // Incorrect: +5 for BAD CoreProblems
@@ -622,6 +624,7 @@ export async function recordGradingResults(results: GradingResult[]) {
                     if (problem.coreProblems.some(cp => cp.id === cpId)) {
                         const current = cpDeltas.get(cpId) || 0;
                         cpDeltas.set(cpId, current + 5);
+                        involvedCpIds.add(cpId);
                     }
                 }
             }
@@ -629,11 +632,9 @@ export async function recordGradingResults(results: GradingResult[]) {
     }
 
     // Apply Deltas (Transaction)
-    const affectedCpIds: string[] = [];
     if (cpDeltas.size > 0) {
         await prisma.$transaction(
             Array.from(cpDeltas.entries()).map(([cpId, delta]) => {
-                affectedCpIds.push(cpId);
                 return prisma.userCoreProblemState.upsert({
                     where: { userId_coreProblemId: { userId, coreProblemId: cpId } },
                     create: {
@@ -648,101 +649,87 @@ export async function recordGradingResults(results: GradingResult[]) {
         );
     }
 
-    // 4. Check Unlocking (Batch check?)
-    // Checking unlocking involves checking thresholds (`checkAndUnlockCoreProblem`).
-    // This reads `coreProblem.subject`, all `problems`, all `userStates`.
-    // We should optimize `checkAndUnlockCoreProblem` or just loop it (it's per CP).
-    // Review said "checkAndUnlockCoreProblem logic mismatch".
-    // I will refactor `checkAndUnlockCoreProblem` later to use shared constants.
-    // For now, I'll loop call it or leave it. The transactional requirement was mostly about data updates.
-    // "途中で失敗すると前半の更新だけが反映される非整合状態" -> History and State updates are main risk.
-    // CoreProblem updates are now also batched.
-    // Unlocking is "Derived State". Even if it fails, it can be recomputed.
-    // I'll loop over `affectedCpIds` to check unlock.
-    for (const cpId of affectedCpIds) {
-        await checkAndUnlockCoreProblem(userId, cpId);
-    }
-}
+    // 4. Batch Unlock Check
+    // We check all involved CoreProblems to see if they are now "Passed".
+    // If passed, we unlock the NEXT CoreProblem.
+    // To do this efficiently, we need:
+    // - Stats for involved CPs (Total Problems, Answered, Correct).
+    // - Next CP info for each involved CP.
 
+    if (involvedCpIds.size > 0) {
+        const cpIdsToCheck = Array.from(involvedCpIds);
 
-
-async function checkAndUnlockCoreProblem(userId: string, coreProblemId: string) {
-    // 1. Get current CoreProblem
-    const currentCP = await prisma.coreProblem.findUnique({
-        where: { id: coreProblemId },
-        include: { subject: true } // Changed from unit to subject
-    });
-
-    if (!currentCP) return;
-
-    // 2. Fetch problems associated with this CoreProblem
-    const problemsInCoreProblem = await prisma.problem.findMany({
-        where: {
-            coreProblems: {
-                some: {
-                    id: coreProblemId
+        // Fetch CP Details (Total Count & Next CP Candidate)
+        const cpDetails = await prisma.coreProblem.findMany({
+            where: { id: { in: cpIdsToCheck } },
+            include: {
+                problems: { select: { id: true } }, // To count total and get IDs
+                subject: {
+                    include: {
+                        coreProblems: {
+                            select: { id: true, order: true, name: true }, // Min selection for next finder
+                            orderBy: { order: 'asc' }
+                        }
+                    }
                 }
             }
-        },
-        select: { id: true }
-    });
-    const problemIds = problemsInCoreProblem.map(p => p.id);
-    const totalProblems = problemIds.length;
-
-    // 2. Fetch user states
-    const userStates = await prisma.userProblemState.findMany({
-        where: {
-            userId,
-            problemId: { in: problemIds }
-        }
-    });
-
-    // 3. Calculate Stats
-    const answeredCount = userStates.length;
-    const correctCount = userStates.filter(s => s.isCleared).length;
-
-    const answerRate = answeredCount / totalProblems;
-    const correctRate = answeredCount > 0 ? (correctCount / answeredCount) : 0;
-
-    // Thresholds from shared config
-    if (isCoreProblemPassed(answerRate, correctRate)) {
-        // Unlock Next CoreProblem
-        const currentCp = await prisma.coreProblem.findUnique({
-            where: { id: coreProblemId }
         });
 
-        if (!currentCp) return;
+        // Loop through each checked CP
+        for (const cp of cpDetails) {
+            const totalProblems = cp.problems.length;
+            const problemIds = cp.problems.map(p => p.id);
 
-        const nextCp = await prisma.coreProblem.findFirst({
-            where: {
-                subjectId: currentCp.subjectId,
-                order: { gt: currentCp.order }
-            },
-            orderBy: { order: 'asc' }
-        });
-
-        if (nextCp) {
-            await prisma.userCoreProblemState.upsert({
+            // Fetch User States for this CP's problems
+            const userStates = await prisma.userProblemState.findMany({
                 where: {
-                    userId_coreProblemId: {
-                        userId,
-                        coreProblemId: nextCp.id
-                    }
-                },
-                create: {
                     userId,
-                    coreProblemId: nextCp.id,
-                    isUnlocked: true,
-                    priority: 0
-                },
-                update: {
-                    isUnlocked: true
+                    problemId: { in: problemIds }
                 }
             });
-            console.log(`Unlocked CoreProblem ${nextCp.name} for user ${userId}`);
+
+            const answeredCount = userStates.length;
+            const correctCount = userStates.filter(s => s.isCleared).length;
+
+            const { isPassed } = calculateCoreProblemStatus(totalProblems, answeredCount, correctCount);
+
+            if (isPassed) {
+                // Find Next CP
+                // We have the subject's CPs sorted.
+                const subjectCps = cp.subject.coreProblems;
+                // Find current index
+                const currentIndex = subjectCps.findIndex(c => c.id === cp.id);
+                if (currentIndex !== -1 && currentIndex < subjectCps.length - 1) {
+                    const nextCp = subjectCps[currentIndex + 1];
+
+                    // Unlock Next CP
+                    await prisma.userCoreProblemState.upsert({
+                        where: {
+                            userId_coreProblemId: {
+                                userId,
+                                coreProblemId: nextCp.id
+                            }
+                        },
+                        create: {
+                            userId,
+                            coreProblemId: nextCp.id,
+                            isUnlocked: true,
+                            priority: 0
+                        },
+                        update: {
+                            isUnlocked: true
+                        }
+                    });
+                    console.log(`Unlocked CoreProblem ${nextCp.name} for user ${userId}`);
+                }
+            }
         }
     }
 }
+
+
+
+
 
 export async function gradeTextAnswer(problemId: string, studentAnswer: string): Promise<{ evaluation: string, feedback: string }> {
     const problem = await prisma.problem.findUnique({

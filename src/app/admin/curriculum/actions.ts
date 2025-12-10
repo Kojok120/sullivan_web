@@ -185,8 +185,8 @@ export async function createProblem(data: {
         const subject = coreProblem.subject;
 
         // 2. Generate Custom ID
-        const { generateCustomId } = await import('@/lib/curriculum-service');
-        const customId = await generateCustomId(subject.id);
+        const { getNextCustomId } = await import('@/lib/curriculum-service');
+        const customId = await getNextCustomId(subject.id);
 
         const problem = await prisma.problem.create({
             data: {
@@ -286,10 +286,8 @@ export async function bulkCreateProblems(subjectId: string, problems: {
         // Counting is unsafe because deletions cause duplicate IDs.
         const allSubjectProblems = await prisma.problem.findMany({
             where: {
-                // Global check for customId collision.
-                // Do NOT filter by subject, because customId is globally unique.
                 customId: {
-                    startsWith: prefix
+                    startsWith: prefix + '-'
                 }
             },
             select: { customId: true }
@@ -298,10 +296,12 @@ export async function bulkCreateProblems(subjectId: string, problems: {
         let maxNum = 0;
         for (const p of allSubjectProblems) {
             if (p.customId) {
-                const part = p.customId.replace(`${prefix}-`, '');
-                const num = parseInt(part, 10);
-                if (!isNaN(num) && num > maxNum) {
-                    maxNum = num;
+                const parts = p.customId.split('-');
+                if (parts.length === 2) {
+                    const num = parseInt(parts[1], 10);
+                    if (!isNaN(num) && num > maxNum) {
+                        maxNum = num;
+                    }
                 }
             }
         }

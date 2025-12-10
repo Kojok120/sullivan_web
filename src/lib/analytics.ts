@@ -23,58 +23,98 @@ export type DailyActivity = {
 };
 
 export async function getStudentStats(userId: string): Promise<StudentStats> {
-    // 1. Get Aggregates and Distinct Dates in optimized queries
-    // We can't easily do distinct count of dates AND total count in one Prisma aggregate.
-    // But we can do:
-    // 1. Count Total
-    // 2. Count Correct
-    // 3. Raw query for Dates (for streak)
+    // 1. Get Aggregates using shared helper
+    const statsMap = await fetchInternalStudentStats([userId]);
+    const stats = statsMap.get(userId) || {
+        totalProblemsSolved: 0,
+        totalCorrect: 0,
+        accuracy: 0,
+        currentStreak: 0,
+        lastActivity: null
+    };
 
-    // Let's combine 1 & 2 if possible, or use raw for everything.
-    // Single Raw Query for Stats:
+    return stats;
+}
+
+// Helper function to bulk fetch stats
+async function fetchInternalStudentStats(userIds: string[]): Promise<Map<string, StudentStats>> {
+    if (userIds.length === 0) return new Map();
+
+    // 1. Fetch Aggregates (Total, Correct, LastActivity)
     const statsRaw = await prisma.$queryRaw<
         Array<{
+            userId: string;
             total: bigint;
             correct: bigint;
             lastActivity: Date | null;
         }>
     >`
         SELECT 
+            "userId", 
             COUNT(*) as "total", 
             SUM(CASE WHEN evaluation IN ('A', 'B') THEN 1 ELSE 0 END) as "correct", 
             MAX("answeredAt") as "lastActivity"
         FROM "LearningHistory"
-        WHERE "userId" = ${userId}
+        WHERE "userId" IN (${Prisma.join(userIds)})
+        GROUP BY "userId"
     `;
 
-    const s = statsRaw[0];
-    const totalProblemsSolved = Number(s.total || 0);
-    const totalCorrect = Number(s.correct || 0);
-    const lastActivity = s.lastActivity;
-
-    // 2. Get Distinct Dates for Streak (Separate query still needed for streak algo, but we used raw earlier)
-    const distinctDates = await prisma.$queryRaw<{ date: Date }[]>`
-        SELECT DISTINCT DATE("answeredAt") as date
+    // 2. Fetch Distinct Dates for Streak
+    const allDistinctDates = await prisma.$queryRaw<{ userId: string, date: Date }[]>`
+        SELECT "userId", DATE("answeredAt") as date
         FROM "LearningHistory"
-        WHERE "userId" = ${userId}
-        ORDER BY date DESC
+        WHERE "userId" IN (${Prisma.join(userIds)})
+        GROUP BY "userId", DATE("answeredAt")
     `;
 
-    const uniqueDates = new Set<string>();
-    distinctDates.forEach(row => {
+    const userDatesMap = new Map<string, Set<string>>();
+    allDistinctDates.forEach(row => {
+        if (!userDatesMap.has(row.userId)) {
+            userDatesMap.set(row.userId, new Set());
+        }
         const d = new Date(row.date);
-        uniqueDates.add(d.toISOString().split('T')[0]);
+        userDatesMap.get(row.userId)!.add(d.toISOString().split('T')[0]);
     });
 
-    const currentStreak = calculateStreak(uniqueDates);
+    // 3. Construct Result Map
+    const statsMap = new Map<string, StudentStats>();
 
-    return {
-        totalProblemsSolved,
-        totalCorrect,
-        accuracy: totalProblemsSolved > 0 ? Math.round((totalCorrect / totalProblemsSolved) * 100) : 0,
-        currentStreak,
-        lastActivity: lastActivity || null,
-    };
+    // Initialize for all requested IDs (ensure entry exists even if no history)
+    userIds.forEach(id => {
+        statsMap.set(id, {
+            totalProblemsSolved: 0,
+            totalCorrect: 0,
+            accuracy: 0,
+            currentStreak: 0,
+            lastActivity: null,
+        });
+    });
+
+    // Merge Aggregates
+    statsRaw.forEach(row => {
+        const s = statsMap.get(row.userId);
+        if (s) {
+            s.totalProblemsSolved = Number(row.total);
+            s.totalCorrect = Number(row.correct || 0);
+            s.lastActivity = row.lastActivity;
+            if (s.totalProblemsSolved > 0) {
+                s.accuracy = Math.round((s.totalCorrect / s.totalProblemsSolved) * 100);
+            }
+        }
+    });
+
+    // Merge Streaks
+    userIds.forEach(id => {
+        const s = statsMap.get(id);
+        const dates = userDatesMap.get(id);
+        if (s && dates) {
+            s.currentStreak = calculateStreak(dates);
+        }
+    });
+
+    return statsMap;
+
+
 }
 
 export async function getStudentsWithStats(query?: string, skip = 0, take = 50) {
@@ -97,78 +137,7 @@ export async function getStudentsWithStats(query?: string, skip = 0, take = 50) 
     const studentIds = students.map(s => s.id);
 
     // Bulk fetch stats
-    // Bulk fetch stats (Total, Correct, LastActivity) in one query
-    const statsRaw = await prisma.$queryRaw<
-        Array<{
-            userId: string;
-            total: bigint;
-            correct: bigint;
-            lastActivity: Date | null;
-        }>
-    >`
-        SELECT 
-            "userId", 
-            COUNT(*) as "total", 
-            SUM(CASE WHEN evaluation IN ('A', 'B') THEN 1 ELSE 0 END) as "correct", 
-            MAX("answeredAt") as "lastActivity"
-        FROM "LearningHistory"
-        WHERE "userId" IN (${Prisma.join(studentIds)})
-        GROUP BY "userId"
-    `;
-
-    const statsMap = new Map<string, StudentStats>();
-
-    // Initialize map
-    studentIds.forEach(id => {
-        statsMap.set(id, {
-            totalProblemsSolved: 0,
-            totalCorrect: 0,
-            accuracy: 0,
-            currentStreak: 0,
-            lastActivity: null,
-        });
-    });
-
-    // Fill data
-    // Fill data
-    statsRaw.forEach(row => {
-        const stats = statsMap.get(row.userId);
-        if (stats) {
-            stats.totalProblemsSolved = Number(row.total);
-            stats.totalCorrect = Number(row.correct || 0);
-            stats.lastActivity = row.lastActivity;
-        }
-    });
-
-    // Calculate accuracy
-    // Calculate accuracy and streak
-    // Fetch dates for streak calculation
-    const allDistinctDates = await prisma.$queryRaw<{ userId: string, date: Date }[]>`
-        SELECT "userId", DATE("answeredAt") as date
-        FROM "LearningHistory"
-        WHERE "userId" IN (${Prisma.join(studentIds)})
-        GROUP BY "userId", DATE("answeredAt")
-    `;
-
-    const userDatesMap = new Map<string, Set<string>>();
-    allDistinctDates.forEach(row => {
-        if (!userDatesMap.has(row.userId)) {
-            userDatesMap.set(row.userId, new Set());
-        }
-        const d = new Date(row.date);
-        userDatesMap.get(row.userId)!.add(d.toISOString().split('T')[0]);
-    });
-
-    statsMap.forEach((stats, userId) => {
-        if (stats.totalProblemsSolved > 0) {
-            stats.accuracy = Math.round((stats.totalCorrect / stats.totalProblemsSolved) * 100);
-        }
-
-        const dates = userDatesMap.get(userId);
-        if (dates) {
-            stats.currentStreak = calculateStreak(dates);
-        }
-    });
+    const statsMap = await fetchInternalStudentStats(studentIds);
 
     return students.map(student => ({
         ...student,
@@ -231,20 +200,23 @@ export async function getDailyActivity(userId: string, days = 30): Promise<Daily
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    const rawLogs = await prisma.learningHistory.findMany({
-        where: {
-            userId,
-            answeredAt: {
-                gte: startDate,
-            },
-        },
-        select: { answeredAt: true },
-    });
+    // Group by Date in DB
+    const stats = await prisma.$queryRaw<Array<{ date: Date | string, count: bigint }>>`
+        SELECT 
+            DATE("answeredAt") as "date", 
+            COUNT(*) as "count"
+        FROM "LearningHistory"
+        WHERE "userId" = ${userId}
+        AND "answeredAt" >= ${startDate}
+        GROUP BY DATE("answeredAt")
+    `;
 
     const activityMap = new Map<string, number>();
-    rawLogs.forEach(log => {
-        const dateStr = log.answeredAt.toISOString().split('T')[0];
-        activityMap.set(dateStr, (activityMap.get(dateStr) || 0) + 1);
+    stats.forEach(s => {
+        // s.date might be a Date object or string depending on driver
+        const d = new Date(s.date);
+        const dateStr = d.toISOString().split('T')[0];
+        activityMap.set(dateStr, Number(s.count));
     });
 
     const result: DailyActivity[] = [];

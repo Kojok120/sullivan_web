@@ -3,11 +3,9 @@ import { redirect } from 'next/navigation';
 import { getStudentStats, getSubjectProgress, getDailyActivity } from '@/lib/analytics';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Activity, Trophy, Target, Clock } from 'lucide-react';
+import { Activity, Trophy, Target } from 'lucide-react'; // Clock removed
 import { ActivityChart } from './activity-chart';
 import Link from 'next/link';
-
-
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
 import { getUnwatchedCount } from "@/lib/analytics";

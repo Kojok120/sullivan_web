@@ -14,13 +14,12 @@ export async function getClassrooms(query?: string) {
         throw new Error('Forbidden');
     }
 
-    const where = query ? {
-        name: { contains: query }
-    } : {};
-
-    return await prisma.classroom.findMany({
-        where,
-        orderBy: { createdAt: 'asc' },
+    const { fetchClassrooms } = await import('@/lib/classroom-service');
+    // Unifying sort order to Name ASC for consistency across the app
+    return await fetchClassrooms({
+        query,
+        orderBy: 'name',
+        sortOrder: 'asc'
     });
 }
 

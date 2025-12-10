@@ -35,7 +35,7 @@ export async function createUser({
     const loginId = `${prefix}${nextNum.toString().padStart(4, '0')}`;
 
     // Default password if not provided (e.g. for admin creation)
-    const finalPassword = password || 'password';
+    const finalPassword = password || 'password123';
     const hashedPassword = await hash(finalPassword, 10);
 
     const user = await prisma.user.create({

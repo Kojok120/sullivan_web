@@ -1,9 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { Problem, UserProblemState, CoreProblem, UserCoreProblemState } from "@prisma/client";
 
-// Configuration for the print algorithm
-export const UNLOCK_ANSWER_RATE = 0.5; // 50%
-export const UNLOCK_CORRECT_RATE = 0.6; // 60%
+import { UNLOCK_ANSWER_RATE, UNLOCK_CORRECT_RATE, calculateCoreProblemStatus } from "@/lib/progression";
 
 export const PRINT_CONFIG = {
     // Weights for scoring
@@ -20,10 +18,8 @@ export const PRINT_CONFIG = {
     UNLOCK_CORRECT_RATE
 };
 
-// Shared Helper for Unlock Check
-export function isCoreProblemPassed(answerRate: number, correctRate: number): boolean {
-    return answerRate >= UNLOCK_ANSWER_RATE && correctRate >= UNLOCK_CORRECT_RATE;
-}
+// Shared Helper is now in @/lib/progression
+// export function isCoreProblemPassed... (Removed)
 
 type ScoredProblem = {
     problem: Problem;
@@ -98,11 +94,8 @@ export async function selectProblemsForPrint(
         // The current UserProblemState has isCleared. Let's use that.
         const correctCount = cpProblemIds.filter(pid => problemStateMap.get(pid)?.isCleared).length;
 
-        const answerRate = answeredCount / totalProblems;
-        // "正答率: 正解したユニークな問題数 / 一度でも解いた問題数"
-        const correctRate = answeredCount > 0 ? correctCount / answeredCount : 0;
-
-        const isCleared = answerRate >= PRINT_CONFIG.UNLOCK_ANSWER_RATE && correctRate >= PRINT_CONFIG.UNLOCK_CORRECT_RATE;
+        const { isPassed, answerRate, correctRate } = calculateCoreProblemStatus(totalProblems, answeredCount, correctCount);
+        const isCleared = isPassed;
 
         coreProblemStats.set(cp.id, { answerRate, correctRate, isCleared });
     }
