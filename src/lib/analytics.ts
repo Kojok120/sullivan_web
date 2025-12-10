@@ -23,29 +23,36 @@ export type DailyActivity = {
 };
 
 export async function getStudentStats(userId: string): Promise<StudentStats> {
-    // 1. Get Aggregates
-    const [aggregates, lastActivity] = await Promise.all([
-        prisma.learningHistory.aggregate({
-            where: { userId },
-            _count: {
-                id: true, // Total
-            },
-        }),
-        prisma.learningHistory.findFirst({
-            where: { userId },
-            orderBy: { answeredAt: 'desc' },
-            select: { answeredAt: true },
-        }),
-    ]);
+    // 1. Get Aggregates and Distinct Dates in optimized queries
+    // We can't easily do distinct count of dates AND total count in one Prisma aggregate.
+    // But we can do:
+    // 1. Count Total
+    // 2. Count Correct
+    // 3. Raw query for Dates (for streak)
 
-    const historyCount = aggregates._count.id;
+    // Let's combine 1 & 2 if possible, or use raw for everything.
+    // Single Raw Query for Stats:
+    const statsRaw = await prisma.$queryRaw<
+        Array<{
+            total: bigint;
+            correct: bigint;
+            lastActivity: Date | null;
+        }>
+    >`
+        SELECT 
+            COUNT(*) as "total", 
+            SUM(CASE WHEN evaluation IN ('A', 'B') THEN 1 ELSE 0 END) as "correct", 
+            MAX("answeredAt") as "lastActivity"
+        FROM "LearningHistory"
+        WHERE "userId" = ${userId}
+    `;
 
-    // 2. Get Correct Count
-    const correctCount = await prisma.learningHistory.count({
-        where: { userId, evaluation: { in: ['A', 'B'] } }
-    });
+    const s = statsRaw[0];
+    const totalProblemsSolved = Number(s.total || 0);
+    const totalCorrect = Number(s.correct || 0);
+    const lastActivity = s.lastActivity;
 
-    // 3. Get Distinct Dates for Streak
+    // 2. Get Distinct Dates for Streak (Separate query still needed for streak algo, but we used raw earlier)
     const distinctDates = await prisma.$queryRaw<{ date: Date }[]>`
         SELECT DISTINCT DATE("answeredAt") as date
         FROM "LearningHistory"
@@ -55,21 +62,18 @@ export async function getStudentStats(userId: string): Promise<StudentStats> {
 
     const uniqueDates = new Set<string>();
     distinctDates.forEach(row => {
-        // Prisma returns Date object for date/timestamp
         const d = new Date(row.date);
         uniqueDates.add(d.toISOString().split('T')[0]);
     });
 
     const currentStreak = calculateStreak(uniqueDates);
 
-
-
     return {
-        totalProblemsSolved: historyCount,
-        totalCorrect: correctCount,
-        accuracy: historyCount > 0 ? Math.round((correctCount / historyCount) * 100) : 0,
+        totalProblemsSolved,
+        totalCorrect,
+        accuracy: totalProblemsSolved > 0 ? Math.round((totalCorrect / totalProblemsSolved) * 100) : 0,
         currentStreak,
-        lastActivity: lastActivity?.answeredAt || null,
+        lastActivity: lastActivity || null,
     };
 }
 

@@ -4,7 +4,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { prisma } from '@/lib/prisma';
 import fs from 'fs';
 import path from 'path';
-import { UNLOCK_ANSWER_RATE, UNLOCK_CORRECT_RATE } from '@/lib/print-algo';
+import { UNLOCK_ANSWER_RATE, UNLOCK_CORRECT_RATE, isCoreProblemPassed } from '@/lib/print-algo';
 import { calculateNewPriority } from '@/lib/priority-algo';
 
 // Configuration
@@ -202,7 +202,14 @@ async function archiveProcessedFile(fileId: string, studentId: string, date: Dat
 }
 
 // Helper to find or create a folder
+const folderCache = new Map<string, string>(); // Cache folder IDs key="${name}:${parentId}"
+
 async function ensureFolder(name: string, parentId: string): Promise<string> {
+    const cacheKey = `${name}:${parentId}`;
+    if (folderCache.has(cacheKey)) {
+        return folderCache.get(cacheKey)!;
+    }
+
     try {
         const driveClient = getDrive();
         // Check if exists
@@ -214,7 +221,9 @@ async function ensureFolder(name: string, parentId: string): Promise<string> {
         });
 
         if (res.data.files && res.data.files.length > 0) {
-            return res.data.files[0].id!;
+            const id = res.data.files[0].id!;
+            folderCache.set(cacheKey, id);
+            return id;
         }
 
         // Create if not exists
@@ -228,7 +237,9 @@ async function ensureFolder(name: string, parentId: string): Promise<string> {
             fields: 'id'
         });
 
-        return file.data.id!;
+        const id = file.data.id!;
+        folderCache.set(cacheKey, id);
+        return id;
     } catch (error) {
         console.error(`Error ensuring folder ${name}:`, error);
         throw error;
@@ -499,40 +510,7 @@ export async function recordGradingResults(results: GradingResult[]) {
     }
 }
 
-// Deprecated or remove
-async function saveGradingResult(result: GradingResult) {
-    // Only used for single case?
-    await recordGradingResults([result]);
-}
 
-// Keep single version if imported elsewhere?
-// The review said "remove redundancy and batch".
-// `checkAndUnlockCoreProblem` needs to use shared constants (Review Point 4).
-// I will update it in next step (Refactor print-algo & logic).
-
-
-async function updateCoreProblemPriority(userId: string, coreProblemId: string, delta: number) {
-    // Upsert State
-    const state = await prisma.userCoreProblemState.findUnique({
-        where: { userId_coreProblemId: { userId, coreProblemId } }
-    });
-
-    if (state) {
-        await prisma.userCoreProblemState.update({
-            where: { userId_coreProblemId: { userId, coreProblemId } },
-            data: { priority: { increment: delta } }
-        });
-    } else {
-        await prisma.userCoreProblemState.create({
-            data: {
-                userId,
-                coreProblemId,
-                priority: delta,
-                isUnlocked: true // Assume unlocked if we are grading it
-            }
-        });
-    }
-}
 
 async function checkAndUnlockCoreProblem(userId: string, coreProblemId: string) {
     // 1. Get current CoreProblem
@@ -573,7 +551,7 @@ async function checkAndUnlockCoreProblem(userId: string, coreProblemId: string) 
     const correctRate = answeredCount > 0 ? (correctCount / answeredCount) : 0;
 
     // Thresholds from shared config
-    if (answerRate >= UNLOCK_ANSWER_RATE && correctRate >= UNLOCK_CORRECT_RATE) {
+    if (isCoreProblemPassed(answerRate, correctRate)) {
         // Unlock Next CoreProblem
         const currentCp = await prisma.coreProblem.findUnique({
             where: { id: coreProblemId }

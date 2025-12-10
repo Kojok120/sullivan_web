@@ -20,6 +20,11 @@ export const PRINT_CONFIG = {
     UNLOCK_CORRECT_RATE
 };
 
+// Shared Helper for Unlock Check
+export function isCoreProblemPassed(answerRate: number, correctRate: number): boolean {
+    return answerRate >= UNLOCK_ANSWER_RATE && correctRate >= UNLOCK_CORRECT_RATE;
+}
+
 type ScoredProblem = {
     problem: Problem;
     score: number;
