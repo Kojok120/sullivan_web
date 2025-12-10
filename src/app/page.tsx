@@ -95,25 +95,22 @@ export default async function Home({
         ) : (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {coreProblems.map((cp) => (
-              <Link href={`/practice/${cp.id}`} key={cp.id} className="block group">
-                <Card className="h-full transition-all hover:shadow-md hover:border-primary/50 cursor-pointer group-hover:-translate-y-1">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center justify-between text-lg group-hover:text-primary transition-colors">
-                      {cp.name}
-                      <ArrowRight className="h-5 w-5 text-primary opacity-0 -translate-x-2 transition-all group-hover:opacity-100 group-hover:translate-x-0" />
-                    </CardTitle>
-                    <CardDescription>
-                      基礎を固めてステップアップ
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground group-hover:text-primary/80 transition-colors">
-                      <BookOpen className="h-4 w-4" />
-                      <span>学習を始める</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
+              <Card key={cp.id} className="h-full border-muted text-muted-foreground">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center justify-between text-lg">
+                    {cp.name}
+                  </CardTitle>
+                  <CardDescription>
+                    {/* Description or stats can go here */}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-2 text-sm">
+                    {/* Removed practice link */}
+                    <span>基本問題</span>
+                  </div>
+                </CardContent>
+              </Card>
             ))}
           </div>
         )}

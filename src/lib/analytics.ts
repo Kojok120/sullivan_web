@@ -91,23 +91,24 @@ export async function getStudentsWithStats(query?: string) {
     const studentIds = students.map(s => s.id);
 
     // Bulk fetch stats
-    const [totalCounts, correctCounts, lastActivities] = await Promise.all([
-        prisma.learningHistory.groupBy({
-            by: ['userId'],
-            where: { userId: { in: studentIds } },
-            _count: { id: true },
-        }),
-        prisma.learningHistory.groupBy({
-            by: ['userId'],
-            where: { userId: { in: studentIds }, evaluation: { in: ['A', 'B'] } },
-            _count: { id: true },
-        }),
-        prisma.learningHistory.groupBy({
-            by: ['userId'],
-            where: { userId: { in: studentIds } },
-            _max: { answeredAt: true },
-        }),
-    ]);
+    // Bulk fetch stats (Total, Correct, LastActivity) in one query
+    const statsRaw = await prisma.$queryRaw<
+        Array<{
+            userId: string;
+            total: bigint;
+            correct: bigint;
+            lastActivity: Date | null;
+        }>
+    >`
+        SELECT 
+            "userId", 
+            COUNT(*) as "total", 
+            SUM(CASE WHEN evaluation IN ('A', 'B') THEN 1 ELSE 0 END) as "correct", 
+            MAX("answeredAt") as "lastActivity"
+        FROM "LearningHistory"
+        WHERE "userId" IN (${Prisma.join(studentIds)})
+        GROUP BY "userId"
+    `;
 
     const statsMap = new Map<string, StudentStats>();
 
@@ -123,19 +124,14 @@ export async function getStudentsWithStats(query?: string) {
     });
 
     // Fill data
-    totalCounts.forEach(item => {
-        const stats = statsMap.get(item.userId);
-        if (stats) stats.totalProblemsSolved = item._count.id;
-    });
-
-    correctCounts.forEach(item => {
-        const stats = statsMap.get(item.userId);
-        if (stats) stats.totalCorrect = item._count.id;
-    });
-
-    lastActivities.forEach(item => {
-        const stats = statsMap.get(item.userId);
-        if (stats) stats.lastActivity = item._max.answeredAt;
+    // Fill data
+    statsRaw.forEach(row => {
+        const stats = statsMap.get(row.userId);
+        if (stats) {
+            stats.totalProblemsSolved = Number(row.total);
+            stats.totalCorrect = Number(row.correct || 0);
+            stats.lastActivity = row.lastActivity;
+        }
     });
 
     // Calculate accuracy

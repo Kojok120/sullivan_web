@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Link from 'next/link';
-import { ArrowLeft, AlertTriangle, Clock, Target, Trophy, Activity, Printer } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, Clock, Target, Trophy } from 'lucide-react';
 import { getStudentStats, getSubjectProgress, getDailyActivity, getStudentWeaknesses } from '@/lib/analytics';
 import { ActivityChart } from '@/app/dashboard/activity-chart';
 import { ProfileCard } from './profile-card';

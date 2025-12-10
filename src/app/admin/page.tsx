@@ -1,8 +1,8 @@
-import { getSession, logout } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Users, BookOpen, Video, Settings, School } from "lucide-react";
+import { Users, BookOpen, Settings, School } from "lucide-react";
 
 export default async function AdminDashboard() {
     const session = await getSession();

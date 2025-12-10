@@ -2,7 +2,6 @@
 
 import { prisma } from '@/lib/prisma';
 import { login, verifyPassword } from '@/lib/auth';
-import { Role } from '@prisma/client';
 import { redirect } from 'next/navigation';
 
 import { z } from 'zod';

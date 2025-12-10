@@ -3,14 +3,7 @@
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { Role } from '@prisma/client';
-import { hashPassword, getSession } from '@/lib/auth';
-
-async function requireAdmin() {
-    const session = await getSession();
-    if (!session || session.role !== 'ADMIN') {
-        throw new Error('Unauthorized');
-    }
-}
+import { getSession, requireAdmin, hashPassword } from '@/lib/auth';
 
 export async function getUsers(
     page: number = 1,

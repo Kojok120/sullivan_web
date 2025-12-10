@@ -66,6 +66,14 @@ export async function getSession(): Promise<SessionPayload | null> {
     return await decrypt(session);
 }
 
+export async function requireAdmin() {
+    const session = await getSession();
+    if (!session || session.role !== 'ADMIN') {
+        throw new Error('Unauthorized');
+    }
+    return session;
+}
+
 export async function hashPassword(password: string) {
     return await bcrypt.hash(password, 10);
 }
