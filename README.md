@@ -4,6 +4,13 @@
 このドキュメントでは、Sullivanアプリケーションの概要と主要機能について解説します。
 開発環境の構築については、[環境構築.md](./環境構築.md) を参照してください。
 
+## System Requirements (New)
+
+- Node.js 18+
+- PostgreSQL
+- **Python 3** (Required for QR Code processing)
+  - `pip3 install opencv-python`
+
 ## アプリケーション概要
 
 Sullivanは、小学4年生〜中高生を対象とした**「基礎学習定着化プラットフォーム」**です。

@@ -302,53 +302,44 @@ type GradingResult = {
     userAnswer: string;
 };
 
-// Local QR Reader using sharp and jsqr
-import sharp from 'sharp';
-import jsQR from 'jsqr';
+// Local QR Reader using Python OpenCV via child_process
+import { exec } from 'child_process';
+import util from 'util';
+
+const execPromise = util.promisify(exec);
+
+// Path to python script (assuming it stays in scripts/ and running from root)
+const PYTHON_SCRIPT_PATH = path.join(process.cwd(), 'scripts', 'qr_reader.py');
+// Use system python that likely has opencv (based on user environment)
+const PYTHON_CMD = '/usr/bin/python3';
 
 async function readQRCodeLocally(filePath: string): Promise<QRData | null> {
     try {
-        const image = sharp(filePath);
-        const metadata = await image.metadata();
-
-        if (!metadata.width || !metadata.height) return null;
-
-        console.log(`Local QR Read: Image size ${metadata.width}x${metadata.height}`);
-
-        // Resize if too large (jsQR is faster/better with reasonable sizes ~1000-2000px)
-        if (metadata.width > 2000) {
-            image.resize(2000);
+        if (!fs.existsSync(PYTHON_SCRIPT_PATH)) {
+            console.warn("Python QR script not found at", PYTHON_SCRIPT_PATH);
+            return null;
         }
 
-        // Ensure image is processed (grayscale + normalize might help)
-        const { data, info } = await image
-            .grayscale() // Convert to grayscale
-            .normalize() // Improve contrast
-            .raw()
-            .toBuffer({ resolveWithObject: true });
+        console.log(`Local QR Read: Calling Python OpenCV...`);
+        // Execute python script
+        const { stdout } = await execPromise(`${PYTHON_CMD} "${PYTHON_SCRIPT_PATH}" "${filePath}"`);
+        const trimmed = stdout.trim();
 
-        const code = jsQR(new Uint8ClampedArray(data), info.width, info.height);
-
-        if (code) {
-            try {
-                const json = JSON.parse(code.data) as QRData;
-
-                // Sanitize PIDs: Remove ".A" suffix if present (common OCR noise from "Q. ... A. ...")
-                if (json.pids && Array.isArray(json.pids)) {
-                    json.pids = json.pids.map((pid: string) => pid.replace(/\.A$/, ''));
-                }
-
-                console.log("Local QR Read Success:", json);
-                return json;
-            } catch (e) {
-                console.error("Failed to parse QR JSON:", code.data);
-                return null;
-            }
+        if (!trimmed) {
+            console.log("Local QR Read Failed (Python returned empty)");
+            return null;
         }
-        console.log("Local QR Read Failed (jsQR returned null)");
-        return null; // QR not found
+
+        try {
+            const json = JSON.parse(trimmed) as QRData;
+            console.log("Local QR Read Success (Python OpenCV):", json);
+            return json;
+        } catch (e) {
+            console.warn("Python returned non-JSON:", trimmed);
+            return null;
+        }
     } catch (error) {
-        console.error("Local QR Read Error:", error);
+        console.error("Local QR Read Error (Python exec):", error);
         return null;
     }
 }
