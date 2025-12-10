@@ -57,10 +57,10 @@ export function calculateEffectivePriority(
  * 2. Unanswered others
  * 3. Highest priority
  */
-export function selectNextProblem(
-    problems: Problem[],
+export function selectNextProblem<T extends Problem>(
+    problems: T[],
     userStates: UserProblemState[]
-): Problem | null {
+): T | null {
     if (problems.length === 0) return null;
 
     // Create a map for quick lookup
@@ -78,7 +78,7 @@ export function selectNextProblem(
 
     // 2. Highest Priority (Review)
     // If all have been answered at least once, pick the one with the highest priority
-    let selectedProblem: Problem | null = null;
+    let selectedProblem: T | null = null;
     let maxPriority = -Infinity;
 
     for (const problem of problems) {

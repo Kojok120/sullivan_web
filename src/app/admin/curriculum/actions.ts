@@ -2,7 +2,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
-import { ProblemType } from '@prisma/client';
+
 import { getSession } from '@/lib/auth';
 
 async function requireAdmin() {
@@ -98,7 +98,7 @@ export async function createProblem(data: {
     answer: string;
     coreProblemId: string; // Primary CoreProblem to link
     order: number;
-    type?: ProblemType;
+
     videoUrl?: string;
     acceptedAnswers?: string[];
     difficulty?: number; // Removed from schema but kept in args? No, schema removed it.

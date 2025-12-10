@@ -23,9 +23,11 @@ async function main() {
         // Fetch all problems for this subject, ordered by creation time
         const problems = await prisma.problem.findMany({
             where: {
-                coreProblem: {
-                    unit: {
-                        subjectId: subject.id
+                coreProblems: {
+                    some: {
+                        subject: {
+                            id: subject.id
+                        }
                     }
                 }
             },

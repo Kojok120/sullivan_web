@@ -3,8 +3,8 @@
 import { getSession, logout } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { calculateNewPriority } from "@/lib/priority-algo";
 import { ProblemData } from "@/components/learning-session";
+import { recordGradingResult } from "@/lib/grading-service";
 
 
 export async function logoutAction() {
@@ -40,59 +40,7 @@ async function requireAuth() {
     return session;
 }
 
-// Helper to record history and update priority
-async function recordProblemResult(
-    userId: string,
-    problemId: string,
-    evaluation: "A" | "B" | "C" | "D",
-    userAnswer?: string,
-    feedback?: string
-) {
-    // 1. Record History
-    await prisma.learningHistory.create({
-        data: {
-            userId,
-            problemId,
-            evaluation,
-            userAnswer,
-            feedback,
-        },
-    });
 
-    // 2. Update UserProblemState
-    const currentState = await prisma.userProblemState.findUnique({
-        where: {
-            userId_problemId: {
-                userId,
-                problemId,
-            },
-        },
-    });
-
-    const currentPriority = currentState?.priority || 0;
-
-    // 3. Calculate new base priority using the unified logic (using default config)
-    const newPriority = calculateNewPriority(currentPriority, evaluation);
-
-    await prisma.userProblemState.upsert({
-        where: {
-            userId_problemId: {
-                userId,
-                problemId,
-            },
-        },
-        update: {
-            priority: newPriority,
-            lastAnsweredAt: new Date(),
-        },
-        create: {
-            userId,
-            problemId,
-            priority: newPriority,
-            lastAnsweredAt: new Date(),
-        },
-    });
-}
 
 export async function getNextProblem(userId: string, coreProblemId: string): Promise<ProblemData | null> {
     const session = await requireAuth();
@@ -166,5 +114,31 @@ export async function submitEvaluation(
         throw new Error('Unauthorized');
     }
 
-    await recordProblemResult(userId, problemId, evaluation);
+    await recordGradingResult(userId, problemId, evaluation);
+}
+
+export async function submitAnswerWithAI(
+    problemId: string,
+    studentAnswer: string
+): Promise<{ aiGraded: boolean; feedback?: string; evaluation?: string }> {
+    const session = await requireAuth();
+
+    try {
+        const { gradeTextAnswer } = await import("@/lib/grading-service");
+        const result = await gradeTextAnswer(problemId, studentAnswer);
+
+        // Optionally record the result immediately?
+        // For now, we just return the AI feedback and let the user confirm/save.
+        // Or we can save it as "AI evaluated" but not "finalized".
+        // The UI flow suggests the user confirms the evaluation.
+
+        return {
+            aiGraded: true,
+            feedback: result.feedback,
+            evaluation: result.evaluation
+        };
+    } catch (error) {
+        console.error("AI Grading Error:", error);
+        return { aiGraded: false };
+    }
 }

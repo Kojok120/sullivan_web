@@ -9,21 +9,24 @@ import { useEffect, useState, useRef, useLayoutEffect } from 'react';
 interface PrintLayoutProps {
     studentName: string;
     subjectName: string;
-    problems: (Problem & { customId?: string | null; qrCodeDataUrl?: string })[];
+    problems: (Problem & { customId?: string | null })[];
+    qrCodeDataUrl?: string;
 }
+
+// ... (MAX_PAGE_HEIGHT_PX remains same)
 
 // A4 height is 297mm. 
 // We reserve space for Header (~30mm) and Footer (~20mm) and margins.
 // Safe content height per page ~ 220mm.
 const MAX_PAGE_HEIGHT_PX = 900; // Approximate pixel height for A4 content area at 96DPI (297mm is ~1123px, minus margins)
 
-export function PrintLayout({ studentName, subjectName, problems }: PrintLayoutProps) {
+export function PrintLayout({ studentName, subjectName, problems, qrCodeDataUrl }: PrintLayoutProps) {
     const router = useRouter();
     const dateStr = new Date().toLocaleDateString('ja-JP');
 
     console.log('PrintLayout received problems:', problems);
 
-    const [paginatedProblems, setPaginatedProblems] = useState<(Problem & { customId?: string | null; qrCodeDataUrl?: string })[][]>([]);
+    const [paginatedProblems, setPaginatedProblems] = useState<(Problem & { customId?: string | null })[][]>([]);
     const [isCalculating, setIsCalculating] = useState(true);
     const measureRef = useRef<HTMLDivElement>(null);
 
@@ -31,8 +34,8 @@ export function PrintLayout({ studentName, subjectName, problems }: PrintLayoutP
         if (!measureRef.current) return;
 
         const problemNodes = measureRef.current.children;
-        const pages: (Problem & { customId?: string | null; qrCodeDataUrl?: string })[][] = [];
-        let currentPage: (Problem & { customId?: string | null; qrCodeDataUrl?: string })[] = [];
+        const pages: (Problem & { customId?: string | null })[][] = [];
+        let currentPage: (Problem & { customId?: string | null })[] = [];
         let currentHeight = 0;
 
         // We only want 2 pages of questions max
@@ -144,17 +147,20 @@ export function PrintLayout({ studentName, subjectName, problems }: PrintLayoutP
                     {/* Answer Sheet Page (Always Page 3) */}
                     <div className="print-page p-[15mm] relative flex flex-col break-before-page">
                         <Header studentName={studentName} subjectName={subjectName} date={dateStr} pageNum={3} totalPages={3} type="解答用紙" />
+
+                        {/* Single QR Code at Top Right */}
+                        {qrCodeDataUrl && (
+                            <div className="absolute top-[15mm] right-[15mm] w-24 h-24">
+                                <img src={qrCodeDataUrl} alt="QR" className="w-full h-full" />
+                            </div>
+                        )}
+
                         <div className="flex-1 mt-6">
                             <div className="flex flex-col gap-8">
                                 {finalProblems.map((problem, index) => (
                                     <div key={problem.id} className="flex gap-4 items-end break-inside-avoid">
                                         <div className="font-bold w-16 text-right text-xl">{problem.customId || index + 1}.</div>
-                                        {/* QR Code */}
-                                        {problem.qrCodeDataUrl && (
-                                            <div className="mb-1">
-                                                <img src={problem.qrCodeDataUrl} alt="QR" className="w-16 h-16" />
-                                            </div>
-                                        )}
+                                        {/* Removed per-problem QR Code */}
                                         <div className="text-xl font-bold mb-1">A.</div>
                                         <div className="flex-1 border-b-2 border-gray-800 mb-1"></div>
                                     </div>

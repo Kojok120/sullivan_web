@@ -55,34 +55,14 @@ export async function getStudentStats(userId: string): Promise<StudentStats> {
 
     const uniqueDates = new Set<string>();
     distinctDates.forEach(row => {
+        // Prisma returns Date object for date/timestamp
         const d = new Date(row.date);
         uniqueDates.add(d.toISOString().split('T')[0]);
     });
 
-    // Calculate Streak
-    let currentStreak = 0;
-    const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    const currentStreak = calculateStreak(uniqueDates);
 
-    // Check if streak is active (today or yesterday has activity)
-    let checkDate = uniqueDates.has(todayStr) ? today : (uniqueDates.has(yesterdayStr) ? yesterday : null);
 
-    if (checkDate) {
-        currentStreak = 0;
-        // Iterate backwards from the active date
-        while (true) {
-            const dateStr = checkDate!.toISOString().split('T')[0];
-            if (uniqueDates.has(dateStr)) {
-                currentStreak++;
-                checkDate!.setDate(checkDate!.getDate() - 1);
-            } else {
-                break;
-            }
-        }
-    }
 
     return {
         totalProblemsSolved: historyCount,
@@ -159,9 +139,32 @@ export async function getStudentsWithStats(query?: string) {
     });
 
     // Calculate accuracy
-    statsMap.forEach(stats => {
+    // Calculate accuracy and streak
+    // Fetch dates for streak calculation
+    const allDistinctDates = await prisma.$queryRaw<{ userId: string, date: Date }[]>`
+        SELECT "userId", DATE("answeredAt") as date
+        FROM "LearningHistory"
+        WHERE "userId" IN (${Prisma.join(studentIds)})
+        GROUP BY "userId", DATE("answeredAt")
+    `;
+
+    const userDatesMap = new Map<string, Set<string>>();
+    allDistinctDates.forEach(row => {
+        if (!userDatesMap.has(row.userId)) {
+            userDatesMap.set(row.userId, new Set());
+        }
+        const d = new Date(row.date);
+        userDatesMap.get(row.userId)!.add(d.toISOString().split('T')[0]);
+    });
+
+    statsMap.forEach((stats, userId) => {
         if (stats.totalProblemsSolved > 0) {
             stats.accuracy = Math.round((stats.totalCorrect / stats.totalProblemsSolved) * 100);
+        }
+
+        const dates = userDatesMap.get(userId);
+        if (dates) {
+            stats.currentStreak = calculateStreak(dates);
         }
     });
 
@@ -254,6 +257,33 @@ export async function getDailyActivity(userId: string, days = 30): Promise<Daily
     }
 
     return result.reverse();
+}
+
+function calculateStreak(uniqueDates: Set<string>): number {
+    let currentStreak = 0;
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+    // Check if streak is active (today or yesterday has activity)
+    // Note: timezone handling matches original implementation (using server local time or whatever node uses)
+    let checkDate = uniqueDates.has(todayStr) ? today : (uniqueDates.has(yesterdayStr) ? yesterday : null);
+
+    if (checkDate) {
+        // Iterate backwards from the active date
+        while (true) {
+            const dateStr = checkDate!.toISOString().split('T')[0];
+            if (uniqueDates.has(dateStr)) {
+                currentStreak++;
+                checkDate!.setDate(checkDate!.getDate() - 1);
+            } else {
+                break;
+            }
+        }
+    }
+    return currentStreak;
 }
 
 export type Weakness = {

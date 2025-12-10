@@ -5,31 +5,51 @@ import { prisma } from '@/lib/prisma';
 import fs from 'fs';
 import path from 'path';
 
+import { calculateNewPriority } from '@/lib/priority-algo';
+
 // Configuration
 const DRIVE_FOLDER_ID = process.env.DRIVE_FOLDER_ID || ''; // Folder to watch
 const SERVICE_ACCOUNT_PATH = path.join(process.cwd(), 'service-account.json');
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 
-// Initialize Gemini
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+// Lazy Initialization
+let genAI: GoogleGenerativeAI | null = null;
+function getGenAI() {
+    if (!genAI) {
+        if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not set");
+        genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+    }
+    return genAI;
+}
 
-// Initialize Drive Auth
-const auth = new google.auth.GoogleAuth({
-    keyFile: SERVICE_ACCOUNT_PATH,
-    scopes: ['https://www.googleapis.com/auth/drive'],
-});
-
-const drive = google.drive({ version: 'v3', auth });
+let drive: any | null = null;
+function getDrive() {
+    if (!drive) {
+        if (!fs.existsSync(SERVICE_ACCOUNT_PATH)) {
+            // Safe guard: if file missing, return null or throw. 
+            // Throwing might break app start if this is called at module level, but we are inside function.
+            // If we return null, callers must handle.
+            // Let's assume validation happens elsewhere or throw here.
+            throw new Error(`Service account file not found at ${SERVICE_ACCOUNT_PATH}`);
+        }
+        const auth = new google.auth.GoogleAuth({
+            keyFile: SERVICE_ACCOUNT_PATH,
+            scopes: ['https://www.googleapis.com/auth/drive'],
+        });
+        drive = google.drive({ version: 'v3', auth });
+    }
+    return drive;
+}
 
 // Types
 type QRData = {
     sid: string; // Student ID
-    pid: string; // Problem ID
+    pids: string[]; // Problem IDs
 };
 
 // 1. Generate QR Code
-export async function generateQRCode(studentId: string, problemId: string): Promise<string> {
-    const data: QRData = { sid: studentId, pid: problemId };
+export async function generateQRCode(studentId: string, problemIds: string[]): Promise<string> {
+    const data: QRData = { sid: studentId, pids: problemIds };
     const json = JSON.stringify(data);
     return await QRCode.toDataURL(json);
 }
@@ -42,7 +62,8 @@ export async function checkDriveForNewFiles() {
     }
 
     try {
-        const res = await drive.files.list({
+        const driveClient = getDrive();
+        const res = await driveClient.files.list({
             q: `'${DRIVE_FOLDER_ID}' in parents and trashed = false and mimeType != 'application/vnd.google-apps.folder'`,
             fields: 'files(id, name, mimeType, createdTime)',
             orderBy: 'createdTime desc',
@@ -85,12 +106,13 @@ async function processFile(fileId: string, fileName: string) {
         // Download file
         const destPath = path.join(process.cwd(), 'tmp', fileName);
         if (!fs.existsSync(path.dirname(destPath))) {
-            fs.mkdirSync(path.dirname(destPath), { recursive: true });
+            await fs.promises.mkdir(path.dirname(destPath), { recursive: true });
         }
 
         const dest = fs.createWriteStream(destPath);
 
-        const res = await drive.files.get(
+        const driveClient = getDrive();
+        const res = await driveClient.files.get(
             { fileId, alt: 'media' },
             { responseType: 'stream' }
         );
@@ -103,20 +125,22 @@ async function processFile(fileId: string, fileName: string) {
         });
 
         // Read QR and Grade using Gemini
-        const result = await gradeWithGemini(destPath);
+        const results = await gradeWithGemini(destPath);
 
         // Update DB
-        if (result) {
-            await saveGradingResult(result);
-            // Archive the file
-            await archiveProcessedFile(fileId, result.studentId, new Date());
+        if (results && results.length > 0) {
+            for (const result of results) {
+                await saveGradingResult(result);
+            }
+            // Archive the file (using the first result's studentId)
+            await archiveProcessedFile(fileId, results[0].studentId, new Date());
             console.log(`Archived file ${fileName}`);
         } else {
             await renameFile(fileId, `[ERROR] ${fileName}`);
         }
 
         // Cleanup
-        fs.unlinkSync(destPath);
+        await fs.promises.unlink(destPath);
 
     } catch (error) {
         console.error(`Error processing file ${fileId}:`, error);
@@ -126,7 +150,8 @@ async function processFile(fileId: string, fileName: string) {
 
 async function renameFile(fileId: string, newName: string) {
     try {
-        await drive.files.update({
+        const driveClient = getDrive();
+        await driveClient.files.update({
             fileId,
             requestBody: { name: newName },
         });
@@ -159,11 +184,12 @@ async function archiveProcessedFile(fileId: string, studentId: string, date: Dat
         const dayId = await ensureFolder(day, monthId);
 
         // 4. Move File
+        const driveClient = getDrive();
         // We need to retrieve the current parents to remove them
-        const file = await drive.files.get({ fileId, fields: 'parents' });
+        const file = await driveClient.files.get({ fileId, fields: 'parents' });
         const previousParents = file.data.parents?.join(',') || '';
 
-        await drive.files.update({
+        await driveClient.files.update({
             fileId,
             addParents: dayId,
             removeParents: previousParents,
@@ -180,9 +206,10 @@ async function archiveProcessedFile(fileId: string, studentId: string, date: Dat
 // Helper to find or create a folder
 async function ensureFolder(name: string, parentId: string): Promise<string> {
     try {
+        const driveClient = getDrive();
         // Check if exists
         const q = `mimeType='application/vnd.google-apps.folder' and name='${name}' and '${parentId}' in parents and trashed=false`;
-        const res = await drive.files.list({
+        const res = await driveClient.files.list({
             q,
             fields: 'files(id)',
             pageSize: 1
@@ -198,7 +225,7 @@ async function ensureFolder(name: string, parentId: string): Promise<string> {
             mimeType: 'application/vnd.google-apps.folder',
             parents: [parentId]
         };
-        const file = await drive.files.create({
+        const file = await driveClient.files.create({
             requestBody: fileMetadata,
             fields: 'id'
         });
@@ -221,45 +248,27 @@ type GradingResult = {
     userAnswer: string;
 };
 
-async function gradeWithGemini(filePath: string): Promise<GradingResult | null> {
+async function gradeWithGemini(filePath: string): Promise<GradingResult[] | null> {
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = getGenAI().getGenerativeModel({ model: "gemini-1.5-flash" });
 
-        const fileBuffer = fs.readFileSync(filePath);
+        const fileBuffer = await fs.promises.readFile(filePath);
         const base64Data = fileBuffer.toString('base64');
-
-        const prompt = `
-        You are an expert teacher grading a student's answer sheet.
-        
-        1.  **Read the QR Code**: There is a QR code in the image. It contains a JSON with "sid" (Student ID) and "pid" (Problem ID). Extract these.
-        2.  **Read the Answer**: Read the student's handwritten answer for the problem.
-        3.  **Grade**: Compare the student's answer with the correct answer (I will provide the problem content below if I could, but since I can't query DB here easily, please infer the question from the sheet or just transcribe the student answer and I will validate it? 
-        Wait, the requirement says: "新規の解答用紙のファイルとQRコードから取得した情報を全てGeminiのAPIに渡して".
-        So I should first extract QR, THEN fetch problem from DB, THEN ask Gemini to grade.
-        
-        Let's do this in two steps or one?
-        If I do one step, Gemini needs to know the correct answer.
-        The sheet might have the question printed.
-        But the correct answer is in DB.
-        
-        **Revised Strategy**:
-        Step 1: Ask Gemini to extract QR code data (sid, pid) and the Student's Answer text.
-        Step 2: Fetch Problem from DB using pid.
-        Step 3: Ask Gemini to grade the Student's Answer against the Correct Answer.
-        
-        Let's do Step 1.
-        `;
 
         const extractionPrompt = `
         Please analyze this image of an answer sheet.
-        1. Find the QR code and extract the JSON data inside it. It should have "sid" and "pid".
-        2. Transcribe the student's handwritten answer.
+        1. Find the QR code and extract the JSON data inside it. It should have "sid" and "pids" (array of problem IDs).
+        2. Transcribe the student's handwritten answers for EACH problem.
+           The problems are usually numbered 1, 2, 3... corresponding to the order in "pids".
         
         Return ONLY a JSON object with this format:
         {
             "sid": "extracted student id",
-            "pid": "extracted problem id",
-            "studentAnswer": "transcribed answer text"
+            "pids": ["pid1", "pid2", ...],
+            "answers": [
+                { "pid": "pid1", "studentAnswer": "transcribed answer 1" },
+                { "pid": "pid2", "studentAnswer": "transcribed answer 2" }
+            ]
         }
         `;
 
@@ -268,8 +277,7 @@ async function gradeWithGemini(filePath: string): Promise<GradingResult | null> 
             {
                 inlineData: {
                     data: base64Data,
-                    mimeType: "image/jpeg" // Assuming JPEG or PNG. If PDF, need to convert? Gemini accepts PDF directly!
-                    // If PDF, mimeType: "application/pdf"
+                    mimeType: "image/jpeg"
                 }
             }
         ]);
@@ -277,67 +285,79 @@ async function gradeWithGemini(filePath: string): Promise<GradingResult | null> 
         const text1 = result1.response.text();
         const json1 = parseJSON(text1);
 
-        if (!json1 || !json1.sid || !json1.pid) {
+        if (!json1 || !json1.sid || !json1.pids || !Array.isArray(json1.pids)) {
             console.error("Failed to extract QR data", text1);
             return null;
         }
 
-        // Fetch Problem
-        const problem = await prisma.problem.findUnique({
-            where: { id: json1.pid },
-            include: { coreProblems: true }
+        const gradingResults: GradingResult[] = [];
+
+        // Grade each problem
+        // Grade each problem in PARALLEL
+        const promises = json1.answers.map(async (answerData: any) => {
+            const pid = answerData.pid;
+            const studentAnswer = answerData.studentAnswer;
+
+            if (!pid) return null;
+
+            // Fetch Problem
+            const problem = await prisma.problem.findUnique({
+                where: { id: pid },
+                include: { coreProblems: true }
+            });
+
+            if (!problem) {
+                console.error("Problem not found", pid);
+                return null;
+            }
+
+            // Step 3: Grade
+            const gradingPrompt = `
+            You are grading a problem.
+            
+            **Question**: ${problem.question}
+            **Correct Answer**: ${problem.answer}
+            **Accepted Answers**: ${problem.acceptedAnswers.join(', ')}
+            
+            **Student Answer**: ${studentAnswer}
+            
+            **Task**:
+            1. Evaluate the student's answer.
+            2. Assign a grade: A (Perfect), B (Correct but minor issues), C (Incorrect but close), D (Incorrect).
+            3. Provide helpful feedback (in Japanese).
+            4. If incorrect (C or D), identify which CoreProblems might be the cause.
+               The problem is related to these CoreProblems:
+               ${problem.coreProblems.map((cp: any) => `- ID: ${cp.id}, Name: ${cp.name}`).join('\n')}
+               Return the IDs of the CoreProblems that the student seems to misunderstand.
+            
+            Return ONLY a JSON object:
+            {
+                "evaluation": "A" | "B" | "C" | "D",
+                "feedback": "feedback text",
+                "badCoreProblemIds": ["id1", "id2"]
+            }
+            `;
+
+            const result2 = await model.generateContent(gradingPrompt);
+            const text2 = result2.response.text();
+            const json2 = parseJSON(text2);
+
+            if (json2) {
+                return {
+                    studentId: json1.sid,
+                    problemId: pid,
+                    userAnswer: studentAnswer,
+                    evaluation: json2.evaluation,
+                    isCorrect: json2.evaluation === 'A' || json2.evaluation === 'B',
+                    feedback: json2.feedback,
+                    badCoreProblemIds: json2.badCoreProblemIds || []
+                };
+            }
+            return null;
         });
 
-        if (!problem) {
-            console.error("Problem not found", json1.pid);
-            return null;
-        }
-
-        // Step 3: Grade
-        const gradingPrompt = `
-        You are grading a problem.
-        
-        **Question**: ${problem.question}
-        **Correct Answer**: ${problem.answer}
-        **Accepted Answers**: ${problem.acceptedAnswers.join(', ')}
-        
-        **Student Answer**: ${json1.studentAnswer}
-        
-        **Task**:
-        1. Evaluate the student's answer.
-        2. Assign a grade: A (Perfect), B (Correct but minor issues), C (Incorrect but close), D (Incorrect).
-        3. Provide helpful feedback (in Japanese).
-        4. If incorrect (C or D), identify which CoreProblems might be the cause.
-           The problem is related to these CoreProblems:
-           ${problem.coreProblems.map(cp => `- ID: ${cp.id}, Name: ${cp.name}`).join('\n')}
-           Return the IDs of the CoreProblems that the student seems to misunderstand.
-        
-        Return ONLY a JSON object:
-        {
-            "evaluation": "A" | "B" | "C" | "D",
-            "feedback": "feedback text",
-            "badCoreProblemIds": ["id1", "id2"]
-        }
-        `;
-
-        const result2 = await model.generateContent(gradingPrompt);
-        const text2 = result2.response.text();
-        const json2 = parseJSON(text2);
-
-        if (!json2) {
-            console.error("Failed to grade", text2);
-            return null;
-        }
-
-        return {
-            studentId: json1.sid,
-            problemId: json1.pid,
-            userAnswer: json1.studentAnswer,
-            evaluation: json2.evaluation,
-            isCorrect: json2.evaluation === 'A' || json2.evaluation === 'B',
-            feedback: json2.feedback,
-            badCoreProblemIds: json2.badCoreProblemIds || []
-        };
+        const results = await Promise.all(promises);
+        return results.filter((r): r is GradingResult => r !== null);
 
     } catch (error) {
         console.error("Gemini Error:", error);
@@ -355,123 +375,144 @@ function parseJSON(text: string): any {
     }
 }
 
-// 5. Save Result
+// 5. Save Result (Unified)
 async function saveGradingResult(result: GradingResult) {
-    // 1. Create LearningHistory
+    await recordGradingResult(
+        result.studentId,
+        result.problemId,
+        result.evaluation,
+        result.userAnswer,
+        result.feedback,
+        result.badCoreProblemIds
+    );
+}
+
+// Unified Grading Logic used by both AI (Scan) and Manual (App) evaluation
+export async function recordGradingResult(
+    userId: string,
+    problemId: string,
+    evaluation: "A" | "B" | "C" | "D",
+    userAnswer?: string,
+    feedback?: string,
+    badCoreProblemIds?: string[]
+) {
+    const isCorrect = evaluation === 'A' || evaluation === 'B';
+
+    // 1. Record History
     await prisma.learningHistory.create({
         data: {
-            userId: result.studentId,
-            problemId: result.problemId,
-            evaluation: result.evaluation,
-            userAnswer: result.userAnswer,
-            feedback: result.feedback,
+            userId,
+            problemId,
+            evaluation,
+            userAnswer,
+            feedback,
             answeredAt: new Date()
         }
     });
 
-    // 2. Update UserProblemState
-    const problemState = await prisma.userProblemState.upsert({
-        where: {
-            userId_problemId: {
-                userId: result.studentId,
-                problemId: result.problemId
-            }
-        },
+    // 2. Update UserProblemState with CalculateNewPriority
+    const currentState = await prisma.userProblemState.findUnique({
+        where: { userId_problemId: { userId, problemId } }
+    });
+
+    const currentPriority = currentState?.priority || 0;
+    const newPriority = calculateNewPriority(currentPriority, evaluation);
+
+    await prisma.userProblemState.upsert({
+        where: { userId_problemId: { userId, problemId } },
         create: {
-            userId: result.studentId,
-            problemId: result.problemId,
-            isCleared: result.isCorrect,
+            userId,
+            problemId,
+            isCleared: isCorrect,
             lastAnsweredAt: new Date(),
-            priority: 0 // Reset priority on answer? Or adjust?
+            priority: newPriority
         },
         update: {
-            isCleared: result.isCorrect,
+            isCleared: isCorrect,
             lastAnsweredAt: new Date(),
-            // Priority logic:
-            // "CoreProblem1, 6, 7のポイントが5下がる" (if correct)
-            // "CoreProblem6,7のポイントが5上がる" (if incorrect)
-            // This is handled in UserCoreProblemState, not UserProblemState.
-            // But UserProblemState has priority too.
-            // Let's reset it to 0 if correct, or increase if incorrect?
-            // Requirement says "CoreProblem...ポイント".
-            // Let's leave UserProblemState priority alone or set to 0.
-            priority: 0
+            priority: newPriority
         }
     });
 
     // 3. Update UserCoreProblemState (Points)
-    // "CoreProblem1,6,7が登録されているquestionE-20を解いた生徒が間違えて、AIが「CoreProblem6,7に問題がある」という返答を返した場合：CoreProblem6,7のポイントが5上がる。CoreProblem1のポイントは変わらない。"
-    // "正解した場合：CoreProblem1, 6, 7のポイントが5下がる。"
-
     const problem = await prisma.problem.findUnique({
-        where: { id: result.problemId },
+        where: { id: problemId },
         include: { coreProblems: true }
     });
 
     if (!problem) return;
 
-    if (result.isCorrect) {
+    if (isCorrect) {
         // Decrease points for ALL associated CoreProblems
         for (const cp of problem.coreProblems) {
-            await updateCoreProblemPriority(result.studentId, cp.id, -5);
-            // Also check for Unlock?
-            // "アンロックされている最新のCoreProblemの解答率が50%、正答率が60%を超えている場合、次のCoreProblemがアンロックされる"
-            // This check should ideally happen here or be re-calculated.
-            // Since we don't have a trigger, we can try to update the NEXT CoreProblem's unlock status.
-            // But that requires knowing the order.
-            // Let's leave unlock logic to the print-algo (it calculates on the fly).
-            // OR we can update `isUnlocked` here.
-            // Let's update `isUnlocked` for the CURRENT CoreProblem if it meets criteria.
-            await checkAndUnlockCoreProblem(result.studentId, cp.id);
+            await updateCoreProblemPriority(userId, cp.id, -5);
+            // Check Unlock
+            await checkAndUnlockCoreProblem(userId, cp.id);
         }
     } else {
         // Increase points for BAD CoreProblems
-        for (const cpId of result.badCoreProblemIds) {
-            // Verify cpId is actually associated? (Gemini might hallucinate)
-            if (problem.coreProblems.some(cp => cp.id === cpId)) {
-                await updateCoreProblemPriority(result.studentId, cpId, 5);
+        // If badCoreProblemIds provided (AI), use them.
+        // If not (Manual), maybe use ALL? Or None?
+        // Let's assume Manual grading doesn't pinpoint bad CP yet.
+        // But we should probably punish ALL if we don't know better?
+        // "Unify logic": If manual grading is C/D, usually it implies the student doesn't understand the core concepts.
+        // Safest: If IDs provided, use them. If not, maybe skip or use all.
+        // Let's use provided IDs if any, else skip for now to avoid punishing everything.
+        if (badCoreProblemIds && badCoreProblemIds.length > 0) {
+            for (const cpId of badCoreProblemIds) {
+                if (problem.coreProblems.some((cp: any) => cp.id === cpId)) {
+                    await updateCoreProblemPriority(userId, cpId, 5);
+                }
             }
         }
     }
 }
 
 async function updateCoreProblemPriority(userId: string, coreProblemId: string, delta: number) {
+    // Upsert State
     const state = await prisma.userCoreProblemState.findUnique({
         where: { userId_coreProblemId: { userId, coreProblemId } }
     });
 
-    const currentPriority = state?.priority || 0;
-    const newPriority = Math.max(0, currentPriority + delta); // Don't go below 0?
-
-    await prisma.userCoreProblemState.upsert({
-        where: { userId_coreProblemId: { userId, coreProblemId } },
-        create: {
-            userId,
-            coreProblemId,
-            priority: newPriority,
-            isUnlocked: false // Default
-        },
-        update: {
-            priority: newPriority
-        }
-    });
+    if (state) {
+        await prisma.userCoreProblemState.update({
+            where: { userId_coreProblemId: { userId, coreProblemId } },
+            data: { priority: { increment: delta } }
+        });
+    } else {
+        await prisma.userCoreProblemState.create({
+            data: {
+                userId,
+                coreProblemId,
+                priority: delta,
+                isUnlocked: true // Assume unlocked if we are grading it
+            }
+        });
+    }
 }
 
 async function checkAndUnlockCoreProblem(userId: string, coreProblemId: string) {
-    // 1. Fetch all problems for this CoreProblem
-    const problems = await prisma.problem.findMany({
+    // 1. Get current CoreProblem
+    const currentCP = await prisma.coreProblem.findUnique({
+        where: { id: coreProblemId },
+        include: { subject: true } // Changed from unit to subject
+    });
+
+    if (!currentCP) return;
+
+    // 2. Fetch problems associated with this CoreProblem
+    const problemsInCoreProblem = await prisma.problem.findMany({
         where: {
             coreProblems: {
-                some: { id: coreProblemId }
+                some: {
+                    id: coreProblemId
+                }
             }
         },
         select: { id: true }
     });
-
-    if (problems.length === 0) return;
-
-    const totalProblems = problems.length;
-    const problemIds = problems.map(p => p.id);
+    const problemIds = problemsInCoreProblem.map(p => p.id);
+    const totalProblems = problemIds.length;
 
     // 2. Fetch user states
     const userStates = await prisma.userProblemState.findMany({
@@ -528,5 +569,48 @@ async function checkAndUnlockCoreProblem(userId: string, coreProblemId: string) 
             });
             console.log(`Unlocked CoreProblem ${nextCp.name} for user ${userId}`);
         }
+    }
+}
+
+export async function gradeTextAnswer(problemId: string, studentAnswer: string): Promise<{ evaluation: string, feedback: string }> {
+    const problem = await prisma.problem.findUnique({
+        where: { id: problemId }
+    });
+
+    if (!problem) {
+        throw new Error("Problem not found");
+    }
+
+    const prompt = `
+    You are a strict but helpful teacher.
+    Problem: ${problem.question}
+    Correct Answer: ${problem.answer}
+    Student Answer: ${studentAnswer}
+
+    Evaluate the student's answer.
+    1. Determine if it is Correct (A), Mostly Correct (B), Partially Correct (C), or Incorrect (D).
+    2. Provide a short, encouraging feedback in Japanese.
+
+    Return ONLY a JSON object:
+    {
+        "evaluation": "A" | "B" | "C" | "D",
+        "feedback": "feedback string"
+    }
+    `;
+
+    const model = getGenAI().getGenerativeModel({ model: "gemini-1.5-flash" });
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+
+    try {
+        const json = parseJSON(text);
+        return {
+            evaluation: json.evaluation || "C",
+            feedback: json.feedback || "AI判定に失敗しました"
+        };
+    } catch (e) {
+        console.error("Failed to parse AI response", text);
+        return { evaluation: "C", feedback: "AI判定エラー" };
     }
 }

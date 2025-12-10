@@ -8,7 +8,7 @@ async function main() {
 
     const subjects = await prisma.subject.findMany({
         include: {
-            units: true,
+            coreProblems: true,
         },
         orderBy: {
             createdAt: 'asc',
@@ -16,7 +16,7 @@ async function main() {
     });
 
     subjects.forEach(s => {
-        console.log(`ID: ${s.id}, Name: "${s.name}" (len: ${s.name.length}), Units: ${s.units.length}`);
+        console.log(`ID: ${s.id}, Name: "${s.name}" (len: ${s.name.length}), CoreProblems: ${s.coreProblems.length}`);
         // Print char codes
         console.log(`  Char codes: ${s.name.split('').map(c => c.charCodeAt(0)).join(', ')}`);
     });

@@ -155,7 +155,7 @@ export function UserList({
                 name: formData.name,
                 role: formData.role,
                 password: formData.password || undefined,
-                groupId: formData.groupId || undefined,
+                group: formData.groupId || undefined,
             });
 
             if (result.success) {
@@ -175,7 +175,7 @@ export function UserList({
                 name: formData.name,
                 role: formData.role,
                 password: formData.password || undefined,
-                groupId: formData.groupId || undefined,
+                group: formData.groupId || undefined,
             });
 
             if (result.success) {

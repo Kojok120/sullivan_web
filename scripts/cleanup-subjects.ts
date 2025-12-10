@@ -8,7 +8,7 @@ async function main() {
 
     const subjects = await prisma.subject.findMany({
         include: {
-            units: true,
+            coreProblems: true,
         },
         orderBy: {
             createdAt: 'asc',
@@ -27,21 +27,21 @@ async function main() {
         if (list.length > 1) {
             console.log(`Found ${list.length} duplicates for ${name}`);
 
-            // Keep the one with the most units, or the oldest one if equal
-            list.sort((a, b) => b.units.length - a.units.length || a.createdAt.getTime() - b.createdAt.getTime());
+            // Keep the one with the most coreProblems, or the oldest one if equal
+            list.sort((a, b) => b.coreProblems.length - a.coreProblems.length || a.createdAt.getTime() - b.createdAt.getTime());
 
             const toKeep = list[0];
             const toDelete = list.slice(1);
 
-            console.log(`Keeping ID: ${toKeep.id} (Units: ${toKeep.units.length})`);
+            console.log(`Keeping ID: ${toKeep.id} (CoreProblems: ${toKeep.coreProblems.length})`);
 
             for (const subject of toDelete) {
-                console.log(`Processing duplicate ID: ${subject.id} (Units: ${subject.units.length})`);
+                console.log(`Processing duplicate ID: ${subject.id} (CoreProblems: ${subject.coreProblems.length})`);
 
-                // Move units to the kept subject
-                if (subject.units.length > 0) {
-                    console.log(`Moving ${subject.units.length} units from ${subject.id} to ${toKeep.id}`);
-                    await prisma.unit.updateMany({
+                // Move coreProblems to the kept subject
+                if (subject.coreProblems.length > 0) {
+                    console.log(`Moving ${subject.coreProblems.length} coreProblems from ${subject.id} to ${toKeep.id}`);
+                    await prisma.coreProblem.updateMany({
                         where: { subjectId: subject.id },
                         data: { subjectId: toKeep.id },
                     });

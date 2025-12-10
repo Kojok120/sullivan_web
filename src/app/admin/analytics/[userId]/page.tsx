@@ -149,18 +149,14 @@ export default async function StudentAnalyticsPage({ params }: PageProps) {
                                         </Badge>
                                     </TableCell>
                                     <TableCell>
-                                        {history.problem.aiGradingEnabled ? (
-                                            <div className="flex flex-col gap-1">
-                                                <span className="text-xs font-medium">回答: {history.userAnswer || '-'}</span>
-                                                {history.feedback && (
-                                                    <span className="text-xs text-muted-foreground truncate max-w-[200px]" title={history.feedback}>
-                                                        FB: {history.feedback}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        ) : (
-                                            <span className="text-xs text-muted-foreground">-</span>
-                                        )}
+                                        <div className="flex flex-col gap-1">
+                                            <span className="text-xs font-medium">回答: {history.userAnswer || '-'}</span>
+                                            {history.feedback && (
+                                                <span className="text-xs text-muted-foreground truncate max-w-[200px]" title={history.feedback}>
+                                                    FB: {history.feedback}
+                                                </span>
+                                            )}
+                                        </div>
                                     </TableCell>
                                 </TableRow>
                             ))}

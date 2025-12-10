@@ -21,12 +21,7 @@ export async function updateStudentProfile(userId: string, formData: FormData) {
     const email = formData.get('email') as string;
 
     try {
-        // Fetch classroom name if classroomId is provided to keep legacy field in sync (optional but good for consistency if we keep the field)
-        let classroomName = null;
-        if (classroomId && classroomId !== 'unselected') {
-            const c = await prisma.classroom.findUnique({ where: { id: classroomId } });
-            if (c) classroomName = c.name;
-        }
+
 
         await prisma.user.update({
             where: { id: userId },
@@ -35,7 +30,7 @@ export async function updateStudentProfile(userId: string, formData: FormData) {
                 notes,
                 birthday: birthdayStr ? new Date(birthdayStr) : null,
                 classroomId: (classroomId && classroomId !== 'unselected') ? classroomId : null,
-                classroom: classroomName, // Sync legacy field
+
                 group: (group && group !== 'unselected') ? group : null,
                 school,
                 phoneNumber,

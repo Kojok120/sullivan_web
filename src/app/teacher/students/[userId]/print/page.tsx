@@ -38,17 +38,16 @@ export default async function PrintPage({
         return <div>Data not found</div>;
     }
 
-    // Generate QR Codes
-    const problemsWithQR = await Promise.all(problems.map(async (p) => ({
-        ...p,
-        qrCodeDataUrl: await generateQRCode(userId, p.id)
-    })));
+    // Generate QR Code for the entire sheet
+    const problemIds = problems.map(p => p.id);
+    const qrCodeDataUrl = await generateQRCode(userId, problemIds);
 
     return (
         <PrintLayout
             studentName={student.name || student.loginId}
             subjectName={subject.name}
-            problems={problemsWithQR}
+            problems={problems}
+            qrCodeDataUrl={qrCodeDataUrl}
         />
     );
 }

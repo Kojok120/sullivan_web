@@ -10,8 +10,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent } from '@/components/ui/card';
 
 import { useRouter } from 'next/navigation';
@@ -34,17 +32,8 @@ export function ProblemList({ coreProblemId, subjectName }: ProblemListProps) {
     const [question, setQuestion] = useState('');
     const [answer, setAnswer] = useState('');
     const [videoUrl, setVideoUrl] = useState('');
-    const [difficulty, setDifficulty] = useState(1);
     const [grade, setGrade] = useState('');
 
-    // English Attributes State
-    const [sentenceType, setSentenceType] = useState('');
-    const [verbSystem, setVerbSystem] = useState('');
-    const [grammarElement, setGrammarElement] = useState('');
-    const [structure, setStructure] = useState('');
-    const [additionalElement, setAdditionalElement] = useState('');
-
-    const isEnglish = subjectName === '英語';
 
     const fetchProblems = async () => {
         setLoading(true);
@@ -64,13 +53,7 @@ export function ProblemList({ coreProblemId, subjectName }: ProblemListProps) {
         setQuestion('');
         setAnswer('');
         setVideoUrl('');
-        setDifficulty(1);
         setGrade('');
-        setSentenceType('');
-        setVerbSystem('');
-        setGrammarElement('');
-        setStructure('');
-        setAdditionalElement('');
         setIsDialogOpen(true);
     };
 
@@ -79,15 +62,7 @@ export function ProblemList({ coreProblemId, subjectName }: ProblemListProps) {
         setQuestion(problem.question);
         setAnswer(problem.answer);
         setVideoUrl(problem.videoUrl || '');
-        setDifficulty(problem.difficulty || 1);
         setGrade((problem as any).grade || '');
-
-        const attrs = (problem as any).attributes || {};
-        setSentenceType(attrs.sentenceType || '');
-        setVerbSystem(attrs.verbSystem || '');
-        setGrammarElement(attrs.grammarElement || '');
-        setStructure(attrs.structure || '');
-        setAdditionalElement(attrs.additionalElement || '');
 
         setIsDialogOpen(true);
     };
@@ -104,15 +79,7 @@ export function ProblemList({ coreProblemId, subjectName }: ProblemListProps) {
                 question,
                 answer,
                 videoUrl,
-                difficulty,
                 grade,
-                attributes: isEnglish ? {
-                    sentenceType,
-                    verbSystem,
-                    grammarElement,
-                    structure,
-                    additionalElement,
-                } : undefined,
             });
             if (result.success) {
                 toast.success('問題を更新しました');
@@ -129,16 +96,8 @@ export function ProblemList({ coreProblemId, subjectName }: ProblemListProps) {
                 question,
                 answer,
                 videoUrl,
-                difficulty,
                 grade,
                 order: maxOrder + 1,
-                attributes: isEnglish ? {
-                    sentenceType,
-                    verbSystem,
-                    grammarElement,
-                    structure,
-                    additionalElement,
-                } : undefined,
             });
             if (result.success) {
                 toast.success('問題を作成しました');
@@ -246,54 +205,15 @@ export function ProblemList({ coreProblemId, subjectName }: ProblemListProps) {
                                 placeholder="https://youtube.com/..."
                             />
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="grid gap-2">
-                                <Label htmlFor="difficulty">難易度 (1-5)</Label>
-                                <Input
-                                    id="difficulty"
-                                    type="number"
-                                    min={1}
-                                    max={5}
-                                    value={difficulty}
-                                    onChange={(e) => setDifficulty(parseInt(e.target.value))}
-                                />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="grade">学年</Label>
-                                <Input
-                                    id="grade"
-                                    value={grade}
-                                    onChange={(e) => setGrade(e.target.value)}
-                                    placeholder="例: 中1, 高2"
-                                />
-                            </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="grade">学年</Label>
+                            <Input
+                                id="grade"
+                                value={grade}
+                                onChange={(e) => setGrade(e.target.value)}
+                                placeholder="例: 中1, 高2"
+                            />
                         </div>
-
-                        {isEnglish && (
-                            <div className="grid grid-cols-2 gap-4 border-t pt-4 mt-2">
-                                <div className="col-span-2 text-sm font-medium text-muted-foreground mb-2">英語属性</div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="sentenceType">文種</Label>
-                                    <Input id="sentenceType" value={sentenceType} onChange={(e) => setSentenceType(e.target.value)} />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="verbSystem">動詞システム</Label>
-                                    <Input id="verbSystem" value={verbSystem} onChange={(e) => setVerbSystem(e.target.value)} />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="grammarElement">文法要素</Label>
-                                    <Input id="grammarElement" value={grammarElement} onChange={(e) => setGrammarElement(e.target.value)} />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="structure">構文</Label>
-                                    <Input id="structure" value={structure} onChange={(e) => setStructure(e.target.value)} />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="additionalElement">付加要素</Label>
-                                    <Input id="additionalElement" value={additionalElement} onChange={(e) => setAdditionalElement(e.target.value)} />
-                                </div>
-                            </div>
-                        )}
                     </div>
                     <DialogFooter>
                         <Button onClick={handleSave}>保存</Button>

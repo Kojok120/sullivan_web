@@ -11,14 +11,10 @@ async function main() {
             id: true,
             customId: true,
             question: true,
-            coreProblem: {
+            coreProblems: {
                 select: {
-                    unit: {
-                        select: {
-                            subject: {
-                                select: { name: true }
-                            }
-                        }
+                    subject: {
+                        select: { name: true }
                     }
                 }
             }
@@ -27,7 +23,8 @@ async function main() {
 
     console.log('Sample problems:');
     problems.forEach(p => {
-        console.log(`[${p.coreProblem.unit.subject.name}] ID: ${p.id}, CustomID: ${p.customId}`);
+        const subjectName = p.coreProblems[0]?.subject.name || 'Unknown';
+        console.log(`[${subjectName}] ID: ${p.id}, CustomID: ${p.customId}`);
     });
 
     const total = await prisma.problem.count();
