@@ -205,11 +205,25 @@ export async function bulkCreateProblems(coreProblemId: string, problems: {
 
         const subject = coreProblem.subject;
 
-        // 2. Generate Custom IDs
-        const { generateCustomId } = await import('@/lib/curriculum-service');
+        // 2. Generate Custom IDs locally to avoid race conditions and N+1
+        // Determine prefix
+        let prefix = '';
+        if (subject.name.includes('英語')) prefix = 'E';
+        else if (subject.name.includes('国語')) prefix = 'J';
+        else if (subject.name.includes('数学')) prefix = 'S';
+        else prefix = subject.name.charAt(0).toUpperCase();
 
-        // Get current max order
-        // We need to check problems linked to this CoreProblem
+        // Get current max count for the subject
+        // We need to count ALL problems in this subject to determine the next ID index.
+        const existingCount = await prisma.problem.count({
+            where: {
+                coreProblems: {
+                    some: { subjectId: subject.id }
+                }
+            }
+        });
+
+        // Get current max order for this CoreProblem
         const currentProblems = await prisma.problem.findMany({
             where: {
                 coreProblems: {
@@ -220,20 +234,18 @@ export async function bulkCreateProblems(coreProblemId: string, problems: {
             orderBy: { order: 'desc' },
             take: 1,
         });
-        let startOrder = (currentProblems[0]?.order || 0) + 1;
+        const startOrder = (currentProblems[0]?.order || 0) + 1;
 
-        // Pre-calculate IDs
-        const problemsWithIds = await Promise.all(problems.map(async (p, index) => {
-            const customId = await generateCustomId(subject.id, index);
-            return { ...p, customId, order: startOrder + index };
+        // Prepare problems
+        const problemsWithData = problems.map((p, index) => ({
+            ...p,
+            customId: `${prefix}-${existingCount + 1 + index}`,
+            order: startOrder + index
         }));
 
         // Create problems in transaction
-        // Note: Prisma createMany doesn't support relations (many-to-many connect).
-        // So we must use create one by one or nested create.
-        // We can use $transaction with multiple create calls.
         await prisma.$transaction(
-            problemsWithIds.map(p =>
+            problemsWithData.map(p =>
                 prisma.problem.create({
                     data: {
                         coreProblems: {

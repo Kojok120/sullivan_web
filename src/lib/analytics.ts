@@ -73,8 +73,10 @@ export async function getStudentStats(userId: string): Promise<StudentStats> {
     };
 }
 
-export async function getStudentsWithStats(query?: string) {
+export async function getStudentsWithStats(query?: string, skip = 0, take = 50) {
     const students = await prisma.user.findMany({
+        skip,
+        take,
         where: {
             role: 'STUDENT',
             OR: query ? [

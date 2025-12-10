@@ -2,7 +2,10 @@ import { prisma } from "@/lib/prisma";
 import { Problem, UserProblemState, CoreProblem, UserCoreProblemState } from "@prisma/client";
 
 // Configuration for the print algorithm
-const PRINT_CONFIG = {
+export const UNLOCK_ANSWER_RATE = 0.5; // 50%
+export const UNLOCK_CORRECT_RATE = 0.6; // 60%
+
+export const PRINT_CONFIG = {
     // Weights for scoring
     WEIGHT_TIME: 2.0,       // Priority for forgetting (time elapsed)
     WEIGHT_WEAKNESS: 1.0,   // Priority for weakness (low accuracy/evaluation)
@@ -13,8 +16,8 @@ const PRINT_CONFIG = {
     FORGETTING_RATE: 5.0,   // Points per day elapsed
 
     // Unlock thresholds
-    UNLOCK_ANSWER_RATE: 0.5, // 50%
-    UNLOCK_CORRECT_RATE: 0.6 // 60%
+    UNLOCK_ANSWER_RATE,
+    UNLOCK_CORRECT_RATE
 };
 
 type ScoredProblem = {
@@ -149,10 +152,8 @@ export async function selectProblemsForPrint(
             }
         },
         include: {
-            coreProblems: true,
-            userStates: {
-                where: { userId }
-            }
+            coreProblems: true
+            // userStates removed - we use problemStateMap
         }
     });
 
@@ -165,7 +166,8 @@ export async function selectProblemsForPrint(
 
     // 4. Calculate Score
     const scoredProblems: ScoredProblem[] = validProblems.map(problem => {
-        const state = problem.userStates[0]; // Single user state
+        // Use map instead of problem.userStates[0]
+        const state = problemStateMap.get(problem.id);
         let score = 0;
         let reason: 'forgetting' | 'weakness' | 'new' | 'priority' = 'new';
 

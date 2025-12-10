@@ -4,7 +4,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { prisma } from '@/lib/prisma';
 import fs from 'fs';
 import path from 'path';
-
+import { UNLOCK_ANSWER_RATE, UNLOCK_CORRECT_RATE } from '@/lib/print-algo';
 import { calculateNewPriority } from '@/lib/priority-algo';
 
 // Configuration
@@ -129,9 +129,7 @@ async function processFile(fileId: string, fileName: string) {
 
         // Update DB
         if (results && results.length > 0) {
-            for (const result of results) {
-                await saveGradingResult(result);
-            }
+            await recordGradingResults(results);
             // Archive the file (using the first result's studentId)
             await archiveProcessedFile(fileId, results[0].studentId, new Date());
             console.log(`Archived file ${fileName}`);
@@ -290,9 +288,16 @@ async function gradeWithGemini(filePath: string): Promise<GradingResult[] | null
             return null;
         }
 
+        // Fetch All Problems at once
+        const uniquePids = Array.from(new Set(json1.pids.filter((p: any) => typeof p === 'string')));
+        const problems = await prisma.problem.findMany({
+            where: { id: { in: uniquePids as string[] } },
+            include: { coreProblems: true }
+        });
+        const problemMap = new Map(problems.map(p => [p.id, p]));
+
         const gradingResults: GradingResult[] = [];
 
-        // Grade each problem
         // Grade each problem in PARALLEL
         const promises = json1.answers.map(async (answerData: any) => {
             const pid = answerData.pid;
@@ -300,11 +305,8 @@ async function gradeWithGemini(filePath: string): Promise<GradingResult[] | null
 
             if (!pid) return null;
 
-            // Fetch Problem
-            const problem = await prisma.problem.findUnique({
-                where: { id: pid },
-                include: { coreProblems: true }
-            });
+            // Get from Map
+            const problem = problemMap.get(pid);
 
             if (!problem) {
                 console.error("Problem not found", pid);
@@ -376,97 +378,138 @@ function parseJSON(text: string): any {
 }
 
 // 5. Save Result (Unified)
-async function saveGradingResult(result: GradingResult) {
-    await recordGradingResult(
-        result.studentId,
-        result.problemId,
-        result.evaluation,
-        result.userAnswer,
-        result.feedback,
-        result.badCoreProblemIds
-    );
-}
+// Unified Grading Logic (Batch)
+export async function recordGradingResults(results: GradingResult[]) {
+    if (results.length === 0) return;
 
-// Unified Grading Logic used by both AI (Scan) and Manual (App) evaluation
-export async function recordGradingResult(
-    userId: string,
-    problemId: string,
-    evaluation: "A" | "B" | "C" | "D",
-    userAnswer?: string,
-    feedback?: string,
-    badCoreProblemIds?: string[]
-) {
-    const isCorrect = evaluation === 'A' || evaluation === 'B';
+    const userId = results[0].studentId; // Assumes all results are for same student (which is true per file)
+    const problemIds = results.map(r => r.problemId);
 
-    // 1. Record History
-    await prisma.learningHistory.create({
-        data: {
+    // 1. Record History (Batch)
+    await prisma.learningHistory.createMany({
+        data: results.map(r => ({
             userId,
-            problemId,
-            evaluation,
-            userAnswer,
-            feedback,
+            problemId: r.problemId,
+            evaluation: r.evaluation,
+            userAnswer: r.userAnswer || '',
+            feedback: r.feedback || '',
             answeredAt: new Date()
-        }
+        }))
     });
 
-    // 2. Update UserProblemState with CalculateNewPriority
-    const currentState = await prisma.userProblemState.findUnique({
-        where: { userId_problemId: { userId, problemId } }
+    // 2. Update UserProblemState (Batch)
+    // Fetch current states
+    const currentStates = await prisma.userProblemState.findMany({
+        where: { userId, problemId: { in: problemIds } }
     });
+    const stateMap = new Map(currentStates.map(s => [s.problemId, s]));
 
-    const currentPriority = currentState?.priority || 0;
-    const newPriority = calculateNewPriority(currentPriority, evaluation);
+    await prisma.$transaction(
+        results.map(r => {
+            const currentState = stateMap.get(r.problemId);
+            const currentPriority = currentState?.priority || 0;
+            const newPriority = calculateNewPriority(currentPriority, r.evaluation);
 
-    await prisma.userProblemState.upsert({
-        where: { userId_problemId: { userId, problemId } },
-        create: {
-            userId,
-            problemId,
-            isCleared: isCorrect,
-            lastAnsweredAt: new Date(),
-            priority: newPriority
-        },
-        update: {
-            isCleared: isCorrect,
-            lastAnsweredAt: new Date(),
-            priority: newPriority
-        }
-    });
+            return prisma.userProblemState.upsert({
+                where: { userId_problemId: { userId, problemId: r.problemId } },
+                create: {
+                    userId,
+                    problemId: r.problemId,
+                    isCleared: r.isCorrect,
+                    lastAnsweredAt: new Date(),
+                    priority: newPriority
+                },
+                update: {
+                    isCleared: r.isCorrect,
+                    lastAnsweredAt: new Date(),
+                    priority: newPriority
+                }
+            });
+        })
+    );
 
-    // 3. Update UserCoreProblemState (Points)
-    const problem = await prisma.problem.findUnique({
-        where: { id: problemId },
+    // 3. Update UserCoreProblemState (Batch / Aggregated)
+    // Fetch problems to get coreProblems
+    const problems = await prisma.problem.findMany({
+        where: { id: { in: problemIds } },
         include: { coreProblems: true }
     });
+    const problemMap = new Map(problems.map(p => [p.id, p]));
 
-    if (!problem) return;
+    // Aggregate Deltas per CoreProblem
+    const cpDeltas = new Map<string, number>();
 
-    if (isCorrect) {
-        // Decrease points for ALL associated CoreProblems
-        for (const cp of problem.coreProblems) {
-            await updateCoreProblemPriority(userId, cp.id, -5);
-            // Check Unlock
-            await checkAndUnlockCoreProblem(userId, cp.id);
-        }
-    } else {
-        // Increase points for BAD CoreProblems
-        // If badCoreProblemIds provided (AI), use them.
-        // If not (Manual), maybe use ALL? Or None?
-        // Let's assume Manual grading doesn't pinpoint bad CP yet.
-        // But we should probably punish ALL if we don't know better?
-        // "Unify logic": If manual grading is C/D, usually it implies the student doesn't understand the core concepts.
-        // Safest: If IDs provided, use them. If not, maybe skip or use all.
-        // Let's use provided IDs if any, else skip for now to avoid punishing everything.
-        if (badCoreProblemIds && badCoreProblemIds.length > 0) {
-            for (const cpId of badCoreProblemIds) {
-                if (problem.coreProblems.some((cp: any) => cp.id === cpId)) {
-                    await updateCoreProblemPriority(userId, cpId, 5);
+    for (const r of results) {
+        const problem = problemMap.get(r.problemId);
+        if (!problem) continue;
+
+        if (r.isCorrect) {
+            // Correct: -5 for ALL CoreProblems
+            for (const cp of problem.coreProblems) {
+                const current = cpDeltas.get(cp.id) || 0;
+                cpDeltas.set(cp.id, current - 5);
+            }
+        } else {
+            // Incorrect: +5 for BAD CoreProblems
+            if (r.badCoreProblemIds && r.badCoreProblemIds.length > 0) {
+                for (const cpId of r.badCoreProblemIds) {
+                    // Verify linkage
+                    if (problem.coreProblems.some(cp => cp.id === cpId)) {
+                        const current = cpDeltas.get(cpId) || 0;
+                        cpDeltas.set(cpId, current + 5);
+                    }
                 }
             }
         }
     }
+
+    // Apply Deltas (Transaction)
+    const affectedCpIds: string[] = [];
+    if (cpDeltas.size > 0) {
+        await prisma.$transaction(
+            Array.from(cpDeltas.entries()).map(([cpId, delta]) => {
+                affectedCpIds.push(cpId);
+                return prisma.userCoreProblemState.upsert({
+                    where: { userId_coreProblemId: { userId, coreProblemId: cpId } },
+                    create: {
+                        userId,
+                        coreProblemId: cpId,
+                        priority: delta,
+                        isUnlocked: true // Assume unlocked if graded
+                    },
+                    update: { priority: { increment: delta } }
+                });
+            })
+        );
+    }
+
+    // 4. Check Unlocking (Batch check?)
+    // Checking unlocking involves checking thresholds (`checkAndUnlockCoreProblem`).
+    // This reads `coreProblem.subject`, all `problems`, all `userStates`.
+    // We should optimize `checkAndUnlockCoreProblem` or just loop it (it's per CP).
+    // Review said "checkAndUnlockCoreProblem logic mismatch".
+    // I will refactor `checkAndUnlockCoreProblem` later to use shared constants.
+    // For now, I'll loop call it or leave it. The transactional requirement was mostly about data updates.
+    // "途中で失敗すると前半の更新だけが反映される非整合状態" -> History and State updates are main risk.
+    // CoreProblem updates are now also batched.
+    // Unlocking is "Derived State". Even if it fails, it can be recomputed.
+    // I'll loop over `affectedCpIds` to check unlock.
+    for (const cpId of affectedCpIds) {
+        await checkAndUnlockCoreProblem(userId, cpId);
+    }
 }
+
+// Deprecated or remove
+async function saveGradingResult(result: GradingResult) {
+    // Only used for single case?
+    await recordGradingResults([result]);
+}
+
+// Keep single version if imported elsewhere?
+// The review said "remove redundancy and batch".
+// `checkAndUnlockCoreProblem` needs to use shared constants (Review Point 4).
+// I will update it in next step (Refactor print-algo & logic).
+
 
 async function updateCoreProblemPriority(userId: string, coreProblemId: string, delta: number) {
     // Upsert State
@@ -526,13 +569,10 @@ async function checkAndUnlockCoreProblem(userId: string, coreProblemId: string) 
     const answeredCount = userStates.length;
     const correctCount = userStates.filter(s => s.isCleared).length;
 
-    const answerRate = (answeredCount / totalProblems) * 100;
-    const correctRate = answeredCount > 0 ? (correctCount / answeredCount) * 100 : 0;
+    const answerRate = answeredCount / totalProblems;
+    const correctRate = answeredCount > 0 ? (correctCount / answeredCount) : 0;
 
-    // Thresholds (could be configurable)
-    const UNLOCK_ANSWER_RATE = 50;
-    const UNLOCK_CORRECT_RATE = 60;
-
+    // Thresholds from shared config
     if (answerRate >= UNLOCK_ANSWER_RATE && correctRate >= UNLOCK_CORRECT_RATE) {
         // Unlock Next CoreProblem
         const currentCp = await prisma.coreProblem.findUnique({

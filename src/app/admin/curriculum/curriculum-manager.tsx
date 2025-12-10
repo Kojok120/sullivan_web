@@ -2,11 +2,8 @@
 
 import { useState } from 'react';
 import { Subject, CoreProblem } from '@prisma/client';
-import { Accordion } from '@/components/ui/accordion';
 import { SidebarSubjectItem } from './components/sidebar-subject-item';
 import { SubjectDetail } from './components/subject-detail'; // Renamed/New component
-import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
 
 // Type definitions including relations
 export type SubjectWithRelations = Subject & {

@@ -1,11 +1,10 @@
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { prisma } from '@/lib/prisma';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { getStudentStats, getStudentsWithStats } from '@/lib/analytics';
+import { getStudentsWithStats } from '@/lib/analytics';
 
 export default async function AdminAnalyticsPage() {
     const session = await getSession();
