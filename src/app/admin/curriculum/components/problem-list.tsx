@@ -4,7 +4,7 @@ import { Problem } from '@prisma/client';
 import { useState, useEffect } from 'react';
 import { getProblemsByCoreProblem, createProblem, updateProblem, deleteProblem } from '../actions';
 import { Button } from '@/components/ui/button';
-import { Plus, Pencil, Trash2, Video, FileSpreadsheet } from 'lucide-react';
+import { Plus, Pencil, Trash2, Video } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -126,16 +126,9 @@ export function ProblemList({ coreProblemId, subjectName }: ProblemListProps) {
         <div className="space-y-4 pl-4 border-l-2 border-muted">
             <div className="flex justify-between items-center">
                 <h5 className="text-xs font-semibold text-muted-foreground uppercase">Problems</h5>
-                <div className="flex gap-2">
-                    <Button size="sm" variant="outline" asChild>
-                        <a href={`/admin/curriculum/${coreProblemId}/bulk-add`}>
-                            <FileSpreadsheet className="mr-2 h-3 w-3" /> 一括追加
-                        </a>
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={openCreate}>
-                        <Plus className="mr-2 h-3 w-3" /> 問題追加
-                    </Button>
-                </div>
+                <Button size="sm" variant="outline" onClick={openCreate}>
+                    <Plus className="mr-2 h-3 w-3" /> 問題追加
+                </Button>
             </div>
 
             <div className="grid gap-4">

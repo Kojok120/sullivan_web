@@ -339,3 +339,67 @@ export async function getStudentWeaknesses(userId: string, limit = 5): Promise<W
         totalAttempts: Number(w.totalAttempts),
     }));
 }
+
+export type HistoryFilter = {
+    subjectId?: string;
+    startDate?: Date;
+    endDate?: Date;
+};
+
+export type HistorySort = 'desc' | 'asc';
+
+export async function getLearningHistory(
+    userId: string,
+    page: number = 1,
+    limit: number = 20,
+    filter?: HistoryFilter,
+    sort: HistorySort = 'desc'
+) {
+    const skip = (page - 1) * limit;
+
+    const whereClause: Prisma.LearningHistoryWhereInput = {
+        userId,
+        answeredAt: {
+            gte: filter?.startDate,
+            lte: filter?.endDate,
+        },
+        problem: filter?.subjectId ? {
+            coreProblems: {
+                some: {
+                    subjectId: filter.subjectId
+                }
+            }
+        } : undefined
+    };
+
+    const [items, total] = await Promise.all([
+        prisma.learningHistory.findMany({
+            where: whereClause,
+            include: {
+                problem: {
+                    include: {
+                        coreProblems: {
+                            include: { subject: true }
+                        }
+                    }
+                }
+            },
+            orderBy: {
+                answeredAt: sort
+            },
+            skip,
+            take: limit,
+        }),
+        prisma.learningHistory.count({
+            where: whereClause
+        })
+    ]);
+
+    return { items, total, totalPages: Math.ceil(total / limit) };
+}
+
+export async function getAllSubjects() {
+    return await prisma.subject.findMany({
+        orderBy: { order: 'asc' }
+    });
+}

@@ -18,9 +18,15 @@ import { useRouter } from 'next/navigation';
 interface CoreProblemItemProps {
     coreProblem: CoreProblem;
     subjectName: string;
+    sortableProps?: {
+        ref: (node: HTMLElement | null) => void;
+        style: React.CSSProperties;
+        attributes: any;
+        listeners: any;
+    };
 }
 
-export function CoreProblemItem({ coreProblem, subjectName }: CoreProblemItemProps) {
+export function CoreProblemItem({ coreProblem, subjectName, sortableProps }: CoreProblemItemProps) {
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [editName, setEditName] = useState(coreProblem.name);
     const router = useRouter();
@@ -53,9 +59,25 @@ export function CoreProblemItem({ coreProblem, subjectName }: CoreProblemItemPro
 
     return (
         <>
-            <AccordionItem value={coreProblem.id} className="border rounded px-4 bg-background">
+            <AccordionItem
+                value={coreProblem.id}
+                className="border rounded px-4 bg-background"
+                ref={sortableProps?.ref}
+                style={sortableProps?.style}
+            >
                 <AccordionTrigger className="hover:no-underline py-2">
                     <div className="flex items-center gap-4 w-full pr-4">
+                        {/* Drag Handle */}
+                        {sortableProps && (
+                            <div
+                                {...sortableProps.attributes}
+                                {...sortableProps.listeners}
+                                className="cursor-grab hover:bg-muted p-1 rounded"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground"><circle cx="9" cy="12" r="1" /><circle cx="9" cy="5" r="1" /><circle cx="9" cy="19" r="1" /><circle cx="15" cy="12" r="1" /><circle cx="15" cy="5" r="1" /><circle cx="15" cy="19" r="1" /></svg>
+                            </div>
+                        )}
                         <span className="font-medium text-sm">{coreProblem.name}</span>
                         <div className="ml-auto flex gap-2">
                             <Button

@@ -34,7 +34,7 @@ type ScoredProblem = {
 export async function selectProblemsForPrint(
     userId: string,
     subjectId: string,
-    count: number = 40
+    count: number = 30
 ): Promise<Problem[]> {
     // 1. Fetch all CoreProblems for the subject, ordered by order
     const coreProblems = await prisma.coreProblem.findMany({

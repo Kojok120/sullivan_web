@@ -54,6 +54,7 @@ export default async function DashboardPage() {
                 </Card>
             </div>
 
+
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
                 {/* Activity Chart */}
                 <Card className="col-span-4">
@@ -90,6 +91,61 @@ export default async function DashboardPage() {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Recent Feedback Section */}
+            <div className="mt-8">
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-bold">最新のフィードバック</h2>
+                    <Link href="/dashboard/history" className="text-sm text-blue-600 hover:underline">
+                        全ての履歴を見る
+                    </Link>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    <RecentFeedbackList userId={session.userId} />
+                </div>
+            </div>
         </div>
+    );
+}
+
+import Link from 'next/link';
+import { getLearningHistory } from '@/lib/analytics';
+
+async function RecentFeedbackList({ userId }: { userId: string }) {
+    const { items } = await getLearningHistory(userId, 1, 3); // Get top 3 for cards
+
+    if (items.length === 0) {
+        return <div className="text-sm text-gray-500">まだ履歴がありません</div>;
+    }
+
+    return (
+        <>
+            {items.map((item) => (
+                <Card key={item.id} className="flex flex-col">
+                    <CardHeader className="pb-2">
+                        <div className="flex justify-between items-start">
+                            <CardTitle className="text-base font-semibold line-clamp-1" title={item.problem.question}>
+                                {item.problem.question}
+                            </CardTitle>
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold
+                                ${item.evaluation === 'A' ? 'bg-green-100 text-green-800' :
+                                    item.evaluation === 'B' ? 'bg-blue-100 text-blue-800' :
+                                        item.evaluation === 'C' ? 'bg-yellow-100 text-yellow-800' :
+                                            'bg-red-100 text-red-800'}`}>
+                                {item.evaluation}
+                            </span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                            {item.problem.coreProblems[0]?.subject.name} &bull; {item.answeredAt.toLocaleDateString('ja-JP')}
+                        </div>
+                    </CardHeader>
+                    <CardContent className="flex-1">
+                        <p className="text-sm text-gray-600 line-clamp-3">
+                            {item.feedback || 'フィードバックなし'}
+                        </p>
+                    </CardContent>
+                </Card>
+            ))}
+        </>
     );
 }

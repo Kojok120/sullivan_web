@@ -12,6 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
+import { ProblemBulkImport } from './problem-bulk-import';
+
 interface SubjectDetailProps {
     subject: Subject & { coreProblems: CoreProblem[] };
 }
@@ -50,6 +52,10 @@ export function SubjectDetail({ subject }: SubjectDetailProps) {
                     </p>
                 </div>
                 <div className="flex gap-2">
+                    <ProblemBulkImport
+                        coreProblems={subject.coreProblems}
+                        subjectId={subject.id}
+                    />
                     <Button onClick={() => setIsCreateOpen(true)}>
                         <Plus className="mr-2 h-4 w-4" /> CoreProblem追加
                     </Button>

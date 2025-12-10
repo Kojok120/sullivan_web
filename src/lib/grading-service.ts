@@ -166,7 +166,7 @@ async function archiveProcessedFile(fileId: string, studentId: string, date: Dat
             where: { id: studentId },
             include: { classroom: true }
         });
-        const classroomName = user?.classroom?.name || '未所属';
+        const classroomName = (user as any)?.classroom?.name || '未所属';
 
         // 2. Build Path Components
         const year = date.getFullYear().toString() + '年';
@@ -246,7 +246,8 @@ async function ensureFolder(name: string, parentId: string): Promise<string> {
     }
 }
 
-// 4. Grade with Gemini
+
+// 4. Grade with Gemini (Refactored)
 type GradingResult = {
     studentId: string;
     problemId: string;
@@ -257,32 +258,113 @@ type GradingResult = {
     userAnswer: string;
 };
 
+// Local QR Reader using sharp and jsqr
+import sharp from 'sharp';
+import jsQR from 'jsqr';
+
+async function readQRCodeLocally(filePath: string): Promise<QRData | null> {
+    try {
+        const image = sharp(filePath);
+        const metadata = await image.metadata();
+
+        if (!metadata.width || !metadata.height) return null;
+
+        // Ensure image is processed (e.g. grayscale for better QR detection)
+        const { data, info } = await image
+            .ensureAlpha()
+            .raw()
+            .toBuffer({ resolveWithObject: true });
+
+        // jsQR expects Uint8ClampedArray, but Buffer is Uint8Array. 
+        // It usually works, or we convert.
+        const code = jsQR(new Uint8ClampedArray(data), info.width, info.height);
+
+        if (code) {
+            try {
+                return JSON.parse(code.data) as QRData;
+            } catch (e) {
+                console.error("Failed to parse QR JSON:", code.data);
+                return null;
+            }
+        }
+        return null; // QR not found
+    } catch (error) {
+        console.error("Local QR Read Error:", error);
+        return null;
+    }
+}
+
 async function gradeWithGemini(filePath: string): Promise<GradingResult[] | null> {
     try {
         const model = getGenAI().getGenerativeModel({ model: "gemini-1.5-flash" });
 
+        // 1. Local QR Reading
+        const qrData = await readQRCodeLocally(filePath);
+        if (!qrData || !qrData.sid || !qrData.pids || !Array.isArray(qrData.pids)) {
+            console.error("Failed to extract QR data locally from", filePath);
+            return null;
+        }
+
+        console.log(`QR Found: Student=${qrData.sid}, Problems=${qrData.pids.length}`);
+
+        // 2. Fetch Full Problem Context from DB
+        // Remove duplicates and clean
+        const uniquePids = Array.from(new Set(qrData.pids.filter((p: any) => typeof p === 'string')));
+        const problems = await prisma.problem.findMany({
+            where: { id: { in: uniquePids as string[] } },
+            include: { coreProblems: true } // Include CoreProblems for context
+        });
+
+        // If no problems found, abort
+        if (problems.length === 0) {
+            console.error("No problems found in DB for IDs:", uniquePids);
+            return null;
+        }
+
+        const problemContexts = problems.map(p => ({
+            id: p.id,
+            question: p.question,
+            correctAnswer: p.answer,
+            acceptedAnswers: p.acceptedAnswers,
+            coreProblems: p.coreProblems.map(cp => ({ id: cp.id, name: cp.name }))
+        }));
+
+        // 3. Prepare Image for Gemini (Transcription & Grading)
         const fileBuffer = await fs.promises.readFile(filePath);
         const base64Data = fileBuffer.toString('base64');
 
-        const extractionPrompt = `
-        Please analyze this image of an answer sheet.
-        1. Find the QR code and extract the JSON data inside it. It should have "sid" and "pids" (array of problem IDs).
-        2. Transcribe the student's handwritten answers for EACH problem.
-           The problems are usually numbered 1, 2, 3... corresponding to the order in "pids".
+        // 4. Construct Prompt with FULL Context
+        const gradingPrompt = `
+        You are an expert teacher grading a student's answer sheet.
         
-        Return ONLY a JSON object with this format:
-        {
-            "sid": "extracted student id",
-            "pids": ["pid1", "pid2", ...],
-            "answers": [
-                { "pid": "pid1", "studentAnswer": "transcribed answer 1" },
-                { "pid": "pid2", "studentAnswer": "transcribed answer 2" }
-            ]
-        }
+        **Student ID**: ${qrData.sid}
+        
+        **Task**:
+        1.  Analyze the image of the answer sheet.
+        2.  Identify the student's handwritten answer for EACH of the following problems.
+        3.  Grade each answer based on the provided "Correct Answer" and "Accepted Answers".
+        4.  Provide a specific, helpful feedback in Japanese.
+        5.  **CRITICAL**: If the student is INCORRECT (C or D), you MUST identify the root cause from the provided "Related CoreProblems". Select the CoreProblem ID that best explains the student's misunderstanding.
+
+        **Problem List** (Use this strictly):
+        ${JSON.stringify(problemContexts, null, 2)}
+
+        **Output Format**:
+        Return ONLY a JSON array of objects. Do not include markdown formatting like \`\`\`json.
+        [
+            {
+                "problemId": "problem_id_from_list",
+                "studentAnswer": "transcribed_text",
+                "evaluation": "A" | "B" | "C" | "D",
+                "feedback": "Japanese feedback text",
+                "badCoreProblemIds": ["core_problem_id_cause"] (Empty if correct)
+            },
+            ...
+        ]
         `;
 
-        const result1 = await model.generateContent([
-            extractionPrompt,
+        const result = await model.generateContent([
+            gradingPrompt,
             {
                 inlineData: {
                     data: base64Data,
@@ -291,89 +373,29 @@ async function gradeWithGemini(filePath: string): Promise<GradingResult[] | null
             }
         ]);
 
-        const text1 = result1.response.text();
-        const json1 = parseJSON(text1);
+        const text = result.response.text();
+        console.log("Gemini Response:", text);
 
-        if (!json1 || !json1.sid || !json1.pids || !Array.isArray(json1.pids)) {
-            console.error("Failed to extract QR data", text1);
+        const resultsJson = parseJSON(text);
+
+        if (!Array.isArray(resultsJson)) {
+            console.error("Gemini returned invalid JSON structure", text);
             return null;
         }
 
-        // Fetch All Problems at once
-        const uniquePids = Array.from(new Set(json1.pids.filter((p: any) => typeof p === 'string')));
-        const problems = await prisma.problem.findMany({
-            where: { id: { in: uniquePids as string[] } },
-            include: { coreProblems: true }
-        });
-        const problemMap = new Map(problems.map(p => [p.id, p]));
-
-        const gradingResults: GradingResult[] = [];
-
-        // Grade each problem in PARALLEL
-        const promises = json1.answers.map(async (answerData: any) => {
-            const pid = answerData.pid;
-            const studentAnswer = answerData.studentAnswer;
-
-            if (!pid) return null;
-
-            // Get from Map
-            const problem = problemMap.get(pid);
-
-            if (!problem) {
-                console.error("Problem not found", pid);
-                return null;
-            }
-
-            // Step 3: Grade
-            const gradingPrompt = `
-            You are grading a problem.
-            
-            **Question**: ${problem.question}
-            **Correct Answer**: ${problem.answer}
-            **Accepted Answers**: ${problem.acceptedAnswers.join(', ')}
-            
-            **Student Answer**: ${studentAnswer}
-            
-            **Task**:
-            1. Evaluate the student's answer.
-            2. Assign a grade: A (Perfect), B (Correct but minor issues), C (Incorrect but close), D (Incorrect).
-            3. Provide helpful feedback (in Japanese).
-            4. If incorrect (C or D), identify which CoreProblems might be the cause.
-               The problem is related to these CoreProblems:
-               ${problem.coreProblems.map((cp: any) => `- ID: ${cp.id}, Name: ${cp.name}`).join('\n')}
-               Return the IDs of the CoreProblems that the student seems to misunderstand.
-            
-            Return ONLY a JSON object:
-            {
-                "evaluation": "A" | "B" | "C" | "D",
-                "feedback": "feedback text",
-                "badCoreProblemIds": ["id1", "id2"]
-            }
-            `;
-
-            const result2 = await model.generateContent(gradingPrompt);
-            const text2 = result2.response.text();
-            const json2 = parseJSON(text2);
-
-            if (json2) {
-                return {
-                    studentId: json1.sid,
-                    problemId: pid,
-                    userAnswer: studentAnswer,
-                    evaluation: json2.evaluation,
-                    isCorrect: json2.evaluation === 'A' || json2.evaluation === 'B',
-                    feedback: json2.feedback,
-                    badCoreProblemIds: json2.badCoreProblemIds || []
-                };
-            }
-            return null;
-        });
-
-        const results = await Promise.all(promises);
-        return results.filter((r): r is GradingResult => r !== null);
+        // Map to GradingResult type
+        return resultsJson.map((r: any) => ({
+            studentId: qrData.sid,
+            problemId: r.problemId,
+            userAnswer: r.studentAnswer || "(空欄)",
+            evaluation: r.evaluation,
+            isCorrect: r.evaluation === 'A' || r.evaluation === 'B',
+            feedback: r.feedback,
+            badCoreProblemIds: r.badCoreProblemIds || []
+        }));
 
     } catch (error) {
-        console.error("Gemini Error:", error);
+        console.error("Gemini Grading Error:", error);
         return null;
     }
 }
@@ -381,9 +403,12 @@ async function gradeWithGemini(filePath: string): Promise<GradingResult[] | null
 function parseJSON(text: string): any {
     try {
         // Clean markdown code blocks
-        const clean = text.replace(/```json/g, '').replace(/```/g, '').trim();
+        let clean = text.replace(/```json/g, '').replace(/```/g, '').trim();
+        // Sometimes Gemini adds "JSON" at start
+        if (clean.startsWith('JSON')) clean = clean.substring(4).trim();
         return JSON.parse(clean);
     } catch (e) {
+        console.error("JSON Parse Error", e);
         return null;
     }
 }

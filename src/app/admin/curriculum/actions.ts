@@ -65,6 +65,79 @@ export async function deleteCoreProblem(id: string) {
     }
 }
 
+export async function bulkCreateCoreProblems(subjectId: string, names: string[]) {
+    await requireAdmin();
+    try {
+        // Filter unique names locally first
+        const uniqueNames = Array.from(new Set(names));
+
+        // Find existing names in this subject
+        const existingProblems = await prisma.coreProblem.findMany({
+            where: {
+                subjectId,
+                name: { in: uniqueNames }
+            },
+            select: { name: true }
+        });
+        const existingNameSet = new Set(existingProblems.map(p => p.name));
+
+        const newNames = uniqueNames.filter(name => !existingNameSet.has(name));
+
+        if (newNames.length === 0) {
+            return { success: true, count: 0, warnings: ['全てのCoreProblemは既に存在します'] };
+        }
+
+        // Determine start order
+        const lastProblem = await prisma.coreProblem.findFirst({
+            where: { subjectId },
+            orderBy: { order: 'desc' }
+        });
+        let order = (lastProblem?.order || 0) + 1;
+
+        await prisma.$transaction(
+            newNames.map(name =>
+                prisma.coreProblem.create({
+                    data: {
+                        name,
+                        subjectId,
+                        order: order++
+                    }
+                })
+            )
+        );
+
+        revalidatePath('/admin/curriculum');
+
+        const warnings = existingNameSet.size > 0
+            ? [`${existingNameSet.size}件のCoreProblemは既に存在するためスキップされました`]
+            : [];
+
+        return { success: true, count: newNames.length, warnings };
+    } catch (error) {
+        console.error('Failed to bulk create core problems:', error);
+        return { error: '一括登録に失敗しました' };
+    }
+}
+
+export async function reorderCoreProblems(items: { id: string, order: number }[]) {
+    await requireAdmin();
+    try {
+        await prisma.$transaction(
+            items.map((item) =>
+                prisma.coreProblem.update({
+                    where: { id: item.id },
+                    data: { order: item.order },
+                })
+            )
+        );
+        revalidatePath('/admin/curriculum');
+        return { success: true };
+    } catch (error) {
+        console.error('Failed to reorder core problems:', error);
+        return { error: 'CoreProblemの並び替えに失敗しました' };
+    }
+}
+
 // --- Problems ---
 export async function getProblemsByCoreProblem(coreProblemId: string) {
     await requireAdmin();
@@ -186,85 +259,111 @@ export async function deleteProblem(id: string) {
     }
 }
 
-export async function bulkCreateProblems(coreProblemId: string, problems: {
+export async function bulkCreateProblems(subjectId: string, problems: {
     question: string;
     answer: string;
     videoUrl?: string;
     grade?: string;
     acceptedAnswers?: string[];
+    coreProblemIds: string[];
 }[]) {
     await requireAdmin();
     try {
-        // 1. Fetch Subject info
-        const coreProblem = await prisma.coreProblem.findUnique({
-            where: { id: coreProblemId },
-            include: { subject: true }
+        const subject = await prisma.subject.findUnique({
+            where: { id: subjectId },
         });
 
-        if (!coreProblem) throw new Error('CoreProblem not found');
+        if (!subject) throw new Error('Subject not found');
 
-        const subject = coreProblem.subject;
-
-        // 2. Generate Custom IDs locally to avoid race conditions and N+1
-        // Determine prefix
+        // Generate Custom ID Prefix
         let prefix = '';
         if (subject.name.includes('英語')) prefix = 'E';
         else if (subject.name.includes('国語')) prefix = 'J';
         else if (subject.name.includes('数学')) prefix = 'S';
         else prefix = subject.name.charAt(0).toUpperCase();
 
-        // Get current max count for the subject
-        // We need to count ALL problems in this subject to determine the next ID index.
-        const existingCount = await prisma.problem.count({
+        // Fetch ALL existing customIDs for this subject to find the true MAX number.
+        // Counting is unsafe because deletions cause duplicate IDs.
+        const allSubjectProblems = await prisma.problem.findMany({
             where: {
-                coreProblems: {
-                    some: { subjectId: subject.id }
-                }
-            }
-        });
-
-        // Get current max order for this CoreProblem
-        const currentProblems = await prisma.problem.findMany({
-            where: {
-                coreProblems: {
-                    some: { id: coreProblemId }
+                // Global check for customId collision.
+                // Do NOT filter by subject, because customId is globally unique.
+                customId: {
+                    startsWith: prefix
                 }
             },
-            select: { order: true },
-            orderBy: { order: 'desc' },
-            take: 1,
+            select: { customId: true }
         });
-        const startOrder = (currentProblems[0]?.order || 0) + 1;
 
-        // Prepare problems
-        const problemsWithData = problems.map((p, index) => ({
-            ...p,
-            customId: `${prefix}-${existingCount + 1 + index}`,
-            order: startOrder + index
-        }));
+        let maxNum = 0;
+        for (const p of allSubjectProblems) {
+            if (p.customId) {
+                const part = p.customId.replace(`${prefix}-`, '');
+                const num = parseInt(part, 10);
+                if (!isNaN(num) && num > maxNum) {
+                    maxNum = num;
+                }
+            }
+        }
 
-        // Create problems in transaction
-        await prisma.$transaction(
-            problemsWithData.map(p =>
-                prisma.problem.create({
+        let nextNum = maxNum;
+        let createdCount = 0;
+        const warnings: string[] = [];
+
+        // Fetch existing questions to simple check
+        const incomingQuestions = problems.map(p => p.question);
+        const existingProblems = await prisma.problem.findMany({
+            where: {
+                question: { in: incomingQuestions }
+            },
+            select: { question: true, customId: true }
+        });
+        const existingMap = new Map(existingProblems.map(p => [p.question, p.customId]));
+
+        await prisma.$transaction(async (tx) => {
+            for (const p of problems) {
+                if (existingMap.has(p.question)) {
+                    warnings.push(`問題「${p.question.substring(0, 20)}...」は既に存在します (ID: ${existingMap.get(p.question)})`);
+                    continue;
+                }
+
+                nextNum++;
+                const customId = `${prefix}-${nextNum}`;
+
+                // Determine Order: Max order of FIRST CoreProblem?
+                // Or just append?
+                // Order is per CoreProblem via Many-to-Many?
+                // Actually `Problem` table has `order` column.
+                // If a problem belongs to multiple CPs, it has ONE order val?
+                // This implies `order` is global or somewhat ambiguous in M2M.
+                // Ideally `order` should be on the relation table `_CoreProblemToProblem`.
+                // But Prisma implicit M2M doesn't expose that easily.
+                // The schema has `order Int` on `Problem`.
+                // This means the problem has a fixed order, likely relative to other problems in the SAME subject?
+                // Or relative to the CP?
+                // Attempting to maintain order per CP is impossible with single `order` column on `Problem` if shared.
+                // We will set order = currentCount (global for subject roughly) or just increment.
+
+                await tx.problem.create({
                     data: {
-                        coreProblems: {
-                            connect: { id: coreProblemId }
-                        },
                         question: p.question,
                         answer: p.answer,
                         videoUrl: p.videoUrl,
                         grade: p.grade,
                         acceptedAnswers: p.acceptedAnswers || [],
-                        order: p.order,
-                        customId: p.customId,
-                    },
-                })
-            )
-        );
+                        customId: customId,
+                        order: nextNum, // Simple increment
+                        coreProblems: {
+                            connect: p.coreProblemIds.map(id => ({ id }))
+                        }
+                    }
+                });
+                createdCount++;
+            }
+        });
 
         revalidatePath('/admin/curriculum');
-        return { success: true };
+        return { success: true, count: createdCount, warnings };
     } catch (error) {
         console.error('Failed to bulk create problems:', error);
         return { error: '一括登録に失敗しました' };
