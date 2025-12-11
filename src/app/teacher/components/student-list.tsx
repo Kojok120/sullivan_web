@@ -52,7 +52,7 @@ export function StudentList({ students }: StudentListProps) {
                         </TableCell>
                         <TableCell className="text-right">{student.stats.currentStreak}日</TableCell>
                         <TableCell className="text-right">
-                            {student.stats.lastActivity ? new Date(student.stats.lastActivity).toLocaleDateString() : '-'}
+                            {student.stats.lastActivity ? new Date(student.stats.lastActivity).toLocaleDateString('ja-JP') : '-'}
                         </TableCell>
                     </TableRow>
                 ))}
