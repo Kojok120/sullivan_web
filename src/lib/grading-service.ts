@@ -6,6 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import { calculateCoreProblemStatus } from '@/lib/progression';
 import { calculateNewPriority } from '@/lib/priority-algo';
+import { serverEvents, EVENTS } from '@/lib/server-events';
 
 // Configuration
 const DRIVE_FOLDER_ID = process.env.DRIVE_FOLDER_ID || ''; // Folder to watch
@@ -652,9 +653,16 @@ export async function recordGradingResults(results: GradingResult[]) {
         return involvedCpIds;
     })
         .then(async (involvedCpIds) => {
-            // 4. Batch Unlock Check (Outside Transaction, but consistent data ensures reliable check)
-            // If this fails, we can retry it; data is safe.
+            // 4. Batch Unlock Check (Outside Transaction)
             await checkProgressAndUnlock(userId, Array.from(involvedCpIds));
+
+            // 5. Emit Event for SSE
+            serverEvents.emit(EVENTS.GRADING_COMPLETED, {
+                studentId: userId,
+                groupId: groupId,
+                timestamp: new Date().toISOString()
+            });
+            console.log(`Emitted GRADING_COMPLETED event for user ${userId}, group ${groupId}`);
         });
 }
 

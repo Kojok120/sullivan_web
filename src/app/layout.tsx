@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { MainNav } from "@/components/main-nav";
+import { GradingNotifier } from "@/components/grading-notifier";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -37,6 +38,7 @@ export default async function RootLayout({
       >
         <MainNav role={session?.role} />
         {children}
+        <GradingNotifier />
         <Toaster />
       </body>
     </html>
