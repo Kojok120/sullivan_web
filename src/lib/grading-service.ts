@@ -1,6 +1,7 @@
 import { google } from 'googleapis';
 import QRCode from 'qrcode';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { Client as QStashClient } from '@upstash/qstash';
 import { prisma } from '@/lib/prisma';
 import fs from 'fs';
 import path from 'path';
@@ -92,8 +93,8 @@ export async function checkDriveForNewFiles() {
             if (file.name.startsWith('[PROCESSED]')) continue;
             if (file.name.startsWith('[ERROR]')) continue;
 
-            console.log(`Processing file: ${file.name} (${file.id})`);
-            await processFile(file.id, file.name);
+            console.log(`Queuing grading job for file: ${file.name} (${file.id})`);
+            await triggerGradingJob(file.id, file.name);
         }
 
     } catch (error) {
@@ -101,8 +102,8 @@ export async function checkDriveForNewFiles() {
     }
 }
 
-// 3. Process File
-async function processFile(fileId: string, fileName: string) {
+// 3. Process File (Now Exported for API Route)
+export async function processFile(fileId: string, fileName: string) {
     try {
         // Download file
         const destPath = path.join(process.cwd(), 'tmp', fileName);
@@ -243,6 +244,38 @@ async function archiveProcessedFile(fileId: string, studentId: string, problemId
         console.error('Error archiving file:', error);
         // Fallback to rename if archiving fails
         await renameFile(fileId, `[PROCESSED] (Archive Failed)`);
+    }
+}
+
+// QStash Integration
+async function triggerGradingJob(fileId: string, fileName: string) {
+    const token = process.env.QSTASH_TOKEN;
+    if (!token) {
+        console.warn('QSTASH_TOKEN not set, falling back to synchronous processing');
+        await processFile(fileId, fileName);
+        return;
+    }
+
+    const client = new QStashClient({ token });
+    const appUrl = process.env.APP_URL;
+
+    if (!appUrl) {
+        console.warn('APP_URL not set, cannot use QStash. Processing synchronously.');
+        await processFile(fileId, fileName);
+        return;
+    }
+
+    try {
+        await client.publishJSON({
+            url: `${appUrl}/api/queue/grading`,
+            body: { fileId, fileName },
+            retries: 3,
+        });
+        console.log(`Published grading job to QStash for ${fileName}`);
+    } catch (error) {
+        console.error('Failed to publish to QStash:', error);
+        // Fallback to sync
+        await processFile(fileId, fileName);
     }
 }
 
