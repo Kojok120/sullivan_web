@@ -391,7 +391,7 @@ async function readQRCodeLocally(filePath: string): Promise<QRData | null> {
 
 async function gradeWithGemini(filePath: string): Promise<GradingResult[] | null> {
     try {
-        const modelName = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+        const modelName = process.env.GEMINI_MODEL || "gemini-2.5-pro";
         console.log("Using Gemini Model:", modelName);
         const model = getGenAI().getGenerativeModel({ model: modelName });
 
@@ -802,52 +802,5 @@ export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: strin
                 console.log(`  -> No next CP found (or is last).`);
             }
         }
-    }
-}
-
-
-
-
-
-export async function gradeTextAnswer(problemId: string, studentAnswer: string): Promise<{ evaluation: string, feedback: string }> {
-    const problem = await prisma.problem.findUnique({
-        where: { id: problemId }
-    });
-
-    if (!problem) {
-        throw new Error("Problem not found");
-    }
-
-    const prompt = `
-    You are a strict but helpful teacher.
-    Problem: ${problem.question}
-    Correct Answer: ${problem.answer}
-    Student Answer: ${studentAnswer}
-
-    Evaluate the student's answer.
-    1. Determine if it is Correct (A), Mostly Correct (B), Partially Correct (C), or Incorrect (D).
-    2. Provide a encouraging feedback in Japanese.
-
-    Return ONLY a JSON object:
-    {
-        "evaluation": "A" | "B" | "C" | "D",
-        "feedback": "feedback string"
-    }
-    `;
-
-    const model = getGenAI().getGenerativeModel({ model: "gemini-2.5-pro" });
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
-
-    try {
-        const json = parseJSON(text);
-        return {
-            evaluation: json.evaluation || "C",
-            feedback: json.feedback || "AI判定に失敗しました"
-        };
-    } catch (e) {
-        console.error("Failed to parse AI response", text);
-        return { evaluation: "C", feedback: "AI判定エラー" };
     }
 }
