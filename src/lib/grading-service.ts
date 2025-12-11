@@ -27,11 +27,17 @@ function getGenAI() {
 let drive: any | null = null;
 function getDrive() {
     if (!drive) {
+        // If GOOGLE_APPLICATION_CREDENTIALS is set, let GoogleAuth handle it automatically
+        if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+            const auth = new google.auth.GoogleAuth({
+                scopes: ['https://www.googleapis.com/auth/drive'],
+            });
+            drive = google.drive({ version: 'v3', auth });
+            return drive;
+        }
+
+        // Fallback to local file (Dev mode)
         if (!fs.existsSync(SERVICE_ACCOUNT_PATH)) {
-            // Safe guard: if file missing, return null or throw. 
-            // Throwing might break app start if this is called at module level, but we are inside function.
-            // If we return null, callers must handle.
-            // Let's assume validation happens elsewhere or throw here.
             throw new Error(`Service account file not found at ${SERVICE_ACCOUNT_PATH}`);
         }
         const auth = new google.auth.GoogleAuth({

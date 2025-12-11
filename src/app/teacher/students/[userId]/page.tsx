@@ -40,16 +40,6 @@ export default async function TeacherStudentDetailPage({
     const { student, stats, subjectProgress, dailyActivity, weaknesses, recentHistory, subjects } = dashboardData;
     const classrooms = await prisma.classroom.findMany({ orderBy: { createdAt: 'asc' } });
 
-    if (!student) {
-        return (
-            <div className="container mx-auto py-8 px-4 text-center">
-                <h1 className="text-2xl font-bold">生徒が見つかりません</h1>
-                <Button asChild className="mt-4">
-                    <Link href="/teacher">一覧に戻る</Link>
-                </Button>
-            </div>
-        );
-    }
 
     return (
         <div className="container mx-auto py-8 px-4 space-y-8">
