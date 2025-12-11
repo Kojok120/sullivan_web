@@ -442,7 +442,15 @@ async function gradeWithGemini(filePath: string): Promise<GradingResult[] | null
             },
             include: { coreProblems: true } // Include CoreProblems for context
         });
-        console.log(`Fetched ${problems.length} problems from DB.`);
+
+        // SORTING FIX: Sort problems to match the order in uniquePids (QR order)
+        problems.sort((a, b) => {
+            const indexA = uniquePids.findIndex((pid: any) => pid === a.id || pid === a.customId);
+            const indexB = uniquePids.findIndex((pid: any) => pid === b.id || pid === b.customId);
+            return indexA - indexB;
+        });
+
+        console.log(`Fetched and sorted ${problems.length} problems from DB.`);
 
         // If no problems found, abort
         if (problems.length === 0) {
