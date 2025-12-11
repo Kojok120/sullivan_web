@@ -425,6 +425,7 @@ export async function getLearningSessions(userId: string, limit = 10): Promise<L
 }
 
 export async function getSessionDetails(groupId: string) {
+    if (!groupId) return [];
     return await prisma.learningHistory.findMany({
         where: { groupId },
         include: {

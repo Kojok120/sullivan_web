@@ -9,11 +9,12 @@ import { ArrowLeft, PlayCircle, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VideoPlayerDialog } from "@/components/video-player-dialog"; // Client component we need to make
 
-export default async function SessionDetailsPage({ params }: { params: { groupId: string } }) {
+export default async function SessionDetailsPage({ params }: { params: Promise<{ groupId: string }> }) {
     const session = await getSession();
     if (!session) redirect('/login');
 
-    const details = await getSessionDetails(params.groupId);
+    const { groupId } = await params;
+    const details = await getSessionDetails(groupId);
     if (!details || details.length === 0) {
         return <div>履歴が見つかりません</div>;
     }
