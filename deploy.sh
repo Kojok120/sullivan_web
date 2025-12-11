@@ -1,0 +1,37 @@
+#!/bin/bash
+
+# Load .env variables
+if [ -f .env ]; then
+  export $(grep -v '^#' .env | xargs)
+else
+  echo ".env file not found!"
+  exit 1
+fi
+
+echo "Deploying to Project: $YOUR_PROJECT_ID"
+echo "Database URL: $DATABASE_URL"
+
+# Deploy Command
+gcloud run deploy sullivan-app \
+  --project "$YOUR_PROJECT_ID" \
+  --source . \
+  --platform managed \
+  --region asia-northeast1 \
+  --memory 4Gi \
+  --cpu 2 \
+  --allow-unauthenticated \
+  --set-env-vars "NODE_ENV=production" \
+  --set-env-vars "DATABASE_URL=$DATABASE_URL" \
+  --set-env-vars "DIRECT_URL=$DIRECT_URL" \
+  --set-env-vars "QSTASH_TOKEN=$QSTASH_TOKEN" \
+  --set-env-vars "QSTASH_CURRENT_SIGNING_KEY=$QSTASH_CURRENT_SIGNING_KEY" \
+  --set-env-vars "UPSTASH_REDIS_REST_URL=$UPSTASH_REDIS_REST_URL" \
+  --set-env-vars "UPSTASH_REDIS_REST_TOKEN=$UPSTASH_REDIS_REST_TOKEN" \
+  --set-env-vars "GEMINI_API_KEY=$GEMINI_API_KEY" \
+  --set-env-vars "GEMINI_MODEL=$GEMINI_MODEL" \
+  --set-env-vars "JWT_SECRET=$JWT_SECRET" \
+  --set-env-vars "DRIVE_FOLDER_ID=$DRIVE_FOLDER_ID" \
+  --set-env-vars "APP_URL=${APP_URL:-https://placeholder.com}" \
+  --set-env-vars "GOOGLE_APPLICATION_CREDENTIALS=/secrets/service-account.json" \
+  --set-secrets="/secrets/service-account.json=sullivan-service-account:latest"
+

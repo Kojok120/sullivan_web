@@ -1,15 +1,22 @@
 
 FROM node:20-bookworm-slim AS base
-# Python and OpenCV dependencies
+# Python and OpenCV dependencies + pyzbar for robust QR detection
+# Note: Using pip opencv-python-headless instead of apt python3-opencv
+# because apt version is 4.6.0 which lacks QRCodeDetectorAruco (added in 4.8+)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
-    python3-opencv \
-    && rm -rf /var/lib/apt/lists/*
+    python3-venv \
+    libgl1 \
+    libglib2.0-0 \
+    libzbar0 \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip3 install --break-system-packages opencv-python-headless pyzbar Pillow
 
 FROM base AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
+COPY prisma ./prisma
 RUN npm ci
 
 FROM base AS builder

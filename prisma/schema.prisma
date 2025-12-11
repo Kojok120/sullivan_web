@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model Subject {
@@ -112,7 +113,7 @@ model LearningHistory {
   userId     String
   user       User     @relation(fields: [userId], references: [id])
   problemId  String
-  problem    Problem  @relation(fields: [problemId], references: [id])
+  problem    Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
   evaluation String // A, B, C, D
   userAnswer String? // User's text answer
   feedback   String? // AI feedback
@@ -128,7 +129,7 @@ model UserProblemState {
   userId         String
   user           User      @relation(fields: [userId], references: [id])
   problemId      String
-  problem        Problem   @relation(fields: [problemId], references: [id])
+  problem        Problem   @relation(fields: [problemId], references: [id], onDelete: Cascade)
   priority       Int       @default(0)
   lastAnsweredAt DateTime?
   isCleared      Boolean   @default(false)

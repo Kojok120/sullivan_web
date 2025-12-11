@@ -3,12 +3,22 @@ import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import * as bcrypt from 'bcryptjs';
 
-const secretKey = process.env.JWT_SECRET;
-if (!secretKey) {
-    throw new Error('JWT_SECRET is not defined in environment variables');
-}
-const SECRET_KEY = new TextEncoder().encode(secretKey);
 const ALG = 'HS256';
+
+function getSecretKey() {
+    const secretKey = process.env.JWT_SECRET;
+    if (!secretKey) {
+        // During build time (static generation), this might be called if pages use auth logic.
+        // However, we shouldn't throw if we can avoid it, or throw only when actually needed.
+        if (process.env.NODE_ENV === 'production' && process.env.NEXT_PHASE === 'phase-production-build') {
+            return new TextEncoder().encode('build-time-secret');
+        }
+        // Fallback for strictness at runtime
+        throw new Error('JWT_SECRET is not defined in environment variables');
+    }
+    return new TextEncoder().encode(secretKey);
+}
+
 
 export type SessionPayload = {
     userId: string;
@@ -21,12 +31,12 @@ export async function encrypt(payload: SessionPayload) {
         .setProtectedHeader({ alg: ALG })
         .setIssuedAt()
         .setExpirationTime('7d') // Session lasts 7 days
-        .sign(SECRET_KEY);
+        .sign(getSecretKey());
 }
 
 export async function decrypt(input: string): Promise<SessionPayload | null> {
     try {
-        const { payload } = await jwtVerify(input, SECRET_KEY, {
+        const { payload } = await jwtVerify(input, getSecretKey(), {
             algorithms: [ALG],
         });
         return payload as SessionPayload;

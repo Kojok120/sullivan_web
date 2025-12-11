@@ -5,6 +5,7 @@ import { Client as QStashClient } from '@upstash/qstash';
 import { prisma } from '@/lib/prisma';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { calculateCoreProblemStatus } from '@/lib/progression';
 import { calculateNewPriority } from '@/lib/priority-algo';
 import { serverEvents, EVENTS } from '@/lib/server-events';
@@ -29,6 +30,10 @@ function getDrive() {
     if (!drive) {
         // If GOOGLE_APPLICATION_CREDENTIALS is set, let GoogleAuth handle it automatically
         if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+            console.log(`[getDrive] Using GOOGLE_APPLICATION_CREDENTIALS: ${process.env.GOOGLE_APPLICATION_CREDENTIALS}`);
+            if (!fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS)) {
+                console.error(`[getDrive] ERROR: Credential file does not exist at ${process.env.GOOGLE_APPLICATION_CREDENTIALS}`);
+            }
             const auth = new google.auth.GoogleAuth({
                 scopes: ['https://www.googleapis.com/auth/drive'],
             });
@@ -112,7 +117,7 @@ export async function checkDriveForNewFiles() {
 export async function processFile(fileId: string, fileName: string) {
     try {
         // Download file
-        const destPath = path.join(process.cwd(), 'tmp', fileName);
+        const destPath = path.join(os.tmpdir(), fileName);
         if (!fs.existsSync(path.dirname(destPath))) {
             await fs.promises.mkdir(path.dirname(destPath), { recursive: true });
         }
@@ -386,7 +391,7 @@ async function readQRCodeLocally(filePath: string): Promise<QRData | null> {
 
 async function gradeWithGemini(filePath: string): Promise<GradingResult[] | null> {
     try {
-        const modelName = process.env.GEMINI_MODEL || "gemini-1.5-flash";
+        const modelName = process.env.GEMINI_MODEL || "gemini-2.5-flash";
         console.log("Using Gemini Model:", modelName);
         const model = getGenAI().getGenerativeModel({ model: modelName });
 
@@ -427,6 +432,7 @@ async function gradeWithGemini(filePath: string): Promise<GradingResult[] | null
 
         // 5. Fetch Full Problem Context from DB
         const uniquePids = Array.from(new Set(qrData.pids.filter((p: any) => typeof p === 'string')));
+        console.log(`Fetching problems from DB for IDs: ${uniquePids.join(', ')}`);
         const problems = await prisma.problem.findMany({
             where: {
                 OR: [
@@ -436,6 +442,7 @@ async function gradeWithGemini(filePath: string): Promise<GradingResult[] | null
             },
             include: { coreProblems: true } // Include CoreProblems for context
         });
+        console.log(`Fetched ${problems.length} problems from DB.`);
 
         // If no problems found, abort
         if (problems.length === 0) {
@@ -481,6 +488,7 @@ async function gradeWithGemini(filePath: string): Promise<GradingResult[] | null
         ]
         `;
 
+        console.log("Calling Gemini generateContent for grading...");
         const result = await model.generateContent([
             gradingPrompt,
             {
@@ -524,21 +532,20 @@ async function scanQRWithGemini(model: any, base64Data: string, mimeType: string
         const prompt = `
         Analyze this document. There is a QR code on it containing JSON data.
         1. Decode the QR code.
-        2. Inspect the decoded JSON for "sid".
-        3. If identifying from text, look for a string starting with "cmiz" followed by alphanumeric characters (approx 25 chars).
+        2. Extract the JSON data from the QR code.
 
         The expected JSON structure:
         {
-            "sid": "student_id",
+            "sid": "student_id_string",
             "pids": ["problem_id_1", "problem_id_2", ...]
         }
 
-        PRIORITY RULES:
-        - If you find a string like "cmizbu15r0000jaw8k1aze4bn", USE IT as "sid".
-        - Do NOT use "生徒1" or Japanese names as "sid" if a CUID/UUID is present.
-        - The "sid" MUST be the ID, not the Name.
+        IMPORTANT:
+        - The "sid" is a CUID string (approximately 25 alphanumeric characters starting with "cm" or "cl").
+        - Do NOT use Japanese names like "生徒1" as the sid. Extract the actual ID string from the QR.
+        - The "pids" array contains problem IDs (e.g., "E-1", "M-5", or CUIDs).
         
-        Return ONLY the JSON object.
+        Return ONLY the JSON object found in the QR code. Do not fabricate data.
         `;
         // ...
 
@@ -828,7 +835,7 @@ export async function gradeTextAnswer(problemId: string, studentAnswer: string):
     }
     `;
 
-    const model = getGenAI().getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = getGenAI().getGenerativeModel({ model: "gemini-2.5-pro" });
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
