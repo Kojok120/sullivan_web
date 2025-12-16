@@ -1,6 +1,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { verifySignature } from '@upstash/qstash/dist/nextjs';
+import { verifySignatureAppRouter } from '@upstash/qstash/nextjs';
 import { processFile } from '@/lib/grading-service';
 
 async function handler(req: NextRequest) {
@@ -24,27 +24,6 @@ async function handler(req: NextRequest) {
     }
 }
 
-// Use built-in signature verification if possible, or manual.
-// @upstash/qstash provides a nextjs helper but it might require specific export structure.
-// Let's use the manual verify or standard handler wrapper if simplest, 
-// but for now, to ensure compatibility with App Router, we just define POST.
-// If QSTASH_CURRENT_SIGNING_KEY is set, we SHOULD verify.
-
-export const POST = async (req: NextRequest) => {
-    // Basic verification check if env vars are present
-    // Note: In a real prod environment, use the official `verifySignatureApp` or similar wrapper
-    // available in newer SDKs, or manual check.
-    // For this implementation, we will trust the caller if verification is not strictly enforced in code 
-    // (though User Request asked for Best Practice).
-    // Best practice: Verify signature.
-
-    return handler(req);
-};
-
-// To add signature verification properly with App Router:
-/*
-import { verifySignatureAppRouter } from "@upstash/qstash/dist/nextjs";
+// QStash署名検証を有効化
+// QSTASH_CURRENT_SIGNING_KEY と QSTASH_NEXT_SIGNING_KEY が必要
 export const POST = verifySignatureAppRouter(handler);
-*/
-// However, I need to check if the installed version supports `dist/nextjs`. 
-// I'll stick to the basic handler for stability unless I confirm the SDK exports.

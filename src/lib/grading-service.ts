@@ -66,29 +66,31 @@ export async function checkDriveForNewFiles() {
             return;
         }
 
-        for (const file of files) {
-            if (!file.id || !file.name) continue;
+        // 処理対象ファイルをフィルタリング
+        const filesToProcess = files.filter((file: { id?: string | null; name?: string | null }) =>
+            file.id && file.name &&
+            !file.name.startsWith('[PROCESSED]') &&
+            !file.name.startsWith('[ERROR]')
+        );
 
-            // Check if already processed (check DB or move file?)
-            // Best practice: Move processed files to a "Processed" folder.
-            // For now, let's assume we move them or rename them.
-            // Or we check if we have a LearningHistory for this file? 
-            // Hard to link file to history before reading QR.
-            // Let's assume we move them to a 'processed' folder.
-            // But we need a processed folder ID.
-            // Simplified: Rename file with prefix "[PROCESSED]"
-
-            if (file.name.startsWith('[PROCESSED]')) continue;
-            if (file.name.startsWith('[ERROR]')) continue;
-
-            console.log(`Queuing grading job for file: ${file.name} (${file.id})`);
-            await triggerGradingJob(file.id, file.name);
+        if (filesToProcess.length === 0) {
+            console.log('No new files to process.');
+            return;
         }
+
+        // 並列でジョブを発行（スループット向上）
+        await Promise.all(
+            filesToProcess.map((file: { id?: string | null; name?: string | null }) => {
+                console.log(`Queuing grading job for file: ${file.name} (${file.id})`);
+                return triggerGradingJob(file.id!, file.name!);
+            })
+        );
 
     } catch (error) {
         console.error('Error checking Drive:', error);
     }
 }
+
 
 // 3. Process File (Now Exported for API Route)
 export async function processFile(fileId: string, fileName: string) {
@@ -117,13 +119,6 @@ export async function processFile(fileId: string, fileName: string) {
 
         const stats = await fs.promises.stat(destPath);
         console.log(`Downloaded ${fileName}: ${stats.size} bytes`);
-
-        // Read header
-        const fd = await fs.promises.open(destPath, 'r');
-        const buffer = Buffer.alloc(8);
-        await fd.read(buffer, 0, 8, 0);
-        await fd.close();
-        console.log(`File Header: ${buffer.toString('hex')}`);
 
         // Read QR and Grade using Gemini
         const results = await gradeWithGemini(destPath);

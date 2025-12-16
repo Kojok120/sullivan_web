@@ -1,7 +1,6 @@
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { prisma } from '@/lib/prisma';
-import { getStudentStats, getSubjectProgress, getDailyActivity } from '@/lib/analytics';
+import { getStudentDashboardData } from '@/lib/analytics';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { ActivityChart } from '@/app/dashboard/activity-chart';
@@ -20,37 +19,12 @@ export default async function StudentAnalyticsPage({ params }: PageProps) {
 
     const { userId } = await params;
 
-    const student = await prisma.user.findUnique({
-        where: { id: userId },
-    });
+    // 共通サービスを使用してデータ取得を統一
+    const dashboardData = await getStudentDashboardData(userId);
+    if (!dashboardData) return <div>生徒が見つかりません</div>;
 
-    if (!student) return <div>生徒が見つかりません</div>;
+    const { stats, subjectProgress, dailyActivity, recentHistory, student } = dashboardData;
 
-    let stats, subjectProgress, dailyActivity, recentHistory;
-    try {
-        [stats, subjectProgress, dailyActivity, recentHistory] = await Promise.all([
-            getStudentStats(student.id),
-            getSubjectProgress(student.id),
-            getDailyActivity(student.id),
-            prisma.learningHistory.findMany({
-                where: { userId: student.id },
-                orderBy: { answeredAt: 'desc' },
-                take: 50,
-                include: {
-                    problem: {
-                        include: {
-                            coreProblems: {
-                                include: { subject: true }
-                            }
-                        }
-                    }
-                }
-            })
-        ]);
-    } catch (error) {
-        console.error("Error fetching analytics data:", error);
-        throw error;
-    }
 
     return (
         <div className="container mx-auto py-8 px-4">
