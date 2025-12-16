@@ -81,8 +81,8 @@ export default async function HistoryPage({
                                 history.items.map((item) => (
                                     <tr key={item.id} className="border-b hover:bg-gray-50">
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            {item.answeredAt.toLocaleDateString('ja-JP')} <br />
-                                            <span className="text-gray-400 text-xs">{item.answeredAt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}</span>
+                                            {item.answeredAt.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })} <br />
+                                            <span className="text-gray-400 text-xs">{item.answeredAt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })}</span>
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="font-medium">

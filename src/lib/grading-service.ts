@@ -209,24 +209,38 @@ async function archiveProcessedFile(fileId: string, studentId: string, problemId
 
         // 3. Build New Filename: 教室名_生徒名_科目_採点時間.pdf
         const ext = path.extname(originalFileName) || '.pdf';
-        const timeStr = date.toISOString().replace(/T/, '_').replace(/:/g, '').split('.')[0];
-        // ISO: 2023-10-10T10:10:10.000Z -> 2023-10-10_101010
-        // User requested: 採点時間. Format YYYYMMDD-HHMMSS? 
-        // Let's use YYYYMMDD-HHMMSS
-        const y = date.getFullYear();
-        const m = String(date.getMonth() + 1).padStart(2, '0');
-        const d = String(date.getDate()).padStart(2, '0');
-        const h = String(date.getHours()).padStart(2, '0');
-        const min = String(date.getMinutes()).padStart(2, '0');
-        const s = String(date.getSeconds()).padStart(2, '0');
+
+        // JST Construction
+        const jstDate = new Intl.DateTimeFormat('ja-JP', {
+            timeZone: 'Asia/Tokyo',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        });
+
+        // Format parts to YYYYMMDD-HHMMSS
+        const parts = jstDate.formatToParts(date);
+        const getPart = (type: string) => parts.find(p => p.type === type)?.value || '00';
+
+        const y = getPart('year');
+        const m = getPart('month');
+        const d = getPart('day');
+        const h = getPart('hour');
+        const min = getPart('minute');
+        const s = getPart('second');
+
         const timestamp = `${y}${m}${d}-${h}${min}${s}`;
 
         const newFileName = `${classroomName}_${studentName}_${subjectName}_${timestamp}${ext}`;
 
         // 4. Build Path Components for Folders
         const year = y + '年';
-        const month = String(date.getMonth() + 1) + '月';
-        const day = String(date.getDate()) + '日';
+        const month = String(parseInt(m)) + '月'; // Remove leading zero for folder name if desired, or keep it. Original used String(date.getMonth() + 1).
+        const day = String(parseInt(d)) + '日';
 
         // 5. Resolve/Create Folders
         // Root: "採点済" inside DRIVE_FOLDER_ID

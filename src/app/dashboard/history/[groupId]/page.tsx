@@ -21,7 +21,7 @@ export default async function SessionDetailsPage({ params }: { params: Promise<{
 
     const firstItem = details[0];
     const subjectName = firstItem.problem.coreProblems[0]?.subject.name || '教科不明';
-    const date = firstItem.answeredAt.toLocaleDateString('ja-JP') + ' ' + firstItem.answeredAt.toLocaleTimeString('ja-JP');
+    const date = firstItem.answeredAt.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) + ' ' + firstItem.answeredAt.toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo' });
 
     return (
         <div className="container mx-auto py-8 px-4 max-w-4xl">

@@ -102,10 +102,10 @@ export default async function TeacherStudentDetailPage({
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold">
-                                    {stats.lastActivity ? new Date(stats.lastActivity).toLocaleDateString() : '-'}
+                                    {stats.lastActivity ? new Date(stats.lastActivity).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '-'}
                                 </div>
                                 <p className="text-xs text-muted-foreground">
-                                    {stats.lastActivity ? new Date(stats.lastActivity).toLocaleTimeString() : ''}
+                                    {stats.lastActivity ? new Date(stats.lastActivity).toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo' }) : ''}
                                 </p>
                             </CardContent>
                         </Card>
@@ -198,7 +198,7 @@ export default async function TeacherStudentDetailPage({
                                                 </span>
                                             </div>
                                             <div className="text-xs text-muted-foreground">
-                                                {new Date(history.answeredAt).toLocaleString()}
+                                                {new Date(history.answeredAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}
                                             </div>
                                         </div>
                                         <div className="text-sm bg-muted/50 p-3 rounded-md">
