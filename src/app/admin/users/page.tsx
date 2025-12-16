@@ -1,4 +1,4 @@
-import { getUsers, getGroups, getClassrooms } from '../actions';
+import { getUsers, getGroups, getClassroomsForAdmin } from '../actions';
 import { UserList } from './user-list';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -29,7 +29,7 @@ export default async function UsersPage({
     const [usersData, groupsData, classroomsData] = await Promise.all([
         getUsers(currentPage, limit, query, currentSortBy, currentSortOrder, roleEnum, groupId),
         getGroups(),
-        getClassrooms(),
+        getClassroomsForAdmin(),
     ]);
 
     const { users, total, error } = usersData;

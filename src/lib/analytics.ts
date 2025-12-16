@@ -500,10 +500,10 @@ export async function getStudentDashboardData(userId: string) {
     if (!student) return null;
 
     // Derive subjects from subjectProgress to avoid duplicate query
+    // Note: Only id and name are needed by PrintProblemCard component
     const subjects = subjectProgress.map(sp => ({
         id: sp.subjectId,
         name: sp.subjectName,
-        coreProblems: Array(sp.totalCoreProblems).fill({ id: '' }) // Placeholder for length compatibility
     }));
 
     return {

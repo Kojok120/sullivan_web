@@ -10,26 +10,6 @@ export async function logoutAction() {
     redirect("/login");
 }
 
-export async function getSubjects() {
-    const { fetchSubjects } = await import('@/lib/curriculum-service');
-    return await fetchSubjects();
-}
-
-export async function getSubject(id: string) {
-    return await prisma.subject.findUnique({
-        where: { id },
-        include: {
-            coreProblems: {
-                orderBy: { order: 'asc' },
-                select: {
-                    id: true,
-                    name: true,
-                },
-            },
-        },
-    });
-}
-
 export async function markVideoWatched(historyId: string) {
     const session = await getSession();
     if (!session) throw new Error("Unauthorized");

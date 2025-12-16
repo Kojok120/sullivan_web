@@ -146,12 +146,13 @@ export async function deleteUser(id: string) {
     }
 }
 
-export async function getClassrooms() {
+// Wrapper for admin/users page that needs { success, classrooms: [{id, name}] } format
+// Uses consolidated getClassrooms from admin/classrooms/actions.ts
+export async function getClassroomsForAdmin() {
     await requireAdmin();
     try {
-        const { fetchClassrooms } = await import('@/lib/classroom-service');
-        const classrooms = await fetchClassrooms({ orderBy: 'name', sortOrder: 'asc' });
-
+        const { getClassrooms } = await import('@/app/admin/classrooms/actions');
+        const classrooms = await getClassrooms();
         return {
             success: true,
             classrooms: classrooms.map(c => ({ id: c.id, name: c.name }))

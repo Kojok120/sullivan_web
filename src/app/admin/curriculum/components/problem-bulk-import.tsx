@@ -37,67 +37,7 @@ export function ProblemBulkImport({ coreProblems, subjectId }: ProblemBulkImport
 
     const cpNameMap = new Map(coreProblems.map(cp => [cp.name, cp.id]));
 
-    const parseText = () => {
-        const rows = rawText.trim().split('\n');
-        const parsed: ParsedProblem[] = rows.map(row => {
-            const cols = row.split('\t');
-            if (cols.length < 4) return null; // Minimum required columns
-
-            // 0: Grade, 1: CoreProblem(s), 2: Question, 3: Answer, 4: Accepted (opt), 5: Video (opt)
-            const grade = cols[0]?.trim() || '';
-            const cpRaw = cols[1]?.trim() || '';
-            const question = cols[2]?.trim() || ''; // Multiline? Excel quotes newlines. Assuming simple tab sep for now.
-            // If pasted from Excel, quotes might handle newlines. Raw copy paste might split newlines.
-            // User said "problem text has newlines". 
-            // In a textarea paste, a newline within a cell usually comes as newline.
-            // But if we split by \n, we break the cell.
-            // We need smarter parsing for Excel paste. 
-            // But usually, Excel copy-paste puts the cell content in quotes if it has newlines?
-            // "A\nB" -> "A\nB" on clipboard? Or "A\r\nB"?
-            // Let's assume standard TSV logic: if double quotes, it maintains newline.
-
-            // Standard TSV parsing is safer.
-            // For now, simple split by tab. If user pastes multiline cell, it might appear as multiple lines in textarea.
-            // If simple split \n doesn't work, we ask user to ensure one line per row or use a parser.
-            // Let's stick to simple split for MVP, but user example had explicit newlines.
-            // If the user simply copies from Excel, newlines in cells *usually* get quoted or just treated as newlines depending on OS.
-            // Actually, Excel copy to text usually puts quotes around multiline cells.
-
-            const answer = cols[3]?.trim() || '';
-            const acceptedRaw = cols[4]?.trim() || '';
-            const videoUrl = cols[5]?.trim() || '';
-
-            const cpNames = cpRaw.split(/[,\n]+/).map(s => s.trim()).filter(Boolean);
-            const acceptedAnswers = acceptedRaw.split(/[,、]+/).map(s => s.trim()).filter(Boolean);
-
-            // Validation
-            const missingCps = cpNames.filter(name => !cpNameMap.has(name));
-            let status: 'valid' | 'error' = 'valid';
-            let message = '';
-
-            if (missingCps.length > 0) {
-                status = 'error';
-                message = `CoreProblemが見つかりません: ${missingCps.join(', ')}`;
-            }
-            if (!question || !answer) {
-                status = 'error';
-                message = message ? `${message}, 必須項目（問題・正答）が不足しています` : '必須項目（問題・正答）が不足しています';
-            }
-
-            return {
-                grade,
-                coreProblemNames: cpNames,
-                question, // We might need to unescape quotes if Excel adds them
-                answer,
-                acceptedAnswers,
-                videoUrl,
-                status,
-                message
-            };
-        }).filter(Boolean) as ParsedProblem[];
-
-        setParsedData(parsed);
-    };
+    // Note: parseText was removed as it was superseded by parseTSV which handles quoted newlines correctly
 
     // Naive Excel TSV Parser to handle quoted newlines
     const parseTSV = (text: string) => {
