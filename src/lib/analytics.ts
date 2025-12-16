@@ -442,14 +442,14 @@ export async function getSessionDetails(groupId: string) {
 // Consolidated Dashboard Data Fetcher
 export async function getStudentDashboardData(userId: string) {
     // 1. Fetch all necessary data in parallel
+    // Note: subjectProgress already contains subject info, so we don't need a separate subjects query
     const [
         stats,
         dailyActivity,
         subjectProgress,
         weaknesses,
         recentHistory,
-        student,
-        subjects
+        student
     ] = await Promise.all([
         getStudentStats(userId),
         getDailyActivity(userId),
@@ -494,18 +494,17 @@ export async function getStudentDashboardData(userId: string) {
                 },
                 classroom: true
             }
-        }),
-        prisma.subject.findMany({
-            orderBy: { order: 'asc' },
-            include: {
-                coreProblems: {
-                    select: { id: true }
-                }
-            },
         })
     ]);
 
     if (!student) return null;
+
+    // Derive subjects from subjectProgress to avoid duplicate query
+    const subjects = subjectProgress.map(sp => ({
+        id: sp.subjectId,
+        name: sp.subjectName,
+        coreProblems: Array(sp.totalCoreProblems).fill({ id: '' }) // Placeholder for length compatibility
+    }));
 
     return {
         student,

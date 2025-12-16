@@ -732,14 +732,44 @@ export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: strin
     // Determine involved Subjects
     const subjectIds = new Set(cpDetails.map(cp => cp.subjectId));
 
-    // Fetch Unlocked CPs for these subjects
-    const { getUnlockedCoreProblemIds } = await import('@/lib/progression');
-    const unlockedCpIds = new Set<string>();
+    // === OPTIMIZATION: Batch fetch all user states upfront ===
 
-    for (const sid of subjectIds) {
-        const ids = await getUnlockedCoreProblemIds(userId, sid);
-        ids.forEach(id => unlockedCpIds.add(id));
-    }
+    // 1. Fetch all UserProblemStates for this user (for problems in checked CPs)
+    const allProblemIds = new Set<string>();
+    cpDetails.forEach(cp => cp.problems.forEach(p => allProblemIds.add(p.id)));
+
+    const allUserProblemStates = await prisma.userProblemState.findMany({
+        where: {
+            userId,
+            problemId: { in: Array.from(allProblemIds) }
+        }
+    });
+    const userProblemStateMap = new Map(allUserProblemStates.map(s => [s.problemId, s]));
+
+    // 2. Fetch all Unlocked CPs for this user across involved subjects
+    const allCpIdsInSubjects = new Set<string>();
+    cpDetails.forEach(cp => cp.subject.coreProblems.forEach(c => allCpIdsInSubjects.add(c.id)));
+
+    const allUnlockedCpStates = await prisma.userCoreProblemState.findMany({
+        where: {
+            userId,
+            coreProblemId: { in: Array.from(allCpIdsInSubjects) },
+            isUnlocked: true
+        },
+        select: { coreProblemId: true }
+    });
+    const unlockedCpIds = new Set(allUnlockedCpStates.map(s => s.coreProblemId));
+
+    // 3. Ensure first CP of each subject is unlocked
+    const firstCpsPerSubject = await prisma.coreProblem.findMany({
+        where: { subjectId: { in: Array.from(subjectIds) } },
+        orderBy: { order: 'asc' },
+        distinct: ['subjectId'],
+        select: { id: true }
+    });
+    firstCpsPerSubject.forEach(cp => unlockedCpIds.add(cp.id));
+
+    // === END OPTIMIZATION ===
 
     // Loop through each checked CP
     for (const cp of cpDetails) {
@@ -752,16 +782,13 @@ export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: strin
         const totalProblems = validProblems.length;
         const validProblemIds = new Set(validProblems.map(p => p.id));
 
-        // Fetch User States for this CP's problems
-        const userStates = await prisma.userProblemState.findMany({
-            where: {
-                userId,
-                problemId: { in: Array.from(validProblemIds) }
-            }
-        });
+        // Use pre-fetched user states instead of querying in loop
+        const userStatesForCp = Array.from(validProblemIds)
+            .map(pid => userProblemStateMap.get(pid))
+            .filter((s): s is NonNullable<typeof s> => s !== undefined);
 
-        const answeredCount = userStates.length;
-        const correctCount = userStates.filter(s => s.isCleared).length;
+        const answeredCount = userStatesForCp.length;
+        const correctCount = userStatesForCp.filter(s => s.isCleared).length;
 
         console.log(`Checking CP ${cp.name}: Valid/Total=${validProblems.length}/${cp.problems.length}, Answered=${answeredCount}`);
 

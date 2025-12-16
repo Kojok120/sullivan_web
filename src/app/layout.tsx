@@ -38,7 +38,7 @@ export default async function RootLayout({
       >
         <MainNav role={session?.role} />
         {children}
-        <GradingNotifier />
+        {session && session.role === 'STUDENT' && <GradingNotifier />}
         <Toaster />
       </body>
     </html>

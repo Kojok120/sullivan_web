@@ -1,33 +1,17 @@
 import { NextResponse } from 'next/server';
 import { checkDriveForNewFiles } from '@/lib/grading-service';
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
+import { acquireGradingLock, releaseGradingLock } from '@/lib/grading-lock';
 
 export const dynamic = 'force-dynamic';
 
-const LOCK_FILE = path.join(os.tmpdir(), 'sullivan_grading.lock');
-const LOCK_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
-
 export async function GET() {
     try {
-        // Check for lock
-        try {
-            await fs.promises.access(LOCK_FILE);
-            const stats = await fs.promises.stat(LOCK_FILE);
-            const now = Date.now();
-            if (now - stats.mtimeMs < LOCK_TIMEOUT_MS) {
-                console.log('Grading check skipped: Lock file exists and is active.');
-                return NextResponse.json({ success: false, message: 'Processing in progress' }, { status: 429 });
-            } else {
-                console.warn('Grading check: Found stale lock file. Overwriting.');
-            }
-        } catch (e) {
-            // Lock file doesn't exist, proceed
+        // Try to acquire lock using shared mechanism
+        const lockAcquired = await acquireGradingLock();
+        if (!lockAcquired) {
+            console.log('Grading check skipped: Lock is active.');
+            return NextResponse.json({ success: false, message: 'Processing in progress' }, { status: 429 });
         }
-
-        // Create lock
-        await fs.promises.writeFile(LOCK_FILE, String(Date.now()));
 
         try {
             console.log('Triggering drive check...');
@@ -35,16 +19,13 @@ export async function GET() {
             return NextResponse.json({ success: true, message: 'Drive check completed' });
         } finally {
             // Release lock
-            try {
-                await fs.promises.unlink(LOCK_FILE);
-            } catch (ignore) { }
+            await releaseGradingLock();
         }
     } catch (error) {
         console.error('Drive check failed:', error);
-        // Ensure lock is released even if checkDriveForNewFiles throws
-        try {
-            await fs.promises.unlink(LOCK_FILE);
-        } catch (ignore) { }
+        // Ensure lock is released even on error
+        await releaseGradingLock();
         return NextResponse.json({ success: false, error: 'Internal Server Error' }, { status: 500 });
     }
 }
+
