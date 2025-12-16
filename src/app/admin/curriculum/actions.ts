@@ -275,36 +275,13 @@ export async function bulkCreateProblems(subjectId: string, problems: {
 
         if (!subject) throw new Error('Subject not found');
 
+        const { getSubjectPrefix, getMaxCustomIdNumber } = await import('@/lib/curriculum-service');
+
         // Generate Custom ID Prefix
-        let prefix = '';
-        if (subject.name.includes('英語')) prefix = 'E';
-        else if (subject.name.includes('国語')) prefix = 'J';
-        else if (subject.name.includes('数学')) prefix = 'S';
-        else prefix = subject.name.charAt(0).toUpperCase();
+        const prefix = getSubjectPrefix(subject.name);
 
-        // Fetch ALL existing customIDs for this subject to find the true MAX number.
-        // Counting is unsafe because deletions cause duplicate IDs.
-        const allSubjectProblems = await prisma.problem.findMany({
-            where: {
-                customId: {
-                    startsWith: prefix + '-'
-                }
-            },
-            select: { customId: true }
-        });
-
-        let maxNum = 0;
-        for (const p of allSubjectProblems) {
-            if (p.customId) {
-                const parts = p.customId.split('-');
-                if (parts.length === 2) {
-                    const num = parseInt(parts[1], 10);
-                    if (!isNaN(num) && num > maxNum) {
-                        maxNum = num;
-                    }
-                }
-            }
-        }
+        // Fetch MAX number
+        const maxNum = await getMaxCustomIdNumber(prefix);
 
         let nextNum = maxNum;
         let createdCount = 0;

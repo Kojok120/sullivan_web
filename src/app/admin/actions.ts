@@ -3,7 +3,7 @@
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { Role } from '@prisma/client';
-import { getSession, requireAdmin, hashPassword } from '@/lib/auth';
+import { requireAdmin, hashPassword } from '@/lib/auth';
 
 export async function getUsers(
     page: number = 1,
@@ -150,10 +150,8 @@ export async function getClassrooms() {
     await requireAdmin();
     try {
         const { fetchClassrooms } = await import('@/lib/classroom-service');
-        const classrooms = await fetchClassrooms({ orderBy: 'name' });
-        // Select only necessary fields if needed, but the service returns all. 
-        // The original returned { id, name }. We can map if strict, but returning full object is usually fine.
-        // To be safe with payload size:
+        const classrooms = await fetchClassrooms({ orderBy: 'name', sortOrder: 'asc' });
+
         return {
             success: true,
             classrooms: classrooms.map(c => ({ id: c.id, name: c.name }))

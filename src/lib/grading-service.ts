@@ -11,8 +11,9 @@ import { calculateNewPriority } from '@/lib/priority-algo';
 import { serverEvents, EVENTS } from '@/lib/server-events';
 
 // Configuration
+import { getDriveClient } from '@/lib/drive-client';
+
 const DRIVE_FOLDER_ID = process.env.DRIVE_FOLDER_ID || ''; // Folder to watch
-const SERVICE_ACCOUNT_PATH = path.join(process.cwd(), 'service-account.json');
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 
 // Lazy Initialization
@@ -25,33 +26,9 @@ function getGenAI() {
     return genAI;
 }
 
-let drive: any | null = null;
+// Deprecated local getDrive removed in favor of shared getDriveClient
 function getDrive() {
-    if (!drive) {
-        // If GOOGLE_APPLICATION_CREDENTIALS is set, let GoogleAuth handle it automatically
-        if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-            console.log(`[getDrive] Using GOOGLE_APPLICATION_CREDENTIALS: ${process.env.GOOGLE_APPLICATION_CREDENTIALS}`);
-            if (!fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS)) {
-                console.error(`[getDrive] ERROR: Credential file does not exist at ${process.env.GOOGLE_APPLICATION_CREDENTIALS}`);
-            }
-            const auth = new google.auth.GoogleAuth({
-                scopes: ['https://www.googleapis.com/auth/drive'],
-            });
-            drive = google.drive({ version: 'v3', auth });
-            return drive;
-        }
-
-        // Fallback to local file (Dev mode)
-        if (!fs.existsSync(SERVICE_ACCOUNT_PATH)) {
-            throw new Error(`Service account file not found at ${SERVICE_ACCOUNT_PATH}`);
-        }
-        const auth = new google.auth.GoogleAuth({
-            keyFile: SERVICE_ACCOUNT_PATH,
-            scopes: ['https://www.googleapis.com/auth/drive'],
-        });
-        drive = google.drive({ version: 'v3', auth });
-    }
-    return drive;
+    return getDriveClient();
 }
 
 // Types
@@ -737,13 +714,6 @@ export async function recordGradingResults(results: GradingResult[]) {
 export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: string[]) {
     if (cpIdsToCheck.length === 0) return;
 
-    // Fetch unlocked CoreProblems for this user to check accessibility
-    const unlockedStates = await prisma.userCoreProblemState.findMany({
-        where: { userId, isUnlocked: true },
-        select: { coreProblemId: true }
-    });
-    const unlockedCpIds = new Set(unlockedStates.map(s => s.coreProblemId));
-
     // Fetch CP Details (Total Count & Next CP Candidate)
     const cpDetails = await prisma.coreProblem.findMany({
         where: { id: { in: cpIdsToCheck } },
@@ -761,6 +731,20 @@ export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: strin
             }
         }
     });
+
+    if (cpDetails.length === 0) return;
+
+    // Determine involved Subjects
+    const subjectIds = new Set(cpDetails.map(cp => cp.subjectId));
+
+    // Fetch Unlocked CPs for these subjects
+    const { getUnlockedCoreProblemIds } = await import('@/lib/progression');
+    const unlockedCpIds = new Set<string>();
+
+    for (const sid of subjectIds) {
+        const ids = await getUnlockedCoreProblemIds(userId, sid);
+        ids.forEach(id => unlockedCpIds.add(id));
+    }
 
     // Loop through each checked CP
     for (const cp of cpDetails) {

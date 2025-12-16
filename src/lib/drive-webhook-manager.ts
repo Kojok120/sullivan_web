@@ -1,19 +1,9 @@
-import { google } from 'googleapis';
-import path from 'path';
-import fs from 'fs';
+import { getDriveClient } from '@/lib/drive-client';
 
-const SERVICE_ACCOUNT_PATH = path.join(process.cwd(), 'service-account.json');
 const DRIVE_FOLDER_ID = process.env.DRIVE_FOLDER_ID || '';
 
 function getDrive() {
-    if (!fs.existsSync(SERVICE_ACCOUNT_PATH)) {
-        throw new Error(`Service account file not found at ${SERVICE_ACCOUNT_PATH}`);
-    }
-    const auth = new google.auth.GoogleAuth({
-        keyFile: SERVICE_ACCOUNT_PATH,
-        scopes: ['https://www.googleapis.com/auth/drive'],
-    });
-    return google.drive({ version: 'v3', auth });
+    return getDriveClient();
 }
 
 export async function watchDriveFolder(webhookUrl: string): Promise<{ resourceId: string; channelId: string; expiration: string }> {
