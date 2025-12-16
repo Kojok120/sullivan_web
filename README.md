@@ -6,10 +6,11 @@
 
 ## System Requirements (New)
 
-- Node.js 18+
+- Node.js 18+ (Next.js 16, React 19)
 - PostgreSQL
 - **Python 3** (Required for QR Code processing)
   - `pip3 install opencv-python`
+- **Upstash QStash** (For background job processing)
 
 ## アプリケーション概要
 
