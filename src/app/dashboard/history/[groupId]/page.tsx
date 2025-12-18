@@ -26,7 +26,7 @@ export default async function SessionDetailsPage({ params }: { params: Promise<{
     return (
         <div className="container mx-auto py-8 px-4 max-w-4xl">
             <div className="mb-6 flex items-center space-x-4">
-                <Link href="/dashboard">
+                <Link href="/">
                     <Button variant="ghost" size="icon">
                         <ArrowLeft className="h-4 w-4" />
                     </Button>

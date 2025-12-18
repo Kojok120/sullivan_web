@@ -28,6 +28,15 @@ export async function markVideoWatched(historyId: string) {
         data: { isVideoWatched: true },
     });
 
-    // Revalidate relevant paths if needed, e.g. dashboard
     // revalidatePath('/dashboard');
 }
+
+import { getLearningSessions } from "@/lib/analytics";
+
+export async function fetchMySessions(offset: number, limit: number) {
+    const session = await getSession();
+    if (!session) throw new Error("Unauthorized");
+
+    return await getLearningSessions(session.userId, limit, offset);
+}
+
