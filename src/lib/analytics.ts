@@ -385,7 +385,7 @@ export type LearningSession = {
 };
 
 // Group history by groupId
-export async function getLearningSessions(userId: string, limit = 10): Promise<LearningSession[]> {
+export async function getLearningSessions(userId: string, limit = 10, offset = 0): Promise<LearningSession[]> {
     // We can't easily group by groupId and join relations in Prisma (it requires raw SQL or post-processing).
     // Let's use Raw SQL for performance grouping.
 
@@ -413,6 +413,7 @@ export async function getLearningSessions(userId: string, limit = 10): Promise<L
         GROUP BY lh."groupId"
         ORDER BY "date" DESC
         LIMIT ${limit}
+        OFFSET ${offset}
     `;
 
     return sessions.map(s => ({
