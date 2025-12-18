@@ -70,38 +70,7 @@ export async function createClassroom(formData: FormData) {
     }
 }
 
-export async function updateClassroom(id: string, formData: FormData) {
-    const session = await getSession();
-    if (!session || session.role !== 'ADMIN') {
-        return { error: 'Unauthorized' };
-    }
-
-    const name = formData.get('name') as string;
-    const groupsStr = formData.get('groups') as string;
-
-    if (!name || name.trim() === '') {
-        return { error: '教室名は必須です' };
-    }
-
-    const groups = groupsStr
-        ? groupsStr.split(',').map(g => g.trim()).filter(g => g !== '')
-        : [];
-
-    try {
-        await prisma.classroom.update({
-            where: { id },
-            data: {
-                name: name.trim(),
-                groups: groups,
-            },
-        });
-        revalidatePath('/admin/classrooms');
-        return { success: true };
-    } catch (error) {
-        console.error('Failed to update classroom:', error);
-        return { error: '教室の更新に失敗しました' };
-    }
-}
+// updateClassroom was removed as it was unused - updateClassroomGroups is used instead
 
 export async function deleteClassroom(classroomId: string) {
     const session = await getSession();

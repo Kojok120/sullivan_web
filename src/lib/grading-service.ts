@@ -7,8 +7,19 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { calculateCoreProblemStatus } from '@/lib/progression';
-import { calculateNewPriority } from '@/lib/priority-algo';
 import { serverEvents, EVENTS } from '@/lib/server-events';
+
+// Priority adjustment logic (inlined from removed priority-algo.ts)
+type Evaluation = "A" | "B" | "C" | "D";
+function calculateNewPriority(currentPriority: number, evaluation: Evaluation): number {
+    const adjustments: Record<Evaluation, number> = {
+        A: -10,  // Correct: Lower priority
+        B: -5,   // Mostly correct: Slightly lower
+        C: 5,    // Incorrect: Higher priority
+        D: 10,   // Very wrong: Much higher priority
+    };
+    return currentPriority + adjustments[evaluation];
+}
 
 // Configuration
 import { getDriveClient } from '@/lib/drive-client';

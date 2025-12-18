@@ -33,6 +33,11 @@ export async function watchDriveFolder(webhookUrl: string): Promise<{ resourceId
     };
 }
 
+// TODO: This function is currently not called from application code.
+// It should be integrated into:
+// 1. A cleanup cron job to stop expired/unused watch channels
+// 2. Admin UI to manually stop watching
+// Without proper stopWatching calls, Drive watch channels may accumulate.
 export async function stopWatching(channelId: string, resourceId: string) {
     const drive = getDrive();
     await drive.channels.stop({

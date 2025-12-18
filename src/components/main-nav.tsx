@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
+import SullivanLogo from "@/assets/Sullivan-Logo.jpg";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { LogOut, BookOpen } from "lucide-react";
@@ -19,8 +21,16 @@ export function MainNav({ role }: { role?: string }) {
             <div className="container flex h-14 items-center justify-between">
                 <div className="flex items-center gap-6">
                     <Link href={role === 'TEACHER' ? "/teacher" : "/"} className="flex items-center space-x-2">
-                        <BookOpen className="h-6 w-6" />
-                        <span className="font-bold">Sullivan Learning</span>
+                        <div className="relative h-10 w-40">
+                            <Image
+                                src={SullivanLogo}
+                                alt="Sullivan Learning"
+                                fill
+                                className="object-contain object-left"
+                                priority
+                                placeholder="blur"
+                            />
+                        </div>
                     </Link>
                     <nav className="flex items-center gap-4 text-sm font-medium">
                         {role !== 'TEACHER' && (

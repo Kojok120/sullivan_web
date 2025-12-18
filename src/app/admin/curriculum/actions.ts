@@ -275,15 +275,8 @@ export async function bulkCreateProblems(subjectId: string, problems: {
 
         if (!subject) throw new Error('Subject not found');
 
-        const { getSubjectPrefix, getMaxCustomIdNumber } = await import('@/lib/curriculum-service');
+        const { getNextCustomId } = await import('@/lib/curriculum-service');
 
-        // Generate Custom ID Prefix
-        const prefix = getSubjectPrefix(subject.name);
-
-        // Fetch MAX number
-        const maxNum = await getMaxCustomIdNumber(prefix);
-
-        let nextNum = maxNum;
         let createdCount = 0;
         const warnings: string[] = [];
 
@@ -297,6 +290,13 @@ export async function bulkCreateProblems(subjectId: string, problems: {
         });
         const existingMap = new Map(existingProblems.map(p => [p.question, p.customId]));
 
+        // Get initial order for new problems
+        const lastProblem = await prisma.problem.findFirst({
+            orderBy: { order: 'desc' },
+            select: { order: true }
+        });
+        let nextOrder = (lastProblem?.order ?? 0) + 1;
+
         await prisma.$transaction(async (tx) => {
             for (const p of problems) {
                 if (existingMap.has(p.question)) {
@@ -304,22 +304,8 @@ export async function bulkCreateProblems(subjectId: string, problems: {
                     continue;
                 }
 
-                nextNum++;
-                const customId = `${prefix}-${nextNum}`;
-
-                // Determine Order: Max order of FIRST CoreProblem?
-                // Or just append?
-                // Order is per CoreProblem via Many-to-Many?
-                // Actually `Problem` table has `order` column.
-                // If a problem belongs to multiple CPs, it has ONE order val?
-                // This implies `order` is global or somewhat ambiguous in M2M.
-                // Ideally `order` should be on the relation table `_CoreProblemToProblem`.
-                // But Prisma implicit M2M doesn't expose that easily.
-                // The schema has `order Int` on `Problem`.
-                // This means the problem has a fixed order, likely relative to other problems in the SAME subject?
-                // Or relative to the CP?
-                // Attempting to maintain order per CP is impossible with single `order` column on `Problem` if shared.
-                // We will set order = currentCount (global for subject roughly) or just increment.
+                // Use unified getNextCustomId for consistent ID generation
+                const customId = await getNextCustomId(subjectId, tx);
 
                 await tx.problem.create({
                     data: {
@@ -329,7 +315,7 @@ export async function bulkCreateProblems(subjectId: string, problems: {
                         grade: p.grade,
                         acceptedAnswers: p.acceptedAnswers || [],
                         customId: customId,
-                        order: nextNum, // Simple increment
+                        order: nextOrder++,
                         coreProblems: {
                             connect: p.coreProblemIds.map(id => ({ id }))
                         }

@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
+import SullivanLogo from "@/assets/Sullivan-Logo.jpg";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -60,9 +62,16 @@ export function AdminNav({ isCollapsed = false, onToggle }: AdminNavProps) {
         )}>
             <div className={cn("flex items-center p-4", isCollapsed ? "justify-center" : "justify-between")}>
                 {!isCollapsed && (
-                    <h2 className="text-lg font-semibold tracking-tight truncate">
-                        Sullivan Admin
-                    </h2>
+                    <div className="relative h-10 w-40">
+                        <Image
+                            src={SullivanLogo}
+                            alt="Sullivan Admin"
+                            fill
+                            className="object-contain object-left"
+                            priority
+                            placeholder="blur"
+                        />
+                    </div>
                 )}
                 {onToggle && (
                     <Button variant="ghost" size="icon" onClick={onToggle} className="h-8 w-8">
