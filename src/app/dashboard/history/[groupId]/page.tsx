@@ -23,6 +23,14 @@ export default async function SessionDetailsPage({ params }: { params: Promise<{
     const subjectName = firstItem.problem.coreProblems[0]?.subject.name || '教科不明';
     const date = firstItem.answeredAt.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) + ' ' + firstItem.answeredAt.toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo' });
 
+    const requiredVideos = details
+        .filter(d => (d.evaluation === 'C' || d.evaluation === 'D') && d.problem.videoUrl) // C/D are mapped to "destructive" badge usually, or checking !A/B
+        .map(d => ({
+            historyId: d.id,
+            videoUrl: d.problem.videoUrl!,
+            question: d.problem.question
+        }));
+
     return (
         <div className="container mx-auto py-8 px-4 max-w-4xl">
             <div className="mb-6 flex items-center space-x-4">
@@ -91,6 +99,7 @@ export default async function SessionDetailsPage({ params }: { params: Promise<{
                                             historyId={item.id}
                                             isWatched={item.isVideoWatched}
                                             isRequired={!isCorrect}
+                                            playlist={!isCorrect ? requiredVideos : undefined}
                                         />
                                     </div>
                                 )}

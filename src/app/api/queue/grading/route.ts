@@ -24,6 +24,10 @@ async function handler(req: NextRequest) {
     }
 }
 
-// QStash署名検証を有効化
+// QStash署名検証を有効化（ビルド時にはenv varsがないため条件付き）
 // QSTASH_CURRENT_SIGNING_KEY と QSTASH_NEXT_SIGNING_KEY が必要
-export const POST = verifySignatureAppRouter(handler);
+const hasQStashKeys = process.env.QSTASH_CURRENT_SIGNING_KEY && process.env.QSTASH_NEXT_SIGNING_KEY;
+
+export const POST = hasQStashKeys
+    ? verifySignatureAppRouter(handler)
+    : handler;
