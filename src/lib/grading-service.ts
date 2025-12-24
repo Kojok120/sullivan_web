@@ -740,8 +740,7 @@ export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: strin
 
     if (cpDetails.length === 0) return;
 
-    // Determine involved Subjects
-    const subjectIds = new Set(cpDetails.map(cp => cp.subjectId));
+
 
     // === OPTIMIZATION: Batch fetch all user states upfront ===
 
@@ -772,13 +771,15 @@ export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: strin
     const unlockedCpIds = new Set(allUnlockedCpStates.map(s => s.coreProblemId));
 
     // 3. Ensure first CP of each subject is unlocked
-    const firstCpsPerSubject = await prisma.coreProblem.findMany({
-        where: { subjectId: { in: Array.from(subjectIds) } },
-        orderBy: { order: 'asc' },
-        distinct: ['subjectId'],
-        select: { id: true }
+    // Optimization: We already have the subject struct with sorted coreProblems in cpDetails
+    // We can just extract the first CP from each unique subject present in cpDetails.
+    const firstCpIds = new Set<string>();
+    cpDetails.forEach(cp => {
+        if (cp.subject && cp.subject.coreProblems && cp.subject.coreProblems.length > 0) {
+            firstCpIds.add(cp.subject.coreProblems[0].id);
+        }
     });
-    firstCpsPerSubject.forEach(cp => unlockedCpIds.add(cp.id));
+    firstCpIds.forEach(id => unlockedCpIds.add(id));
 
     // === END OPTIMIZATION ===
 

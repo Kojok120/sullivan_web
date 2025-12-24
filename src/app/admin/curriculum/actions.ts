@@ -167,10 +167,7 @@ export async function createProblem(data: {
 
     videoUrl?: string;
     acceptedAnswers?: string[];
-    difficulty?: number; // Removed from schema but kept in args? No, schema removed it.
     grade?: string;
-    tags?: string[]; // Removed from schema
-    attributes?: any; // Removed from schema
 }) {
     await requireAdmin();
     try {
@@ -218,7 +215,6 @@ export async function updateProblem(id: string, data: {
     videoUrl?: string;
     acceptedAnswers?: string[];
     grade?: string;
-    // Removed difficulty, tags, attributes
 }) {
     await requireAdmin();
     try {

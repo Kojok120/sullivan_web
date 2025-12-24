@@ -18,6 +18,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { RoleBadge } from '@/components/ui/role-badge';
 
 interface User {
     id: string;
@@ -172,13 +173,7 @@ export function ClassroomDetail({ classroom }: { classroom: Classroom }) {
                                             <TableCell className="font-medium">{user.loginId}</TableCell>
                                             <TableCell>{user.name || '-'}</TableCell>
                                             <TableCell>
-                                                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${user.role === 'ADMIN' ? 'bg-red-100 text-red-800' :
-                                                        user.role === 'TEACHER' ? 'bg-purple-100 text-purple-800' :
-                                                            user.role === 'PARENT' ? 'bg-green-100 text-green-800' :
-                                                                'bg-blue-100 text-blue-800'
-                                                    }`}>
-                                                    {user.role}
-                                                </span>
+                                                <RoleBadge role={user.role} />
                                             </TableCell>
                                             <TableCell>
                                                 {user.group ? (

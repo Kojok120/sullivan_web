@@ -13,14 +13,6 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
@@ -39,7 +31,6 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -49,6 +40,9 @@ import {
 } from '@/components/ui/select';
 import { MoreHorizontal, Plus, Pencil, Trash2, Loader2, ArrowUpDown, Filter } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { UserFormDialog } from './user-form-dialog';
+import { RoleBadge } from '@/components/ui/role-badge';
+import { DateDisplay } from '@/components/ui/date-display';
 
 type UserWithGroup = User; // Group is now just a string field on User
 
@@ -92,15 +86,6 @@ export function UserList({
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState<UserWithGroup | null>(null);
-
-    // Form states
-    const [formData, setFormData] = useState({
-        name: '',
-        role: 'STUDENT' as Role,
-        password: '',
-        groupId: '',
-        classroomId: '',
-    });
 
     // Search state
     const [search, setSearch] = useState(searchQuery);
@@ -152,48 +137,6 @@ export function UserList({
         updateParams({ page: newPage.toString() });
     };
 
-    const handleAddUser = async () => {
-        startTransition(async () => {
-            const result = await createUser({
-                name: formData.name,
-                role: formData.role,
-                password: formData.password || undefined,
-                group: formData.groupId || undefined,
-                classroomId: formData.classroomId || undefined,
-            });
-
-            if (result.success) {
-                setIsAddOpen(false);
-                setFormData({ name: '', role: 'STUDENT', password: '', groupId: '', classroomId: '' });
-                router.refresh();
-            } else {
-                alert(result.error);
-            }
-        });
-    };
-
-    const handleEditUser = async () => {
-        if (!selectedUser) return;
-        startTransition(async () => {
-            const result = await updateUser(selectedUser.id, {
-                name: formData.name,
-                role: formData.role,
-                password: formData.password || undefined,
-                group: formData.groupId || undefined,
-                classroomId: formData.classroomId || undefined,
-            });
-
-            if (result.success) {
-                setIsEditOpen(false);
-                setSelectedUser(null);
-                setFormData({ name: '', role: 'STUDENT', password: '', groupId: '', classroomId: '' });
-                router.refresh();
-            } else {
-                alert(result.error);
-            }
-        });
-    };
-
     const handleDeleteUser = async () => {
         if (!selectedUser) return;
         startTransition(async () => {
@@ -210,13 +153,6 @@ export function UserList({
 
     const openEdit = (user: UserWithGroup) => {
         setSelectedUser(user);
-        setFormData({
-            name: user.name || '',
-            role: user.role,
-            password: '',
-            groupId: user.group || '',
-            classroomId: user.classroomId || '',
-        });
         setIsEditOpen(true);
     };
 
@@ -326,16 +262,12 @@ export function UserList({
                                 <TableCell className="font-medium">{user.loginId}</TableCell>
                                 <TableCell>{user.name}</TableCell>
                                 <TableCell>
-                                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${user.role === 'ADMIN' ? 'bg-red-100 text-red-800' :
-                                        user.role === 'TEACHER' ? 'bg-purple-100 text-purple-800' :
-                                            user.role === 'PARENT' ? 'bg-green-100 text-green-800' :
-                                                'bg-blue-100 text-blue-800'
-                                        }`}>
-                                        {user.role}
-                                    </span>
+                                    <RoleBadge role={user.role} />
                                 </TableCell>
                                 <TableCell>{user.group || '-'}</TableCell>
-                                <TableCell>{new Date(user.createdAt).toLocaleDateString()}</TableCell>
+                                <TableCell>
+                                    <DateDisplay date={user.createdAt} />
+                                </TableCell>
                                 <TableCell className="text-right">
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
@@ -387,217 +319,25 @@ export function UserList({
                 </div>
             )}
 
-            {/* Add User Dialog */}
-            <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>新規ユーザー作成</DialogTitle>
-                        <DialogDescription>
-                            新しいユーザーアカウントを作成します。ログインIDは自動生成されます。
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="name" className="text-right">
-                                名前
-                            </Label>
-                            <Input
-                                id="name"
-                                value={formData.name}
-                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                className="col-span-3"
-                            />
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="role" className="text-right">
-                                役割
-                            </Label>
-                            <Select
-                                value={formData.role}
-                                onValueChange={(value: Role) => setFormData({ ...formData, role: value })}
-                            >
-                                <SelectTrigger className="col-span-3">
-                                    <SelectValue placeholder="役割を選択" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="STUDENT">生徒 (Student)</SelectItem>
-                                    <SelectItem value="TEACHER">講師 (Teacher)</SelectItem>
-                                    <SelectItem value="PARENT">保護者 (Parent)</SelectItem>
-                                    <SelectItem value="ADMIN">管理者 (Admin)</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="password" className="text-right">
-                                パスワード
-                            </Label>
-                            <Input
-                                id="password"
-                                type="password"
-                                placeholder="未入力で 'password123'"
-                                value={formData.password}
-                                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                className="col-span-3"
-                            />
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="classroomId" className="text-right">
-                                教室
-                            </Label>
-                            <Select
-                                value={formData.classroomId}
-                                onValueChange={(value) => setFormData({ ...formData, classroomId: value })}
-                            >
-                                <SelectTrigger className="col-span-3">
-                                    <SelectValue placeholder="教室を選択 (任意)" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value=" ">なし</SelectItem>
-                                    {classrooms.map((c) => (
-                                        <SelectItem key={c.id} value={c.id}>
-                                            {c.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="groupId" className="text-right">
-                                グループ
-                            </Label>
-                            <Select
-                                value={formData.groupId}
-                                onValueChange={(value) => setFormData({ ...formData, groupId: value })}
-                            >
-                                <SelectTrigger className="col-span-3">
-                                    <SelectValue placeholder="グループを選択 (任意)" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value=" ">なし</SelectItem>
-                                    {groups.map((group) => (
-                                        <SelectItem key={group.id} value={group.id}>
-                                            {group.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsAddOpen(false)}>キャンセル</Button>
-                        <Button onClick={handleAddUser} disabled={isPending}>
-                            {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            作成
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            {/* User Form Dialogs using Shared Component */}
+            <UserFormDialog
+                open={isAddOpen}
+                onOpenChange={setIsAddOpen}
+                mode="create"
+                groups={groups}
+                classrooms={classrooms}
+                onSuccess={() => router.refresh()}
+            />
 
-            {/* Edit User Dialog */}
-            <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>ユーザー編集</DialogTitle>
-                        <DialogDescription>
-                            ユーザー情報を更新します。パスワードは変更する場合のみ入力してください。
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="edit-name" className="text-right">
-                                名前
-                            </Label>
-                            <Input
-                                id="edit-name"
-                                value={formData.name}
-                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                className="col-span-3"
-                            />
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="edit-role" className="text-right">
-                                役割
-                            </Label>
-                            <Select
-                                value={formData.role}
-                                onValueChange={(value: Role) => setFormData({ ...formData, role: value })}
-                            >
-                                <SelectTrigger className="col-span-3">
-                                    <SelectValue placeholder="役割を選択" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="STUDENT">生徒 (Student)</SelectItem>
-                                    <SelectItem value="TEACHER">講師 (Teacher)</SelectItem>
-                                    <SelectItem value="PARENT">保護者 (Parent)</SelectItem>
-                                    <SelectItem value="ADMIN">管理者 (Admin)</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="edit-password" className="text-right">
-                                パスワード
-                            </Label>
-                            <Input
-                                id="edit-password"
-                                type="password"
-                                placeholder="変更しない場合は空欄"
-                                value={formData.password}
-                                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                className="col-span-3"
-                            />
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="edit-classroomId" className="text-right">
-                                教室
-                            </Label>
-                            <Select
-                                value={formData.classroomId}
-                                onValueChange={(value) => setFormData({ ...formData, classroomId: value })}
-                            >
-                                <SelectTrigger className="col-span-3">
-                                    <SelectValue placeholder="教室を選択 (任意)" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value=" ">なし</SelectItem>
-                                    {classrooms.map((c) => (
-                                        <SelectItem key={c.id} value={c.id}>
-                                            {c.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="edit-groupId" className="text-right">
-                                グループ
-                            </Label>
-                            <Select
-                                value={formData.groupId}
-                                onValueChange={(value) => setFormData({ ...formData, groupId: value })}
-                            >
-                                <SelectTrigger className="col-span-3">
-                                    <SelectValue placeholder="グループを選択 (任意)" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value=" ">なし</SelectItem>
-                                    {groups.map((group) => (
-                                        <SelectItem key={group.id} value={group.id}>
-                                            {group.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsEditOpen(false)}>キャンセル</Button>
-                        <Button onClick={handleEditUser} disabled={isPending}>
-                            {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            更新
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            <UserFormDialog
+                open={isEditOpen}
+                onOpenChange={setIsEditOpen}
+                mode="edit"
+                user={selectedUser}
+                groups={groups}
+                classrooms={classrooms}
+                onSuccess={() => router.refresh()}
+            />
 
             {/* Delete Confirmation Dialog */}
             <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>

@@ -5,6 +5,7 @@ import { HistoryFilter } from './filter';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, FileText } from 'lucide-react';
 import Link from 'next/link';
+import { DateDisplay } from '@/components/ui/date-display';
 
 export default async function HistoryPage({
     searchParams,
@@ -81,8 +82,7 @@ export default async function HistoryPage({
                                 history.items.map((item) => (
                                     <tr key={item.id} className="border-b hover:bg-gray-50">
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            {item.answeredAt.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })} <br />
-                                            <span className="text-gray-400 text-xs">{item.answeredAt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })}</span>
+                                            <DateDisplay date={item.answeredAt} showTime />
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="font-medium">

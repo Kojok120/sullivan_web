@@ -1,24 +1,5 @@
-import { SignJWT, jwtVerify } from 'jose';
-import { cookies } from 'next/headers';
-import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
 import * as bcrypt from 'bcryptjs';
-
-const ALG = 'HS256';
-
-function getSecretKey() {
-    const secretKey = process.env.JWT_SECRET;
-    if (!secretKey) {
-        // During build time (static generation), this might be called if pages use auth logic.
-        // However, we shouldn't throw if we can avoid it, or throw only when actually needed.
-        if (process.env.NODE_ENV === 'production' && process.env.NEXT_PHASE === 'phase-production-build') {
-            return new TextEncoder().encode('build-time-secret');
-        }
-        // Fallback for strictness at runtime
-        throw new Error('JWT_SECRET is not defined in environment variables');
-    }
-    return new TextEncoder().encode(secretKey);
-}
-
 
 export type SessionPayload = {
     userId: string;
@@ -26,54 +7,29 @@ export type SessionPayload = {
     name: string;
 };
 
-export async function encrypt(payload: SessionPayload) {
-    return await new SignJWT(payload)
-        .setProtectedHeader({ alg: ALG })
-        .setIssuedAt()
-        .setExpirationTime('7d') // Session lasts 7 days
-        .sign(getSecretKey());
-}
+// Deprecated functions (encrypt, decrypt, login) removed
 
-export async function decrypt(input: string): Promise<SessionPayload | null> {
-    try {
-        const { payload } = await jwtVerify(input, getSecretKey(), {
-            algorithms: [ALG],
-        });
-        return payload as SessionPayload;
-    } catch (error) {
-        return null;
-    }
-}
-
-export async function login(payload: SessionPayload) {
-    const session = await encrypt(payload);
-    const cookieStore = await cookies();
-
-    cookieStore.set('session', session, {
-        httpOnly: true,
-        secure: true,
-        sameSite: 'lax',
-        path: '/',
-        expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    });
-}
 
 export async function logout() {
-    const cookieStore = await cookies();
-    cookieStore.set('session', '', {
-        httpOnly: true,
-        secure: true,
-        sameSite: 'lax',
-        path: '/',
-        expires: new Date(0),
-    });
+    const supabase = await createClient();
+    await supabase.auth.signOut();
 }
 
 export async function getSession(): Promise<SessionPayload | null> {
-    const cookieStore = await cookies();
-    const session = cookieStore.get('session')?.value;
-    if (!session) return null;
-    return await decrypt(session);
+    try {
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+
+        if (!user) return null;
+
+        return {
+            userId: user.user_metadata.prismaUserId || user.id, // Fallback to user.id (UUID) only if metadata is missing, but should be prismaUserId (CUID)
+            role: user.user_metadata.role || 'STUDENT',
+            name: user.user_metadata.name || '',
+        };
+    } catch (error) {
+        return null;
+    }
 }
 
 export async function requireAdmin() {

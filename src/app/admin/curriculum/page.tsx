@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { getSubjects } from './actions';
 import { CurriculumManager } from './curriculum-manager';
 

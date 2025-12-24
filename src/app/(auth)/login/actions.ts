@@ -1,7 +1,7 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import { login, verifyPassword } from '@/lib/auth';
+// Removed unused imports
 import { redirect } from 'next/navigation';
 
 import { z } from 'zod';
@@ -24,24 +24,26 @@ export async function loginAction(prevState: any, formData: FormData) {
     }
 
     const { loginId, password } = result.data;
+    const email = `${loginId}@sullivan-internal.local`;
 
-    const user = await prisma.user.findUnique({
-        where: { loginId },
+    const { createClient } = await import('@/lib/supabase/server');
+    const supabase = await createClient();
+
+    const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
     });
 
-    if (!user || !(await verifyPassword(password, user.password))) {
+    if (error) {
         return { error: 'IDまたはパスワードが間違っています' };
     }
 
-    await login({
-        userId: user.id,
-        name: user.name || '',
-        role: user.role,
-    });
+    const { data: { user } } = await supabase.auth.getUser();
+    const role = user?.user_metadata?.role;
 
-    if (user.role === 'ADMIN') {
+    if (role === 'ADMIN') {
         redirect('/admin');
-    } else if (user.role === 'TEACHER') {
+    } else if (role === 'TEACHER') {
         redirect('/teacher');
     } else {
         redirect('/');

@@ -1,11 +1,9 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { decrypt } from './lib/auth';
+import { updateSession } from '@/lib/supabase/middleware';
 
 export async function middleware(request: NextRequest) {
-    const cookie = request.cookies.get('session')?.value;
-    const session = cookie ? await decrypt(cookie) : null;
-
+    const { supabaseResponse, user } = await updateSession(request);
 
     // Paths that don't require authentication
     const publicPaths = ['/login', '/signup'];
@@ -13,29 +11,29 @@ export async function middleware(request: NextRequest) {
 
     // Admin routes check - must be authenticated AND have ADMIN role
     if (request.nextUrl.pathname.startsWith('/admin')) {
-        if (!session || session.role !== 'ADMIN') {
+        if (!user || user.user_metadata?.role !== 'ADMIN') {
             return NextResponse.redirect(new URL('/', request.url));
         }
-        return NextResponse.next();
+        return supabaseResponse;
     }
 
     // Teacher routes check - must be authenticated AND have TEACHER or ADMIN role
     if (request.nextUrl.pathname.startsWith('/teacher')) {
-        if (!session || (session.role !== 'TEACHER' && session.role !== 'ADMIN')) {
+        if (!user || (user.user_metadata?.role !== 'TEACHER' && user.user_metadata?.role !== 'ADMIN')) {
             return NextResponse.redirect(new URL('/', request.url));
         }
-        return NextResponse.next();
+        return supabaseResponse;
     }
 
-    if (!session && !isPublicPath) {
+    if (!user && !isPublicPath) {
         return NextResponse.redirect(new URL('/login', request.url));
     }
 
-    if (session && isPublicPath) {
+    if (user && isPublicPath) {
         return NextResponse.redirect(new URL('/', request.url));
     }
 
-    return NextResponse.next();
+    return supabaseResponse;
 }
 
 export const config = {

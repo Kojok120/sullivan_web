@@ -7,6 +7,7 @@ import { ArrowRight, BookOpen } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { useState } from 'react';
 import { fetchMySessions } from '@/app/actions';
+import { DateDisplay } from '@/components/ui/date-display';
 
 export function SessionListClient({ initialSessions }: { initialSessions: LearningSession[] }) {
     const [sessions, setSessions] = useState<LearningSession[]>(initialSessions);
@@ -53,7 +54,7 @@ export function SessionListClient({ initialSessions }: { initialSessions: Learni
                                         {session.subjectName}
                                     </CardTitle>
                                     <div className="text-sm text-muted-foreground">
-                                        {new Date(session.date).toLocaleDateString('ja-JP')} • {new Date(session.date).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
+                                        <DateDisplay date={session.date} showTime />
                                     </div>
                                 </div>
                             </div>

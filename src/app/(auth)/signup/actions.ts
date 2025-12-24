@@ -35,6 +35,32 @@ export async function signupAction(prevState: any, formData: FormData) {
             password,
             role, // Use the role selected in UI
         });
+
+        // 4. Register in Supabase
+        const { createClient } = await import('@/lib/supabase/server');
+        const supabase = await createClient();
+        const email = `${user.loginId}@sullivan-internal.local`;
+
+        const { error: supabaseError } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+                data: {
+                    role,
+                    loginId: user.loginId,
+                    name: user.name,
+                    prismaUserId: user.id,
+                },
+            },
+        });
+
+        if (supabaseError) {
+            // Rollback: Delete Prisma user if Supabase registration fails
+            await prisma.user.delete({ where: { id: user.id } });
+            console.error('Supabase registration failed:', supabaseError);
+            return { error: 'アカウント作成に失敗しました(Auth)。' };
+        }
+
         return { success: true, loginId: user.loginId };
     } catch (error) {
         console.error(error);

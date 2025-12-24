@@ -30,6 +30,28 @@ type ParsedProblem = {
 };
 
 export function ProblemBulkImport({ coreProblems, subjectId }: ProblemBulkImportProps) {
+    // Helper for validation
+    const validateRow = (row: ParsedProblem, cpNameMap: Map<string, string>): ParsedProblem => {
+        const cpNames = row.coreProblemNames;
+        // Ensure cpNames is array
+        const safeCpNames = Array.isArray(cpNames) ? cpNames : [];
+
+        const missingCps = safeCpNames.filter(name => !cpNameMap.has(name));
+        let status: 'valid' | 'error' = 'valid';
+        let message = '';
+
+        if (missingCps.length > 0) {
+            status = 'error';
+            message = `CoreProblemが見つかりません: ${missingCps.join(', ')}`;
+        }
+        if (!row.question || !row.answer) {
+            status = 'error';
+            message = message ? `${message}, 必須項目（問題・正答）が不足しています` : '必須項目（問題・正答）が不足しています';
+        }
+
+        return { ...row, status, message };
+    };
+
     const [isOpen, setIsOpen] = useState(false);
     const [rawText, setRawText] = useState('');
     const [parsedData, setParsedData] = useState<ParsedProblem[]>([]);
@@ -95,30 +117,17 @@ export function ProblemBulkImport({ coreProblems, subjectId }: ProblemBulkImport
             const cpNames = cpRaw.split(/[,\n]+/).map(s => s.trim()).filter(Boolean);
             const acceptedAnswers = acceptedRaw.split(/[,、]+/).map(s => s.trim()).filter(Boolean);
 
-            // Validation
-            const missingCps = cpNames.filter(name => !cpNameMap.has(name));
-            let status: 'valid' | 'error' = 'valid';
-            let message = '';
-
-            if (missingCps.length > 0) {
-                status = 'error';
-                message = `CoreProblemが見つかりません: ${missingCps.join(', ')}`;
-            }
-            if (!question || !answer) {
-                status = 'error';
-                message = message ? `${message}, 必須項目（問題・正答）が不足しています` : '必須項目（問題・正答）が不足しています';
-            }
-
-            return {
+            const row: ParsedProblem = {
                 grade,
                 coreProblemNames: cpNames,
                 question,
                 answer,
                 acceptedAnswers,
                 videoUrl,
-                status,
-                message
+                status: 'valid', // Temp, will validte below
             };
+
+            return validateRow(row, cpNameMap);
         }).filter(Boolean) as ParsedProblem[];
     };
 
@@ -192,28 +201,11 @@ export function ProblemBulkImport({ coreProblems, subjectId }: ProblemBulkImport
 
     const updateCell = (index: number, field: keyof ParsedProblem, value: any) => {
         const newData = [...parsedData];
-        const row = { ...newData[index], [field]: value };
+        let row = { ...newData[index], [field]: value };
 
-        // Re-validate if coreProblemNames or required fields changed
+        // Re-validate if check fields changed
         if (field === 'coreProblemNames' || field === 'question' || field === 'answer') {
-            const cpNames = field === 'coreProblemNames' ? value as string[] : row.coreProblemNames;
-            // Ensure cpNames is array
-            const safeCpNames = Array.isArray(cpNames) ? cpNames : [];
-
-            const missingCps = safeCpNames.filter(name => !cpNameMap.has(name));
-            let status: 'valid' | 'error' = 'valid';
-            let message = '';
-
-            if (missingCps.length > 0) {
-                status = 'error';
-                message = `CoreProblemが見つかりません: ${missingCps.join(', ')}`;
-            }
-            if (!row.question || !row.answer) {
-                status = 'error';
-                message = message ? `${message}, 必須項目（問題・正答）が不足しています` : '必須項目（問題・正答）が不足しています';
-            }
-            row.status = status;
-            row.message = message;
+            row = validateRow(row, cpNameMap);
         }
 
         newData[index] = row;

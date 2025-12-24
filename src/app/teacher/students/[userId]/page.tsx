@@ -13,6 +13,7 @@ import { ActivityChart } from '@/app/dashboard/activity-chart';
 import { ProfileCard } from './profile-card';
 import { GuidanceList } from './guidance-list';
 import { PrintProblemCard } from './print-problem-card';
+import { DateDisplay } from '@/components/ui/date-display';
 
 export default async function TeacherStudentDetailPage({
     params,
@@ -102,10 +103,10 @@ export default async function TeacherStudentDetailPage({
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold">
-                                    {stats.lastActivity ? new Date(stats.lastActivity).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '-'}
+                                    {stats.lastActivity ? <DateDisplay date={stats.lastActivity} /> : '-'}
                                 </div>
                                 <p className="text-xs text-muted-foreground">
-                                    {stats.lastActivity ? new Date(stats.lastActivity).toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo' }) : ''}
+                                    {stats.lastActivity ? <DateDisplay date={stats.lastActivity} showTime /> : ''}
                                 </p>
                             </CardContent>
                         </Card>
@@ -198,7 +199,7 @@ export default async function TeacherStudentDetailPage({
                                                 </span>
                                             </div>
                                             <div className="text-xs text-muted-foreground">
-                                                {new Date(history.answeredAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}
+                                                <DateDisplay date={history.answeredAt} showTime />
                                             </div>
                                         </div>
                                         <div className="text-sm bg-muted/50 p-3 rounded-md">
@@ -249,6 +250,6 @@ export default async function TeacherStudentDetailPage({
                     </div>
                 </TabsContent>
             </Tabs>
-        </div>
+        </div >
     );
 }
