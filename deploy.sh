@@ -32,6 +32,8 @@ gcloud run deploy sullivan-app \
   --set-env-vars "JWT_SECRET=$JWT_SECRET" \
   --set-env-vars "DRIVE_FOLDER_ID=$DRIVE_FOLDER_ID" \
   --set-env-vars "APP_URL=${APP_URL:-https://placeholder.com}" \
+  --set-env-vars "NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL" \
+  --set-env-vars "NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
   --set-env-vars "GOOGLE_APPLICATION_CREDENTIALS=/secrets/service-account.json" \
   --set-secrets="/secrets/service-account.json=sullivan-service-account:latest"
 

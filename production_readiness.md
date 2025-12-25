@@ -6,8 +6,19 @@
 - [ ] **環境変数の設定**
     - 本番環境（Vercelなど）に以下の環境変数を設定する。
         - `DATABASE_URL`
-        - `JWT_SECRET`
+        - `DIRECT_URL`
+        - `NEXT_PUBLIC_SUPABASE_URL`
+        - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+        - `SUPABASE_SERVICE_ROLE_KEY`
         - `GEMINI_API_KEY`
+        - `DRIVE_FOLDER_ID`
+        - `APP_URL`
+        - `QSTASH_TOKEN`
+        - `QSTASH_CURRENT_SIGNING_KEY` / `QSTASH_NEXT_SIGNING_KEY`
+        - `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`
+        - `INTERNAL_API_SECRET` (必要に応じて)
+        - `DRIVE_WEBHOOK_CHANNEL_ID` (必要に応じて)
+        - `GOOGLE_APPLICATION_CREDENTIALS` (本番でシークレットをマウントする場合)
 - [ ] **データベース**
     - 本番用データベース（PostgreSQLなど）の構築。
     - マイグレーションの実行（`npx prisma migrate deploy`）。
@@ -18,7 +29,10 @@
 - [ ] **HTTPヘッダー**
     - `next.config.ts` にセキュリティヘッダー（CSP, X-Frame-Options, X-Content-Type-Optionsなど）を追加する。
 - [ ] **Cookie設定**
-    - `src/lib/auth.ts` のCookie設定に `sameSite: 'lax'` または `'strict'` を明示的に追加する。
+    - Supabase AuthのCookie設定を確認し、必要に応じて `src/lib/supabase/server.ts` / `src/lib/supabase/middleware.ts` で `sameSite` / `secure` を明示する。
+- [ ] **内部エンドポイント保護**
+    - `/api/grading/check` 用に `INTERNAL_API_SECRET` を設定する。
+    - Webhookの検証が必要な場合は `DRIVE_WEBHOOK_CHANNEL_ID` を設定する。
 - [ ] **レート制限**
     - 過剰なリクエストを防ぐためのレート制限（Rate Limiting）をMiddleware等で導入する。
 

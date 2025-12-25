@@ -7,10 +7,13 @@
 ## System Requirements (New)
 
 - Node.js 18+ (Next.js 16, React 19)
-- PostgreSQL
+- PostgreSQL (Local or Supabase)
+- **Supabase Auth** (Login/Role management)
 - **Python 3** (Required for QR Code processing)
   - `pip3 install opencv-python`
+- **Google Drive API** (Scan ingestion) + Service Account
 - **Upstash QStash** (For background job processing)
+- **Upstash Redis** (Drive webhook watch state)
 
 ## アプリケーション概要
 
@@ -24,10 +27,11 @@ Sullivanは、小学4年生〜中高生を対象とした**「基礎学習定着
 ### 1. プリント学習サイクル (Print & Scan)
 生徒はシステムから自分専用の問題セットを印刷し、手書きで解答します。
 - **個別最適化**: 生徒の過去の成績や忘却度合いに基づき、今解くべき問題を自動選出します。
-- **AIスキャン採点**: 解答済みのプリントをスキャンしてGoogle Driveにアップロードすると、システムが自動的に検知・採点・集計します。
+- **AIスキャン採点**: 解答済みのプリントをGoogle Driveにアップロードすると、Webhookで検知し、QStash経由で採点ジョブを実行します。
 
 ### 2. AI採点とフィードバック
 Google Gemini APIを活用し、単なる正誤判定だけでなく、記述式回答の評価や、生徒へのアドバイス生成を行います。
+- **QR読み取り**: 画像の場合はPython + OpenCVでQRコードを読み取り、失敗時はGeminiでフォールバックします。
 - **部分点・評価**: A〜Dの4段階評価に加え、具体的な改善点をフィードバック。
 - **弱点特定**: 間違いの原因となった「基礎概念(CoreProblem)」を推測し、カリキュラムを遡って復習を促します。
 
@@ -38,8 +42,9 @@ Google Gemini APIを活用し、単なる正誤判定だけでなく、記述式
 - **依存関係**: 基礎問題でつまずくと、関連する応用問題もロックされるなどの制御機能。
 
 ### 4. ダッシュボード
-- **生徒用**: 「今日の課題」や現在のランク、ストリーク（継続日数）を表示し、モチベーションを維持。
-- **講師用**: 生徒ごとの弱点分析、学習履歴、指導記録を一元管理。特定の問題グループ（教室単位など）でのフィルタリングも可能。
+- **生徒用**: 総学習数、正答率、連続学習日数、直近30日のアクティビティ、教科別進捗、未視聴解説の通知を表示。
+- **講師用**: 生徒検索、学習進捗の確認、指導記録、プリント作成を一元管理。
+- **管理者用**: ユーザー/教室/カリキュラム/問題の管理。
 
 ## システムアーキテクチャ
 
@@ -49,9 +54,11 @@ Google Gemini APIを活用し、単なる正誤判定だけでなく、記述式
     - サーバーアクションを活用したフルスタック構成。
 - **Database**: PostgreSQL (Prisma ORM)
     - ユーザー、カリキュラム、学習履歴のリレーショナルデータ管理。
+- **Auth**: Supabase Auth (SSR)
 - **AI & Storage**:
     - **Google Gemini API**: 手書き文字認識、採点、フィードバック生成。
-    - **Google Drive API**: スキャン画像の取り込みとアーカイブ。
+    - **Google Drive API**: スキャン画像の取り込みとアーカイブ (Webhook連携)。
+    - **Upstash QStash / Redis**: 採点ジョブのキューイングとWebhook Watch状態の保存。
 
 ## クイックリンク
 - [環境構築ガイド](./環境構築.md)
