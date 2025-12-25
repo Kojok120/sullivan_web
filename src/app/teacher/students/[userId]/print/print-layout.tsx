@@ -23,9 +23,7 @@ const MAX_PAGE_HEIGHT_PX = 900; // Approximate pixel height for A4 content area 
 
 export function PrintLayout({ studentName, subjectName, problems, qrCodeDataUrl }: PrintLayoutProps) {
     const router = useRouter();
-    const dateStr = new Date().toLocaleDateString('ja-JP');
-
-    console.log('PrintLayout received problems:', problems);
+    const dateStr = new Date().toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
 
     const [paginatedProblems, setPaginatedProblems] = useState<(Problem & { customId?: string | null })[][]>([]);
     const [isCalculating, setIsCalculating] = useState(true);

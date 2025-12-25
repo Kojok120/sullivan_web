@@ -22,10 +22,14 @@ export async function getSession(): Promise<SessionPayload | null> {
 
         if (!user) return null;
 
+        // SECURITY: Read from app_metadata (secure, server-only) with fallback to user_metadata for migration
+        const appMeta = user.app_metadata || {};
+        const userMeta = user.user_metadata || {};
+
         return {
-            userId: user.user_metadata.prismaUserId || user.id, // Fallback to user.id (UUID) only if metadata is missing, but should be prismaUserId (CUID)
-            role: user.user_metadata.role || 'STUDENT',
-            name: user.user_metadata.name || '',
+            userId: appMeta.prismaUserId || userMeta.prismaUserId || user.id,
+            role: appMeta.role || userMeta.role || 'STUDENT',
+            name: appMeta.name || userMeta.name || '',
         };
     } catch (error) {
         return null;

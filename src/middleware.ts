@@ -9,9 +9,25 @@ export async function middleware(request: NextRequest) {
     const publicPaths = ['/login', '/signup'];
     const isPublicPath = publicPaths.some(path => request.nextUrl.pathname.startsWith(path));
 
+    // Force Password Change Check
+    if (user && user.user_metadata?.isDefaultPassword) {
+        if (!request.nextUrl.pathname.startsWith('/force-password-change')) {
+            return NextResponse.redirect(new URL('/force-password-change', request.url));
+        }
+        return supabaseResponse;
+    }
+
+    // Prevent access to force-password-change if not required
+    if (user && !user.user_metadata?.isDefaultPassword && request.nextUrl.pathname.startsWith('/force-password-change')) {
+        return NextResponse.redirect(new URL('/', request.url));
+    }
+
+    // SECURITY: Read role from app_metadata (secure) with fallback to user_metadata for migration
+    const userRole = user?.app_metadata?.role || user?.user_metadata?.role;
+
     // Admin routes check - must be authenticated AND have ADMIN role
     if (request.nextUrl.pathname.startsWith('/admin')) {
-        if (!user || user.user_metadata?.role !== 'ADMIN') {
+        if (!user || userRole !== 'ADMIN') {
             return NextResponse.redirect(new URL('/', request.url));
         }
         return supabaseResponse;
@@ -19,7 +35,7 @@ export async function middleware(request: NextRequest) {
 
     // Teacher routes check - must be authenticated AND have TEACHER or ADMIN role
     if (request.nextUrl.pathname.startsWith('/teacher')) {
-        if (!user || (user.user_metadata?.role !== 'TEACHER' && user.user_metadata?.role !== 'ADMIN')) {
+        if (!user || (userRole !== 'TEACHER' && userRole !== 'ADMIN')) {
             return NextResponse.redirect(new URL('/', request.url));
         }
         return supabaseResponse;
@@ -33,9 +49,14 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL('/', request.url));
     }
 
+    // Redirect ADMIN users from root to /admin
+    if (user && userRole === 'ADMIN' && request.nextUrl.pathname === '/') {
+        return NextResponse.redirect(new URL('/admin', request.url));
+    }
+
     return supabaseResponse;
 }
 
 export const config = {
-    matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
+    matcher: ['/((?!api|_next/static|_next/image|favicon.ico|google.*\\.html).*)'],
 };

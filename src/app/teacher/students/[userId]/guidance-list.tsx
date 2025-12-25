@@ -10,6 +10,7 @@ import { MessageSquare, Plus, Trash2, Calendar } from 'lucide-react';
 import { addGuidanceRecord, deleteGuidanceRecord } from './actions';
 import { toast } from 'sonner';
 import { GuidanceRecord, GuidanceType } from '@prisma/client';
+import { DateDisplay } from '@/components/ui/date-display';
 
 interface GuidanceListProps {
     userId: string;
@@ -115,15 +116,15 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
                                         <span className={`text-xs px-2 py-0.5 rounded-full border ${record.type === 'INTERVIEW' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                                                record.type === 'GUIDANCE' ? 'bg-green-50 text-green-700 border-green-200' :
-                                                    'bg-gray-50 text-gray-700 border-gray-200'
+                                            record.type === 'GUIDANCE' ? 'bg-green-50 text-green-700 border-green-200' :
+                                                'bg-gray-50 text-gray-700 border-gray-200'
                                             }`}>
                                             {record.type === 'INTERVIEW' ? '面談' :
                                                 record.type === 'GUIDANCE' ? '指導' : 'その他'}
                                         </span>
                                         <span className="text-sm font-medium flex items-center gap-1 text-muted-foreground">
                                             <Calendar className="h-3 w-3" />
-                                            {new Date(record.date).toLocaleDateString()}
+                                            <DateDisplay date={record.date} />
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-2">

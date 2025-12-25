@@ -1,10 +1,18 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { checkDriveForNewFiles } from '@/lib/grading-service';
 import { acquireGradingLock, releaseGradingLock } from '@/lib/grading-lock';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+    // SECURITY: Require internal API secret for this endpoint
+    const authHeader = request.headers.get('Authorization');
+    const expectedSecret = process.env.INTERNAL_API_SECRET;
+
+    if (expectedSecret && authHeader !== `Bearer ${expectedSecret}`) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         // Try to acquire lock using shared mechanism
         const lockAcquired = await acquireGradingLock();

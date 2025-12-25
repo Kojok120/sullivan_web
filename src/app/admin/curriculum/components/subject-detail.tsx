@@ -21,6 +21,7 @@ interface SubjectDetailProps {
 export function SubjectDetail({ subject }: SubjectDetailProps) {
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [newCoreProblemName, setNewCoreProblemName] = useState('');
+    const [selectedCoreProblemId, setSelectedCoreProblemId] = useState<string | null>(null);
     const router = useRouter();
 
     const handleCreateCoreProblem = async () => {
@@ -65,7 +66,8 @@ export function SubjectDetail({ subject }: SubjectDetailProps) {
             <CoreProblemList
                 subjectId={subject.id}
                 coreProblems={subject.coreProblems}
-                subjectName={subject.name}
+                selectedId={selectedCoreProblemId}
+                onSelect={setSelectedCoreProblemId}
             />
 
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>

@@ -1,9 +1,18 @@
 import { NextResponse } from 'next/server';
 import { serverEvents, EVENTS } from '@/lib/server-events';
+import { createClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
+    // SECURITY: Require authentication for SSE events
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        return new Response('Unauthorized', { status: 401 });
+    }
+
     const encoder = new TextEncoder();
 
     // Create a streaming response

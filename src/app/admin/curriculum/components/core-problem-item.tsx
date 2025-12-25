@@ -12,6 +12,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 import { useRouter } from 'next/navigation';
 
@@ -28,13 +38,17 @@ interface CoreProblemItemProps {
 
 export function CoreProblemItem({ coreProblem, subjectName, sortableProps }: CoreProblemItemProps) {
     const [isEditOpen, setIsEditOpen] = useState(false);
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [editName, setEditName] = useState(coreProblem.name);
     const router = useRouter();
 
-    const handleDelete = async (e: React.MouseEvent) => {
+    const handleDeleteClick = (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (!confirm('本当に削除しますか？含まれる問題も削除される可能性があります。')) return;
+        setIsDeleteDialogOpen(true);
+    };
 
+    const handleDeleteConfirm = async () => {
+        setIsDeleteDialogOpen(false);
         const result = await deleteCoreProblem(coreProblem.id);
         if (result.success) {
             toast.success('CoreProblemを削除しました');
@@ -96,7 +110,7 @@ export function CoreProblemItem({ coreProblem, subjectName, sortableProps }: Cor
                                 size="icon"
                                 variant="ghost"
                                 className="h-8 w-8 text-red-500 hover:text-red-600 cursor-pointer"
-                                onClick={handleDelete}
+                                onClick={handleDeleteClick}
                             >
                                 <div role="button" tabIndex={0}>
                                     <Trash2 className="h-4 w-4" />
@@ -131,6 +145,27 @@ export function CoreProblemItem({ coreProblem, subjectName, sortableProps }: Cor
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>コア問題を削除しますか？</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            含まれる問題も削除される可能性があります。この操作は取り消せません。
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>キャンセル</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleDeleteConfirm}
+                            className="bg-red-500 hover:bg-red-600"
+                        >
+                            削除
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </>
     );
 }
+

@@ -11,6 +11,22 @@ export async function updateStudentProfile(userId: string, formData: FormData) {
         return { error: '権限がありません' };
     }
 
+    // SECURITY: Teachers can only edit students in their assigned classroom (IDOR protection)
+    if (session.role === 'TEACHER') {
+        const teacher = await prisma.user.findUnique({
+            where: { id: session.userId },
+            select: { classroomId: true }
+        });
+        const student = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { classroomId: true }
+        });
+
+        if (!teacher?.classroomId || !student?.classroomId || teacher.classroomId !== student.classroomId) {
+            return { error: '担当教室外の生徒は編集できません' };
+        }
+    }
+
     const bio = formData.get('bio') as string;
     const notes = formData.get('notes') as string;
     const birthdayStr = formData.get('birthday') as string;

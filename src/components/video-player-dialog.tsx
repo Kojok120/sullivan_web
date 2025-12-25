@@ -81,19 +81,10 @@ export function VideoPlayerDialog({
         // Capture the current video's historyId before we change index
         const historyIdToMark = currentVideo.historyId;
 
-        console.log('[VideoPlayerDialog] handleNextVideo called');
-        console.log('[VideoPlayerDialog] playlist:', playlist);
-        console.log('[VideoPlayerDialog] playlist.length:', playlist.length);
-        console.log('[VideoPlayerDialog] currentIndex BEFORE:', currentIndex);
-        console.log('[VideoPlayerDialog] currentVideo BEFORE:', currentVideo);
-
         // Update index FIRST (synchronously) - this is the critical fix
         if (playlist.length > 0 && currentIndex < playlist.length - 1) {
             const newIndex = currentIndex + 1;
-            console.log('[VideoPlayerDialog] Setting new index to:', newIndex);
             setCurrentIndex(newIndex);
-        } else {
-            console.log('[VideoPlayerDialog] NOT advancing - at end of playlist or playlist empty');
         }
 
         // Then fire-and-forget the watched marking (no router.refresh!)
@@ -102,7 +93,6 @@ export function VideoPlayerDialog({
 
     const handleVideoEnd = () => {
         // Auto-advance logic
-        console.log('[VideoPlayerDialog] handleVideoEnd called');
         if (playlist.length > 0 && currentIndex < playlist.length - 1) {
             handleNextVideo();
         } else {

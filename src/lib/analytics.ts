@@ -388,27 +388,37 @@ export type LearningSession = {
 export async function getLearningSessions(userId: string, limit = 10, offset = 0): Promise<LearningSession[]> {
     // We can't easily group by groupId and join relations in Prisma (it requires raw SQL or post-processing).
     // Let's use Raw SQL for performance grouping.
+    //
+    // [FIX] Problem has many-to-many with CoreProblem, so JOIN would multiply rows.
+    // Using subquery to get Subject name without row multiplication.
+    // Using COUNT(DISTINCT lh.id) to avoid duplicate counting.
 
     const sessions = await prisma.$queryRaw<Array<{
         groupId: string;
         date: Date;
-        subjectName: string;
+        subjectName: string | null;
         total: bigint;
         correct: bigint;
     }>>`
         SELECT 
             lh."groupId",
             MAX(lh."answeredAt") as "date",
-            MAX(s.name) as "subjectName",
-            COUNT(*) as "total",
-            SUM(CASE WHEN lh.evaluation IN ('A', 'B') THEN 1 ELSE 0 END) as "correct"
+            (
+                SELECT s.name 
+                FROM "_CoreProblemToProblem" cpp
+                JOIN "CoreProblem" cp ON cpp."A" = cp.id
+                JOIN "Subject" s ON cp."subjectId" = s.id
+                WHERE cpp."B" = (
+                    SELECT lh2."problemId" 
+                    FROM "LearningHistory" lh2 
+                    WHERE lh2."groupId" = lh."groupId" 
+                    LIMIT 1
+                )
+                LIMIT 1
+            ) as "subjectName",
+            COUNT(DISTINCT lh.id) as "total",
+            COUNT(DISTINCT CASE WHEN lh.evaluation IN ('A', 'B') THEN lh.id END) as "correct"
         FROM "LearningHistory" lh
-        JOIN "Problem" p ON lh."problemId" = p.id
-        -- We join CoreProblem -> Subject.
-        -- Problem has many CoreProblems. We pick the first one roughly (MAX/MIN).
-        JOIN "_CoreProblemToProblem" cpp ON p.id = cpp."B"
-        JOIN "CoreProblem" cp ON cpp."A" = cp.id
-        JOIN "Subject" s ON cp."subjectId" = s.id
         WHERE lh."userId" = ${userId} AND lh."groupId" IS NOT NULL
         GROUP BY lh."groupId"
         ORDER BY "date" DESC

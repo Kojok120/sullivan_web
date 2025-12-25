@@ -65,6 +65,23 @@ export async function deleteCoreProblem(id: string) {
     }
 }
 
+export async function bulkDeleteCoreProblems(ids: string[]) {
+    await requireAdmin();
+    try {
+        if (ids.length === 0) return { success: true, count: 0 };
+
+        const result = await prisma.coreProblem.deleteMany({
+            where: { id: { in: ids } }
+        });
+
+        revalidatePath('/admin/curriculum');
+        return { success: true, count: result.count };
+    } catch (error) {
+        console.error('Failed to bulk delete core problems:', error);
+        return { error: 'コア問題の一括削除に失敗しました' };
+    }
+}
+
 export async function bulkCreateCoreProblems(subjectId: string, names: string[]) {
     await requireAdmin();
     try {
@@ -255,6 +272,25 @@ export async function deleteProblem(id: string) {
     }
 }
 
+export async function reorderProblems(items: { id: string, order: number }[]) {
+    await requireAdmin();
+    try {
+        await prisma.$transaction(
+            items.map((item) =>
+                prisma.problem.update({
+                    where: { id: item.id },
+                    data: { order: item.order },
+                })
+            )
+        );
+        revalidatePath('/admin/curriculum');
+        return { success: true };
+    } catch (error) {
+        console.error('Failed to reorder problems:', error);
+        return { error: '問題の並び替えに失敗しました' };
+    }
+}
+
 export async function bulkCreateProblems(subjectId: string, problems: {
     question: string;
     answer: string;
@@ -271,12 +307,12 @@ export async function bulkCreateProblems(subjectId: string, problems: {
 
         if (!subject) throw new Error('Subject not found');
 
-        const { getNextCustomId } = await import('@/lib/curriculum-service');
+        const { getNextCustomIds } = await import('@/lib/curriculum-service');
 
         let createdCount = 0;
         const warnings: string[] = [];
 
-        // Fetch existing questions to simple check
+        // Fetch existing questions to check
         const incomingQuestions = problems.map(p => p.question);
         const existingProblems = await prisma.problem.findMany({
             where: {
@@ -286,6 +322,19 @@ export async function bulkCreateProblems(subjectId: string, problems: {
         });
         const existingMap = new Map(existingProblems.map(p => [p.question, p.customId]));
 
+        // Filter problems to create
+        const problemsToCreate = problems.filter(p => {
+            if (existingMap.has(p.question)) {
+                warnings.push(`問題「${p.question.substring(0, 20)}...」は既に存在します (ID: ${existingMap.get(p.question)})`);
+                return false;
+            }
+            return true;
+        });
+
+        if (problemsToCreate.length === 0) {
+            return { success: true, count: 0, warnings };
+        }
+
         // Get initial order for new problems
         const lastProblem = await prisma.problem.findFirst({
             orderBy: { order: 'desc' },
@@ -293,15 +342,12 @@ export async function bulkCreateProblems(subjectId: string, problems: {
         });
         let nextOrder = (lastProblem?.order ?? 0) + 1;
 
-        await prisma.$transaction(async (tx) => {
-            for (const p of problems) {
-                if (existingMap.has(p.question)) {
-                    warnings.push(`問題「${p.question.substring(0, 20)}...」は既に存在します (ID: ${existingMap.get(p.question)})`);
-                    continue;
-                }
+        // [N+1 解消] Generate all custom IDs at once
+        const customIds = await getNextCustomIds(subjectId, problemsToCreate.length);
 
-                // Use unified getNextCustomId for consistent ID generation
-                const customId = await getNextCustomId(subjectId, tx);
+        await prisma.$transaction(async (tx) => {
+            for (let i = 0; i < problemsToCreate.length; i++) {
+                const p = problemsToCreate[i];
 
                 await tx.problem.create({
                     data: {
@@ -310,7 +356,7 @@ export async function bulkCreateProblems(subjectId: string, problems: {
                         videoUrl: p.videoUrl,
                         grade: p.grade,
                         acceptedAnswers: p.acceptedAnswers || [],
-                        customId: customId,
+                        customId: customIds[i],
                         order: nextOrder++,
                         coreProblems: {
                             connect: p.coreProblemIds.map(id => ({ id }))

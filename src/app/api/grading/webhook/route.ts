@@ -15,6 +15,13 @@ export async function POST(request: Request) {
         const resourceId = headers.get('x-goog-resource-id');
         const resourceState = headers.get('x-goog-resource-state');
 
+        // SECURITY: Verify webhook channel ID if configured
+        const expectedChannelId = process.env.DRIVE_WEBHOOK_CHANNEL_ID;
+        if (expectedChannelId && channelId !== expectedChannelId) {
+            console.log(`Webhook rejected: Invalid channel ID ${channelId}`);
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         console.log(`Webhook received. State: ${resourceState}, Channel: ${channelId}`);
 
         // Handle specific states

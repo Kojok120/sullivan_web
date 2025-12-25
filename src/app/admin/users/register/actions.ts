@@ -1,7 +1,6 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import { hashPassword } from '@/lib/auth';
 import { Role } from '@prisma/client';
 
 import { z } from 'zod';
@@ -36,21 +35,25 @@ export async function signupAction(prevState: any, formData: FormData) {
             role, // Use the role selected in UI
         });
 
-        // 4. Register in Supabase
-        const { createClient } = await import('@/lib/supabase/server');
-        const supabase = await createClient();
+        // 4. Register in Supabase (using Admin API to skip email confirmation)
+        const { createAdminClient } = await import('@/lib/supabase/admin');
+        const supabaseAdmin = createAdminClient();
         const email = `${user.loginId}@sullivan-internal.local`;
 
-        const { error: supabaseError } = await supabase.auth.signUp({
+        const { error: supabaseError } = await supabaseAdmin.auth.admin.createUser({
             email,
             password,
-            options: {
-                data: {
-                    role,
-                    loginId: user.loginId,
-                    name: user.name,
-                    prismaUserId: user.id,
-                },
+            email_confirm: true, // Confirm email automatically
+            // SECURITY: Use app_metadata (not user_metadata) for authorization data
+            // app_metadata cannot be modified by the user
+            app_metadata: {
+                role,
+                loginId: user.loginId,
+                name: user.name,
+                prismaUserId: user.id,
+            },
+            user_metadata: {
+                isDefaultPassword: true,
             },
         });
 

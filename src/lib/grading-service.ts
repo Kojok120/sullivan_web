@@ -345,10 +345,7 @@ type GradingResult = {
 };
 
 // Local QR Reader using Python OpenCV via child_process
-import { exec } from 'child_process';
-import util from 'util';
-
-const execPromise = util.promisify(exec);
+import { spawn } from 'child_process';
 
 // Path to python script (assuming it stays in scripts/ and running from root)
 const PYTHON_SCRIPT_PATH = path.join(process.cwd(), 'scripts', 'qr_reader.py');
@@ -363,9 +360,30 @@ async function readQRCodeLocally(filePath: string): Promise<QRData | null> {
         }
 
         console.log(`Local QR Read: Calling Python OpenCV...`);
-        // Execute python script
-        const { stdout } = await execPromise(`${PYTHON_CMD} "${PYTHON_SCRIPT_PATH}" "${filePath}"`);
-        const trimmed = stdout.trim();
+
+        // SECURITY: Use spawn with separate arguments to prevent command injection
+        // Also sanitize filePath using path.basename to prevent path traversal
+        const safeFilePath = path.resolve(path.dirname(filePath), path.basename(filePath));
+
+        const result = await new Promise<string>((resolve, reject) => {
+            const proc = spawn(PYTHON_CMD, [PYTHON_SCRIPT_PATH, safeFilePath]);
+            let stdout = '';
+            let stderr = '';
+
+            proc.stdout.on('data', (data) => { stdout += data.toString(); });
+            proc.stderr.on('data', (data) => { stderr += data.toString(); });
+
+            proc.on('close', (code) => {
+                if (code === 0) {
+                    resolve(stdout);
+                } else {
+                    reject(new Error(`Python exited with code ${code}: ${stderr}`));
+                }
+            });
+            proc.on('error', reject);
+        });
+
+        const trimmed = result.trim();
 
         if (!trimmed) {
             console.log("Local QR Read Failed (Python returned empty)");
@@ -425,7 +443,8 @@ async function gradeWithGemini(filePath: string): Promise<GradingResult[] | null
             return null;
         }
 
-        console.log(`QR Found: Student=${qrData.sid}, Problems=${qrData.pids.length}`);
+        // SECURITY: Mask student ID in logs (show only last 4 chars)
+        console.log(`QR Found: Student=...${qrData.sid.slice(-4)}, Problems=${qrData.pids.length}`);
 
         // 5. Fetch Full Problem Context from DB
         const uniquePids = Array.from(new Set(qrData.pids.filter((p: any) => typeof p === 'string')));

@@ -1,15 +1,15 @@
 #!/bin/bash
 
-# Load .env variables
-if [ -f .env ]; then
-  export $(grep -v '^#' .env | xargs)
+# Load .env.production variables for deployment
+if [ -f .env.production ]; then
+  export $(grep -v '^#' .env.production | xargs)
 else
-  echo ".env file not found!"
+  echo ".env.production file not found!"
   exit 1
 fi
 
 echo "Deploying to Project: $YOUR_PROJECT_ID"
-echo "Database URL: $DATABASE_URL"
+echo "Database URL: [REDACTED]"
 
 # Deploy Command
 gcloud run deploy sullivan-app \

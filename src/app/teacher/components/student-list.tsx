@@ -2,6 +2,7 @@
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
+import { DateDisplay } from '@/components/ui/date-display';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { StudentStats } from '@/lib/analytics';
@@ -63,7 +64,7 @@ export function StudentList({
                         </TableCell>
                         <TableCell className="text-right">{student.stats.currentStreak}日</TableCell>
                         <TableCell className="text-right">
-                            {student.stats.lastActivity ? new Date(student.stats.lastActivity).toLocaleDateString('ja-JP') : '-'}
+                            {student.stats.lastActivity ? <DateDisplay date={student.stats.lastActivity} /> : '-'}
                         </TableCell>
                         {showDetailButton && (
                             <TableCell className="text-right">

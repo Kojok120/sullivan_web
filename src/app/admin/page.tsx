@@ -2,7 +2,7 @@ import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Users, BookOpen, Settings, School } from "lucide-react";
+import { Users, BookOpen, School } from "lucide-react";
 
 export default async function AdminDashboard() {
     const session = await getSession();
@@ -32,11 +32,11 @@ export default async function AdminDashboard() {
             color: 'text-green-600',
         },
         {
-            title: 'システム設定',
-            description: '出題ロジックとパラメータの設定',
-            icon: Settings,
-            href: '/admin/settings',
-            color: 'text-orange-600',
+            title: '問題管理',
+            description: '問題の単独管理・一括登録',
+            icon: BookOpen,
+            href: '/admin/problems',
+            color: 'text-purple-600',
         },
     ];
 

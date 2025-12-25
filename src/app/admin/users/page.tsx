@@ -47,6 +47,15 @@ export default async function UsersPage({
     return (
         <div className="min-h-screen bg-gray-50">
             <div className="container mx-auto px-4 py-8">
+                <div className="flex justify-between items-center mb-6">
+                    <h1 className="text-2xl font-bold text-gray-800">ユーザー管理</h1>
+                    <Link href="/admin/users/register">
+                        <Button className="bg-blue-600 hover:bg-blue-700">
+                            + 新規ユーザー登録
+                        </Button>
+                    </Link>
+                </div>
+
                 <div className="bg-white rounded-lg shadow p-6">
                     <UserList
                         initialUsers={users}

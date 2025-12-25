@@ -60,6 +60,9 @@ export function MainNav({ role }: { role?: string }) {
                     </nav>
                 </div>
                 <div className="flex items-center gap-4">
+                    <Link href="/settings" className="text-sm font-medium text-foreground/60 transition-colors hover:text-foreground">
+                        設定
+                    </Link>
                     <form action={logoutAction}>
                         <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50">
                             <LogOut className="mr-2 h-4 w-4" />

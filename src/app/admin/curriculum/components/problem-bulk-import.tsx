@@ -12,6 +12,7 @@ import { bulkCreateProblems } from '../actions';
 import { toast } from 'sonner';
 import { CoreProblem } from '@prisma/client';
 import { Input } from '@/components/ui/input';
+import { parseProblemTSV } from '@/lib/tsv-parser';
 
 interface ProblemBulkImportProps {
     coreProblems: CoreProblem[]; // All available CoreProblems
@@ -59,80 +60,28 @@ export function ProblemBulkImport({ coreProblems, subjectId }: ProblemBulkImport
 
     const cpNameMap = new Map(coreProblems.map(cp => [cp.name, cp.id]));
 
-    // Note: parseText was removed as it was superseded by parseTSV which handles quoted newlines correctly
+    // [TSV統一] Use shared parseProblemTSV with unified header detection and delimiter handling
+    const parseProblemRows = (text: string) => {
+        const rows = parseProblemTSV(text);
 
-    // Naive Excel TSV Parser to handle quoted newlines
-    const parseTSV = (text: string) => {
-        const rows: string[][] = [];
-        let currentRow: string[] = [];
-        let curVal = '';
-        let insideQuote = false;
-
-        for (let i = 0; i < text.length; i++) {
-            const char = text[i];
-            const nextChar = text[i + 1];
-
-            if (insideQuote) {
-                if (char === '"' && nextChar === '"') {
-                    curVal += '"';
-                    i++;
-                } else if (char === '"') {
-                    insideQuote = false;
-                } else {
-                    curVal += char;
-                }
-            } else {
-                if (char === '"') {
-                    insideQuote = true;
-                } else if (char === '\t') {
-                    currentRow.push(curVal);
-                    curVal = '';
-                } else if (char === '\n' || char === '\r') {
-                    if (char === '\r' && nextChar === '\n') i++;
-                    currentRow.push(curVal);
-                    rows.push(currentRow);
-                    currentRow = [];
-                    curVal = '';
-                } else {
-                    curVal += char;
-                }
-            }
-        }
-        if (curVal || currentRow.length > 0) {
-            currentRow.push(curVal);
-            rows.push(currentRow);
-        }
-
-        return rows.map(cols => {
-            // 0: Grade, 1: CoreProblem(s), 2: Question, 3: Answer, 4: Accepted (opt), 5: Video (opt)
-            if (cols.length < 4) return null;
-
-            const grade = cols[0]?.trim() || '';
-            const cpRaw = cols[1]?.trim() || '';
-            const question = cols[2]?.trim() || '';
-            const answer = cols[3]?.trim() || '';
-            const acceptedRaw = cols[4]?.trim() || '';
-            const videoUrl = cols[5]?.trim() || '';
-
-            const cpNames = cpRaw.split(/[,\n]+/).map(s => s.trim()).filter(Boolean);
-            const acceptedAnswers = acceptedRaw.split(/[,、]+/).map(s => s.trim()).filter(Boolean);
-
-            const row: ParsedProblem = {
-                grade,
-                coreProblemNames: cpNames,
-                question,
-                answer,
-                acceptedAnswers,
-                videoUrl,
-                status: 'valid', // Temp, will validte below
+        return rows.map(row => {
+            // Already parsed by parseProblemTSV
+            const parsedRow: ParsedProblem = {
+                grade: row.grade,
+                coreProblemNames: row.coreProblemNames,
+                question: row.question,
+                answer: row.answer,
+                acceptedAnswers: row.acceptedAnswers,
+                videoUrl: row.videoUrl,
+                status: 'valid',
             };
 
-            return validateRow(row, cpNameMap);
-        }).filter(Boolean) as ParsedProblem[];
+            return validateRow(parsedRow, cpNameMap);
+        });
     };
 
     const handleParse = () => {
-        const parsed = parseTSV(rawText);
+        const parsed = parseProblemRows(rawText);
         setParsedData(parsed);
     };
 

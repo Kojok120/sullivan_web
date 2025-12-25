@@ -35,3 +35,15 @@ export async function watchDriveFolder(webhookUrl: string): Promise<{ resourceId
 
 // stopWatching removed as it was unused.
 // If needed for cleanup cron jobs in future, implement using Google Drive API directly.
+
+export async function stopWatching(channelId: string, resourceId: string): Promise<void> {
+    const drive = getDrive();
+    await drive.channels.stop({
+        requestBody: {
+            id: channelId,
+            resourceId: resourceId,
+        }
+    });
+    console.log(`Stopped watching channel: ${channelId}`);
+}
+

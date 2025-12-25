@@ -38,9 +38,10 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { MoreHorizontal, Plus, Pencil, Trash2, Loader2, ArrowUpDown, Filter } from 'lucide-react';
+import { MoreHorizontal, Plus, Pencil, Trash2, Loader2, ArrowUpDown, Filter, KeyRound } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { UserFormDialog } from './user-form-dialog';
+import { PasswordResetDialog } from './password-reset-dialog';
 import { RoleBadge } from '@/components/ui/role-badge';
 import { DateDisplay } from '@/components/ui/date-display';
 
@@ -85,6 +86,7 @@ export function UserList({
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+    const [isPasswordResetOpen, setIsPasswordResetOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState<UserWithGroup | null>(null);
 
     // Search state
@@ -161,6 +163,11 @@ export function UserList({
         setIsDeleteOpen(true);
     };
 
+    const openPasswordReset = (user: UserWithGroup) => {
+        setSelectedUser(user);
+        setIsPasswordResetOpen(true);
+    };
+
     const start = (currentPage - 1) * limit + 1;
     const end = Math.min(currentPage * limit, total);
     const totalPages = Math.ceil(total / limit);
@@ -180,9 +187,6 @@ export function UserList({
                             {total > 0 ? `${start}〜${end} / ${total}名表示中` : 'ユーザーが見つかりません'}
                         </p>
                     </div>
-                    <Button onClick={() => setIsAddOpen(true)}>
-                        <Plus className="mr-2 h-4 w-4" /> 新規ユーザー
-                    </Button>
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-4 items-center bg-muted/30 p-4 rounded-lg">
@@ -281,6 +285,9 @@ export function UserList({
                                             <DropdownMenuItem onClick={() => openEdit(user)}>
                                                 <Pencil className="mr-2 h-4 w-4" /> 編集
                                             </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => openPasswordReset(user)}>
+                                                <KeyRound className="mr-2 h-4 w-4" /> パスワード変更
+                                            </DropdownMenuItem>
                                             <DropdownMenuSeparator />
                                             <DropdownMenuItem onClick={() => openDelete(user)} className="text-red-600">
                                                 <Trash2 className="mr-2 h-4 w-4" /> 削除
@@ -338,6 +345,17 @@ export function UserList({
                 classrooms={classrooms}
                 onSuccess={() => router.refresh()}
             />
+
+            {/* Password Reset Dialog */}
+            {selectedUser && (
+                <PasswordResetDialog
+                    open={isPasswordResetOpen}
+                    onOpenChange={setIsPasswordResetOpen}
+                    userId={selectedUser.id}
+                    userName={selectedUser.name || ''}
+                    loginId={selectedUser.loginId}
+                />
+            )}
 
             {/* Delete Confirmation Dialog */}
             <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>

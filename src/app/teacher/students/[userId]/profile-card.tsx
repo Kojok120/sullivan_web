@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { User, Calendar, MapPin, School, Phone, Mail, Users } from 'lucide-react';
 import { updateStudentProfile } from './actions';
 import { toast } from 'sonner';
+import { DateDisplay } from '@/components/ui/date-display';
 
 interface Classroom {
     id: string;
@@ -201,7 +202,7 @@ export function ProfileCard({
                     <div className="flex items-center gap-2">
                         <Calendar className="h-4 w-4 text-muted-foreground" />
                         <span className="text-muted-foreground">生年月日:</span>
-                        <span>{initialBirthday ? new Date(initialBirthday).toLocaleDateString() : '未設定'}</span>
+                        <span>{initialBirthday ? <DateDisplay date={initialBirthday} /> : '未設定'}</span>
                     </div>
                     <div className="flex items-center gap-2">
                         <MapPin className="h-4 w-4 text-muted-foreground" />

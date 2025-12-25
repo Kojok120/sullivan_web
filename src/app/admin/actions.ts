@@ -4,6 +4,111 @@ import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { Role } from '@prisma/client';
 import { requireAdmin, hashPassword } from '@/lib/auth';
+import { createAdminClient } from '@/lib/supabase/admin';
+
+export async function resetPassword(userId: string, password: string) {
+    try {
+        const supabase = createAdminClient();
+
+        // 1. Get user to find their Prisma ID (which is mapped to Supabase metadata)
+        // Or directly use the ID if it matches? 
+        // Our system maps Prisma ID to Supabase metadata.prismaUserId.
+        // But for Admin API updateUserById, we need the Supabase User ID (UUID).
+        // Wait, 'userId' passed here is likely the Prisma ID from the UI.
+
+        // We need to find the Supabase User ID associated with this Prisma User ID.
+        // We can look it up in Supabase using the Prisma ID stored in metadata?
+        // Or we can rely on email which is [loginId]@sullivan-internal.local?
+
+        const prismaUser = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { loginId: true }
+        });
+
+        if (!prismaUser) {
+            return { success: false, error: 'ユーザーが見つかりません' };
+        }
+
+        // Find Supabase user by email (mapped from loginId)
+        const email = `${prismaUser.loginId}@sullivan-internal.local`;
+        const { data: { users }, error: searchError } = await supabase.auth.admin.listUsers();
+
+        // listUsers might be slow if many users. better to search? or assume ID?
+        // Actually, we don't store Supabase ID in Prisma (we store Prisma ID in Supabase).
+        // So we must lookup by email.
+        // Efficient way: listUsers can filter? No, standard listUsers doesn't filter by email easily in JS client?
+        // Actually, we can just use the email map logic if it's consistent.
+        // But updateUserById needs the UUID.
+
+        // Better: Store supabase_id in Prisma? No, we decided not to change schema significantly yet.
+        // Let's search by email.
+
+        // Note: listUsers() returns a list. If we have thousands, this is bad.
+        // Alternative: creating a user with same email fails? No.
+        // supabase.auth.admin.getUserById() -> needs ID.
+
+        // Wait, if we use the mapping `[loginId]@...`, is there any other way?
+        // If we strictly maintain the email map, we can rely on it.
+        // But we need the UID.
+
+        // Actually... we can fetch the user by logging in? No.
+
+        // Let's assume we iterate? No.
+        // OK, I'll use `listUsers` but in a production app with many users this is bad.
+        // Is there a better way?
+        // supabase.auth.admin.createUser will fail if exists.
+
+        // Retrying `listUsers`: does it support search?
+        // documentation says `listUsers` is paginated.
+
+        // Let's try to grab the user ID using a trick?
+        // No.
+
+        // Okay, for now I will fetch users and filter.
+
+        // But wait! When we create the user `admin.createUser`, it returns the user object with ID.
+        // We didn't save it back to Prisma.
+
+        // Correct approach for now: Filter `listUsers`.
+        // If efficient lookup is needed later, we should add `supabaseId` to Prisma User model.
+
+        // Let's proceed with finding user by email in the list.
+
+        const { data, error: listError } = await supabase.auth.admin.listUsers({
+            page: 1,
+            perPage: 1000 // Temporary limit
+        });
+
+        if (listError || !data.users) {
+            console.error(listError);
+            return { success: false, error: 'Supabaseユーザーの取得に失敗しました' };
+        }
+
+        const supabaseUser = data.users.find(u => u.email === email);
+
+        if (!supabaseUser) {
+            return { success: false, error: 'Supabaseユーザーが見つかりません' };
+        }
+
+        const { error: updateError } = await supabase.auth.admin.updateUserById(
+            supabaseUser.id,
+            {
+                password: password,
+                user_metadata: { isDefaultPassword: true }
+            }
+        );
+
+        if (updateError) {
+            console.error(updateError);
+            return { success: false, error: 'パスワードの更新に失敗しました' };
+        }
+
+        return { success: true };
+    } catch (error) {
+        console.error(error);
+        return { success: false, error: 'システムエラーが発生しました' };
+    }
+}
 
 export async function getUsers(
     page: number = 1,

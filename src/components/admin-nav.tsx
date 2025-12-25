@@ -41,10 +41,11 @@ const navItems = [
         icon: BookOpen,
     },
     {
-        title: "システム設定",
-        href: "/admin/settings",
-        icon: Settings,
+        title: "問題管理",
+        href: "/admin/problems",
+        icon: BookOpen, // Or another icon like FileText
     },
+
 ];
 
 interface AdminNavProps {

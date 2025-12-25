@@ -2,12 +2,14 @@ import { prisma } from '@/lib/prisma';
 import { hash } from 'bcryptjs';
 import { Role } from '@prisma/client';
 
+import crypto from 'crypto';
+
 export async function createUser({
     name,
     role = 'STUDENT',
     group,
     classroomId,
-    password, // Optional, defaults to 'password' if not provided (for bulk import etc)
+    password, // Optional, generates random if not provided
 }: {
     name: string;
     role?: Role;
@@ -34,8 +36,8 @@ export async function createUser({
 
     const loginId = `${prefix}${nextNum.toString().padStart(4, '0')}`;
 
-    // Default password if not provided (e.g. for admin creation)
-    const finalPassword = password || 'password123';
+    // SECURITY: Generate random password if not provided (no more fixed 'password123')
+    const finalPassword = password || crypto.randomBytes(8).toString('base64url').slice(0, 12);
     const hashedPassword = await hash(finalPassword, 10);
 
     const user = await prisma.user.create({

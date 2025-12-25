@@ -82,6 +82,23 @@ export async function getNextCustomId(subjectId: string, tx?: any): Promise<stri
     return `${prefix}-${maxNum + 1}`;
 }
 
+/**
+ * バッチ対応版: 複数のカスタムIDを一度に生成 (N+1問題解消用)
+ */
+export async function getNextCustomIds(
+    subjectId: string,
+    count: number,
+    tx?: any
+): Promise<string[]> {
+    const client = tx || prisma;
+    const subject = await client.subject.findUnique({ where: { id: subjectId } });
+    if (!subject) throw new Error('Subject not found');
+
+    const prefix = getSubjectPrefix(subject.name);
+    const maxNum = await getMaxCustomIdNumber(prefix, client);
+
+    return Array.from({ length: count }, (_, i) => `${prefix}-${maxNum + i + 1}`);
+}
+
 // Deprecated wrapper for backward compatibility if widely used, 
 // but we should aim to migrate to getNextCustomId.
-
