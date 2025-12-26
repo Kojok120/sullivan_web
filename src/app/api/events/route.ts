@@ -23,6 +23,10 @@ export async function GET(request: Request) {
 
             // Listener for grading completion
             const onGradingCompleted = (data: any) => {
+                // SECURITY: Filter events to ensure users only receive their own data
+                if (data.studentId && data.studentId !== user.id) {
+                    return;
+                }
                 const message = JSON.stringify({ type: EVENTS.GRADING_COMPLETED, ...data });
                 controller.enqueue(encoder.encode(`data: ${message}\n\n`));
             };

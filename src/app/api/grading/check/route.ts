@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
     const authHeader = request.headers.get('Authorization');
     const expectedSecret = process.env.INTERNAL_API_SECRET;
 
-    if (expectedSecret && authHeader !== `Bearer ${expectedSecret}`) {
+    if (!expectedSecret || authHeader !== `Bearer ${expectedSecret}`) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

@@ -49,9 +49,6 @@ export default function LoginPage() {
                     </form>
                 </div>
                 <div className="text-center text-sm">
-                    <a href="/signup" className="text-primary hover:underline font-medium">
-                        アカウントをお持ちでない方はこちら
-                    </a>
                 </div>
             </div>
         </div>

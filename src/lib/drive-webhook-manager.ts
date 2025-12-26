@@ -9,8 +9,10 @@ function getDrive() {
 export async function watchDriveFolder(webhookUrl: string): Promise<{ resourceId: string; channelId: string; expiration: string }> {
     if (!DRIVE_FOLDER_ID) throw new Error("DRIVE_FOLDER_ID is not set");
 
+    const DRIVE_WEBHOOK_CHANNEL_ID = process.env.DRIVE_WEBHOOK_CHANNEL_ID || '';
+
     const drive = getDrive();
-    const channelId = crypto.randomUUID();
+    const channelId = DRIVE_WEBHOOK_CHANNEL_ID || crypto.randomUUID();
 
     console.log(`Setting up watch for folder ${DRIVE_FOLDER_ID} pointed to ${webhookUrl}`);
 

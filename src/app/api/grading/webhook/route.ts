@@ -15,11 +15,19 @@ export async function POST(request: Request) {
         const resourceId = headers.get('x-goog-resource-id');
         const resourceState = headers.get('x-goog-resource-state');
 
-        // SECURITY: Verify webhook channel ID if configured
-        const expectedChannelId = process.env.DRIVE_WEBHOOK_CHANNEL_ID;
-        if (expectedChannelId && channelId !== expectedChannelId) {
-            console.log(`Webhook rejected: Invalid channel ID ${channelId}`);
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        // SECURITY: Verify webhook channel ID matches the active watch stored in Redis
+        const { getWatchState } = await import('@/lib/drive-watch-state');
+        const activeState = await getWatchState();
+
+        if (!activeState) {
+            console.error('No active watch state found in Redis. Rejecting webhook.');
+            return NextResponse.json({ error: 'No Active Watch' }, { status: 401 });
+        }
+
+        if (channelId !== activeState.channelId) {
+            console.log(`Webhook rejected: Channel ID mismatch. Expected ${activeState.channelId}, got ${channelId}`);
+            // Note: This might happen if an old watch sends a notification. We should ignore it.
+            return NextResponse.json({ error: 'Unauthorized Channel' }, { status: 401 });
         }
 
         console.log(`Webhook received. State: ${resourceState}, Channel: ${channelId}`);
@@ -48,6 +56,10 @@ export async function POST(request: Request) {
             lastTriggerTime = now;
 
             try {
+                // Wait for Google Drive API consistency (files might not be visible immediately after webhook)
+                console.log("Waiting 5s for Drive API consistency...");
+                await new Promise(resolve => setTimeout(resolve, 5000));
+
                 await checkDriveForNewFiles();
             } catch (e) {
                 console.error("Webhook processing error:", e);

@@ -23,7 +23,7 @@ export async function middleware(request: NextRequest) {
     }
 
     // SECURITY: Read role from app_metadata (secure) with fallback to user_metadata for migration
-    const userRole = user?.app_metadata?.role || user?.user_metadata?.role;
+    const userRole = user?.app_metadata?.role;
 
     // Admin routes check - must be authenticated AND have ADMIN role
     if (request.nextUrl.pathname.startsWith('/admin')) {

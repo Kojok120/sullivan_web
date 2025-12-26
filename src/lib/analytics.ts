@@ -435,10 +435,17 @@ export async function getLearningSessions(userId: string, limit = 10, offset = 0
     }));
 }
 
-export async function getSessionDetails(groupId: string) {
+export async function getSessionDetails(groupId: string, userId?: string) {
     if (!groupId) return [];
+
+    // SECURITY: If userId is provided, ensure we only fetch data for that user
+    const whereClause: any = { groupId };
+    if (userId) {
+        whereClause.userId = userId;
+    }
+
     return await prisma.learningHistory.findMany({
-        where: { groupId },
+        where: whereClause,
         include: {
             problem: {
                 include: {

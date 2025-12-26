@@ -7,3 +7,5 @@ README.md
 .next
 .git
 .env
+.env.production
+service-account.json

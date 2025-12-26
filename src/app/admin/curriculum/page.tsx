@@ -16,7 +16,7 @@ export default async function CurriculumPage() {
 
     return (
         <div className="container mx-auto py-10">
-            <h1 className="text-3xl font-bold mb-8">カリキュラム・コンテンツ管理</h1>
+            <h1 className="text-3xl font-bold mb-8">Core Problem管理</h1>
             <p className="text-muted-foreground mb-6">
                 科目、単元、コア問題、および個々の問題と解説動画を管理します。
             </p>

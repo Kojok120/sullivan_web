@@ -22,13 +22,14 @@ export async function getSession(): Promise<SessionPayload | null> {
 
         if (!user) return null;
 
-        // SECURITY: Read from app_metadata (secure, server-only) with fallback to user_metadata for migration
+        // SECURITY: Read from app_metadata (secure, server-only) strictly.
+        // Fallback to user_metadata removed to prevent privilege escalation.
         const appMeta = user.app_metadata || {};
-        const userMeta = user.user_metadata || {};
+        const userMeta = user.user_metadata || {}; // Kept for 'name' if allowed
 
         return {
-            userId: appMeta.prismaUserId || userMeta.prismaUserId || user.id,
-            role: appMeta.role || userMeta.role || 'STUDENT',
+            userId: appMeta.prismaUserId || user.id, // removed userMeta.prismaUserId
+            role: appMeta.role || 'STUDENT',         // removed userMeta.role
             name: appMeta.name || userMeta.name || '',
         };
     } catch (error) {

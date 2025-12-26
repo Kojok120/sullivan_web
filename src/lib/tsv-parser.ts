@@ -107,7 +107,7 @@ export function parseProblemTSV(input: string, skipHeader = true): ParsedProblem
         const videoUrl = cols[5] || '';
 
         // Parse CoreProblem names (can be comma or newline separated)
-        const coreProblemNames = cpRaw.split(/[,\n]+/).map(s => s.trim()).filter(Boolean);
+        const coreProblemNames = cpRaw.split(/[,\n、]+/).map(s => s.trim()).filter(Boolean);
         const coreProblemName = cpRaw; // raw value for single name case
 
         // Parse accepted answers (comma separated)

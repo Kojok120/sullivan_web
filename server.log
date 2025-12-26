@@ -1,0 +1,25 @@
+
+> sullivan-app@0.1.0 dev
+> next dev
+
+ ⚠ Port 3000 is in use by process 9957, using available port 3001 instead.
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+ ⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of /Users/kojok/Desktop/pnpm-lock.yaml as the root directory.
+ To silence this warning, set `turbopack.root` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack#root-directory for more information.
+ Detected additional lockfiles: 
+   * /Users/kojok/Desktop/Sullivan/package-lock.json
+
+   ▲ Next.js 16.0.3 (Turbopack)
+   - Local:         http://localhost:3001
+   - Network:       http://192.168.0.20:3001
+   - Environments: .env
+
+ ✓ Starting...
+ ⨯ Unable to acquire lock at /Users/kojok/Desktop/Sullivan/.next/dev/lock, is another i POST /api/drive/watch/setup 401 in 1921ms (compile: 1908ms, render: 13ms)
+ POST /api/drive/watch/setup 500 in 5ms (compile: 3ms, render: 2ms)
+ POST /api/drive/watch/setup 401 in 6ms (compile: 2ms, render: 4ms)
+ POST /api/drive/watch/setup 500 in 6ms (compile: 3ms, render: 4ms)
+mapping@latest -D`
+[?25h

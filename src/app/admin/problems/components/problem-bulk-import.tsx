@@ -27,6 +27,7 @@ interface ParsedProblem {
     grade?: string;
     videoUrl?: string;
     coreProblemName?: string;
+    coreProblemNames?: string[];
     isValid: boolean;
     error?: string;
 }
@@ -94,6 +95,7 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
                 grade: row.grade,
                 videoUrl: row.videoUrl,
                 coreProblemName: row.coreProblemName,
+                coreProblemNames: row.coreProblemNames,
                 isValid,
                 error
             };
@@ -130,8 +132,16 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
                 // Add manually selected CoreProblems
                 coreProblems.forEach(cp => coreProblemIds.push(cp.id));
 
-                // Add auto-resolved CoreProblem from the row
-                if (p.coreProblemName) {
+                // Add auto-resolved CoreProblems from the row
+                if (p.coreProblemNames && p.coreProblemNames.length > 0) {
+                    p.coreProblemNames.forEach(name => {
+                        const resolved = resolvedCoreProblems.get(name);
+                        if (resolved && !coreProblemIds.includes(resolved.id)) {
+                            coreProblemIds.push(resolved.id);
+                        }
+                    });
+                } else if (p.coreProblemName) {
+                    // Fallback for singular
                     const resolved = resolvedCoreProblems.get(p.coreProblemName);
                     if (resolved && !coreProblemIds.includes(resolved.id)) {
                         coreProblemIds.push(resolved.id);
@@ -294,10 +304,21 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
                                                     )}
                                                 </TableCell>
                                                 <TableCell>{row.grade}</TableCell>
-                                                <TableCell className="max-w-[100px] truncate">
-                                                    {row.coreProblemName}
-                                                    {row.coreProblemName && !resolvedCoreProblems.has(row.coreProblemName) && (
-                                                        <span className="text-orange-500 ml-1" title="未解決">⚠</span>
+                                                <TableCell className="max-w-[150px]">
+                                                    {row.coreProblemNames && row.coreProblemNames.length > 0 ? (
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {row.coreProblemNames.map(name => {
+                                                                const isResolved = resolvedCoreProblems.has(name);
+                                                                return (
+                                                                    <span key={name} className={`text-xs px-1 rounded border ${isResolved ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
+                                                                        {name}
+                                                                        {!isResolved && ' (?)'}
+                                                                    </span>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    ) : (
+                                                        row.coreProblemName || '-'
                                                     )}
                                                 </TableCell>
                                                 <TableCell className="max-w-[200px] truncate" title={row.question}>{row.question}</TableCell>

@@ -24,6 +24,11 @@ export async function createClient() {
                     }
                 },
             },
+            cookieOptions: {
+                sameSite: 'lax',
+                secure: process.env.NODE_ENV === 'production',
+                httpOnly: true,
+            },
         }
     );
 }

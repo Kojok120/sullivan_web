@@ -37,7 +37,7 @@ export async function getMaxCustomIdNumber(prefix: string, client: any = prisma)
     try {
         const lengthPlusOne = prefixDash.length + 1;
         const result = await client.$queryRaw`
-            SELECT MAX(CAST(SUBSTRING("customId", ${lengthPlusOne}) AS INTEGER)) as max_num
+            SELECT MAX(CAST(SUBSTRING("customId", ${lengthPlusOne}::integer) AS INTEGER)) as max_num
             FROM "Problem"
             WHERE "customId" LIKE ${prefixDash + '%'}
             -- Ensure we only pick ones that look like number at the end to avoid casting errors

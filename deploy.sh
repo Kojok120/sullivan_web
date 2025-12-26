@@ -31,9 +31,11 @@ gcloud run deploy sullivan-app \
   --set-env-vars "GEMINI_MODEL=$GEMINI_MODEL" \
   --set-env-vars "JWT_SECRET=$JWT_SECRET" \
   --set-env-vars "DRIVE_FOLDER_ID=$DRIVE_FOLDER_ID" \
-  --set-env-vars "APP_URL=${APP_URL:-https://placeholder.com}" \
+  --set-env-vars "APP_URL=https://sullivan-app-97352275682.asia-northeast1.run.app" \
   --set-env-vars "NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL" \
   --set-env-vars "NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+  --set-env-vars "INTERNAL_API_SECRET=$INTERNAL_API_SECRET" \
+  --set-env-vars "DRIVE_WEBHOOK_CHANNEL_ID=$DRIVE_WEBHOOK_CHANNEL_ID" \
   --set-env-vars "GOOGLE_APPLICATION_CREDENTIALS=/secrets/service-account.json" \
   --set-secrets="/secrets/service-account.json=sullivan-service-account:latest"
 

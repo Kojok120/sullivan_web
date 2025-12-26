@@ -7,6 +7,7 @@ import { requireAdmin, hashPassword } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function resetPassword(userId: string, password: string) {
+    await requireAdmin();
     try {
         const supabase = createAdminClient();
 

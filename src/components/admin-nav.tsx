@@ -36,7 +36,7 @@ const navItems = [
         icon: School,
     },
     {
-        title: "カリキュラム管理",
+        title: "Core Problem管理",
         href: "/admin/curriculum",
         icon: BookOpen,
     },

@@ -9,8 +9,13 @@ export const dynamic = 'force-dynamic';
  * Registers a new Google Drive Push Notification watch for the configured folder.
  * This should be called once after deployment, or when the watch expires.
  */
-export async function POST() {
+export async function POST(request: Request) {
     try {
+        const authHeader = request.headers.get('Authorization');
+        if (authHeader !== `Bearer ${process.env.INTERNAL_API_SECRET}`) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const appUrl = process.env.APP_URL;
         if (!appUrl) {
             return NextResponse.json(

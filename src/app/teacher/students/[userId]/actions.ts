@@ -45,7 +45,8 @@ export async function updateStudentProfile(userId: string, formData: FormData) {
                 bio,
                 notes,
                 birthday: birthdayStr ? new Date(birthdayStr) : null,
-                classroomId: (classroomId && classroomId !== 'unselected') ? classroomId : null,
+                // SECURITY: Only Admins can change classroomId to prevent unauthorized transfers
+                classroomId: (session.role === 'ADMIN' && classroomId && classroomId !== 'unselected') ? classroomId : undefined,
 
                 group: (group && group !== 'unselected') ? group : null,
                 school,
@@ -76,6 +77,15 @@ export async function addGuidanceRecord(userId: string, formData: FormData) {
         return { error: '必須項目が入力されていません' };
     }
 
+    // SECURITY: Verify student is in teacher's classroom
+    if (session.role === 'TEACHER') {
+        const teacher = await prisma.user.findUnique({ where: { id: session.userId }, select: { classroomId: true } });
+        const student = await prisma.user.findUnique({ where: { id: userId }, select: { classroomId: true } });
+        if (!teacher?.classroomId || !student?.classroomId || teacher.classroomId !== student.classroomId) {
+            return { error: '担当教室外の生徒です' };
+        }
+    }
+
     try {
         await prisma.guidanceRecord.create({
             data: {
@@ -102,6 +112,14 @@ export async function deleteGuidanceRecord(recordId: string, studentId: string) 
     }
 
     try {
+        // SECURITY: Verify ownership or admin
+        if (session.role !== 'ADMIN') {
+            const record = await prisma.guidanceRecord.findUnique({ where: { id: recordId } });
+            if (!record || record.teacherId !== session.userId) {
+                return { error: '削除権限がありません' };
+            }
+        }
+
         await prisma.guidanceRecord.delete({
             where: { id: recordId },
         });

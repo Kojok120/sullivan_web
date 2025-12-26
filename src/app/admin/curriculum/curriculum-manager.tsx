@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Subject, CoreProblem } from '@prisma/client';
 import { CoreProblemList } from './components/core-problem-list';
+import { CoreProblemBulkImport } from './components/core-problem-bulk-import';
 import { ProblemEditor } from './components/problem-editor';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -20,6 +21,11 @@ export function CurriculumManager({ initialSubjects }: CurriculumManagerProps) {
     const [subjects, setSubjects] = useState(initialSubjects);
     const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(subjects[0]?.id || null);
     const [selectedCoreProblemId, setSelectedCoreProblemId] = useState<string | null>(null);
+
+    // Sync state with props when server action updates data
+    useEffect(() => {
+        setSubjects(initialSubjects);
+    }, [initialSubjects]);
 
     const selectedSubject = subjects.find(s => s.id === selectedSubjectId) || null;
 
@@ -60,7 +66,10 @@ export function CurriculumManager({ initialSubjects }: CurriculumManagerProps) {
                 {/* Left Pane: Core Problems */}
                 <div className="col-span-3 border rounded-lg bg-muted/10 flex flex-col overflow-hidden">
                     <div className="p-3 border-b bg-muted/20 font-semibold text-sm flex justify-between items-center">
-                        <span>単元・コア問題</span>
+                        <div className="flex items-center gap-2">
+                            <span>単元・コア問題</span>
+                            {selectedSubject && <CoreProblemBulkImport subjectId={selectedSubject.id} />}
+                        </div>
                         <span className="text-xs font-normal text-muted-foreground">
                             {selectedSubject?.coreProblems.length || 0}件
                         </span>

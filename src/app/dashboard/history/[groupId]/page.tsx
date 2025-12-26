@@ -14,7 +14,8 @@ export default async function SessionDetailsPage({ params }: { params: Promise<{
     if (!session) redirect('/login');
 
     const { groupId } = await params;
-    const details = await getSessionDetails(groupId);
+    // SECURITY: Pass userId to restrict access to own history only
+    const details = await getSessionDetails(groupId, session.userId);
     if (!details || details.length === 0) {
         return <div>履歴が見つかりません</div>;
     }
