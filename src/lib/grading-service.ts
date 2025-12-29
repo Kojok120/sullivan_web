@@ -140,6 +140,32 @@ export async function processFile(fileId: string, fileName: string) {
             // Archive the file (using the first result's studentId)
             const problemIdForContext = results[0].problemId;
             await archiveProcessedFile(fileId, results[0].studentId, problemIdForContext, new Date(), fileName);
+
+            // [NEW] Increment Stamp Count (Effort Visualization)
+            try {
+                const userId = results[0].studentId;
+                const user = await prisma.user.findUnique({ where: { id: userId }, select: { metadata: true } });
+                const meta = (user?.metadata as any) || {};
+                const stampCard = meta.stampCard || { totalStamps: 0, lastSeenStamps: 0 };
+
+                // Increment totalStamps by 1 (per file)
+                await prisma.user.update({
+                    where: { id: userId },
+                    data: {
+                        metadata: {
+                            ...meta,
+                            stampCard: {
+                                ...stampCard,
+                                totalStamps: (stampCard.totalStamps || 0) + 1
+                            }
+                        }
+                    }
+                });
+                console.log(`Incremented stamp count for user ${userId}`);
+            } catch (e) {
+                console.error("Failed to update stamp count:", e);
+            }
+
             console.log(`Archived file ${fileName}`);
         } else {
             await renameFile(fileId, `[ERROR] ${fileName}`);

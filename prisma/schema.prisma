@@ -62,6 +62,7 @@ model User {
   group     String?  // 所属グループ名 (e.g., "月曜")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  metadata  Json?
 
   learningHistory       LearningHistory[]
   userProblemStates     UserProblemState[]

@@ -1,4 +1,3 @@
-import { watchDriveFolder } from '../src/lib/drive-webhook-manager';
 import dotenv from 'dotenv';
 import path from 'path';
 
@@ -15,9 +14,21 @@ if (!url) {
 
 async function main() {
     try {
+        // Dynamic import to ensure env vars are loaded first
+        const { watchDriveFolder } = await import('../src/lib/drive-webhook-manager');
+
         console.log(`Setting up webhook for URL: ${url}`);
         const result = await watchDriveFolder(url);
-        console.log("SUCCESS! Webhook registered.");
+
+        // Save state to Redis (CRITICAL FIX)
+        const { saveWatchState } = await import('../src/lib/drive-watch-state');
+        await saveWatchState({
+            channelId: result.channelId,
+            resourceId: result.resourceId,
+            expiration: Number(result.expiration)
+        });
+
+        console.log("SUCCESS! Webhook registered and state saved to Redis.");
         console.log("----------------------------------------");
         console.log("Channel ID:", result.channelId);
         console.log("Resource ID:", result.resourceId);

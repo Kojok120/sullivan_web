@@ -1,23 +1,45 @@
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { SessionList } from "./dashboard/components/session-list";
+import { getSubjectProgress } from "@/lib/analytics";
+import { History } from "lucide-react";
+import { StudentPrintDialog } from "@/components/print/student-print-dialog";
+import { StampOverlay } from "@/components/grading/stamp-overlay";
 
 export default async function Home() {
     const session = await getSession();
     if (!session) redirect("/login");
 
+    const subjectProgress = await getSubjectProgress(session.userId);
+
     return (
         <div className="container mx-auto px-4 py-12 max-w-4xl">
-            <header className="mb-8">
+            <header className="mb-10">
+                <StampOverlay />
                 <h1 className="text-3xl font-bold text-foreground tracking-tight mb-2">
-                    学習履歴
+                    ホーム
                 </h1>
                 <p className="text-muted-foreground">
-                    {session.name}さんのこれまでの学習記録です
+                    {session.name}さん、こんにちは
                 </p>
             </header>
 
-            <SessionList userId={session.userId} />
+            <section className="mb-8 flex justify-end">
+                <StudentPrintDialog subjects={subjectProgress} />
+            </section>
+
+            <section>
+                <div className="mb-6">
+                    <h2 className="text-2xl font-bold mb-2 flex items-center gap-2">
+                        <History className="h-6 w-6" />
+                        学習履歴
+                    </h2>
+                    <p className="text-muted-foreground">
+                        これまでの学習記録です
+                    </p>
+                </div>
+                <SessionList userId={session.userId} />
+            </section>
         </div>
     );
 }

@@ -1,0 +1,128 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import confetti from 'canvas-confetti';
+import { StampCard } from './stamp-card';
+import { getStampData, markStampsAsSeen } from '@/app/actions/stamp';
+import { Button } from '@/components/ui/button';
+import { X } from 'lucide-react';
+
+export function StampOverlay() {
+    const [isOpen, setIsOpen] = useState(false);
+    const [data, setData] = useState<{ total: number, newCount: number } | null>(null);
+
+    useEffect(() => {
+        const checkStamps = async () => {
+            try {
+                const stampData = await getStampData();
+                if (stampData && stampData.newStamps > 0) {
+                    setData({ total: stampData.totalStamps, newCount: stampData.newStamps });
+                    setIsOpen(true);
+                    triggerConfetti();
+                }
+            } catch (error) {
+                console.error("Failed to check stamps:", error);
+            }
+        };
+
+        // Check immediately on mount
+        checkStamps();
+
+        // Optional: Poll every 30 seconds for external updates (e.g. if grading finished in bg)
+        // const interval = setInterval(checkStamps, 30000);
+        // return () => clearInterval(interval);
+    }, []);
+
+    const handleClose = async () => {
+        setIsOpen(false);
+        if (data) {
+            await markStampsAsSeen(data.total);
+        }
+    };
+
+    const triggerConfetti = () => {
+        const duration = 3000;
+        const animationEnd = Date.now() + duration;
+        const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 9999 };
+
+        const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
+
+        const interval: any = setInterval(function () {
+            const timeLeft = animationEnd - Date.now();
+
+            if (timeLeft <= 0) {
+                return clearInterval(interval);
+            }
+
+            const particleCount = 50 * (timeLeft / duration);
+            // since particles fall down, start a bit higher than random
+            confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
+            confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
+        }, 250);
+    };
+
+    return (
+        <AnimatePresence>
+            {isOpen && data && (
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+                >
+                    <motion.div
+                        initial={{ scale: 0.5, y: 50 }}
+                        animate={{ scale: 1, y: 0 }}
+                        exit={{ scale: 0.5, y: 50 }}
+                        className="w-full max-w-md"
+                    >
+                        <div className="relative">
+                            {/* Close button just in case */}
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="absolute -top-12 right-0 text-white hover:bg-white/20"
+                                onClick={handleClose}
+                            >
+                                <X className="h-6 w-6" />
+                            </Button>
+
+                            <div className="text-center mb-8">
+                                <motion.h2
+                                    initial={{ scale: 0 }}
+                                    animate={{ scale: 1.2 }}
+                                    transition={{ type: "spring", stiffness: 200, delay: 0.2 }}
+                                    className="text-4xl font-extrabold text-white drop-shadow-md"
+                                >
+                                    提出えらい！
+                                </motion.h2>
+                                <motion.p
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    transition={{ delay: 0.5 }}
+                                    className="text-xl text-yellow-300 mt-2 font-bold"
+                                >
+                                    スタンプ {data.newCount}個 GET!!
+                                </motion.p>
+                            </div>
+
+                            <StampCard totalStamps={data.total} newStamps={data.newCount} />
+
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 2 }} // Wait 2 seconds before showing close button to ensure they see it
+                                className="mt-8 flex justify-center"
+                            >
+                                <Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-8 shadow-lg transform transition active:scale-95" onClick={handleClose}>
+                                    あつめる！
+                                </Button>
+                            </motion.div>
+                        </div>
+                    </motion.div>
+                </motion.div>
+            )}
+        </AnimatePresence>
+    );
+}

@@ -3,12 +3,15 @@ import { redirect } from 'next/navigation';
 import { getStudentStats, getSubjectProgress, getDailyActivity } from '@/lib/analytics';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Activity, Trophy, Target } from 'lucide-react'; // Clock removed
+import { Activity, Trophy, Target, Printer } from 'lucide-react'; // Clock removed
+import { Button } from "@/components/ui/button";
 import { ActivityChart } from './activity-chart';
 import Link from 'next/link';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
 import { getUnwatchedCount } from "@/lib/analytics";
+
+import { StampOverlay } from '@/components/grading/stamp-overlay';
 
 export default async function DashboardPage() {
     const session = await getSession();
@@ -103,7 +106,14 @@ export default async function DashboardPage() {
                                 <div key={subject.subjectId} className="space-y-2">
                                     <div className="flex items-center justify-between text-sm">
                                         <div className="font-medium">{subject.subjectName}</div>
-                                        <div className="text-muted-foreground">{subject.progressPercentage}%</div>
+                                        <div className="flex items-center gap-2">
+                                            <div className="text-muted-foreground">{subject.progressPercentage}%</div>
+                                            <Link href={`/dashboard/print?subjectId=${subject.subjectId}`} title="問題を印刷">
+                                                <Button variant="ghost" size="icon" className="h-6 w-6">
+                                                    <Printer className="h-4 w-4" />
+                                                </Button>
+                                            </Link>
+                                        </div>
                                     </div>
                                     <Progress value={subject.progressPercentage} />
                                 </div>
