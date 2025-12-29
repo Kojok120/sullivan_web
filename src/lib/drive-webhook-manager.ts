@@ -22,7 +22,7 @@ export async function watchDriveFolder(webhookUrl: string): Promise<{ resourceId
             id: channelId,
             type: 'web_hook',
             address: webhookUrl,
-            // expiration: (Date.now() + 86400000).toString() // Optional: 1 day, default varies
+            expiration: (Date.now() + 604800000).toString() // 7 days (Google Drive Max)
         }
     });
 

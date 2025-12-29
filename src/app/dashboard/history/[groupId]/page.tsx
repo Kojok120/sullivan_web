@@ -59,9 +59,11 @@ export default async function SessionDetailsPage({ params }: { params: Promise<{
                                         <Badge variant={isCorrect ? "default" : "destructive"}>
                                             {item.evaluation}
                                         </Badge>
-                                        <span className="text-sm font-bold text-muted-foreground">問{index + 1}</span>
+                                        <span className="text-sm font-bold text-muted-foreground">
+                                            {item.problem.customId ? item.problem.customId : `問${index + 1}`}
+                                        </span>
                                     </div>
-                                    <CardTitle className="text-lg leading-relaxed pt-2">
+                                    <CardTitle className="text-lg leading-relaxed pt-2 whitespace-pre-wrap">
                                         {item.problem.question}
                                     </CardTitle>
                                 </div>

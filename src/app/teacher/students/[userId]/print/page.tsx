@@ -39,8 +39,10 @@ export default async function PrintPage({
     }
 
     // Generate QR Code for the entire sheet
-    const problemIds = problems.map(p => p.id);
-    const qrCodeDataUrl = await generateQRCode(userId, problemIds);
+    // Use customId (e.g. "E-1") for compression if available, otherwise fall back to id (CUID)
+    const problemIds = problems.map(p => p.customId || p.id);
+    // Use loginId (e.g. S0001) for QR code to ensure persistence across DB resets
+    const qrCodeDataUrl = await generateQRCode(student.loginId, problemIds);
 
     return (
         <PrintLayout

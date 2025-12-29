@@ -28,29 +28,52 @@ export function PrintLayout({ studentName, subjectName, problems, qrCodeDataUrl 
     const [paginatedProblems, setPaginatedProblems] = useState<(Problem & { customId?: string | null })[][]>([]);
     const [isCalculating, setIsCalculating] = useState(true);
     const measureRef = useRef<HTMLDivElement>(null);
+    const answerMeasureRef = useRef<HTMLDivElement>(null);
 
     useLayoutEffect(() => {
         if (!measureRef.current) return;
 
+        // 1. Calculate Max Answer Sheet Capacity (Strict Height Calculation)
+        let safeLimit = problems.length;
+
+        if (answerMeasureRef.current) {
+            const answerRow = answerMeasureRef.current.firstElementChild as HTMLElement;
+            if (answerRow) {
+                const rowHeight = answerRow.offsetHeight;
+                const gap = 32; // gap-8 = 2rem = 32px
+                // Formula: N * h + (N-1) * gap <= MAX_HEIGHT
+                // N(h+g) - g <= MAX
+                // N <= (MAX + g) / (h+g)
+                const maxQuestions = Math.floor((MAX_PAGE_HEIGHT_PX + gap) / (rowHeight + gap));
+                safeLimit = Math.min(problems.length, maxQuestions);
+
+                // Debug log (optional)
+                // console.log(`Answer Sheet Capacity: ${maxQuestions}, Safe Limit: ${safeLimit}`);
+            }
+        }
+
+        const limitedProblems = problems.slice(0, safeLimit);
         const problemNodes = measureRef.current.children;
         const pages: (Problem & { customId?: string | null })[][] = [];
         let currentPage: (Problem & { customId?: string | null })[] = [];
         let currentHeight = 0;
 
-        // Dynamic Max Pages if needed, or keep limit but allow dynamic count up to limit
-        // Current requirement: "1〜2 ページしかない場合でも1/3...実数に合わせる"
-        // So we should calculate total pages based on content.
-
-        for (let i = 0; i < problemNodes.length; i++) {
+        // 2. Paginate Question Pages using the LIMITED problem set
+        // Note: problemNodes corresponds to the full 'problems' list. We only iterate up to safeLimit.
+        for (let i = 0; i < limitedProblems.length; i++) {
             const node = problemNodes[i] as HTMLElement;
             const height = node.offsetHeight;
 
+            // Existing logic underestimates height because it ignores gap/margin between items (space-y-6)
+            // But we keep it as is to minimize regression on Question Pages, 
+            // assuming MAX_PAGE_HEIGHT_PX has enough buffer.
+
             if (currentHeight + height > MAX_PAGE_HEIGHT_PX) {
                 pages.push(currentPage);
-                currentPage = [problems[i]];
+                currentPage = [limitedProblems[i]];
                 currentHeight = height;
             } else {
-                currentPage.push(problems[i]);
+                currentPage.push(limitedProblems[i]);
                 currentHeight += height;
             }
         }
@@ -88,6 +111,20 @@ export function PrintLayout({ studentName, subjectName, problems, qrCodeDataUrl 
                         isMeasurement={true}
                     />
                 ))}
+            </div>
+
+            {/* Hidden Answer Sheet Measurement Container */}
+            <div
+                ref={answerMeasureRef}
+                className="absolute top-0 left-0 -z-50 opacity-0 pointer-events-none w-[210mm] print:hidden"
+                aria-hidden="true"
+            >
+                {/* Mock Answer Row to measure height */}
+                <div className="flex gap-4 items-end break-inside-avoid">
+                    <div className="font-bold w-16 text-right text-xl">1.</div>
+                    <div className="text-xl font-bold mb-1">A.</div>
+                    <div className="flex-1 border-b-2 border-gray-800 mb-1"></div>
+                </div>
             </div>
 
             {/* No-Print Controls */}

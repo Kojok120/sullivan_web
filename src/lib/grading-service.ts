@@ -44,15 +44,71 @@ function getDrive() {
 
 // Types
 type QRData = {
-    sid: string; // Student ID
-    pids: string[]; // Problem IDs
+    sid: string; // Student ID (LoginID or CUID)
+    pids?: string[]; // Legacy or fallback full IDs
+    sub?: string; // Subject prefix (e.g. "E")
+    nos?: (string | number)[]; // Numbers (e.g. [1, 2])
 };
+
+// Compression Helpers
+function compressProblemIds(ids: string[]): Partial<QRData> {
+    if (ids.length === 0) return { pids: [] };
+
+    // Regex to capture "Prefix-Number" (e.g. "E-151" -> "E", "151")
+    // Assumes customId format is "Subject-Number" or similar.
+    // Adjust regex if format differs. Taking flexible approach: "Anything-Number"
+    const regex = /^([a-zA-Z]+)-(\d+)$/;
+
+    // Check first item
+    const firstMatch = ids[0].match(regex);
+    if (!firstMatch) {
+        // Fallback to full list if first item doesn't match
+        return { pids: ids };
+    }
+
+    const commonPrefix = firstMatch[1];
+    const numbers: (string | number)[] = [];
+
+    // Verify all items match and have same prefix
+    for (const id of ids) {
+        const match = id.match(regex);
+        if (!match || match[1] !== commonPrefix) {
+            // Mixed or invalid format -> Fallback
+            return { pids: ids };
+        }
+        numbers.push(parseInt(match[2], 10)); // Store as number for compactness
+    }
+
+    return { sub: commonPrefix, nos: numbers };
+}
+
+function expandProblemIds(data: QRData): string[] {
+    if (data.pids && data.pids.length > 0) {
+        return data.pids;
+    }
+    if (data.sub && data.nos) {
+        return data.nos.map(n => `${data.sub}-${n}`);
+    }
+    return [];
+}
 
 // 1. Generate QR Code
 export async function generateQRCode(studentId: string, problemIds: string[]): Promise<string> {
-    const data: QRData = { sid: studentId, pids: problemIds };
+    // Attempt compression
+    const compressed = compressProblemIds(problemIds);
+
+    const data: QRData = {
+        sid: studentId,
+        ...compressed
+    };
+
     const json = JSON.stringify(data);
-    return await QRCode.toDataURL(json);
+    // Increase robustness: High error correction and reasonable resolution
+    return await QRCode.toDataURL(json, {
+        errorCorrectionLevel: 'H',
+        width: 300, // Ensure sufficient resolution
+        margin: 2
+    });
 }
 
 // 2. Poll Drive for New Files
@@ -141,30 +197,6 @@ export async function processFile(fileId: string, fileName: string) {
             const problemIdForContext = results[0].problemId;
             await archiveProcessedFile(fileId, results[0].studentId, problemIdForContext, new Date(), fileName);
 
-            // [NEW] Increment Stamp Count (Effort Visualization)
-            try {
-                const userId = results[0].studentId;
-                const user = await prisma.user.findUnique({ where: { id: userId }, select: { metadata: true } });
-                const meta = (user?.metadata as any) || {};
-                const stampCard = meta.stampCard || { totalStamps: 0, lastSeenStamps: 0 };
-
-                // Increment totalStamps by 1 (per file)
-                await prisma.user.update({
-                    where: { id: userId },
-                    data: {
-                        metadata: {
-                            ...meta,
-                            stampCard: {
-                                ...stampCard,
-                                totalStamps: (stampCard.totalStamps || 0) + 1
-                            }
-                        }
-                    }
-                });
-                console.log(`Incremented stamp count for user ${userId}`);
-            } catch (e) {
-                console.error("Failed to update stamp count:", e);
-            }
 
             console.log(`Archived file ${fileName}`);
         } else {
@@ -464,16 +496,57 @@ async function gradeWithGemini(filePath: string): Promise<GradingResult[] | null
             qrData = await scanQRWithGemini(model, base64Data, mimeType);
         }
 
-        if (!qrData || !qrData.sid || !qrData.pids || !Array.isArray(qrData.pids)) {
+        if (!qrData || !qrData.sid) {
             console.error("Failed to extract QR data (Local & AI) from", filePath);
             return null;
         }
 
         // SECURITY: Mask student ID in logs (show only last 4 chars)
-        console.log(`QR Found: Student=...${qrData.sid.slice(-4)}, Problems=${qrData.pids.length}`);
+        const pidsCount = qrData.pids ? qrData.pids.length : (qrData.nos ? qrData.nos.length : 0);
+        console.log(`QR Found: Student=...${qrData.sid.slice(-4)}, Problems=${pidsCount}`);
+
+        // [NEW] Resolve User (Strict loginId only)
+        // User requested to rely solely on loginId (e.g. S0001) for persistence.
+        let userId = qrData.sid;
+        const user = await prisma.user.findUnique({
+            where: { loginId: userId }
+        });
+
+        if (!user) {
+            console.error(`User for QR ID ${userId} not found in DB (checked loginId and id).`);
+            return null;
+        }
+
+        // Use the persistent CUID for internal processing
+        userId = user.id;
+        console.log(`Resolved User: ${user.name} (${user.loginId}) -> ${user.id}`);
+
+        // [NEW] Increment Stamp Count (Effort Visualization) - Triggered immediately after ID resolution
+        try {
+            const meta = (user.metadata as any) || {};
+            const stampCard = meta.stampCard || { totalStamps: 0, lastSeenStamps: 0 };
+
+            await prisma.user.update({
+                where: { id: user.id },
+                data: {
+                    metadata: {
+                        ...meta,
+                        stampCard: {
+                            ...stampCard,
+                            totalStamps: (stampCard.totalStamps || 0) + 1
+                        }
+                    }
+                }
+            });
+            console.log(`[Effort] Incremented stamp count for user ${user.id} early.`);
+        } catch (e) {
+            console.error("[Effort] Failed to update stamp count:", e);
+        }
 
         // 5. Fetch Full Problem Context from DB
-        const uniquePids = Array.from(new Set(qrData.pids.filter((p: any) => typeof p === 'string')));
+        const extractedPids = expandProblemIds(qrData);
+        const uniquePids = Array.from(new Set(extractedPids));
+
         console.log(`Fetching problems from DB for IDs: ${uniquePids.join(', ')}`);
         const problems = await prisma.problem.findMany({
             where: {
@@ -561,7 +634,7 @@ async function gradeWithGemini(filePath: string): Promise<GradingResult[] | null
 
         // Map to GradingResult type
         return resultsJson.map((r: any) => ({
-            studentId: qrData.sid,
+            studentId: userId, // Use the verified/recovered ID
             problemId: r.problemId,
             userAnswer: r.studentAnswer || "(空欄)",
             evaluation: r.evaluation,
@@ -584,16 +657,18 @@ async function scanQRWithGemini(model: any, base64Data: string, mimeType: string
         1. Decode the QR code.
         2. Extract the JSON data from the QR code.
 
-        The expected JSON structure:
+        The expected JSON structure (it might be compressed):
         {
             "sid": "student_id_string",
-            "pids": ["problem_id_1", "problem_id_2", ...]
+            "pids": ["pid1", "pid2"] // Legacy format
+            // OR Compressed Format:
+            "sub": "SubjectPrefix", // e.g. "E"
+            "nos": [1, 2, 5...]     // Numbers, which combine with sub to form IDs (e.g. "E-1")
         }
 
         IMPORTANT:
-        - The "sid" is a CUID string (approximately 25 alphanumeric characters starting with "cm" or "cl").
-        - Do NOT use Japanese names like "生徒1" as the sid. Extract the actual ID string from the QR.
-        - The "pids" array contains problem IDs (e.g., "E-1", "M-5", or CUIDs).
+        - The "sid" is the student Identifier. It can be a Login ID (e.g. "S0001") or a CUID (e.g. "cm...").
+        - If you see "S0001", use it as the sid.
         
         Return ONLY the JSON object found in the QR code. Do not fabricate data.
         `;
@@ -630,6 +705,8 @@ function parseJSON(text: string): any {
         return null;
     }
 }
+
+
 
 // 5. Save Result (Unified)
 // Unified Grading Logic (Batch)
