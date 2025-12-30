@@ -37,18 +37,21 @@ export default async function StudentPrintPage({
         return <div>Data not found</div>;
     }
 
-    // Generate QR Code for the entire sheet
-    // Use customId (e.g. "E-1") for compression if available, otherwise fall back to id (CUID)
-    const problemIds = problems.map(p => p.customId || p.id);
-    // Use loginId (e.g. S0001) for QR code to ensure persistence across DB resets
-    const qrCodeDataUrl = await generateQRCode(student.loginId, problemIds);
+    // Sort by customId (Natural Sort)
+    // Client-side will handle final truncation and QR generation
+    const { naturalSort } = await import('@/lib/utils');
+    problems.sort((a, b) => {
+        const idA = a.customId || a.id;
+        const idB = b.customId || b.id;
+        return naturalSort(idA, idB);
+    });
 
     return (
         <PrintLayout
             studentName={student.name || student.loginId}
             subjectName={subject.name}
             problems={problems}
-            qrCodeDataUrl={qrCodeDataUrl}
+            studentLoginId={student.loginId}
         />
     );
 }

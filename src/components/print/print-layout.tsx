@@ -1,17 +1,18 @@
 'use client';
-
 import { Problem } from '@prisma/client';
 import { Button } from '@/components/ui/button';
 import { Printer, ArrowLeft, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useRef, useLayoutEffect } from 'react';
 import { PrintProblemItem } from './print-problem-item';
+import QRCode from 'qrcode';
+import { compressProblemIds } from '@/lib/qr-utils';
 
 interface PrintLayoutProps {
     studentName: string;
     subjectName: string;
     problems: (Problem & { customId?: string | null })[];
-    qrCodeDataUrl?: string;
+    studentLoginId: string;
 }
 
 // ... (MAX_PAGE_HEIGHT_PX remains same)
@@ -21,12 +22,13 @@ interface PrintLayoutProps {
 // Safe content height per page ~ 220mm.
 const MAX_PAGE_HEIGHT_PX = 900; // Approximate pixel height for A4 content area at 96DPI (297mm is ~1123px, minus margins)
 
-export function PrintLayout({ studentName, subjectName, problems, qrCodeDataUrl }: PrintLayoutProps) {
+export function PrintLayout({ studentName, subjectName, problems, studentLoginId }: PrintLayoutProps) {
     const router = useRouter();
     const dateStr = new Date().toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
 
     const [paginatedProblems, setPaginatedProblems] = useState<(Problem & { customId?: string | null })[][]>([]);
     const [isCalculating, setIsCalculating] = useState(true);
+    const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
     const measureRef = useRef<HTMLDivElement>(null);
     const answerMeasureRef = useRef<HTMLDivElement>(null);
 
@@ -83,8 +85,32 @@ export function PrintLayout({ studentName, subjectName, problems, qrCodeDataUrl 
         }
 
         setPaginatedProblems(pages);
-        setIsCalculating(false);
-    }, [problems]);
+
+        // 3. Generate QR Code based on the FINAL limited list
+        const generateQR = async () => {
+            const problemIds = limitedProblems.map(p => p.customId || p.id);
+            const compressed = compressProblemIds(problemIds);
+            const qrData = {
+                sid: studentLoginId,
+                ...compressed
+            };
+            const json = JSON.stringify(qrData);
+            try {
+                const url = await QRCode.toDataURL(json, {
+                    errorCorrectionLevel: 'H',
+                    width: 300,
+                    margin: 2
+                });
+                setQrCodeDataUrl(url);
+            } catch (e) {
+                console.error("Failed to generate QR", e);
+            }
+            setIsCalculating(false);
+        };
+
+        generateQR();
+
+    }, [problems, studentLoginId]);
 
     const handlePrint = () => {
         window.print();

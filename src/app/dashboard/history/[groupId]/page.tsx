@@ -1,5 +1,5 @@
 
-import { getSessionDetails } from "@/lib/analytics";
+import { getSessionDetails, markSessionAsReviewed } from "@/lib/analytics";
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +19,9 @@ export default async function SessionDetailsPage({ params }: { params: Promise<{
     if (!details || details.length === 0) {
         return <div>履歴が見つかりません</div>;
     }
+
+    // Mark as reviewed (Server Side Effect)
+    await markSessionAsReviewed(groupId, session.userId);
 
     const firstItem = details[0];
     const subjectName = firstItem.problem.coreProblems[0]?.subject.name || '教科不明';

@@ -31,12 +31,19 @@ export async function markVideoWatched(historyId: string) {
     // revalidatePath('/dashboard');
 }
 
-import { getLearningSessions } from "@/lib/analytics";
+import { getLearningSessions, markSessionAsReviewed } from "@/lib/analytics";
 
 export async function fetchMySessions(offset: number, limit: number) {
     const session = await getSession();
     if (!session) throw new Error("Unauthorized");
 
     return await getLearningSessions(session.userId, limit, offset);
+}
+
+export async function markSessionReviewed(groupId: string) {
+    const session = await getSession();
+    if (!session) throw new Error("Unauthorized");
+
+    await markSessionAsReviewed(groupId, session.userId);
 }
 

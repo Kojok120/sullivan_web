@@ -380,8 +380,10 @@ export type LearningSession = {
     groupId: string;
     date: Date;
     subjectName: string;
+    coreProblemName: string;
     totalProblems: number;
     correctCount: number;
+    hasUnread: boolean;
 };
 
 // Group history by groupId
@@ -397,8 +399,10 @@ export async function getLearningSessions(userId: string, limit = 10, offset = 0
         groupId: string;
         date: Date;
         subjectName: string | null;
+        coreProblemName: string | null;
         total: bigint;
         correct: bigint;
+        unreadCount: bigint;
     }>>`
         SELECT 
             lh."groupId",
@@ -416,8 +420,21 @@ export async function getLearningSessions(userId: string, limit = 10, offset = 0
                 )
                 LIMIT 1
             ) as "subjectName",
+            (
+                SELECT cp.name 
+                FROM "_CoreProblemToProblem" cpp
+                JOIN "CoreProblem" cp ON cpp."A" = cp.id
+                WHERE cpp."B" = (
+                    SELECT lh2."problemId" 
+                    FROM "LearningHistory" lh2 
+                    WHERE lh2."groupId" = lh."groupId" 
+                    LIMIT 1
+                )
+                LIMIT 1
+            ) as "coreProblemName",
             COUNT(DISTINCT lh.id) as "total",
-            COUNT(DISTINCT CASE WHEN lh.evaluation IN ('A', 'B') THEN lh.id END) as "correct"
+            COUNT(DISTINCT CASE WHEN lh.evaluation IN ('A', 'B') THEN lh.id END) as "correct",
+            COUNT(CASE WHEN lh."isStudentReviewed" = false THEN 1 END) as "unreadCount"
         FROM "LearningHistory" lh
         WHERE lh."userId" = ${userId} AND lh."groupId" IS NOT NULL
         GROUP BY lh."groupId"
@@ -430,9 +447,26 @@ export async function getLearningSessions(userId: string, limit = 10, offset = 0
         groupId: s.groupId,
         date: s.date,
         subjectName: s.subjectName || "不明な教科",
+        coreProblemName: s.coreProblemName || "不明な単元",
         totalProblems: Number(s.total),
-        correctCount: Number(s.correct)
+        correctCount: Number(s.correct),
+        hasUnread: Number(s.unreadCount) > 0
     }));
+}
+
+export async function markSessionAsReviewed(groupId: string, userId: string) {
+    if (!groupId) return;
+
+    await prisma.learningHistory.updateMany({
+        where: {
+            groupId: groupId,
+            userId: userId,
+            isStudentReviewed: false,
+        },
+        data: {
+            isStudentReviewed: true
+        }
+    });
 }
 
 export async function getSessionDetails(groupId: string, userId?: string) {
@@ -454,6 +488,14 @@ export async function getSessionDetails(groupId: string, userId?: string) {
             }
         },
         orderBy: { problem: { order: 'asc' } } // or custom order logic
+    }).then(items => {
+        // Natural Sort by customId
+        const { naturalSort } = require('@/lib/utils');
+        return items.sort((a, b) => {
+            const idA = a.problem.customId || a.problem.id;
+            const idB = b.problem.customId || b.problem.id;
+            return naturalSort(idA, idB);
+        });
     });
 }
 

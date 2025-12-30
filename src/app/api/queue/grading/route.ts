@@ -3,6 +3,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifySignatureAppRouter } from '@upstash/qstash/nextjs';
 import { processFile } from '@/lib/grading-service';
 
+export const maxDuration = 300; // Allow up to 5 minutes for AI grading
+
+
 async function handler(req: NextRequest) {
     try {
         const body = await req.json();

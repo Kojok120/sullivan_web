@@ -123,6 +123,7 @@ model LearningHistory {
   // Grouping & Video Logic
   groupId        String?   // UUID for batch grouping
   isVideoWatched Boolean   @default(false)
+  isStudentReviewed Boolean @default(false) // New: Has the student reviewed this history?
 }
 
 model UserProblemState {

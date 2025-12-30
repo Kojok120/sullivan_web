@@ -3,6 +3,8 @@ import { checkDriveForNewFiles } from '@/lib/grading-service';
 import { acquireGradingLock, releaseGradingLock } from '@/lib/grading-lock';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60; // Allow up to 60 seconds (max for Hobby) for fallback processing
+
 
 // Debounce timing (still needed to throttle rapid webhook calls)
 let lastTriggerTime = 0;

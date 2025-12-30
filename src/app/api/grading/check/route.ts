@@ -3,6 +3,8 @@ import { checkDriveForNewFiles } from '@/lib/grading-service';
 import { acquireGradingLock, releaseGradingLock } from '@/lib/grading-lock';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60; // Allow up to 60 seconds for fallback processing
+
 
 export async function GET(request: NextRequest) {
     // SECURITY: Require internal API secret for this endpoint
