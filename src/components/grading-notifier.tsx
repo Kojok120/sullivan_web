@@ -37,6 +37,12 @@ export function GradingNotifier() {
                         },
                         duration: 5000,
                     });
+                } else if (data.type === 'grading_failed') {
+                    toast.error("採点中にエラーが発生しました", {
+                        description: "お手数ですが、講師に相談してください。",
+                        duration: 6000,
+                        dismissible: true
+                    });
                 }
             } catch (error) {
                 console.error("Error parsing SSE data", error);

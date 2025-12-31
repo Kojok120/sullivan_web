@@ -120,6 +120,9 @@ export async function checkDriveForNewFiles() {
     } catch (error) {
         console.error('Error checking Drive:', error);
     }
+
+    // Also check for stuck files
+    await checkStuckFiles();
 }
 
 
@@ -197,6 +200,15 @@ export async function processFile(fileId: string, fileName: string) {
             console.log(`Archived file ${fileName}`);
         } else {
             await renameFile(fileId, `[ERROR] ${fileName}`);
+
+            // Notify if possible
+            if (user) {
+                console.log(`Grading failed (no results). Notifying user ${user.id}...`);
+                serverEvents.emit(EVENTS.GRADING_FAILED, {
+                    studentId: user.id,
+                    fileName: fileName
+                });
+            }
         }
 
         // Cleanup
@@ -205,6 +217,13 @@ export async function processFile(fileId: string, fileName: string) {
     } catch (error) {
         console.error(`Error processing file ${fileId}:`, error);
         await renameFile(fileId, `[ERROR] ${fileName}`);
+
+        // Try to recover user context if possible to notify them
+        try {
+            await notifyErrorForFile(fileId, fileName, "Processing Error");
+        } catch (e) {
+            console.error(`Failed to notify for error file ${fileName}:`, e);
+        }
     }
 }
 
@@ -934,5 +953,94 @@ export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: strin
                 console.log(`  -> No next CP found (or is last).`);
             }
         }
+    }
+}
+
+// 2.5 Check for Stuck Files (Timeout > 3 mins)
+export async function checkStuckFiles() {
+    if (!DRIVE_FOLDER_ID) return;
+
+    try {
+        const driveClient = getDrive();
+        // Look for files created > 3 minutes ago that are NOT [PROCESSED] or [ERROR]
+        const timeoutThreshold = new Date(Date.now() - 3 * 60 * 1000);
+        const timeStr = timeoutThreshold.toISOString();
+
+        const res = await driveClient.files.list({
+            q: `'${DRIVE_FOLDER_ID}' in parents and trashed = false and mimeType != 'application/vnd.google-apps.folder' and createdTime < '${timeStr}'`,
+            fields: 'files(id, name, createdTime)',
+            orderBy: 'createdTime desc',
+            pageSize: 20,
+        });
+
+        const files = res.data.files;
+        if (!files || files.length === 0) return;
+
+        for (const file of files) {
+            const name = file.name || '';
+            const id = file.id || '';
+
+            if (!name || name.startsWith('[PROCESSED]') || name.startsWith('[ERROR]')) {
+                continue;
+            }
+
+            console.log(`Found stuck file (Timeout > 3m): ${name} (${id})`);
+
+            // 1. Rename to [ERROR] (Timeout)
+            const newName = `[ERROR] (Timeout) ${name}`;
+            await renameFile(id, newName);
+
+            // 2. Try to identify user to notify
+            try {
+                await notifyErrorForFile(id, name, "Timeout");
+            } catch (e) {
+                console.error(`Failed to notify for stuck file ${name}:`, e);
+            }
+        }
+
+    } catch (error) {
+        console.error('Error checking stuck files:', error);
+    }
+}
+
+// Helper to download, scan QR, and notify error
+async function notifyErrorForFile(fileId: string, fileName: string, reason: string) {
+    const destPath = path.join(os.tmpdir(), `notify_${fileName}`);
+    try {
+        const driveClient = getDrive();
+        const res = await driveClient.files.get(
+            { fileId, alt: 'media' },
+            { responseType: 'stream' }
+        );
+
+        const dest = fs.createWriteStream(destPath);
+        await new Promise((resolve, reject) => {
+            res.data.pipe(dest).on('error', reject).on('finish', resolve);
+        });
+
+        const prepared = await prepareFileForGemini(destPath);
+        // Try local QR first
+        let qrData = await readQRCodeLocally(destPath);
+        if (!qrData && !prepared.isPdfHeader) {
+            // Fallback to Gemini if needed
+            const modelName = process.env.GEMINI_MODEL || "gemini-2.5-pro";
+            const model = getGenAI().getGenerativeModel({ model: modelName });
+            qrData = await scanQRWithGemini(model, prepared.base64Data, prepared.mimeType);
+        }
+
+        if (qrData && qrData.sid) {
+            const user = await resolveUserFromQr(qrData);
+            if (user) {
+                console.log(`Notifying user ${user.id} of error: ${reason}`);
+                serverEvents.emit(EVENTS.GRADING_FAILED, {
+                    studentId: user.id,
+                    fileName: fileName
+                });
+            }
+        }
+    } catch (error) {
+        console.warn(`Could not extract user for error notification (${fileName}):`, error);
+    } finally {
+        if (fs.existsSync(destPath)) await fs.promises.unlink(destPath).catch(() => { });
     }
 }
