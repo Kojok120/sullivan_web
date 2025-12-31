@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { requireAdmin } from '@/lib/auth';
 import { Prisma } from '@prisma/client';
+import { bulkCreateProblemsCore } from '@/lib/problem-service';
 
 export async function getProblems(
     page: number = 1,
@@ -458,130 +459,13 @@ export async function bulkCreateStandaloneProblems(problems: {
 }[]) {
     await requireAdmin();
     try {
-        const { getNextCustomIds } = await import('@/lib/curriculum-service');
-
-        let createdCount = 0;
-        const warnings: string[] = [];
-
-        // Batch processing to avoid timeout
-        const BATCH_SIZE = 50;
-        const totalProblems = problems.length;
-
-        // Loop through batches
-        for (let i = 0; i < totalProblems; i += BATCH_SIZE) {
-            const batchProblems = problems.slice(i, i + BATCH_SIZE);
-
-            try {
-                await prisma.$transaction(async (tx) => {
-                    // [N+1 解消] 1. 重複チェックを一括で行う (Batch scope)
-                    const batchQuestions = batchProblems.map(p => p.question);
-                    const existingProblems = await tx.problem.findMany({
-                        where: { question: { in: batchQuestions } },
-                        select: { question: true }
-                    });
-                    const existingQuestions = new Set(existingProblems.map(p => p.question));
-
-                    // [N+1 解消] 2. 必要なCoreProblemを一括取得 (Batch scope)
-                    // Note: If CoreProblem cache is needed across batches, we could fetch it once outside, 
-                    // but fetching per batch is safer for memory if massive.
-                    const batchCoreProblemIds = [...new Set(batchProblems.flatMap(p => p.coreProblemIds))];
-                    const coreProblemRecords = batchCoreProblemIds.length > 0
-                        ? await tx.coreProblem.findMany({
-                            where: { id: { in: batchCoreProblemIds } },
-                            include: { subject: true }
-                        })
-                        : [];
-                    const coreProblemMap = new Map(coreProblemRecords.map(cp => [cp.id, cp]));
-
-                    // [N+1 解消] 3. 登録対象の問題をフィルタリングし、subjectId別にグループ化
-                    type ProblemWithSubject = (typeof batchProblems)[0] & { subjectId?: string };
-                    const problemsToCreate: ProblemWithSubject[] = [];
-                    const subjectCounts: Map<string, number> = new Map();
-
-                    for (const p of batchProblems) {
-                        if (existingQuestions.has(p.question)) {
-                            // Accumulate warning but don't fail transaction
-                            // We need to push to outer warnings array.
-                            // However, we are inside transaction. Pushing to outer array is fine as long as we don't rely on rollback undoing it?
-                            // Transaction only rolls back DB writes.
-                            warnings.push(`「${p.question.substring(0, 10)}...」は既に存在するためスキップしました`);
-                            continue;
-                        }
-
-                        let subjectId: string | undefined;
-                        if (p.coreProblemIds.length > 0) {
-                            const firstCP = coreProblemMap.get(p.coreProblemIds[0]);
-                            if (firstCP) {
-                                subjectId = firstCP.subjectId;
-                            }
-                        }
-
-                        problemsToCreate.push({ ...p, subjectId });
-
-                        if (subjectId) {
-                            subjectCounts.set(subjectId, (subjectCounts.get(subjectId) || 0) + 1);
-                        }
-                    }
-
-                    // [N+1 解消] 4. 各subjectのcustomIdを一括生成
-                    const customIdsBySubject: Map<string, string[]> = new Map();
-                    for (const [subjectId, count] of subjectCounts) {
-                        const ids = await getNextCustomIds(subjectId, count, tx);
-                        customIdsBySubject.set(subjectId, ids);
-                    }
-
-                    // 5. 問題を作成
-                    const subjectIndexes: Map<string, number> = new Map();
-                    const createPromises = problemsToCreate.map(p => {
-                        let customId: string | undefined;
-
-                        if (p.subjectId) {
-                            const ids = customIdsBySubject.get(p.subjectId);
-                            const idx = subjectIndexes.get(p.subjectId) || 0;
-                            if (ids && ids[idx]) {
-                                customId = ids[idx];
-                                subjectIndexes.set(p.subjectId, idx + 1);
-                            }
-                        }
-
-                        // Create without waiting (Promise.all later)
-                        return tx.problem.create({
-                            data: {
-                                question: p.question,
-                                answer: p.answer,
-                                acceptedAnswers: p.acceptedAnswers || [],
-                                grade: p.grade,
-                                videoUrl: p.videoUrl,
-                                customId: customId,
-                                order: 0,
-                                coreProblems: {
-                                    connect: p.coreProblemIds.map(id => ({ id }))
-                                }
-                            }
-                        });
-                    });
-
-                    await Promise.all(createPromises);
-                    createdCount += problemsToCreate.length;
-
-                }, {
-                    maxWait: 10000,
-                    timeout: 20000 // 20s per batch is reasonable
-                });
-            } catch (batchError) {
-                console.error(`Batch ${i / BATCH_SIZE + 1} failed:`, batchError);
-                warnings.push(`バッチ処理エラー (${i + 1}〜${Math.min(i + BATCH_SIZE, totalProblems)}件目): ${batchError}`);
-                // Continue to next batch? or stop?
-                // Usually for bulk imports, stopping on system error (not validation error) is safer.
-                // But "Transaction closed" might be sporadic.
-                // Let's stop to be safe, but return what we have.
-                warnings.push('エラーのため処理を中断しました。');
-                break;
-            }
-        }
+        const { count, warnings } = await bulkCreateProblemsCore(
+            problems,
+            { batchSize: 50, assignOrder: false }
+        );
 
         revalidatePath('/admin/problems');
-        return { success: true, count: createdCount, warnings };
+        return { success: true, count, warnings };
     } catch (error) {
         console.error('Failed to bulk create problems:', error);
         return { error: '一括登録に失敗しました' };

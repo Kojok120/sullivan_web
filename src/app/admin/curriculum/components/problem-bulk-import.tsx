@@ -100,26 +100,6 @@ export function ProblemBulkImport({ coreProblems, subjectId }: ProblemBulkImport
             return;
         }
 
-        // We need to map CP names to IDs
-        // And since one problem can have multiple CPs, we need to adjust the server action.
-        // Current server action `bulkCreateProblems` takes `coreProblemId`.
-        // We need a NEW server action `bulkCreateProblemsV2` or modify existing to accept `{ coreProblemIds: string[] }`.
-
-        // Wait, `bulkCreateProblems` in actions.ts logic:
-        // 1. Generate Custom ID using Prefix from Subject.
-        // 2. Count existing problems in Subject.
-        // 3. Create.
-
-        // We can group by Subject? No, all items here are for THIS Subject (from props).
-        // But `CoreProblem`s might arguably belong to *other* subjects?
-        // No, assuming user stays within the subject page.
-        // BUT, `CoreProblem` is `Subject` dependent.
-        // The props `coreProblems` passed here must be from the current subject?
-        // User said: "ProblemとCoreProblemは多対多の関係... Problemを一括で登録できるように...".
-        // It implies we are in "Curriculum Management" for a Subject or Global?
-        // The screen seems to be `SubjectDetail`.
-        // So we strictly look up CPs in this Subject.
-
         const payload = validData.map(p => ({
             question: p.question,
             answer: p.answer,

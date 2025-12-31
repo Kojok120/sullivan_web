@@ -3,7 +3,6 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { selectProblemsForPrint } from '@/lib/print-algo';
 import { PrintLayout } from '@/components/print/print-layout';
-import { generateQRCode } from '@/lib/grading-service';
 
 export default async function PrintPage({
     params,

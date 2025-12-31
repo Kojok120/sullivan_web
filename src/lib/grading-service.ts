@@ -8,6 +8,7 @@ import path from 'path';
 import os from 'os';
 import { calculateCoreProblemStatus } from '@/lib/progression';
 import { serverEvents, EVENTS } from '@/lib/server-events';
+import { incrementStampCount } from '@/lib/stamp-service';
 
 // Priority adjustment logic (inlined from removed priority-algo.ts)
 type Evaluation = "A" | "B" | "C" | "D";
@@ -150,8 +151,40 @@ export async function processFile(fileId: string, fileName: string) {
         const stats = await fs.promises.stat(destPath);
         console.log(`Downloaded ${fileName}: ${stats.size} bytes`);
 
-        // Read QR and Grade using Gemini
-        const results = await gradeWithGemini(destPath);
+        const prepared = await prepareFileForGemini(destPath);
+        const qrData = await extractQrDataFromFile(destPath, prepared);
+
+        if (!qrData || !qrData.sid) {
+            console.error("Failed to extract QR data (Local & AI) from", destPath);
+            await renameFile(fileId, `[ERROR] ${fileName}`);
+            await fs.promises.unlink(destPath);
+            return;
+        }
+
+        // SECURITY: Mask student ID in logs (show only last 4 chars)
+        const pidsCount = qrData.pids ? qrData.pids.length : (qrData.nos ? qrData.nos.length : 0);
+        console.log(`QR Found: Student=...${qrData.sid.slice(-4)}, Problems=${pidsCount}`);
+
+        const user = await resolveUserFromQr(qrData);
+        if (!user) {
+            console.error(`User for QR ID ${qrData.sid} not found in DB (checked loginId and id).`);
+            await renameFile(fileId, `[ERROR] ${fileName}`);
+            await fs.promises.unlink(destPath);
+            return;
+        }
+
+        console.log(`Resolved User: ${user.name} (${user.loginId}) -> ${user.id}`);
+
+        // Stamp is the canonical "upload time" trigger (before grading completes).
+        try {
+            await incrementStampCount(user.id);
+            console.log(`[Effort] Incremented stamp count for user ${user.id}.`);
+        } catch (e) {
+            console.error("[Effort] Failed to update stamp count:", e);
+        }
+
+        // Grade using Gemini with prepared data
+        const results = await gradeWithGemini(prepared, qrData, user.id);
 
         // Update DB
         if (results && results.length > 0) {
@@ -425,88 +458,66 @@ async function readQRCodeLocally(filePath: string): Promise<QRData | null> {
     }
 }
 
-async function gradeWithGemini(filePath: string): Promise<GradingResult[] | null> {
+type PreparedFile = {
+    base64Data: string;
+    mimeType: string;
+    isPdfHeader: boolean;
+};
+
+async function prepareFileForGemini(filePath: string): Promise<PreparedFile> {
+    const fd = await fs.promises.open(filePath, 'r');
+    const headerBuffer = Buffer.alloc(4);
+    await fd.read(headerBuffer, 0, 4, 0);
+    await fd.close();
+
+    const isPdfHeader = headerBuffer.toString('hex') === '25504446'; // %PDF
+    const mimeType = isPdfHeader ? 'application/pdf' : (filePath.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
+    console.log(`Detected MIME Type: ${mimeType} (Header: ${headerBuffer.toString('hex')})`);
+
+    const fileBuffer = await fs.promises.readFile(filePath);
+
+    return {
+        base64Data: fileBuffer.toString('base64'),
+        mimeType,
+        isPdfHeader
+    };
+}
+
+async function extractQrDataFromFile(filePath: string, prepared: PreparedFile): Promise<QRData | null> {
+    let qrData: QRData | null = null;
+
+    if (!prepared.isPdfHeader) {
+        qrData = await readQRCodeLocally(filePath);
+    } else {
+        console.log("Skipping local QR read for PDF file.");
+    }
+
+    if (!qrData || !qrData.sid) {
+        console.log("Local QR read failed/skipped. Attempting to scan QR with Gemini...");
+        const modelName = process.env.GEMINI_MODEL || "gemini-2.5-pro";
+        const model = getGenAI().getGenerativeModel({ model: modelName });
+        qrData = await scanQRWithGemini(model, prepared.base64Data, prepared.mimeType);
+    }
+
+    return qrData;
+}
+
+async function resolveUserFromQr(qrData: QRData) {
+    // [NEW] Resolve User (Strict loginId only)
+    // User requested to rely solely on loginId (e.g. S0001) for persistence.
+    const userId = qrData.sid;
+    return await prisma.user.findUnique({
+        where: { loginId: userId }
+    });
+}
+
+async function gradeWithGemini(prepared: PreparedFile, qrData: QRData, userId: string): Promise<GradingResult[] | null> {
     try {
         const modelName = process.env.GEMINI_MODEL || "gemini-2.5-pro";
         console.log("Using Gemini Model:", modelName);
         const model = getGenAI().getGenerativeModel({ model: modelName });
 
-        // 1. Read header to check actual file type (Magic Bytes)
-        const fd = await fs.promises.open(filePath, 'r');
-        const headerBuffer = Buffer.alloc(4);
-        await fd.read(headerBuffer, 0, 4, 0);
-        await fd.close();
-
-        const isPdfHeader = headerBuffer.toString('hex') === '25504446'; // %PDF
-        const mimeType = isPdfHeader ? 'application/pdf' : (filePath.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
-        console.log(`Detected MIME Type: ${mimeType} (Header: ${headerBuffer.toString('hex')})`);
-
-        // 2. Read Full File for Gemini
-        const fileBuffer = await fs.promises.readFile(filePath);
-        const base64Data = fileBuffer.toString('base64');
-
-        // 3. Local QR Reading (Try first)
-        let qrData: QRData | null = null;
-        if (!isPdfHeader) {
-            qrData = await readQRCodeLocally(filePath);
-        } else {
-            console.log("Skipping local QR read for PDF file.");
-        }
-
-        // 4. Fallback: Ask Gemini to read QR validation
-        if (!qrData || !qrData.sid) {
-            console.log("Local QR read failed/skipped. Attempting to scan QR with Gemini...");
-            qrData = await scanQRWithGemini(model, base64Data, mimeType);
-        }
-
-        if (!qrData || !qrData.sid) {
-            console.error("Failed to extract QR data (Local & AI) from", filePath);
-            return null;
-        }
-
-        // SECURITY: Mask student ID in logs (show only last 4 chars)
-        const pidsCount = qrData.pids ? qrData.pids.length : (qrData.nos ? qrData.nos.length : 0);
-        console.log(`QR Found: Student=...${qrData.sid.slice(-4)}, Problems=${pidsCount}`);
-
-        // [NEW] Resolve User (Strict loginId only)
-        // User requested to rely solely on loginId (e.g. S0001) for persistence.
-        let userId = qrData.sid;
-        const user = await prisma.user.findUnique({
-            where: { loginId: userId }
-        });
-
-        if (!user) {
-            console.error(`User for QR ID ${userId} not found in DB (checked loginId and id).`);
-            return null;
-        }
-
-        // Use the persistent CUID for internal processing
-        userId = user.id;
-        console.log(`Resolved User: ${user.name} (${user.loginId}) -> ${user.id}`);
-
-        // [NEW] Increment Stamp Count (Effort Visualization) - Triggered immediately after ID resolution
-        try {
-            const meta = (user.metadata as any) || {};
-            const stampCard = meta.stampCard || { totalStamps: 0, lastSeenStamps: 0 };
-
-            await prisma.user.update({
-                where: { id: user.id },
-                data: {
-                    metadata: {
-                        ...meta,
-                        stampCard: {
-                            ...stampCard,
-                            totalStamps: (stampCard.totalStamps || 0) + 1
-                        }
-                    }
-                }
-            });
-            console.log(`[Effort] Incremented stamp count for user ${user.id} early.`);
-        } catch (e) {
-            console.error("[Effort] Failed to update stamp count:", e);
-        }
-
-        // 5. Fetch Full Problem Context from DB
+        // 1. Fetch Full Problem Context from DB
         const extractedPids = expandProblemIds(qrData);
         const uniquePids = Array.from(new Set(extractedPids));
 
@@ -530,7 +541,6 @@ async function gradeWithGemini(filePath: string): Promise<GradingResult[] | null
 
         console.log(`Fetched and sorted ${problems.length} problems from DB.`);
 
-        // If no problems found, abort
         if (problems.length === 0) {
             console.error("No problems found in DB for IDs:", uniquePids);
             return null;
@@ -544,7 +554,7 @@ async function gradeWithGemini(filePath: string): Promise<GradingResult[] | null
             coreProblems: p.coreProblems.map(cp => ({ id: cp.id, name: cp.name }))
         }));
 
-        // 6. Construct Prompt with FULL Context
+        // 2. Construct Prompt with FULL Context
         const gradingPrompt = `
         You are an expert teacher grading a student's answer sheet.
         
@@ -579,8 +589,8 @@ async function gradeWithGemini(filePath: string): Promise<GradingResult[] | null
             gradingPrompt,
             {
                 inlineData: {
-                    data: base64Data,
-                    mimeType: mimeType
+                    data: prepared.base64Data,
+                    mimeType: prepared.mimeType
                 }
             }
         ]);
@@ -595,9 +605,8 @@ async function gradeWithGemini(filePath: string): Promise<GradingResult[] | null
             return null;
         }
 
-        // Map to GradingResult type
         return resultsJson.map((r: any) => ({
-            studentId: userId, // Use the verified/recovered ID
+            studentId: userId,
             problemId: r.problemId,
             userAnswer: r.studentAnswer || "(空欄)",
             evaluation: r.evaluation,
@@ -671,8 +680,6 @@ function parseJSON(text: string): any {
 
 
 
-// 5. Save Result (Unified)
-// Unified Grading Logic (Batch)
 // 5. Save Result (Unified)
 // Unified Grading Logic (Batch)
 export async function recordGradingResults(results: GradingResult[]) {

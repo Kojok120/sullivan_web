@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 
 import { requireAdmin } from '@/lib/auth';
+import { bulkCreateProblemsCore } from '@/lib/problem-service';
 
 // --- Subjects ---
 export async function getSubjects() {
@@ -303,72 +304,18 @@ export async function bulkCreateProblems(subjectId: string, problems: {
     try {
         const subject = await prisma.subject.findUnique({
             where: { id: subjectId },
+            select: { id: true }
         });
 
         if (!subject) throw new Error('Subject not found');
 
-        const { getNextCustomIds } = await import('@/lib/curriculum-service');
-
-        let createdCount = 0;
-        const warnings: string[] = [];
-
-        // Fetch existing questions to check
-        const incomingQuestions = problems.map(p => p.question);
-        const existingProblems = await prisma.problem.findMany({
-            where: {
-                question: { in: incomingQuestions }
-            },
-            select: { question: true, customId: true }
-        });
-        const existingMap = new Map(existingProblems.map(p => [p.question, p.customId]));
-
-        // Filter problems to create
-        const problemsToCreate = problems.filter(p => {
-            if (existingMap.has(p.question)) {
-                warnings.push(`問題「${p.question.substring(0, 20)}...」は既に存在します (ID: ${existingMap.get(p.question)})`);
-                return false;
-            }
-            return true;
-        });
-
-        if (problemsToCreate.length === 0) {
-            return { success: true, count: 0, warnings };
-        }
-
-        // Get initial order for new problems
-        const lastProblem = await prisma.problem.findFirst({
-            orderBy: { order: 'desc' },
-            select: { order: true }
-        });
-        let nextOrder = (lastProblem?.order ?? 0) + 1;
-
-        // [N+1 解消] Generate all custom IDs at once
-        const customIds = await getNextCustomIds(subjectId, problemsToCreate.length);
-
-        await prisma.$transaction(async (tx) => {
-            for (let i = 0; i < problemsToCreate.length; i++) {
-                const p = problemsToCreate[i];
-
-                await tx.problem.create({
-                    data: {
-                        question: p.question,
-                        answer: p.answer,
-                        videoUrl: p.videoUrl,
-                        grade: p.grade,
-                        acceptedAnswers: p.acceptedAnswers || [],
-                        customId: customIds[i],
-                        order: nextOrder++,
-                        coreProblems: {
-                            connect: p.coreProblemIds.map(id => ({ id }))
-                        }
-                    }
-                });
-                createdCount++;
-            }
-        });
+        const { count, warnings } = await bulkCreateProblemsCore(
+            problems.map(p => ({ ...p, subjectId })),
+            { subjectId, assignOrder: true }
+        );
 
         revalidatePath('/admin/curriculum');
-        return { success: true, count: createdCount, warnings };
+        return { success: true, count, warnings };
     } catch (error) {
         console.error('Failed to bulk create problems:', error);
         return { error: '一括登録に失敗しました' };

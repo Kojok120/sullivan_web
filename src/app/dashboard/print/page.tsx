@@ -3,9 +3,6 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { selectProblemsForPrint } from '@/lib/print-algo';
 import { PrintLayout } from '@/components/print/print-layout';
-// QR code generation might be teacher-only or we can allow it for students too.
-// For now, let's keep it consistent.
-import { generateQRCode } from '@/lib/grading-service';
 
 export default async function StudentPrintPage({
     searchParams,
