@@ -12,8 +12,8 @@
   - `POST /api/grading/webhook`（Drive通知受信）
   - `GET /api/grading/check`（旧ポーリング/手動実行のフォールバック）
   - `POST /api/queue/grading`（QStash経由の採点ジョブ実行）
-  - `POST /api/drive/watch/setup`（初回Watch登録）
-  - `POST /api/drive/watch/renew`（Watch更新）
+  - `POST /api/drive/watch/setup`（初回Watch登録、Authorization: Bearer INTERNAL_API_SECRET）
+  - `POST /api/drive/watch/renew`（Watch更新、Authorization: Bearer INTERNAL_API_SECRET）
 - Upstash QStash（キュー実行）
 - Upstash Redis（Drive Watch状態保存）
 - Gemini API（解答読み取り・採点 / QR読み取りフォールバック）
@@ -23,11 +23,11 @@
 ## 時系列フロー
 
 ### 0) Drive Watchの準備
-- 初回登録: `POST /api/drive/watch/setup`
+- 初回登録: `POST /api/drive/watch/setup`（Authorization: Bearer `INTERNAL_API_SECRET` 必須）
   - `APP_URL` + `/api/grading/webhook` を通知先として登録
   - `channelId`, `resourceId`, `expiration` をUpstash Redisに保存
   - `expiration` は7日後を指定（Google Driveの最大値）
-- 更新: `POST /api/drive/watch/renew`（Schedulerで12時間ごとに実行を想定）
+- 更新: `POST /api/drive/watch/renew`（Authorization: Bearer `INTERNAL_API_SECRET` 必須、Schedulerで12時間ごとに実行を想定）
   - 期限が近い場合のみ更新（閾値: 6時間前）
   - 旧Watchを停止して再登録
 
@@ -46,6 +46,11 @@
 - 対象ファイルごとに採点ジョブを発行
   - QStashが使える場合は非同期
   - 未設定時は同期処理で実行
+
+### 2.5) スタックファイルの検知
+- `checkStuckFiles()` が「3分以上前に作成された未処理ファイル」を検出
+- 該当ファイルは `[ERROR] (Timeout)` にリネーム
+- QRからユーザー特定できる場合は通知を試行
 
 ### 3) 採点ジョブ実行（QStash or 直接）
 - `POST /api/queue/grading`
@@ -89,6 +94,7 @@
 
 ### 8) 通知（SSE）
 - 採点完了時に `grading_completed` イベントを発火
+- ゲーミフィケーション更新がある場合は `gamification_update` も送出
 - `GET /api/events` でSSE配信（本人のイベントのみ）
 
 ### 9) Drive側のアーカイブ
@@ -103,6 +109,7 @@
 - QStash未設定 → 同期処理へフォールバック
 - QR取得失敗/ユーザー不明 → `[ERROR]` にリネーム
 - GeminiのJSON不正 → `[ERROR]` にリネーム
+- 3分超の未処理 → `[ERROR] (Timeout)` にリネーム
 
 ## 主要な環境変数
 - `DRIVE_FOLDER_ID`（監視対象フォルダ）

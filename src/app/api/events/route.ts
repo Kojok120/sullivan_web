@@ -34,13 +34,21 @@ export async function GET(request: Request) {
             // Register listener
             serverEvents.on(EVENTS.GRADING_COMPLETED, onGradingCompleted);
 
-            // Cleanup on close is tricky in Next.js App Router route handlers
-            // Ideally, we detect disconnect, but for now we rely on the stream closure mechanism if possible
-            // or just let it be. However, memory leaks are possible if we don't remove listener.
-            // Since we can't easily detect "close" in this simple ReadableStream setup without AbortSignal check loop:
+            // Listener for gamification updates
+            const onGamificationUpdate = (data: any) => {
+                // SECURITY: Filter events
+                if (data.userId && data.userId !== user.id) {
+                    return;
+                }
+                const message = JSON.stringify({ type: EVENTS.GAMIFICATION_UPDATE, ...data });
+                controller.enqueue(encoder.encode(`data: ${message}\n\n`));
+            };
+            serverEvents.on(EVENTS.GAMIFICATION_UPDATE, onGamificationUpdate);
 
+            // Cleanup on close
             request.signal.addEventListener('abort', () => {
                 serverEvents.off(EVENTS.GRADING_COMPLETED, onGradingCompleted);
+                serverEvents.off(EVENTS.GAMIFICATION_UPDATE, onGamificationUpdate);
             });
         }
     });

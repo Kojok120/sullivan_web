@@ -7,6 +7,8 @@ export type StudentStats = {
     accuracy: number;
     currentStreak: number;
     lastActivity: Date | null;
+    xp: number;
+    level: number;
 };
 
 export type SubjectProgress = {
@@ -30,7 +32,9 @@ export async function getStudentStats(userId: string): Promise<StudentStats> {
         totalCorrect: 0,
         accuracy: 0,
         currentStreak: 0,
-        lastActivity: null
+        lastActivity: null,
+        xp: 0,
+        level: 1
     };
 
     return stats;
@@ -59,34 +63,27 @@ async function fetchInternalStudentStats(userIds: string[]): Promise<Map<string,
         GROUP BY "userId"
     `;
 
-    // 2. Fetch Distinct Dates for Streak
-    const allDistinctDates = await prisma.$queryRaw<{ userId: string, date: Date }[]>`
-        SELECT "userId", DATE("answeredAt") as date
-        FROM "LearningHistory"
-        WHERE "userId" IN (${Prisma.join(userIds)})
-        GROUP BY "userId", DATE("answeredAt")
-    `;
-
-    const userDatesMap = new Map<string, Set<string>>();
-    allDistinctDates.forEach(row => {
-        if (!userDatesMap.has(row.userId)) {
-            userDatesMap.set(row.userId, new Set());
-        }
-        const d = new Date(row.date);
-        userDatesMap.get(row.userId)!.add(d.toISOString().split('T')[0]);
+    // 2. Fetch User Gamification Stats
+    const users = await prisma.user.findMany({
+        where: { id: { in: userIds } },
+        select: { id: true, xp: true, level: true, currentStreak: true }
     });
+    const userMap = new Map(users.map(u => [u.id, u]));
 
     // 3. Construct Result Map
     const statsMap = new Map<string, StudentStats>();
 
-    // Initialize for all requested IDs (ensure entry exists even if no history)
+    // Initialize
     userIds.forEach(id => {
+        const u = userMap.get(id);
         statsMap.set(id, {
             totalProblemsSolved: 0,
             totalCorrect: 0,
             accuracy: 0,
-            currentStreak: 0,
+            currentStreak: u?.currentStreak || 0,
             lastActivity: null,
+            xp: u?.xp || 0,
+            level: u?.level || 1
         });
     });
 
@@ -103,14 +100,8 @@ async function fetchInternalStudentStats(userIds: string[]): Promise<Map<string,
         }
     });
 
-    // Merge Streaks
-    userIds.forEach(id => {
-        const s = statsMap.get(id);
-        const dates = userDatesMap.get(id);
-        if (s && dates) {
-            s.currentStreak = calculateStreak(dates);
-        }
-    });
+    // Streaks are now fetched from User table, so no manual calculation needed here
+    // unless we want to verify. We rely on gamification-service to update it.
 
     return statsMap;
 
@@ -231,33 +222,6 @@ export async function getDailyActivity(userId: string, days = 30): Promise<Daily
     }
 
     return result.reverse();
-}
-
-function calculateStreak(uniqueDates: Set<string>): number {
-    let currentStreak = 0;
-    const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split('T')[0];
-
-    // Check if streak is active (today or yesterday has activity)
-    // Note: timezone handling matches original implementation (using server local time or whatever node uses)
-    let checkDate = uniqueDates.has(todayStr) ? today : (uniqueDates.has(yesterdayStr) ? yesterday : null);
-
-    if (checkDate) {
-        // Iterate backwards from the active date
-        while (true) {
-            const dateStr = checkDate!.toISOString().split('T')[0];
-            if (uniqueDates.has(dateStr)) {
-                currentStreak++;
-                checkDate!.setDate(checkDate!.getDate() - 1);
-            } else {
-                break;
-            }
-        }
-    }
-    return currentStreak;
 }
 
 export type Weakness = {
@@ -384,10 +348,11 @@ export type LearningSession = {
     totalProblems: number;
     correctCount: number;
     hasUnread: boolean;
+    unwatchedMistakeCount: number;
 };
 
 // Group history by groupId
-export async function getLearningSessions(userId: string, limit = 10, offset = 0): Promise<LearningSession[]> {
+export async function getLearningSessions(userId: string, limit = 10, offset = 0, onlyUnreviewed = false): Promise<LearningSession[]> {
     // We can't easily group by groupId and join relations in Prisma (it requires raw SQL or post-processing).
     // Let's use Raw SQL for performance grouping.
     //
@@ -403,6 +368,7 @@ export async function getLearningSessions(userId: string, limit = 10, offset = 0
         total: bigint;
         correct: bigint;
         unreadCount: bigint;
+        unwatchedMistakeCount: bigint;
     }>>`
         SELECT 
             lh."groupId",
@@ -434,10 +400,18 @@ export async function getLearningSessions(userId: string, limit = 10, offset = 0
             ) as "coreProblemName",
             COUNT(DISTINCT lh.id) as "total",
             COUNT(DISTINCT CASE WHEN lh.evaluation IN ('A', 'B') THEN lh.id END) as "correct",
-            COUNT(CASE WHEN lh."isStudentReviewed" = false THEN 1 END) as "unreadCount"
+            COUNT(CASE WHEN lh."isStudentReviewed" = false THEN 1 END) as "unreadCount",
+            COUNT(DISTINCT CASE 
+                WHEN lh.evaluation IN ('C', 'D') 
+                AND lh."isVideoWatched" = false 
+                AND p."videoUrl" IS NOT NULL 
+                THEN lh.id 
+            END) as "unwatchedMistakeCount"
         FROM "LearningHistory" lh
+        JOIN "Problem" p ON lh."problemId" = p.id
         WHERE lh."userId" = ${userId} AND lh."groupId" IS NOT NULL
         GROUP BY lh."groupId"
+        ${onlyUnreviewed ? Prisma.sql`HAVING COUNT(DISTINCT CASE WHEN lh.evaluation IN ('C', 'D') AND lh."isVideoWatched" = false AND p."videoUrl" IS NOT NULL THEN lh.id END) > 0` : Prisma.empty}
         ORDER BY "date" DESC
         LIMIT ${limit}
         OFFSET ${offset}
@@ -450,7 +424,8 @@ export async function getLearningSessions(userId: string, limit = 10, offset = 0
         coreProblemName: s.coreProblemName || "不明な単元",
         totalProblems: Number(s.total),
         correctCount: Number(s.correct),
-        hasUnread: Number(s.unreadCount) > 0
+        hasUnread: Number(s.unreadCount) > 0,
+        unwatchedMistakeCount: Number(s.unwatchedMistakeCount)
     }));
 }
 

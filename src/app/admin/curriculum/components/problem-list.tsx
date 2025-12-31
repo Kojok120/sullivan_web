@@ -4,25 +4,21 @@ import { Problem } from '@prisma/client';
 import { useState, useEffect } from 'react';
 import { getProblemsByCoreProblem, createProblem, updateProblem, deleteProblem } from '../actions';
 import { Button } from '@/components/ui/button';
-import { Plus, Pencil, Trash2, Video } from 'lucide-react';
+import { Plus, Trash2, Video } from 'lucide-react';
 import { toast } from 'sonner';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 
-import { useRouter } from 'next/navigation';
-
 interface ProblemListProps {
     coreProblemId: string;
-    subjectName: string;
 }
 
-export function ProblemList({ coreProblemId, subjectName }: ProblemListProps) {
+export function ProblemList({ coreProblemId }: ProblemListProps) {
     const [problems, setProblems] = useState<Problem[]>([]);
     const [loading, setLoading] = useState(true);
-    const router = useRouter();
 
     // Create/Edit State
     const [isDialogOpen, setIsDialogOpen] = useState(false);

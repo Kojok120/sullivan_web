@@ -66,7 +66,19 @@ model User {
 
   learningHistory       LearningHistory[]
   userProblemStates     UserProblemState[]
+
   userCoreProblemStates UserCoreProblemState[]
+
+  // Gamification
+  xp             Int      @default(0)
+  level          Int      @default(1)
+  currentStreak  Int      @default(0)
+  maxStreak      Int      @default(0)
+  lastStudyDate  DateTime?
+
+  achievements   UserAchievement[]
+  dailySummaries DailyLearningSummary[]
+
 
   // Teacher specific fields
   bio             String? // 生徒プロフィール（部活、志望校など）
@@ -149,4 +161,39 @@ model UserCoreProblemState {
   isUnlocked    Boolean     @default(false)
 
   @@unique([userId, coreProblemId])
+}
+
+model Achievement {
+  id          String   @id @default(cuid())
+  slug        String   @unique // e.g., "streak-7"
+  name        String
+  description String
+  icon        String
+  xpReward    Int      @default(0)
+  isHidden    Boolean  @default(false)
+
+  users       UserAchievement[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model UserAchievement {
+  id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id])
+  achievementId String
+  achievement   Achievement @relation(fields: [achievementId], references: [id])
+  unlockedAt    DateTime    @default(now())
+
+  @@unique([userId, achievementId])
+}
+
+model DailyLearningSummary {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  date        DateTime // YYYY-MM-DD 00:00:00
+  count       Int      @default(0)
+
+  @@unique([userId, date])
 }

@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { requireAdmin } from '@/lib/auth';
 import { Prisma } from '@prisma/client';
-import { bulkCreateProblemsCore } from '@/lib/problem-service';
+import { bulkCreateProblemsCore, createProblemCore, deleteProblemsWithRelations } from '@/lib/problem-service';
 
 export async function getProblems(
     page: number = 1,
@@ -48,15 +48,7 @@ export async function getProblems(
 
         const skip = (page - 1) * limit;
 
-        // Exact match query for customId
-        const exactMatchWhere: Prisma.ProblemWhereInput = {
-            AND: [
-                where, // Keep other filters
-                { customId: { equals: search, mode: 'insensitive' } } // Exact match
-            ]
-        };
-
-        // Partial match query (exclude exact matches to avoid duplicates if we were to just concat, 
+        // Partial match query (exclude exact matches to avoid duplicates if we were to just concat,
         // but since we page, we need a more robust strategy or just acceptable approximation)
         // A simple "exact match first" strategy with pagination is tricky in one go without raw SQL.
         // Option:
@@ -85,19 +77,6 @@ export async function getProblems(
             // We will execute two queries. 
             // Query A: Exact match on customId
             // Query B: The original OR query BUT excluding the ids from Query A (to avoid duplicates)
-
-            const exactIds = await prisma.problem.findMany({
-                where: {
-                    ...where, // filters
-                    customId: { equals: search, mode: 'insensitive' }
-                },
-                select: { id: true }
-            });
-
-            const exactIdsList = exactIds.map(p => p.id);
-
-            // Total count calculation
-            const countWhere = where; // Original broad where
 
             // We need to fetch enough items to fill the current page.
             // This is getting complicated for standard pagination.
@@ -287,40 +266,15 @@ export async function createStandaloneProblem(data: {
 }) {
     await requireAdmin();
     try {
-        // NOTE: strict validation or customId generation logic might need one subject context
-        // If we don't have a coreProblem linked, we might not be able to generate a customId effectively if it's tied to Subject
-        // For now, let's assume we need at least one coreProblem to generate customId OR we make customId optional/global?
-        // Schema says: customId String? @unique.
-        // The existing logic relies on Subject to generate customId (e.g. "S-1").
-        // If we connect multiple core problems, which subject custom ID do we use?
-        // -> Probably the first one.
-
-        let customId: string | undefined;
-
-        if (data.coreProblemIds.length > 0) {
-            const firstCP = await prisma.coreProblem.findUnique({
-                where: { id: data.coreProblemIds[0] },
-                include: { subject: true }
-            });
-            if (firstCP) {
-                const { getNextCustomId } = await import('@/lib/curriculum-service');
-                customId = await getNextCustomId(firstCP.subjectId);
-            }
-        }
-
-        const problem = await prisma.problem.create({
-            data: {
-                question: data.question,
-                answer: data.answer,
-                acceptedAnswers: data.acceptedAnswers || [],
-                grade: data.grade,
-                videoUrl: data.videoUrl,
-                customId: customId, // Might be null if no core problem linked
-                order: 0, // Default order? or should we manage it?
-                coreProblems: {
-                    connect: data.coreProblemIds.map(id => ({ id }))
-                }
-            }
+        // NOTE: customId生成はcreateProblemCore側で共通化
+        const problem = await createProblemCore({
+            question: data.question,
+            answer: data.answer,
+            acceptedAnswers: data.acceptedAnswers,
+            grade: data.grade,
+            videoUrl: data.videoUrl,
+            coreProblemIds: data.coreProblemIds,
+            order: 0, // 既存挙動（未指定相当）を維持
         });
 
         revalidatePath('/admin/problems');
@@ -375,12 +329,7 @@ export async function updateStandaloneProblem(id: string, data: {
 export async function deleteStandaloneProblem(id: string) {
     await requireAdmin();
     try {
-        // Similar to deleteProblem in curriculum actions
-        await prisma.$transaction([
-            prisma.learningHistory.deleteMany({ where: { problemId: id } }),
-            prisma.userProblemState.deleteMany({ where: { problemId: id } }),
-            prisma.problem.delete({ where: { id } }),
-        ]);
+        await deleteProblemsWithRelations([id]);
 
         revalidatePath('/admin/problems');
         return { success: true };
@@ -395,15 +344,10 @@ export async function bulkDeleteProblems(ids: string[]) {
     try {
         if (ids.length === 0) return { success: true, count: 0 };
 
-        // Delete related data first, then problems
-        await prisma.$transaction([
-            prisma.learningHistory.deleteMany({ where: { problemId: { in: ids } } }),
-            prisma.userProblemState.deleteMany({ where: { problemId: { in: ids } } }),
-            prisma.problem.deleteMany({ where: { id: { in: ids } } }),
-        ]);
+        const deletedCount = await deleteProblemsWithRelations(ids);
 
         revalidatePath('/admin/problems');
-        return { success: true, count: ids.length };
+        return { success: true, count: deletedCount };
     } catch (error) {
         console.error('Failed to bulk delete problems:', error);
         return { error: '問題の一括削除に失敗しました' };
@@ -416,14 +360,16 @@ export async function bulkDeleteProblems(ids: string[]) {
 export async function bulkSearchCoreProblems(names: string[]) {
     await requireAdmin();
     try {
-        const uniqueNames = [...new Set(names)];
+        const uniqueNames = [...new Set(names.map(name => name.trim()))].filter(Boolean);
         if (uniqueNames.length === 0) {
             return { success: true, coreProblemsMap: {} };
         }
 
         const coreProblems = await prisma.coreProblem.findMany({
             where: {
-                name: { in: uniqueNames }
+                OR: uniqueNames.map(name => ({
+                    name: { contains: name, mode: 'insensitive' }
+                }))
             },
             include: { subject: true },
             orderBy: [
@@ -432,13 +378,22 @@ export async function bulkSearchCoreProblems(names: string[]) {
             ]
         });
 
+        const normalizedCoreProblems = coreProblems.map(cp => ({
+            coreProblem: cp,
+            nameLower: cp.name.toLowerCase()
+        }));
+        const exactMatchMap = new Map(
+            normalizedCoreProblems.map(item => [item.nameLower, item.coreProblem])
+        );
+
         // 名前→CoreProblemのマップを返す（完全一致優先）
         const resultMap: Record<string, typeof coreProblems[0] | null> = {};
         for (const name of uniqueNames) {
-            const exactMatch = coreProblems.find(cp => cp.name === name);
-            const partialMatch = coreProblems.find(cp =>
-                cp.name.toLowerCase().includes(name.toLowerCase())
-            );
+            const normalized = name.toLowerCase();
+            const exactMatch = exactMatchMap.get(normalized);
+            const partialMatch = normalizedCoreProblems.find(item =>
+                item.nameLower.includes(normalized)
+            )?.coreProblem;
             resultMap[name] = exactMatch || partialMatch || null;
         }
 

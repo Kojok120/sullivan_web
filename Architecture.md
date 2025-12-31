@@ -76,6 +76,8 @@ erDiagram
     User ||--o{ LearningHistory : "学習履歴"
     User ||--o{ UserProblemState : "習熟度・優先度"
     User ||--o{ UserCoreProblemState : "単元の状態"
+    User ||--o{ UserAchievement : "実績解除"
+    User ||--o{ DailyLearningSummary : "日次学習集計"
     Classroom ||--o{ User : "所属ユーザー"
 
     Subject ||--o{ CoreProblem : "単元"
@@ -83,6 +85,8 @@ erDiagram
 
     Problem ||--o{ LearningHistory : "回答結果"
     Problem ||--o{ UserProblemState : "個別の進捗"
+
+    Achievement ||--o{ UserAchievement : "実績"
 ```
 
 * **Subject / CoreProblem / Problem**:
@@ -97,6 +101,12 @@ erDiagram
 * **UserCoreProblemState**:
     * 単元の優先度とアンロック状態を保持。
     * 出題選定とアンロック判定に利用。
+* **Achievement / UserAchievement**:
+    * 実績の定義と解除状況を管理。
+* **DailyLearningSummary**:
+    * 日次の学習数を集計（ヒートマップ/連続学習に使用）。
+* **User.metadata**:
+    * スタンプカードなど軽量なユーザー状態を保持。
 
 ## 5. 主要なロジックフロー
 
@@ -112,7 +122,8 @@ erDiagram
     * `LearningHistory` を保存。
     * `UserProblemState` と `UserCoreProblemState` を更新。
 7. **アンロック判定**: `checkProgressAndUnlock` で次のCoreProblemを解放。
-8. **通知**: SSEイベント `GRADING_COMPLETED` を発火。
+8. **ゲーミフィケーション更新**: XP/連続学習/実績を更新。
+9. **通知**: SSEイベント `grading_completed` を発火（必要に応じて `gamification_update` も送出）。
 
 ### 5.2. プリント生成フロー
 1. **問題選択**: 教師が対象生徒と教科を選択。

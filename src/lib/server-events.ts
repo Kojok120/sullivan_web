@@ -9,4 +9,5 @@ serverEvents.setMaxListeners(100); // Support up to 100 concurrent SSE clients
 export const EVENTS = {
     GRADING_COMPLETED: 'grading_completed',
     GRADING_FAILED: 'grading_failed',
+    GAMIFICATION_UPDATE: 'gamification_update',
 };

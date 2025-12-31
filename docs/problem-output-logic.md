@@ -78,17 +78,21 @@
 ## 5. QRコードの生成
 実装: `src/lib/grading-service.ts`（`generateQRCode`）
 
-- QR内容は以下のJSONをそのままエンコード:
+- QR内容は以下のJSONをエンコード（可能なら圧縮形式を使用）:
   ```json
   { "sid": "<studentId>", "pids": ["<problemId>", "..."] }
   ```
-- これにより、後段の採点処理で「生徒ID × 問題ID群」を復元可能。
+  もしくは圧縮形式:
+  ```json
+  { "sid": "<studentId>", "sub": "<prefix>", "nos": [1, 2] }
+  ```
+- いずれの形式でも後段の採点処理で「生徒ID × 問題ID群」を復元可能。
 
 ## 6. スキャン/採点ロジック詳細
 実装: `src/lib/grading-service.ts` / `src/app/api/grading/webhook/route.ts` / `src/app/api/queue/grading/route.ts`
 
 ### 6.1 トリガと排他制御
-- Webhook は `x-goog-channel-id` を `DRIVE_WEBHOOK_CHANNEL_ID` と照合し、`resourceState=change|update|add` のみ処理。
+- Webhook は `x-goog-channel-id` をRedis保存のWatch stateの `channelId` と照合し、`resourceState=change|update|add` のみ処理。
 - 連続呼び出しを 5 秒でデバウンス（`DEBOUNCE_MS = 5000`）。
 - 排他制御は `/tmp/sullivan_grading.lock` を使うファイルロック（`src/lib/grading-lock.ts`）。
 - 内部手動チェック用の `/api/grading/check` は `INTERNAL_API_SECRET` が必要。
@@ -122,7 +126,8 @@
   - 優先度調整: A:-10 / B:-5 / C:+5 / D:+10
 - `UserCoreProblemState` を upsert（正解: 関連CPに-5 / 不正解: 推定CPに+5、`isUnlocked=true`）。
 - `checkProgressAndUnlock` で解放判定（解答率>=50% かつ 正答率>=60%）を満たすと次のCoreProblemを解放。
-- 採点完了は SSE イベント `GRADING_COMPLETED` を送出（`/api/events`）。
+- 採点完了は SSE イベント `grading_completed` を送出（`/api/events`）。
+- ゲーミフィケーション更新がある場合は `gamification_update` を送出。
 
 ### 6.7 アーカイブとリネーム
 - `archiveProcessedFile` が `採点済/<教室>/<年>/<月>/<日>/` に移動・リネーム。
@@ -135,3 +140,4 @@
 - 出題数（`count`）はUIから変更できず、コード上のデフォルトに依存。
 - ローカルQR解析は `/usr/bin/python3` と `scripts/qr_reader.py` に依存し、PDFは必ずGemini解析にフォールバック。
 - `checkDriveForNewFiles` は最新10件のみ対象で、失敗時は `[ERROR]` リネームのみ行うため運用側で再処理が必要。
+- 3分超の未処理ファイルは `[ERROR] (Timeout)` にリネームされる。

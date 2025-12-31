@@ -47,6 +47,12 @@ export function MainNav({ role }: { role?: string }) {
                                 >
                                     ダッシュボード
                                 </Link>
+                                <Link
+                                    href="/achievements"
+                                    className={pathname === "/achievements" ? "text-foreground" : "text-foreground/60 transition-colors hover:text-foreground"}
+                                >
+                                    実績
+                                </Link>
                             </>
                         )}
                         {(role === 'TEACHER' || role === 'ADMIN') && (

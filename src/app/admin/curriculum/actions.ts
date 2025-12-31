@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 
 import { requireAdmin } from '@/lib/auth';
-import { bulkCreateProblemsCore } from '@/lib/problem-service';
+import { bulkCreateProblemsCore, createProblemCore, deleteProblemsWithRelations } from '@/lib/problem-service';
 
 // --- Subjects ---
 export async function getSubjects() {
@@ -189,34 +189,14 @@ export async function createProblem(data: {
 }) {
     await requireAdmin();
     try {
-        // 1. Fetch Subject info via CoreProblem
-        const coreProblem = await prisma.coreProblem.findUnique({
-            where: { id: data.coreProblemId },
-            include: { subject: true }
-        });
-
-        if (!coreProblem) throw new Error('CoreProblem not found');
-
-        const subject = coreProblem.subject;
-
-        // 2. Generate Custom ID
-        const { getNextCustomId } = await import('@/lib/curriculum-service');
-        const customId = await getNextCustomId(subject.id);
-
-        const problem = await prisma.problem.create({
-            data: {
-                question: data.question,
-                answer: data.answer,
-                // Connect to CoreProblem
-                coreProblems: {
-                    connect: { id: data.coreProblemId }
-                },
-                order: data.order,
-                videoUrl: data.videoUrl,
-                acceptedAnswers: data.acceptedAnswers || [],
-                grade: data.grade,
-                customId,
-            },
+        const problem = await createProblemCore({
+            question: data.question,
+            answer: data.answer,
+            coreProblemIds: [data.coreProblemId],
+            order: data.order,
+            videoUrl: data.videoUrl,
+            acceptedAnswers: data.acceptedAnswers,
+            grade: data.grade,
         });
         revalidatePath('/admin/curriculum');
         return { success: true, problem };
@@ -258,13 +238,7 @@ export async function updateProblem(id: string, data: {
 export async function deleteProblem(id: string) {
     await requireAdmin();
     try {
-        await prisma.$transaction([
-            // Delete related records first
-            prisma.learningHistory.deleteMany({ where: { problemId: id } }),
-            prisma.userProblemState.deleteMany({ where: { problemId: id } }),
-            // Finally delete the problem
-            prisma.problem.delete({ where: { id } }),
-        ]);
+        await deleteProblemsWithRelations([id]);
         revalidatePath('/admin/curriculum');
         return { success: true };
     } catch (error) {

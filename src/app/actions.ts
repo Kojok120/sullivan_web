@@ -3,6 +3,8 @@
 import { getSession, logout } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { processVideoWatch } from "@/lib/gamification-service";
+import { serverEvents, EVENTS } from "@/lib/server-events";
 
 
 export async function logoutAction() {
@@ -28,16 +30,26 @@ export async function markVideoWatched(historyId: string) {
         data: { isVideoWatched: true },
     });
 
+    // Gamification Hook
+    try {
+        const gamificationResult = await processVideoWatch(session.userId);
+        if (gamificationResult.achievementsUnlocked.length > 0 || gamificationResult.levelUp) {
+            serverEvents.emit(EVENTS.GAMIFICATION_UPDATE, gamificationResult);
+        }
+    } catch (e) {
+        console.error("Failed to process video watch gamification:", e);
+    }
+
     // revalidatePath('/dashboard');
 }
 
 import { getLearningSessions, markSessionAsReviewed } from "@/lib/analytics";
 
-export async function fetchMySessions(offset: number, limit: number) {
+export async function fetchMySessions(offset: number, limit: number, filter?: { onlyUnreviewed?: boolean }) {
     const session = await getSession();
     if (!session) throw new Error("Unauthorized");
 
-    return await getLearningSessions(session.userId, limit, offset);
+    return await getLearningSessions(session.userId, limit, offset, filter?.onlyUnreviewed);
 }
 
 export async function markSessionReviewed(groupId: string) {

@@ -9,6 +9,7 @@ import os from 'os';
 import { calculateCoreProblemStatus } from '@/lib/progression';
 import { serverEvents, EVENTS } from '@/lib/server-events';
 import { incrementStampCount } from '@/lib/stamp-service';
+import { processGamificationUpdates } from '@/lib/gamification-service';
 
 // Priority adjustment logic (inlined from removed priority-algo.ts)
 type Evaluation = "A" | "B" | "C" | "D";
@@ -192,6 +193,16 @@ export async function processFile(fileId: string, fileName: string) {
         // Update DB
         if (results && results.length > 0) {
             await recordGradingResults(results);
+
+            // [GAMIFICATION] Process XP, Streaks, Achievements
+            try {
+                const gamificationResult = await processGamificationUpdates(results[0].studentId, results);
+                serverEvents.emit(EVENTS.GAMIFICATION_UPDATE, gamificationResult);
+                console.log(`[Gamification] Updated for user ${results[0].studentId}: +${gamificationResult.xpGained} XP`);
+            } catch (e) {
+                console.error("[Gamification] Error processing updates:", e);
+            }
+
             // Archive the file (using the first result's studentId)
             const problemIdForContext = results[0].problemId;
             await archiveProcessedFile(fileId, results[0].studentId, problemIdForContext, new Date(), fileName);

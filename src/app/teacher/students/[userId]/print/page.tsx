@@ -1,8 +1,7 @@
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { prisma } from '@/lib/prisma';
-import { selectProblemsForPrint } from '@/lib/print-algo';
 import { PrintLayout } from '@/components/print/print-layout';
+import { getPrintData } from '@/lib/print-service';
 
 export default async function PrintPage({
     params,
@@ -21,36 +20,17 @@ export default async function PrintPage({
         redirect(`/teacher/students/${userId}`);
     }
 
-    const [student, subject, problems] = await Promise.all([
-        prisma.user.findUnique({
-            where: { id: userId },
-            select: { name: true, loginId: true }
-        }),
-        prisma.subject.findUnique({
-            where: { id: subjectId },
-            select: { name: true }
-        }),
-        selectProblemsForPrint(userId, subjectId)
-    ]);
-
-    if (!student || !subject) {
+    const data = await getPrintData(userId, subjectId);
+    if (!data) {
         return <div>Data not found</div>;
     }
 
-    // Sort by customId (Natural Sort)
-    const { naturalSort } = await import('@/lib/utils');
-    problems.sort((a, b) => {
-        const idA = a.customId || a.id;
-        const idB = b.customId || b.id;
-        return naturalSort(idA, idB);
-    });
-
     return (
         <PrintLayout
-            studentName={student.name || student.loginId}
-            subjectName={subject.name}
-            problems={problems}
-            studentLoginId={student.loginId}
+            studentName={data.studentName}
+            subjectName={data.subjectName}
+            problems={data.problems}
+            studentLoginId={data.studentLoginId}
         />
     );
 }

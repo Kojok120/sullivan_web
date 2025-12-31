@@ -4,14 +4,13 @@ import { AccordionContent, AccordionItem, AccordionTrigger } from '@/components/
 import { CoreProblem } from '@prisma/client';
 import { ProblemList } from './problem-list';
 import { Button } from '@/components/ui/button';
-import { Trash2, Pencil, Video } from 'lucide-react';
+import { Trash2, Pencil } from 'lucide-react';
 import { deleteCoreProblem, updateCoreProblem } from '../actions';
 import { toast } from 'sonner';
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -27,7 +26,6 @@ import { useRouter } from 'next/navigation';
 
 interface CoreProblemItemProps {
     coreProblem: CoreProblem;
-    subjectName: string;
     sortableProps?: {
         ref: (node: HTMLElement | null) => void;
         style: React.CSSProperties;
@@ -36,7 +34,7 @@ interface CoreProblemItemProps {
     };
 }
 
-export function CoreProblemItem({ coreProblem, subjectName, sortableProps }: CoreProblemItemProps) {
+export function CoreProblemItem({ coreProblem, sortableProps }: CoreProblemItemProps) {
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [editName, setEditName] = useState(coreProblem.name);
@@ -120,7 +118,7 @@ export function CoreProblemItem({ coreProblem, subjectName, sortableProps }: Cor
                     </div>
                 </AccordionTrigger>
                 <AccordionContent className="pt-4">
-                    <ProblemList coreProblemId={coreProblem.id} subjectName={subjectName} />
+                    <ProblemList coreProblemId={coreProblem.id} />
                 </AccordionContent>
             </AccordionItem>
 
@@ -168,4 +166,3 @@ export function CoreProblemItem({ coreProblem, subjectName, sortableProps }: Cor
         </>
     );
 }
-

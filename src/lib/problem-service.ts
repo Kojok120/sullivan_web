@@ -52,7 +52,7 @@ export async function createProblemCore(
 
     // order取得（指定がない場合は自動採番）
     let order = data.order;
-    if (order === undefined || order === 0) {
+    if (order === undefined) {
         const lastProblem = await tx.problem.findFirst({
             orderBy: { order: 'desc' },
             select: { order: true }
@@ -74,6 +74,36 @@ export async function createProblemCore(
             }
         }
     });
+}
+
+/**
+ * 問題削除の共通ロジック（関連データも削除）
+ * @param ids 削除対象のProblem ID
+ * @param tx Prismaトランザクション（オプション）
+ */
+export async function deleteProblemsWithRelations(
+    ids: string[],
+    tx: any = prisma
+): Promise<number> {
+    if (ids.length === 0) return 0;
+
+    if (ids.length === 1) {
+        const id = ids[0];
+        await tx.$transaction([
+            tx.learningHistory.deleteMany({ where: { problemId: id } }),
+            tx.userProblemState.deleteMany({ where: { problemId: id } }),
+            tx.problem.delete({ where: { id } }),
+        ]);
+        return 1;
+    }
+
+    const [, , deleteResult] = await tx.$transaction([
+        tx.learningHistory.deleteMany({ where: { problemId: { in: ids } } }),
+        tx.userProblemState.deleteMany({ where: { problemId: { in: ids } } }),
+        tx.problem.deleteMany({ where: { id: { in: ids } } }),
+    ]);
+
+    return deleteResult.count ?? ids.length;
 }
 
 /**
