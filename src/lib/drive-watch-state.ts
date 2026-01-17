@@ -10,6 +10,7 @@ const WATCH_STATE_KEY = 'sullivan:drive:watch:state';
 export interface WatchState {
     channelId: string;
     resourceId: string;
+    token?: string;
     expiration: number; // Unix timestamp (ms)
 }
 

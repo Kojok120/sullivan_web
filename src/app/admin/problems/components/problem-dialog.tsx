@@ -51,7 +51,7 @@ export function ProblemDialog({ open, onOpenChange, problem, onSuccess }: Proble
 
             if (problem) {
                 setQuestion(problem.question);
-                setAnswer(problem.answer);
+                setAnswer(problem.answer || '');
                 setGrade(problem.grade || '');
                 setVideoUrl(problem.videoUrl || '');
                 setCoreProblems(problem.coreProblems || []);
@@ -126,12 +126,11 @@ export function ProblemDialog({ open, onOpenChange, problem, onSuccess }: Proble
 
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <Label>解答 (正答)</Label>
+                            <Label>解答 (任意)</Label>
                             <Input
-                                required
                                 value={answer}
                                 onChange={e => setAnswer(e.target.value)}
-                                placeholder="解答"
+                                placeholder="解答 (空欄可)"
                             />
                         </div>
                         <div className="space-y-2">

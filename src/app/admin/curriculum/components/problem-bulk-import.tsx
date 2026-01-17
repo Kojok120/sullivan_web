@@ -22,7 +22,7 @@ type ParsedProblem = {
     grade: string;
     coreProblemNames: string[];
     question: string;
-    answer: string;
+    answer?: string;
     acceptedAnswers: string[];
     videoUrl: string;
     status: 'valid' | 'error';
@@ -44,9 +44,9 @@ export function ProblemBulkImport({ coreProblems, subjectId }: ProblemBulkImport
             status = 'error';
             message = `CoreProblemが見つかりません: ${missingCps.join(', ')}`;
         }
-        if (!row.question || !row.answer) {
+        if (!row.question) {
             status = 'error';
-            message = message ? `${message}, 必須項目（問題・正答）が不足しています` : '必須項目（問題・正答）が不足しています';
+            message = message ? `${message}, 必須項目（問題文）が不足しています` : '必須項目（問題文）が不足しています';
         }
 
         return { ...row, status, message };
@@ -196,7 +196,7 @@ export function ProblemBulkImport({ coreProblems, subjectId }: ProblemBulkImport
                             <Alert>
                                 <AlertDescription>
                                     Excelから以下のカラム順でコピー＆ペーストしてください。<br />
-                                    学年 | CoreProblem | 問題文 | 正答 | 別解(カンマ区切り) | 動画URL
+                                    学年 | CoreProblem | 問題文 | 正答(任意) | 別解(カンマ区切り) | 動画URL
                                 </AlertDescription>
                             </Alert>
                             <Textarea

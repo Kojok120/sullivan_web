@@ -58,6 +58,55 @@ export async function signupAction(prevState: any, formData: FormData) {
         });
 
         if (supabaseError) {
+            if (supabaseError.code === 'email_exists') {
+                const { data, error: listError } = await supabaseAdmin.auth.admin.listUsers({
+                    page: 1,
+                    perPage: 1000,
+                });
+
+                if (listError || !data?.users) {
+                    await prisma.user.delete({ where: { id: user.id } });
+                    console.error('Supabase listUsers failed:', listError);
+                    return { error: 'アカウント作成に失敗しました(Auth)。' };
+                }
+
+                const normalizedEmail = email.toLowerCase();
+                const existing = data.users.find(
+                    (u) => (u.email || '').toLowerCase() === normalizedEmail
+                );
+                if (!existing) {
+                    await prisma.user.delete({ where: { id: user.id } });
+                    console.error('Supabase user not found for email:', email);
+                    return { error: 'アカウント作成に失敗しました(Auth)。' };
+                }
+
+                const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+                    existing.id,
+                    {
+                        password,
+                        email_confirm: true,
+                        app_metadata: {
+                            role,
+                            loginId: user.loginId,
+                            name: user.name,
+                            prismaUserId: user.id,
+                        },
+                        user_metadata: {
+                            ...(existing.user_metadata || {}),
+                            isDefaultPassword: true,
+                        },
+                    }
+                );
+
+                if (updateError) {
+                    await prisma.user.delete({ where: { id: user.id } });
+                    console.error('Supabase update failed:', updateError);
+                    return { error: 'アカウント作成に失敗しました(Auth)。' };
+                }
+
+                return { success: true, loginId: user.loginId };
+            }
+
             // Rollback: Delete Prisma user if Supabase registration fails
             await prisma.user.delete({ where: { id: user.id } });
             console.error('Supabase registration failed:', supabaseError);

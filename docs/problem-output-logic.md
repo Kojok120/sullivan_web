@@ -21,7 +21,7 @@
 1. Drive Webhook（`/api/grading/webhook`）または内部チェック（`/api/grading/check`）で `checkDriveForNewFiles` を起動。
 2. `checkDriveForNewFiles` が対象ファイルを抽出し、QStash もしくは同期処理で採点ジョブを実行。
 3. `processFile` がファイルをダウンロードし、QR解析 + Gemini採点を実施。
-4. 採点結果を保存し、優先度/アンロックを更新、ファイルをアーカイブ、SSE通知を送出。
+4. 採点結果を保存し、優先度/アンロックを更新、ファイルをアーカイブ、Realtime通知を送出。
 
 ## 3. 問題選出ロジック（selectProblemsForPrint）
 実装: `src/lib/print-algo.ts` / `src/lib/progression.ts`
@@ -100,7 +100,7 @@
 ### 6.2 Driveファイル抽出とジョブ発行
 - `checkDriveForNewFiles` で `DRIVE_FOLDER_ID` 配下の最新ファイルを取得。
 - ファイル名が `[PROCESSED]` / `[ERROR]` で始まるものは対象外。
-- `QSTASH_TOKEN` + `APP_URL` がある場合は `/api/queue/grading` へ非同期発行。無ければ同期で `processFile` 実行。
+- `QSTASH_TOKEN` + `GRADING_WORKER_URL`（未設定時は `APP_URL`）がある場合は `/api/queue/grading` へ非同期発行。無ければ同期で `processFile` 実行。
 
 ### 6.3 ファイル処理
 - Drive からファイルを `/tmp` にストリーム保存。
@@ -126,8 +126,8 @@
   - 優先度調整: A:-10 / B:-5 / C:+5 / D:+10
 - `UserCoreProblemState` を upsert（正解: 関連CPに-5 / 不正解: 推定CPに+5、`isUnlocked=true`）。
 - `checkProgressAndUnlock` で解放判定（解答率>=50% かつ 正答率>=60%）を満たすと次のCoreProblemを解放。
-- 採点完了は SSE イベント `grading_completed` を送出（`/api/events`）。
-- ゲーミフィケーション更新がある場合は `gamification_update` を送出。
+- 採点完了は `realtime_events` へ `grading_completed` をINSERTし通知。
+- ゲーミフィケーション更新がある場合は `gamification_update` をINSERTして通知。
 
 ### 6.7 アーカイブとリネーム
 - `archiveProcessedFile` が `採点済/<教室>/<年>/<月>/<日>/` に移動・リネーム。

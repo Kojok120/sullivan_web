@@ -1,37 +1,51 @@
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
+import { Redis } from '@upstash/redis';
 
-const LOCK_FILE = path.join(os.tmpdir(), 'sullivan_grading.lock');
-const LOCK_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL!,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+});
 
-/**
- * Attempts to acquire the grading lock.
- * @returns true if lock acquired, false if another process is holding it
- */
-export async function acquireGradingLock(): Promise<boolean> {
-    try {
-        await fs.promises.access(LOCK_FILE);
-        const stats = await fs.promises.stat(LOCK_FILE);
-        if (Date.now() - stats.mtimeMs < LOCK_TIMEOUT_MS) {
-            return false; // Lock is active
-        }
-        console.warn('Grading lock: Found stale lock file. Overwriting.');
-        // Stale lock, proceed to overwrite
-    } catch {
-        // Lock file doesn't exist, proceed
-    }
-    await fs.promises.writeFile(LOCK_FILE, String(Date.now()));
-    return true;
+const SCAN_LOCK_KEY = 'sullivan:grading:scan:lock';
+const SCAN_LOCK_TTL_SECONDS = 60;
+const FILE_LOCK_PREFIX = 'sullivan:grading:file:';
+const FILE_LOCK_TTL_SECONDS = 15 * 60;
+
+function fileLockKey(fileId: string) {
+  return `${FILE_LOCK_PREFIX}${fileId}`;
 }
 
 /**
- * Releases the grading lock.
+ * Attempts to acquire the global scan lock (for Drive polling).
+ */
+export async function acquireGradingLock(): Promise<boolean> {
+  const result = await redis.set(SCAN_LOCK_KEY, '1', {
+    nx: true,
+    ex: SCAN_LOCK_TTL_SECONDS,
+  });
+  return result === 'OK';
+}
+
+/**
+ * Releases the global scan lock.
  */
 export async function releaseGradingLock(): Promise<void> {
-    try {
-        await fs.promises.unlink(LOCK_FILE);
-    } catch {
-        // Ignore - lock might not exist
-    }
+  await redis.del(SCAN_LOCK_KEY);
+}
+
+/**
+ * Attempts to acquire a file-level lock for grading.
+ */
+export async function acquireGradingFileLock(fileId: string): Promise<boolean> {
+  const result = await redis.set(fileLockKey(fileId), '1', {
+    nx: true,
+    ex: FILE_LOCK_TTL_SECONDS,
+  });
+  return result === 'OK';
+}
+
+/**
+ * Releases the file-level grading lock.
+ */
+export async function releaseGradingFileLock(fileId: string): Promise<void> {
+  await redis.del(fileLockKey(fileId));
 }

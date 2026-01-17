@@ -56,7 +56,7 @@ export function ProblemList({ coreProblemId }: ProblemListProps) {
     const openEdit = (problem: Problem) => {
         setEditingProblem(problem);
         setQuestion(problem.question);
-        setAnswer(problem.answer);
+        setAnswer(problem.answer || '');
         setVideoUrl(problem.videoUrl || '');
         setGrade((problem as any).grade || '');
 
@@ -64,8 +64,8 @@ export function ProblemList({ coreProblemId }: ProblemListProps) {
     };
 
     const handleSave = async () => {
-        if (!question.trim() || !answer.trim()) {
-            toast.error('問題文と解答は必須です');
+        if (!question.trim()) {
+            toast.error('問題文は必須です');
             return;
         }
 

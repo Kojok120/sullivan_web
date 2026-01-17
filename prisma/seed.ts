@@ -1,225 +1,495 @@
 import 'dotenv/config';
 import { PrismaClient, Role } from '@prisma/client';
-import * as bcrypt from 'bcryptjs';
 import { createClient } from '@supabase/supabase-js';
+import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
-// Initialize Supabase Admin Client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!supabaseUrl || !supabaseServiceRoleKey) {
-    console.warn('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY. Skipping Supabase Auth creation.');
+const supabaseAdmin = supabaseUrl && supabaseServiceRoleKey
+  ? createClient(supabaseUrl, supabaseServiceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
+  : null;
+
+const DEFAULT_PASSWORD = 'password123';
+
+type SeedUser = {
+  loginId: string;
+  name: string;
+  role: Role;
+  group?: string | null;
+  classroomId?: string | null;
+};
+
+async function upsertPrismaUser({
+  loginId,
+  name,
+  role,
+  group,
+  classroomId,
+}: SeedUser) {
+  const hashedPassword = await bcrypt.hash(DEFAULT_PASSWORD, 10);
+  return await prisma.user.upsert({
+    where: { loginId },
+    update: {
+      name,
+      role,
+      group: group ?? null,
+      classroomId: classroomId ?? null,
+      password: hashedPassword,
+    },
+    create: {
+      loginId,
+      name,
+      role,
+      group: group ?? null,
+      classroomId: classroomId ?? null,
+      password: hashedPassword,
+    },
+  });
 }
 
-const supabase = (supabaseUrl && supabaseServiceRoleKey)
-    ? createClient(supabaseUrl, supabaseServiceRoleKey, {
-        auth: {
-            autoRefreshToken: false,
-            persistSession: false
-        }
-    })
-    : null;
+async function ensureSupabaseAuthUser(prismaUser: {
+  id: string;
+  loginId: string;
+  name: string | null;
+  role: Role;
+}) {
+  if (!supabaseAdmin) {
+    console.warn('Supabase admin client not configured. Skipping Auth user creation.');
+    return;
+  }
 
-async function upsertUser(loginId: string, name: string, role: Role, passwordPlain: string) {
-    console.log(`Processing user: ${loginId} (${name})`);
+  const email = `${prismaUser.loginId}@sullivan-internal.local`;
+  const appMetadata = {
+    role: prismaUser.role,
+    loginId: prismaUser.loginId,
+    name: prismaUser.name ?? '',
+    prismaUserId: prismaUser.id,
+  };
+  const userMetadata = {
+    isDefaultPassword: true,
+  };
 
-    let userId: string | undefined;
+  const { error } = await supabaseAdmin.auth.admin.createUser({
+    email,
+    password: DEFAULT_PASSWORD,
+    email_confirm: true,
+    app_metadata: appMetadata,
+    user_metadata: userMetadata,
+  });
 
-    // 1. Create/Get User in Supabase Auth
-    if (supabase) {
-        const email = `${loginId}@sullivan-internal.local`;
+  if (!error) return;
 
-        // Check if user exists by listing users (Admin API doesn't have getUserByEmail directly in all versions, 
-        // but createUser handles duplicates safely if we catch error, strictly speaking request user by email is safer)
-        // Actually, admin.createUser returns the user if it exists? No, it throws error.
+  if (!error.message.includes('already')) {
+    console.warn(`Supabase Auth creation failed for ${email}:`, error.message);
+    return;
+  }
 
-        // Try deleting first to ensure clean state? No, that deletes data.
-        // Let's try to fetch user specific data first?
-        // Simplest: Try create, if fail with "already registered", then skip auth creation (we assume ID is stable? No, we need the ID).
+  const { data, error: listError } = await supabaseAdmin.auth.admin.listUsers({
+    page: 1,
+    perPage: 200,
+  });
 
-        // Better: List users by email
-        // Note: listUsers is paginated, but for specific check we might need better approach.
-        // Actually, currently we can just try to creating.
+  if (listError) {
+    console.warn(`Supabase listUsers failed for ${email}:`, listError.message);
+    return;
+  }
 
-        // Wait, to get the ID of an existing user reliably without iterating all users:
-        // Admin API mostly relies on ID.
-        // However, we can use `admin.listUsers` with a filter if supported? Unfortunately searching by email in listUsers is not always direct.
-        // 
-        // CORRECT APPROACH: Use `admin.createUser` and catch error? 
-        // If error says "Email already registered", we can't easily get the ID without signing in or listing.
-        // But for a seed script, maybe we can just create if not exists?
-        // 
-        // Strategy: 
-        // 1. Try `createUser`. If success, usage `data.user.id`.
-        // 2. If fail, maybe we shouldn't fail silently if we need the ID for Prisma.
-        // 
-        // Workaround: Since we know the password, we can try `signInWithPassword`? 
-        // No, we are admin.
-        //
-        // Let's check `admin.listUsers` docs in mind.
-        // Actually, let's use a simpler approach for now:
-        // Try creating. If it fails, assume it exists in Prisma and fetch from there?
-        // But we want to ensure Prisma has the CORRECT Auth ID.
+  const existing = data.users.find((user) => user.email === email);
+  if (!existing) {
+    console.warn(`Supabase user not found for ${email}.`);
+    return;
+  }
 
-        // Let's just try to delete the user in Auth first to be safe for a seed script?
-        // No, that's destructive.
-
-        // Let's try to find the user in Prisma first. If they have an ID, we assume that's the Auth ID.
-        // If they don't exist in Prisma, we MUST create in Auth.
-
-        const existingPrismaUser = await prisma.user.findUnique({ where: { loginId } });
-
-        if (existingPrismaUser) {
-            console.log(`User ${loginId} already exists in Prisma. Assuming Auth user exists.`);
-            userId = existingPrismaUser.id;
-            // Optionally we could verify against Auth but let's trust Prisma for existing seeds.
-        } else {
-            // Create in Auth
-            const { data, error } = await supabase.auth.admin.createUser({
-                email,
-                password: passwordPlain,
-                email_confirm: true,
-                user_metadata: { loginId, name, role }
-            });
-
-            if (error) {
-                // If error is "User already registered", we have a problem: we don't have the ID.
-                // We need to fetch the ID.
-                console.warn(`Failed to create Auth user for ${loginId}:`, error.message);
-                // Try to recover ID?
-                // For now, let's fall back to generating a CUID if Auth failed, BUT warn heavily.
-                // ACTUALLY: If Auth exists but Prisma doesn't, we are in inconsistent state.
-                // We should probably try to find user by email via listUsers?
-                // supabase.auth.admin.listUsers() is possible.
-            } else {
-                userId = data.user.id;
-            }
-        }
+  const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+    existing.id,
+    {
+      app_metadata: appMetadata,
+      user_metadata: {
+        ...(existing.user_metadata || {}),
+        isDefaultPassword: true,
+      },
     }
+  );
 
-    // Default to CUID if no Supabase or failed to communicate (dev mode fallback)
-    // BUT we must ensure we don't overwrite the ID if it already exists in Prisma
+  if (updateError) {
+    console.warn(`Supabase Auth update failed for ${email}:`, updateError.message);
+  }
+}
 
-    // Perform Upsert to Prisma
-    const hashedPassword = await bcrypt.hash(passwordPlain, 10);
+async function seedUsers() {
+  const classroom = await prisma.classroom.upsert({
+    where: { name: 'デモ教室' },
+    update: { groups: ['月曜', '水曜'] },
+    create: { name: 'デモ教室', groups: ['月曜', '水曜'] },
+  });
 
-    // If we have a userId from Auth, use it.
-    // If we don't (and didn't find in Prisma), Prisma will generate CUID (default).
-    // Ideally we FORCE the ID if we got it from Auth.
+  const users: SeedUser[] = [
+    {
+      loginId: 'S0001',
+      name: 'Test Student',
+      role: Role.STUDENT,
+      group: '月曜',
+      classroomId: classroom.id,
+    },
+    {
+      loginId: 'T0001',
+      name: 'Test Teacher',
+      role: Role.TEACHER,
+      classroomId: classroom.id,
+    },
+    {
+      loginId: 'A0001',
+      name: 'Admin User',
+      role: Role.ADMIN,
+    },
+  ];
 
-    const data: any = {
-        loginId,
-        password: hashedPassword,
-        name,
-        role,
-    };
-    if (userId) {
-        data.id = userId;
-    }
+  for (const user of users) {
+    const prismaUser = await upsertPrismaUser(user);
+    await ensureSupabaseAuthUser(prismaUser);
+  }
+}
 
-    const user = await prisma.user.upsert({
-        where: { loginId },
-        update: {
-            // If we found them in Prisma, we update fields but usually ID doesn't change.
-            // If we are "fixing" the ID to match Auth... upsert doesn't allow updating ID easily?
-            // Actually, if where matches, it updates.
-            name,
-            role,
-            password: hashedPassword
+type SeedProblem = {
+  customId: string;
+  question: string;
+  answer: string;
+  order: number;
+  videoUrl?: string;
+  acceptedAnswers?: string[];
+};
+
+type SeedCoreProblem = {
+  name: string;
+  order: number;
+  problems: SeedProblem[];
+};
+
+type SeedSubject = {
+  name: string;
+  order: number;
+  coreProblems: SeedCoreProblem[];
+};
+
+async function upsertCoreProblem(subjectId: string, coreProblem: SeedCoreProblem) {
+  const existing = await prisma.coreProblem.findFirst({
+    where: { subjectId, name: coreProblem.name },
+  });
+
+  if (existing) {
+    return await prisma.coreProblem.update({
+      where: { id: existing.id },
+      data: { order: coreProblem.order },
+    });
+  }
+
+  return await prisma.coreProblem.create({
+    data: {
+      name: coreProblem.name,
+      order: coreProblem.order,
+      subjectId,
+    },
+  });
+}
+
+async function upsertProblem(coreProblemId: string, problem: SeedProblem) {
+  return await prisma.problem.upsert({
+    where: { customId: problem.customId },
+    update: {
+      question: problem.question,
+      answer: problem.answer,
+      order: problem.order,
+      videoUrl: problem.videoUrl,
+      acceptedAnswers: problem.acceptedAnswers ?? [],
+      coreProblems: { set: [{ id: coreProblemId }] },
+    },
+    create: {
+      customId: problem.customId,
+      question: problem.question,
+      answer: problem.answer,
+      order: problem.order,
+      videoUrl: problem.videoUrl,
+      acceptedAnswers: problem.acceptedAnswers ?? [],
+      coreProblems: { connect: [{ id: coreProblemId }] },
+    },
+  });
+}
+
+async function seedCurriculum() {
+  const subjects: SeedSubject[] = [
+    {
+      name: '英語',
+      order: 1,
+      coreProblems: [
+        {
+          name: 'be動詞の肯定文',
+          order: 1,
+          problems: [
+            { customId: 'E-1', question: 'I ( ) a student.', answer: 'am', order: 1 },
+            { customId: 'E-2', question: 'You ( ) a teacher.', answer: 'are', order: 2 },
+            { customId: 'E-3', question: 'He ( ) my friend.', answer: 'is', order: 3 },
+          ],
         },
-        create: data,
+        {
+          name: 'be動詞の否定文',
+          order: 2,
+          problems: [
+            { customId: 'E-4', question: 'I ( ) not a doctor.', answer: 'am', order: 1 },
+            { customId: 'E-5', question: 'She ( ) not happy.', answer: 'is', order: 2 },
+          ],
+        },
+        {
+          name: '一般動詞の肯定文',
+          order: 3,
+          problems: [
+            { customId: 'E-6', question: 'I ( ) tennis.', answer: 'play', order: 1 },
+            { customId: 'E-7', question: 'He ( ) soccer.', answer: 'plays', order: 2 },
+          ],
+        },
+      ],
+    },
+    {
+      name: '数学',
+      order: 2,
+      coreProblems: [
+        {
+          name: '一次方程式',
+          order: 1,
+          problems: [
+            { customId: 'M-1', question: 'x + 3 = 7 のとき x = ?', answer: '4', order: 1 },
+            { customId: 'M-2', question: '2x = 10 のとき x = ?', answer: '5', order: 2 },
+          ],
+        },
+      ],
+    },
+    {
+      name: '国語',
+      order: 3,
+      coreProblems: [
+        {
+          name: '漢字の読み',
+          order: 1,
+          problems: [
+            { customId: 'J-1', question: '「挑戦」の読み方は？', answer: 'ちょうせん', order: 1 },
+            { customId: 'J-2', question: '「努力」の読み方は？', answer: 'どりょく', order: 2 },
+          ],
+        },
+      ],
+    },
+  ];
+
+  for (const subject of subjects) {
+    const subjectRecord = await prisma.subject.upsert({
+      where: { name: subject.name },
+      update: { order: subject.order },
+      create: { name: subject.name, order: subject.order },
     });
 
-    return user;
+    for (const coreProblem of subject.coreProblems) {
+      const coreProblemRecord = await upsertCoreProblem(subjectRecord.id, coreProblem);
+
+      for (const problem of coreProblem.problems) {
+        await upsertProblem(coreProblemRecord.id, problem);
+      }
+    }
+  }
+}
+
+async function seedAchievements() {
+  const achievements = [
+    {
+      slug: 'streak-3',
+      name: '三日坊主卒業',
+      description: '3日間連続で学習しました',
+      icon: 'seedling',
+      xpReward: 100,
+    },
+    {
+      slug: 'streak-7',
+      name: '1週間継続',
+      description: '7日間連続で学習しました',
+      icon: 'fire',
+      xpReward: 300,
+    },
+    {
+      slug: 'streak-14',
+      name: '2週間継続',
+      description: '14日間連続で学習しました',
+      icon: 'fire-blue',
+      xpReward: 500,
+    },
+    {
+      slug: 'streak-30',
+      name: '1ヶ月継続',
+      description: '30日間連続で学習しました',
+      icon: 'fire-gold',
+      xpReward: 1000,
+    },
+    {
+      slug: 'streak-100',
+      name: '百日修行',
+      description: '100日間連続で学習しました',
+      icon: 'crown',
+      xpReward: 5000,
+    },
+    {
+      slug: 'streak-365',
+      name: '1年間継続',
+      description: '365日間連続で学習しました',
+      icon: 'trophy',
+      xpReward: 10000,
+    },
+    {
+      slug: 'solve-10',
+      name: 'はじめの一歩',
+      description: '累計10問学習しました',
+      icon: 'footprint',
+      xpReward: 50,
+    },
+    {
+      slug: 'solve-100',
+      name: '努力家',
+      description: '累計100問学習しました',
+      icon: 'star-bronze',
+      xpReward: 500,
+    },
+    {
+      slug: 'solve-500',
+      name: '知識の泉',
+      description: '累計500問学習しました',
+      icon: 'star-silver',
+      xpReward: 2000,
+    },
+    {
+      slug: 'solve-1000',
+      name: 'マスターへの道',
+      description: '累計1000問学習しました',
+      icon: 'star-gold',
+      xpReward: 5000,
+    },
+    {
+      slug: 'solve-5000',
+      name: '伝説の学習者',
+      description: '累計5000問学習しました',
+      icon: 'trophy',
+      xpReward: 10000,
+    },
+    {
+      slug: 'perfect-1',
+      name: 'パーフェクト',
+      description: '1回の学習で全問正解しました',
+      icon: 'target',
+      xpReward: 100,
+    },
+    {
+      slug: 'perfect-10',
+      name: 'パーフェクトマスター',
+      description: '10回全問正解を達成しました',
+      icon: 'bullseye',
+      xpReward: 1000,
+    },
+    {
+      slug: 'core-unlock-english',
+      name: '英語マスター',
+      description: '英語のすべての単元を解放しました',
+      icon: 'book-open',
+      xpReward: 3000,
+    },
+    {
+      slug: 'core-unlock-math',
+      name: '数学マスター',
+      description: '数学のすべての単元を解放しました',
+      icon: 'calculator',
+      xpReward: 3000,
+    },
+    {
+      slug: 'video-1',
+      name: '初めての発見',
+      description: '解説動画を初めて視聴しました',
+      icon: 'play-circle',
+      xpReward: 50,
+    },
+    {
+      slug: 'video-10',
+      name: '熱心な視聴者',
+      description: '解説動画を10回視聴しました',
+      icon: 'film',
+      xpReward: 300,
+    },
+    {
+      slug: 'video-50',
+      name: '動画学習マスター',
+      description: '解説動画を50回視聴しました',
+      icon: 'video',
+      xpReward: 1000,
+    },
+    {
+      slug: 'video-100',
+      name: '知識の探求者',
+      description: '解説動画を100回視聴しました',
+      icon: 'monitor-play',
+      xpReward: 2000,
+    },
+    {
+      slug: 'review-1',
+      name: '復習の第一歩',
+      description: '間違えた問題の解説動画を全て視聴しました（1回達成）',
+      icon: 'check-circle',
+      xpReward: 100,
+    },
+    {
+      slug: 'review-10',
+      name: '復習の習慣',
+      description: '間違えた問題の解説動画を全て視聴しました（10回達成）',
+      icon: 'clipboard-check',
+      xpReward: 500,
+    },
+    {
+      slug: 'review-50',
+      name: '復習マスター',
+      description: '間違えた問題の解説動画を全て視聴しました（50回達成）',
+      icon: 'medal',
+      xpReward: 2000,
+    },
+    {
+      slug: 'review-100',
+      name: '完璧主義',
+      description: '間違えた問題の解説動画を全て視聴しました（100回達成）',
+      icon: 'shield-check',
+      xpReward: 5000,
+    },
+  ];
+
+  for (const achievement of achievements) {
+    await prisma.achievement.upsert({
+      where: { slug: achievement.slug },
+      update: achievement,
+      create: achievement,
+    });
+  }
 }
 
 async function main() {
-    console.log('Start seeding ...');
-
-    // Password for all seed users
-    const PASSWORD = 'password123';
-
-    await upsertUser('S0001', 'Test Student', Role.STUDENT, PASSWORD);
-    await upsertUser('T0001', 'Test Teacher', Role.TEACHER, PASSWORD);
-    await upsertUser('A0001', 'Admin User', Role.ADMIN, PASSWORD);
-
-    // Create Subjects
-    console.log('Seeding subjects...');
-    const english = await prisma.subject.upsert({
-        where: { name: '英語' },
-        update: {},
-        create: { name: '英語', order: 1 },
-    });
-
-    const math = await prisma.subject.upsert({
-        where: { name: '数学' },
-        update: {},
-        create: { name: '数学', order: 2 },
-    });
-
-    const japanese = await prisma.subject.upsert({
-        where: { name: '国語' },
-        update: {},
-        create: { name: '国語', order: 3 },
-    });
-
-    // Create CoreProblems for English
-    // Unit 1: be動詞 -> CoreProblem Group 1
-    console.log('Seeding core problems...');
-    await prisma.coreProblem.create({
-        data: {
-            name: 'be動詞の肯定文',
-            order: 1,
-            subjectId: english.id,
-            problems: {
-                create: [
-                    { question: 'I ( ) a student.', answer: 'am', order: 1, videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ' },
-                    { question: 'You ( ) a teacher.', answer: 'are', order: 2, videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ' },
-                    { question: 'He ( ) my friend.', answer: 'is', order: 3, videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ' },
-                ],
-            },
-        },
-    });
-
-    await prisma.coreProblem.create({
-        data: {
-            name: 'be動詞の否定文',
-            order: 2,
-            subjectId: english.id,
-            problems: {
-                create: [
-                    { question: 'I ( ) not a doctor.', answer: 'am', order: 1 },
-                    { question: 'She ( ) not happy.', answer: 'is', order: 2 },
-                ],
-            },
-        },
-    });
-
-    // Unit 2: 一般動詞 -> CoreProblem Group 2
-    await prisma.coreProblem.create({
-        data: {
-            name: '一般動詞の肯定文',
-            order: 3,
-            subjectId: english.id,
-            problems: {
-                create: [
-                    { question: 'I ( ) tennis.', answer: 'play', order: 1 },
-                    { question: 'He ( ) soccer.', answer: 'plays', order: 2 },
-                ],
-            },
-        },
-    });
-
-    console.log('Seeding finished.');
+  console.log('Start seeding...');
+  await seedUsers();
+  await seedCurriculum();
+  await seedAchievements();
+  console.log('Seeding finished.');
 }
 
 main()
-    .catch((e) => {
-        console.error(e);
-        process.exit(1);
-    })
-    .finally(async () => {
-        await prisma.$disconnect();
-    });
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

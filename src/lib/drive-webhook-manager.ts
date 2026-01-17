@@ -6,13 +6,18 @@ function getDrive() {
     return getDriveClient();
 }
 
-export async function watchDriveFolder(webhookUrl: string): Promise<{ resourceId: string; channelId: string; expiration: string }> {
+export async function watchDriveFolder(webhookUrl: string): Promise<{ resourceId: string; channelId: string; expiration: string; token?: string }> {
     if (!DRIVE_FOLDER_ID) throw new Error("DRIVE_FOLDER_ID is not set");
 
     const DRIVE_WEBHOOK_CHANNEL_ID = process.env.DRIVE_WEBHOOK_CHANNEL_ID || '';
+    const DRIVE_WEBHOOK_TOKEN = process.env.DRIVE_WEBHOOK_TOKEN || '';
 
     const drive = getDrive();
     const channelId = DRIVE_WEBHOOK_CHANNEL_ID || crypto.randomUUID();
+    const token = DRIVE_WEBHOOK_TOKEN || undefined;
+    if (!token) {
+        console.warn('DRIVE_WEBHOOK_TOKEN is not set; webhook token verification will be skipped.');
+    }
 
     console.log(`Setting up watch for folder ${DRIVE_FOLDER_ID} pointed to ${webhookUrl}`);
 
@@ -22,6 +27,7 @@ export async function watchDriveFolder(webhookUrl: string): Promise<{ resourceId
             id: channelId,
             type: 'web_hook',
             address: webhookUrl,
+            token,
             expiration: (Date.now() + 604800000).toString() // 7 days (Google Drive Max)
         }
     });
@@ -32,6 +38,7 @@ export async function watchDriveFolder(webhookUrl: string): Promise<{ resourceId
         resourceId: res.data.resourceId!,
         channelId: channelId,
         expiration: res.data.expiration!,
+        token,
     };
 }
 
@@ -48,4 +55,3 @@ export async function stopWatching(channelId: string, resourceId: string): Promi
     });
     console.log(`Stopped watching channel: ${channelId}`);
 }
-

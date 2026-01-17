@@ -8,7 +8,7 @@ import { getNextCustomId, getNextCustomIds } from '@/lib/curriculum-service';
 
 export interface CreateProblemData {
     question: string;
-    answer: string;
+    answer?: string;
     acceptedAnswers?: string[];
     grade?: string;
     videoUrl?: string;

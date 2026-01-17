@@ -82,7 +82,7 @@ export default async function SessionDetailsPage({ params }: { params: Promise<{
                                     <div>
                                         <span className="font-semibold block mb-1">正解:</span>
                                         <div className="bg-white p-2 rounded border text-lg min-h-[40px] text-green-700">
-                                            {item.problem.answer}
+                                            {item.problem.answer || '（正答なし）'}
                                         </div>
                                     </div>
                                 </div>

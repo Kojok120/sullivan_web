@@ -36,6 +36,8 @@
     * Drive検知後の採点処理をキューイング
 * **State Store**: Upstash Redis
     * Drive Watch状態の保存
+* **Realtime**: Supabase Realtime (Postgres Changes)
+    * `realtime_events` へのINSERTで通知
 
 ## 3. ディレクトリ構造 (`src/`)
 
@@ -78,6 +80,7 @@ erDiagram
     User ||--o{ UserCoreProblemState : "単元の状態"
     User ||--o{ UserAchievement : "実績解除"
     User ||--o{ DailyLearningSummary : "日次学習集計"
+    User ||--o{ RealtimeEvent : "通知イベント"
     Classroom ||--o{ User : "所属ユーザー"
 
     Subject ||--o{ CoreProblem : "単元"
@@ -105,6 +108,8 @@ erDiagram
     * 実績の定義と解除状況を管理。
 * **DailyLearningSummary**:
     * 日次の学習数を集計（ヒートマップ/連続学習に使用）。
+* **RealtimeEvent**:
+    * 通知イベントを一時保存し、Supabase Realtimeで配信。
 * **User.metadata**:
     * スタンプカードなど軽量なユーザー状態を保持。
 
@@ -123,7 +128,7 @@ erDiagram
     * `UserProblemState` と `UserCoreProblemState` を更新。
 7. **アンロック判定**: `checkProgressAndUnlock` で次のCoreProblemを解放。
 8. **ゲーミフィケーション更新**: XP/連続学習/実績を更新。
-9. **通知**: SSEイベント `grading_completed` を発火（必要に応じて `gamification_update` も送出）。
+9. **通知**: `realtime_events` へINSERTし、Supabase Realtimeで通知（必要に応じて `gamification_update` も送出）。
 
 ### 5.2. プリント生成フロー
 1. **問題選択**: 教師が対象生徒と教科を選択。
@@ -163,4 +168,4 @@ npm run dev
     * `GEMINI_API_KEY`, `DRIVE_FOLDER_ID`, `APP_URL`
     * `QSTASH_TOKEN` (必要に応じて `QSTASH_CURRENT_SIGNING_KEY`, `QSTASH_NEXT_SIGNING_KEY`)
     * `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`
-    * `INTERNAL_API_SECRET` (任意), `DRIVE_WEBHOOK_CHANNEL_ID` (任意)
+    * `INTERNAL_API_SECRET` (任意), `DRIVE_WEBHOOK_CHANNEL_ID` (任意), `DRIVE_WEBHOOK_TOKEN` (Webhook検証用)

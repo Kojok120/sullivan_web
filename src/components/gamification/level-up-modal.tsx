@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import { Trophy, Star, Sparkles } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { createClient } from '@/lib/supabase/client';
 
 // Simple implementation of SSE listening
 export function LevelUpModal() {
@@ -12,21 +13,48 @@ export function LevelUpModal() {
     const [data, setData] = useState<{ newLevel: number; xpGained: number } | null>(null);
 
     useEffect(() => {
-        const eventSource = new EventSource('/api/events');
+        const supabase = createClient();
+        let channel: ReturnType<typeof supabase.channel> | null = null;
 
-        eventSource.onmessage = (event) => {
-            const parsed = JSON.parse(event.data);
-            if (parsed.type === 'gamification_update') {
-                if (parsed.levelUp) {
-                    setData({ newLevel: parsed.newLevel, xpGained: parsed.xpGained });
-                    setOpen(true);
-                    triggerConfetti();
-                }
-            }
+        const setup = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+            const prismaUserId = (user.app_metadata as { prismaUserId?: string } | null)?.prismaUserId || user.id;
+
+            channel = supabase
+                .channel(`realtime-events:gamification:${prismaUserId}`)
+                .on(
+                    'postgres_changes',
+                    {
+                        event: 'INSERT',
+                        schema: 'public',
+                        table: 'realtime_events',
+                        filter: `user_id=eq.${prismaUserId}`,
+                    },
+                    (payload) => {
+                        const record = payload.new as { type?: string; payload?: any } | null;
+                        if (!record || record.type !== 'gamification_update') return;
+
+                        const update = record.payload;
+                        if (update?.levelUp?.newLevel) {
+                            setData({
+                                newLevel: update.levelUp.newLevel,
+                                xpGained: update.xpGained ?? 0,
+                            });
+                            setOpen(true);
+                            triggerConfetti();
+                        }
+                    }
+                )
+                .subscribe();
         };
 
+        setup();
+
         return () => {
-            eventSource.close();
+            if (channel) {
+                supabase.removeChannel(channel);
+            }
         };
     }, []);
 

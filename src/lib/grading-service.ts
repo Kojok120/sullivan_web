@@ -7,9 +7,11 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { calculateCoreProblemStatus } from '@/lib/progression';
-import { serverEvents, EVENTS } from '@/lib/server-events';
+import { emitRealtimeEvent } from '@/lib/realtime-events';
 import { incrementStampCount } from '@/lib/stamp-service';
-import { processGamificationUpdates } from '@/lib/gamification-service';
+import { processGamificationUpdates, toGamificationPayload } from '@/lib/gamification-service';
+import { acquireGradingFileLock, releaseGradingFileLock } from '@/lib/grading-lock';
+import { claimGradingJob, markGradingJobCompleted, markGradingJobFailed } from '@/lib/grading-job';
 
 // Priority adjustment logic (inlined from removed priority-algo.ts)
 type Evaluation = "A" | "B" | "C" | "D";
@@ -129,7 +131,31 @@ export async function checkDriveForNewFiles() {
 
 // 3. Process File (Now Exported for API Route)
 export async function processFile(fileId: string, fileName: string) {
+    const lockAcquired = await acquireGradingFileLock(fileId);
+    if (!lockAcquired) {
+        console.log(`[Lock] File ${fileId} is already being processed. Skipping.`);
+        return;
+    }
+
+    let jobFinalized = false;
+    const finalizeFailure = async (message: string) => {
+        if (jobFinalized) return;
+        jobFinalized = true;
+        await markGradingJobFailed(fileId, message);
+    };
+    const finalizeSuccess = async () => {
+        if (jobFinalized) return;
+        jobFinalized = true;
+        await markGradingJobCompleted(fileId);
+    };
+
     try {
+        const claim = await claimGradingJob(fileId, fileName);
+        if (!claim.shouldProcess) {
+            console.log(`[Idempotency] Skip file ${fileId} (${claim.reason ?? 'unknown'}).`);
+            return;
+        }
+
         // Download file
         const destPath = path.join(os.tmpdir(), fileName);
         if (!fs.existsSync(path.dirname(destPath))) {
@@ -161,6 +187,7 @@ export async function processFile(fileId: string, fileName: string) {
         if (!qrData || !qrData.sid) {
             console.error("Failed to extract QR data (Local & AI) from", destPath);
             await renameFile(fileId, `[ERROR] ${fileName}`);
+            await finalizeFailure('QR data not found');
             await fs.promises.unlink(destPath);
             return;
         }
@@ -173,6 +200,7 @@ export async function processFile(fileId: string, fileName: string) {
         if (!user) {
             console.error(`User for QR ID ${qrData.sid} not found in DB (checked loginId and id).`);
             await renameFile(fileId, `[ERROR] ${fileName}`);
+            await finalizeFailure('User not found');
             await fs.promises.unlink(destPath);
             return;
         }
@@ -197,7 +225,12 @@ export async function processFile(fileId: string, fileName: string) {
             // [GAMIFICATION] Process XP, Streaks, Achievements
             try {
                 const gamificationResult = await processGamificationUpdates(results[0].studentId, results);
-                serverEvents.emit(EVENTS.GAMIFICATION_UPDATE, gamificationResult);
+                const payload = toGamificationPayload(gamificationResult);
+                await emitRealtimeEvent({
+                    userId: gamificationResult.userId,
+                    type: 'gamification_update',
+                    payload,
+                });
                 console.log(`[Gamification] Updated for user ${results[0].studentId}: +${gamificationResult.xpGained} XP`);
             } catch (e) {
                 console.error("[Gamification] Error processing updates:", e);
@@ -207,18 +240,24 @@ export async function processFile(fileId: string, fileName: string) {
             const problemIdForContext = results[0].problemId;
             await archiveProcessedFile(fileId, results[0].studentId, problemIdForContext, new Date(), fileName);
 
-
             console.log(`Archived file ${fileName}`);
+            await finalizeSuccess();
         } else {
             await renameFile(fileId, `[ERROR] ${fileName}`);
+            await finalizeFailure('No grading results');
 
             // Notify if possible
             if (user) {
                 console.log(`Grading failed (no results). Notifying user ${user.id}...`);
-                serverEvents.emit(EVENTS.GRADING_FAILED, {
-                    studentId: user.id,
-                    fileName: fileName
-                });
+                try {
+                    await emitRealtimeEvent({
+                        userId: user.id,
+                        type: 'grading_failed',
+                        payload: { fileName },
+                    });
+                } catch (e) {
+                    console.error('[Realtime] Failed to emit grading_failed event:', e);
+                }
             }
         }
 
@@ -226,8 +265,10 @@ export async function processFile(fileId: string, fileName: string) {
         await fs.promises.unlink(destPath);
 
     } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
         console.error(`Error processing file ${fileId}:`, error);
         await renameFile(fileId, `[ERROR] ${fileName}`);
+        await finalizeFailure(message);
 
         // Try to recover user context if possible to notify them
         try {
@@ -235,6 +276,8 @@ export async function processFile(fileId: string, fileName: string) {
         } catch (e) {
             console.error(`Failed to notify for error file ${fileName}:`, e);
         }
+    } finally {
+        await releaseGradingFileLock(fileId);
     }
 }
 
@@ -349,17 +392,19 @@ async function triggerGradingJob(fileId: string, fileName: string) {
     }
 
     const client = new QStashClient({ token });
-    const appUrl = process.env.APP_URL;
+    const appUrl = process.env.GRADING_WORKER_URL || process.env.APP_URL;
 
     if (!appUrl) {
-        console.warn('APP_URL not set, cannot use QStash. Processing synchronously.');
+        console.warn('GRADING_WORKER_URL/APP_URL not set, cannot use QStash. Processing synchronously.');
         await processFile(fileId, fileName);
         return;
     }
 
+    const baseUrl = appUrl.replace(/\/+$/, '');
+
     try {
         await client.publishJSON({
-            url: `${appUrl}/api/queue/grading`,
+            url: `${baseUrl}/api/queue/grading`,
             body: { fileId, fileName },
             retries: 3,
         });
@@ -594,6 +639,7 @@ async function gradeWithGemini(prepared: PreparedFile, qrData: QRData, userId: s
         1.  Analyze the image/document of the answer sheet.
         2.  Identify the student's handwritten answer for EACH of the following problems.
         3.  Grade each answer based on the provided "Correct Answer" and "Accepted Answers".
+            - If "Correct Answer" is null or empty, evaluate the student's answer based on the "Question" content and your general knowledge.
         4.  Provide a specific, helpful feedback in Japanese.
         5.  **CRITICAL**: If the student is INCORRECT (C or D), you MUST identify the root cause from the provided "Related CoreProblems". Select the CoreProblem ID that best explains the student's misunderstanding.
 
@@ -830,11 +876,18 @@ export async function recordGradingResults(results: GradingResult[]) {
             await checkProgressAndUnlock(userId, Array.from(involvedCpIds));
 
             // 5. Emit Event for SSE
-            serverEvents.emit(EVENTS.GRADING_COMPLETED, {
-                studentId: userId,
-                groupId: groupId,
-                timestamp: new Date().toISOString()
-            });
+            try {
+                await emitRealtimeEvent({
+                    userId,
+                    type: 'grading_completed',
+                    payload: {
+                        groupId,
+                        timestamp: new Date().toISOString(),
+                    },
+                });
+            } catch (e) {
+                console.error('[Realtime] Failed to emit grading_completed event:', e);
+            }
             console.log(`Emitted GRADING_COMPLETED event for user ${userId}, group ${groupId}`);
         });
 }
@@ -1043,9 +1096,10 @@ async function notifyErrorForFile(fileId: string, fileName: string, reason: stri
             const user = await resolveUserFromQr(qrData);
             if (user) {
                 console.log(`Notifying user ${user.id} of error: ${reason}`);
-                serverEvents.emit(EVENTS.GRADING_FAILED, {
-                    studentId: user.id,
-                    fileName: fileName
+                await emitRealtimeEvent({
+                    userId: user.id,
+                    type: 'grading_failed',
+                    payload: { fileName, reason },
                 });
             }
         }

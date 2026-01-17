@@ -1,4 +1,12 @@
+import fs from "fs";
+import path from "path";
+import { config as loadEnv } from "dotenv";
 import type { NextConfig } from "next";
+
+const buildEnvPath = path.resolve(process.cwd(), ".env.build");
+if (process.env.NODE_ENV === "production" && fs.existsSync(buildEnvPath)) {
+  loadEnv({ path: buildEnvPath });
+}
 
 const nextConfig: NextConfig = {
   output: 'standalone',

@@ -92,10 +92,10 @@
   - 不正解: `badCoreProblemIds` に +5
 - トランザクション後に `checkProgressAndUnlock()` を実行し次の単元を解放
 
-### 8) 通知（SSE）
-- 採点完了時に `grading_completed` イベントを発火
+### 8) 通知（Supabase Realtime）
+- 採点完了時に `realtime_events` へ `grading_completed` をINSERT
 - ゲーミフィケーション更新がある場合は `gamification_update` も送出
-- `GET /api/events` でSSE配信（本人のイベントのみ）
+- クライアントはSupabase RealtimeのPostgres Changesを購読
 
 ### 9) Drive側のアーカイブ
 - 採点完了後、Drive上で以下を実施
@@ -114,11 +114,13 @@
 ## 主要な環境変数
 - `DRIVE_FOLDER_ID`（監視対象フォルダ）
 - `APP_URL`（Webhook URL作成に使用）
+- `GRADING_WORKER_URL`（採点ワーカー分離時の送信先）
 - `GEMINI_API_KEY`, `GEMINI_MODEL`（Gemini設定）
 - `QSTASH_TOKEN`, `QSTASH_CURRENT_SIGNING_KEY`, `QSTASH_NEXT_SIGNING_KEY`
-- `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`（Watch状態保存）
+- `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`（Watch状態/ロック保存）
 - `INTERNAL_API_SECRET`（内部API保護）
 - `DRIVE_WEBHOOK_CHANNEL_ID`（固定channelIdにする場合）
+- `DRIVE_WEBHOOK_TOKEN`（Webhook検証用トークン）
 
 ## 主要な実装ファイル
 - `src/app/api/grading/webhook/route.ts`

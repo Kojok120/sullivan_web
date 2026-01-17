@@ -23,6 +23,24 @@ export type GamificationUpdateResult = {
     achievementsUnlocked: Achievement[];
 };
 
+export function toGamificationPayload(result: GamificationUpdateResult) {
+    return {
+        userId: result.userId,
+        xpGained: result.xpGained ?? 0,
+        levelUp: result.levelUp ?? null,
+        streakUpdated: result.streakUpdated ?? false,
+        achievementsUnlocked: result.achievementsUnlocked.map((a) => ({
+            id: a.id,
+            slug: a.slug,
+            name: a.name,
+            description: a.description,
+            icon: a.icon,
+            xpReward: a.xpReward,
+            isHidden: a.isHidden,
+        })),
+    };
+}
+
 /**
  * Main entry point to update gamification stats after a grading batch.
  */

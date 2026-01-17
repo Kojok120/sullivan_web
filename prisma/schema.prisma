@@ -33,7 +33,7 @@ model CoreProblem {
 model Problem {
   id              String             @id @default(cuid())
   question        String
-  answer          String
+  answer          String?
   customId        String?            @unique // Custom ID (e.g., E-1, S-10)
   acceptedAnswers String[]           @default([]) // 許容解答（複数）
   grade           String?            // 学年 (e.g., "中1", "高2")
@@ -78,6 +78,7 @@ model User {
 
   achievements   UserAchievement[]
   dailySummaries DailyLearningSummary[]
+  realtimeEvents RealtimeEvent[]
 
 
   // Teacher specific fields
@@ -196,4 +197,36 @@ model DailyLearningSummary {
   count       Int      @default(0)
 
   @@unique([userId, date])
+}
+
+model RealtimeEvent {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  payload   Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, createdAt])
+  @@map("realtime_events")
+}
+
+enum GradingJobStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model GradingJob {
+  id        String           @id @default(cuid())
+  fileId    String           @unique @map("file_id")
+  fileName  String           @map("file_name")
+  status    GradingJobStatus
+  attempts  Int              @default(1)
+  lastError String?          @map("last_error")
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+
+  @@index([status, updatedAt])
+  @@map("grading_jobs")
 }

@@ -14,6 +14,7 @@ export async function POST(request: Request) {
     try {
         const headers = request.headers;
         const channelId = headers.get('x-goog-channel-id');
+        const channelToken = headers.get('x-goog-channel-token');
         const resourceId = headers.get('x-goog-resource-id');
         const resourceState = headers.get('x-goog-resource-state');
 
@@ -30,6 +31,16 @@ export async function POST(request: Request) {
             console.log(`Webhook rejected: Channel ID mismatch. Expected ${activeState.channelId}, got ${channelId}`);
             // Note: This might happen if an old watch sends a notification. We should ignore it.
             return NextResponse.json({ error: 'Unauthorized Channel' }, { status: 401 });
+        }
+
+        const expectedToken = activeState.token || process.env.DRIVE_WEBHOOK_TOKEN;
+        if (expectedToken) {
+            if (channelToken !== expectedToken) {
+                console.log('Webhook rejected: Channel token mismatch.');
+                return NextResponse.json({ error: 'Unauthorized Token' }, { status: 401 });
+            }
+        } else {
+            console.warn('Drive webhook token is not configured; skipping token verification.');
         }
 
         console.log(`Webhook received. State: ${resourceState}, Channel: ${channelId}`);
@@ -80,4 +91,3 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: false }, { status: 500 });
     }
 }
-

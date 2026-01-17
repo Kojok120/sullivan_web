@@ -62,6 +62,7 @@ export async function POST(request: Request) {
         await saveWatchState({
             channelId: result.channelId,
             resourceId: result.resourceId,
+            token: result.token,
             expiration: Number(result.expiration),
         });
 

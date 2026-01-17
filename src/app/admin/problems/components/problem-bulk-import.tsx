@@ -80,8 +80,8 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
         const coreProblemNames = new Set<string>();
 
         const parsed = rows.map(row => {
-            const isValid = !!row.question && !!row.answer;
-            const error = !isValid ? '問題文と解答は必須です' : undefined;
+            const isValid = !!row.question;
+            const error = !isValid ? '問題文は必須です' : undefined;
 
             // Collect all CoreProblem names for bulk resolution
             for (const name of row.coreProblemNames) {
@@ -286,7 +286,7 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
                                             <TableHead>学年</TableHead>
                                             <TableHead>コア問題</TableHead>
                                             <TableHead>問題文</TableHead>
-                                            <TableHead>解答</TableHead>
+                                            <TableHead>解答(任意)</TableHead>
                                             <TableHead>別解</TableHead>
                                             <TableHead>動画URL</TableHead>
                                         </TableRow>

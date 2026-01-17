@@ -18,7 +18,9 @@
         - `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`
         - `INTERNAL_API_SECRET` (必要に応じて)
         - `DRIVE_WEBHOOK_CHANNEL_ID` (必要に応じて)
+        - `DRIVE_WEBHOOK_TOKEN` (Webhook検証用)
         - `GOOGLE_APPLICATION_CREDENTIALS` (本番でシークレットをマウントする場合)
+        - `GRADING_WORKER_URL` (採点ワーカーを別サービスに分離する場合)
 - [ ] **データベース**
     - 本番用データベース（PostgreSQLなど）の構築。
     - マイグレーションの実行（`npx prisma migrate deploy`）。
@@ -32,7 +34,7 @@
     - Supabase AuthのCookie設定を確認し、必要に応じて `src/lib/supabase/server.ts` / `src/lib/supabase/middleware.ts` で `sameSite` / `secure` を明示する。
 - [ ] **内部エンドポイント保護**
     - `/api/grading/check` 用に `INTERNAL_API_SECRET` を設定する。
-    - Webhookの検証が必要な場合は `DRIVE_WEBHOOK_CHANNEL_ID` を設定する。
+    - Webhookの検証が必要な場合は `DRIVE_WEBHOOK_TOKEN` を設定する。
 - [ ] **レート制限**
     - 過剰なリクエストを防ぐためのレート制限（Rate Limiting）をMiddleware等で導入する。
 
@@ -50,6 +52,9 @@
     - Sentryなどのエラートラッキングツールを導入し、本番環境でのクラッシュやエラーを検知できるようにする。
 - [ ] **構造化ログ**
     - サーバーサイドのログをJSON形式などの構造化ログに変更し、分析しやすくする（Pinoなどのライブラリ導入検討）。
+- [ ] **Supabase Realtime (通知)**
+    - Realtime用のPostgres Replicationを有効化し、`realtime_events` テーブルを `supabase_realtime` publication に追加する。
+    - `realtime_events` にRLSを有効化し、`app_metadata.prismaUserId` と `user_id` が一致する行のみSELECT可能にする。
 
 ## 5. UX・品質向上
 - [ ] **エラーページ**

@@ -162,7 +162,7 @@ export function ProblemList({ problems, onEdit }: ProblemListProps) {
                                     <TableCell className="min-w-[200px] whitespace-pre-wrap" title={problem.question}>
                                         {problem.question}
                                     </TableCell>
-                                    <TableCell className="min-w-[150px] whitespace-pre-wrap" title={problem.answer}>
+                                    <TableCell className="min-w-[150px] whitespace-pre-wrap" title={problem.answer || ''}>
                                         {problem.answer}
                                     </TableCell>
                                     <TableCell>

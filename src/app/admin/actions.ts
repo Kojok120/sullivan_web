@@ -85,7 +85,10 @@ export async function resetPassword(userId: string, password: string) {
             return { success: false, error: 'Supabaseユーザーの取得に失敗しました' };
         }
 
-        const supabaseUser = data.users.find(u => u.email === email);
+        const normalizedEmail = email.toLowerCase();
+        const supabaseUser = data.users.find(
+            (u) => (u.email || '').toLowerCase() === normalizedEmail
+        );
 
         if (!supabaseUser) {
             return { success: false, error: 'Supabaseユーザーが見つかりません' };

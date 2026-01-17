@@ -258,7 +258,7 @@ export async function searchCoreProblems(query: string) {
 // Re-using/Refining createProblem from curriculum actions but decoupling it
 export async function createStandaloneProblem(data: {
     question: string;
-    answer: string;
+    answer?: string;
     acceptedAnswers?: string[];
     grade?: string;
     videoUrl?: string;
@@ -406,7 +406,7 @@ export async function bulkSearchCoreProblems(names: string[]) {
 
 export async function bulkCreateStandaloneProblems(problems: {
     question: string;
-    answer: string;
+    answer?: string;
     acceptedAnswers?: string[];
     grade?: string;
     videoUrl?: string;

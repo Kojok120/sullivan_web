@@ -179,7 +179,7 @@ export async function getProblemsByCoreProblem(coreProblemId: string) {
 
 export async function createProblem(data: {
     question: string;
-    answer: string;
+    answer?: string;
     coreProblemId: string; // Primary CoreProblem to link
     order: number;
 
@@ -268,7 +268,7 @@ export async function reorderProblems(items: { id: string, order: number }[]) {
 
 export async function bulkCreateProblems(subjectId: string, problems: {
     question: string;
-    answer: string;
+    answer?: string;
     videoUrl?: string;
     grade?: string;
     acceptedAnswers?: string[];

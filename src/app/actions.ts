@@ -3,8 +3,8 @@
 import { getSession, logout } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { processVideoWatch } from "@/lib/gamification-service";
-import { serverEvents, EVENTS } from "@/lib/server-events";
+import { processVideoWatch, toGamificationPayload } from "@/lib/gamification-service";
+import { emitRealtimeEvent } from "@/lib/realtime-events";
 
 
 export async function logoutAction() {
@@ -34,7 +34,12 @@ export async function markVideoWatched(historyId: string) {
     try {
         const gamificationResult = await processVideoWatch(session.userId);
         if (gamificationResult.achievementsUnlocked.length > 0 || gamificationResult.levelUp) {
-            serverEvents.emit(EVENTS.GAMIFICATION_UPDATE, gamificationResult);
+            const payload = toGamificationPayload(gamificationResult);
+            await emitRealtimeEvent({
+                userId: gamificationResult.userId,
+                type: 'gamification_update',
+                payload,
+            });
         }
     } catch (e) {
         console.error("Failed to process video watch gamification:", e);
@@ -58,4 +63,3 @@ export async function markSessionReviewed(groupId: string) {
 
     await markSessionAsReviewed(groupId, session.userId);
 }
-
