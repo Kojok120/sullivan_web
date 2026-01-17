@@ -28,7 +28,6 @@ EOF
 RUNTIME_SA_EMAIL="${RUNTIME_SA_EMAIL:-sullivan-runtime@${GOOGLE_CLOUD_PROJECT_ID}.iam.gserviceaccount.com}"
 
 echo "Deploying to Project: $GOOGLE_CLOUD_PROJECT_ID"
-echo "Database URL: [REDACTED]"
 
 # Deploy Command
 gcloud run deploy sullivan-app-production \
@@ -40,6 +39,7 @@ gcloud run deploy sullivan-app-production \
   --memory 4Gi \
   --cpu 2 \
   --allow-unauthenticated \
+  --set-build-env-vars "NODE_ENV=production" \
   --set-env-vars "NODE_ENV=production" \
   --set-env-vars "DATABASE_URL=$DATABASE_URL" \
   --set-env-vars "DIRECT_URL=$DIRECT_URL" \
@@ -61,3 +61,4 @@ gcloud run deploy sullivan-app-production \
   --update-secrets "DRIVE_WEBHOOK_TOKEN=drive-webhook-token:latest" \
   --set-env-vars "DRIVE_WEBHOOK_CHANNEL_ID=$DRIVE_WEBHOOK_CHANNEL_ID" \
   --set-env-vars "GRADING_WORKER_URL=$GRADING_WORKER_URL"
+

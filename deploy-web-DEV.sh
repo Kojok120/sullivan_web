@@ -28,7 +28,6 @@ EOF
 RUNTIME_SA_EMAIL="${RUNTIME_SA_EMAIL:-sullivan-runtime@${GOOGLE_CLOUD_PROJECT_ID}.iam.gserviceaccount.com}"
 
 echo "Deploying to Project: $GOOGLE_CLOUD_PROJECT_ID"
-echo "Database URL: [REDACTED]"
 
 # Deploy Command
 gcloud run deploy sullivan-app-dev \
