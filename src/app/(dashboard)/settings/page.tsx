@@ -1,14 +1,18 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { updatePassword } from './actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Eye, EyeOff } from 'lucide-react';
 
 export default function SettingsPage() {
     const [state, action, pending] = useActionState(updatePassword, undefined);
+    const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+    const [showNewPassword, setShowNewPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     return (
         <div className="container mx-auto py-10 px-4">
@@ -25,32 +29,68 @@ export default function SettingsPage() {
                     <form action={action} className="space-y-4">
                         <div className="space-y-2">
                             <Label htmlFor="currentPassword">現在のパスワード</Label>
-                            <Input
-                                id="currentPassword"
-                                name="currentPassword"
-                                type="password"
-                                required
-                            />
+                            <div className="relative">
+                                <Input
+                                    id="currentPassword"
+                                    name="currentPassword"
+                                    type={showCurrentPassword ? 'text' : 'password'}
+                                    required
+                                    className="pr-10"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowCurrentPassword((prev) => !prev)}
+                                    aria-label={showCurrentPassword ? 'パスワードを非表示' : 'パスワードを表示'}
+                                    aria-pressed={showCurrentPassword}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                >
+                                    {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </button>
+                            </div>
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="newPassword">新しいパスワード</Label>
-                            <Input
-                                id="newPassword"
-                                name="newPassword"
-                                type="password"
-                                required
-                                minLength={8}
-                            />
+                            <div className="relative">
+                                <Input
+                                    id="newPassword"
+                                    name="newPassword"
+                                    type={showNewPassword ? 'text' : 'password'}
+                                    required
+                                    minLength={8}
+                                    className="pr-10"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowNewPassword((prev) => !prev)}
+                                    aria-label={showNewPassword ? 'パスワードを非表示' : 'パスワードを表示'}
+                                    aria-pressed={showNewPassword}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                >
+                                    {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </button>
+                            </div>
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="confirmPassword">新しいパスワード（確認）</Label>
-                            <Input
-                                id="confirmPassword"
-                                name="confirmPassword"
-                                type="password"
-                                required
-                                minLength={8}
-                            />
+                            <div className="relative">
+                                <Input
+                                    id="confirmPassword"
+                                    name="confirmPassword"
+                                    type={showConfirmPassword ? 'text' : 'password'}
+                                    required
+                                    minLength={8}
+                                    className="pr-10"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowConfirmPassword((prev) => !prev)}
+                                    aria-label={showConfirmPassword ? 'パスワードを非表示' : 'パスワードを表示'}
+                                    aria-pressed={showConfirmPassword}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                >
+                                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </button>
+                            </div>
                         </div>
 
                         {state?.error && (

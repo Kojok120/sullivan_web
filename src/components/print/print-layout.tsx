@@ -147,7 +147,7 @@ export function PrintLayout({ studentName, subjectName, problems, studentLoginId
             >
                 {/* Mock Answer Row to measure height */}
                 <div className="flex gap-4 items-end break-inside-avoid">
-                    <div className="font-bold w-16 text-right text-xl">1.</div>
+                    <div className="font-bold min-w-[5.5rem] text-right text-xl whitespace-nowrap shrink-0">1.</div>
                     <div className="text-xl font-bold mb-1">A.</div>
                     <div className="flex-1 border-b-2 border-gray-800 mb-1"></div>
                 </div>
@@ -216,7 +216,7 @@ export function PrintLayout({ studentName, subjectName, problems, studentLoginId
                             <div className="flex flex-col gap-8">
                                 {finalProblems.map((problem, index) => (
                                     <div key={problem.id} className="flex gap-4 items-end break-inside-avoid">
-                                        <div className="font-bold w-16 text-right text-xl">{problem.customId || index + 1}.</div>
+                                        <div className="font-bold min-w-[5.5rem] text-right text-xl whitespace-nowrap shrink-0">{problem.customId || index + 1}.</div>
                                         <div className="text-xl font-bold mb-1">A.</div>
                                         <div className="flex-1 border-b-2 border-gray-800 mb-1"></div>
                                     </div>

@@ -1,16 +1,18 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { forceUpdatePassword } from './actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { logoutAction } from '@/app/actions';
-import { LogOut } from 'lucide-react';
+import { Eye, EyeOff, LogOut } from 'lucide-react';
 
 export default function ForcePasswordChangePage() {
     const [state, action, pending] = useActionState(forceUpdatePassword, undefined);
+    const [showNewPassword, setShowNewPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
@@ -36,25 +38,49 @@ export default function ForcePasswordChangePage() {
                         <form action={action} className="space-y-6">
                             <div className="space-y-2">
                                 <Label htmlFor="newPassword">新しいパスワード</Label>
-                                <Input
-                                    id="newPassword"
-                                    name="newPassword"
-                                    type="password"
-                                    required
-                                    minLength={8}
-                                    autoComplete="new-password"
-                                />
+                                <div className="relative">
+                                    <Input
+                                        id="newPassword"
+                                        name="newPassword"
+                                        type={showNewPassword ? 'text' : 'password'}
+                                        required
+                                        minLength={8}
+                                        autoComplete="new-password"
+                                        className="pr-10"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowNewPassword((prev) => !prev)}
+                                        aria-label={showNewPassword ? 'パスワードを非表示' : 'パスワードを表示'}
+                                        aria-pressed={showNewPassword}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md text-gray-500 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                                    >
+                                        {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                    </button>
+                                </div>
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="confirmPassword">新しいパスワード（確認）</Label>
-                                <Input
-                                    id="confirmPassword"
-                                    name="confirmPassword"
-                                    type="password"
-                                    required
-                                    minLength={8}
-                                    autoComplete="new-password"
-                                />
+                                <div className="relative">
+                                    <Input
+                                        id="confirmPassword"
+                                        name="confirmPassword"
+                                        type={showConfirmPassword ? 'text' : 'password'}
+                                        required
+                                        minLength={8}
+                                        autoComplete="new-password"
+                                        className="pr-10"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowConfirmPassword((prev) => !prev)}
+                                        aria-label={showConfirmPassword ? 'パスワードを非表示' : 'パスワードを表示'}
+                                        aria-pressed={showConfirmPassword}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md text-gray-500 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                                    >
+                                        {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                    </button>
+                                </div>
                             </div>
 
                             {state?.error && (
