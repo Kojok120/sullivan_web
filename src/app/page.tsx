@@ -5,6 +5,8 @@ import { getSubjectProgress } from "@/lib/analytics";
 import { History } from "lucide-react";
 import { StudentPrintDialog } from "@/components/print/student-print-dialog";
 import { StampOverlay } from "@/components/grading/stamp-overlay";
+import { AchievementOverlay } from "@/components/gamification/achievement-overlay";
+import { LevelUpOverlay } from "@/components/gamification/level-up-overlay";
 
 export default async function Home() {
     const session = await getSession();
@@ -16,6 +18,8 @@ export default async function Home() {
         <div className="container mx-auto px-4 py-12 max-w-4xl">
             <header className="mb-10">
                 <StampOverlay />
+                <AchievementOverlay />
+                <LevelUpOverlay />
                 <h1 className="text-3xl font-bold text-foreground tracking-tight mb-2">
                     ホーム
                 </h1>

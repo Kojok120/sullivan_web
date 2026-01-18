@@ -185,6 +185,7 @@ model UserAchievement {
   achievementId String
   achievement   Achievement @relation(fields: [achievementId], references: [id])
   unlockedAt    DateTime    @default(now())
+  isSeen        Boolean     @default(false)
 
   @@unique([userId, achievementId])
 }
