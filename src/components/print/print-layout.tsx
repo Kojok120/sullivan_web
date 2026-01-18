@@ -203,7 +203,7 @@ export function PrintLayout({ studentName, subjectName, problems, studentLoginId
                     })}
 
                     {/* Answer Sheet Page (Always Last Page) */}
-                    <div className="print-page p-[15mm] relative flex flex-col break-before-page">
+                    <div className="print-page p-[15mm] relative flex flex-col break-before-page answer-sheet-page">
                         <Header studentName={studentName} subjectName={subjectName} date={dateStr} pageNum={totalPages} totalPages={totalPages} type="解答用紙" />
 
                         {qrCodeDataUrl && (
@@ -256,11 +256,17 @@ export function PrintLayout({ studentName, subjectName, problems, studentLoginId
         page-break-after: always;
         break-after: page;
         position: relative;
+        box-sizing: border-box;
     }
 
     .print-page:last-child {
         page-break-after: auto;
         break-after: auto;
+    }
+
+    .answer-sheet-page {
+        page-break-before: always !important;
+        break-before: page !important;
     }
 
     .break-before-page {
