@@ -30,10 +30,18 @@ export function PrintLayout({ studentName, subjectName, problems, studentLoginId
     const [isCalculating, setIsCalculating] = useState(true);
     const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
     const measureRef = useRef<HTMLDivElement>(null);
+    const contentMeasureRef = useRef<HTMLDivElement>(null);
     const answerMeasureRef = useRef<HTMLDivElement>(null);
 
     useLayoutEffect(() => {
         if (!measureRef.current) return;
+        setIsCalculating(true);
+
+        const listStyles = window.getComputedStyle(measureRef.current);
+        const listMarginTop = parseFloat(listStyles.marginTop || '0') || 0;
+        const measuredContentHeight = contentMeasureRef.current?.getBoundingClientRect().height || 0;
+        const maxContentHeight = measuredContentHeight > 0 ? measuredContentHeight : MAX_PAGE_HEIGHT_PX;
+        const availableHeight = Math.max(0, maxContentHeight - listMarginTop);
 
         // 1. Calculate Max Answer Sheet Capacity (Strict Height Calculation)
         let safeLimit = problems.length;
@@ -46,7 +54,7 @@ export function PrintLayout({ studentName, subjectName, problems, studentLoginId
                 // Formula: N * h + (N-1) * gap <= MAX_HEIGHT
                 // N(h+g) - g <= MAX
                 // N <= (MAX + g) / (h+g)
-                const maxQuestions = Math.floor((MAX_PAGE_HEIGHT_PX + gap) / (rowHeight + gap));
+                const maxQuestions = Math.floor((availableHeight + gap) / (rowHeight + gap));
                 safeLimit = Math.min(problems.length, maxQuestions);
 
                 // Debug log (optional)
@@ -64,13 +72,13 @@ export function PrintLayout({ studentName, subjectName, problems, studentLoginId
         // Note: problemNodes corresponds to the full 'problems' list. We only iterate up to safeLimit.
         for (let i = 0; i < limitedProblems.length; i++) {
             const node = problemNodes[i] as HTMLElement;
-            const height = node.offsetHeight;
+            const nodeStyles = window.getComputedStyle(node);
+            const marginTop = parseFloat(nodeStyles.marginTop || '0') || 0;
+            const height = node.offsetHeight + (currentPage.length > 0 ? marginTop : 0);
 
-            // Existing logic underestimates height because it ignores gap/margin between items (space-y-6)
-            // But we keep it as is to minimize regression on Question Pages, 
-            // assuming MAX_PAGE_HEIGHT_PX has enough buffer.
+            // Include item margins so pagination matches the printed layout.
 
-            if (currentHeight + height > MAX_PAGE_HEIGHT_PX) {
+            if (currentHeight + height > availableHeight) {
                 pages.push(currentPage);
                 currentPage = [limitedProblems[i]];
                 currentHeight = height;
@@ -124,19 +132,33 @@ export function PrintLayout({ studentName, subjectName, problems, studentLoginId
         <div className="min-h-screen bg-gray-100 p-8 print:p-0 print:bg-white print:min-h-0 print:h-auto">
             {/* Hidden Measurement Container */}
             <div
-                ref={measureRef}
-                className="absolute top-0 left-0 -z-50 opacity-0 pointer-events-none w-[210mm] p-[15mm] print:hidden"
+                className="absolute top-0 left-0 -z-50 opacity-0 pointer-events-none w-[210mm] h-[297mm] p-[15mm] print:hidden"
                 aria-hidden="true"
             >
-                {problems.map((problem, index) => (
-                    <PrintProblemItem
-                        key={problem.id}
-                        problem={problem}
-                        index={index}
-                        customId={problem.customId}
-                        isMeasurement={true}
+                <div className="h-full flex flex-col">
+                    <Header
+                        studentName={studentName}
+                        subjectName={subjectName}
+                        date={dateStr}
+                        pageNum={1}
+                        totalPages={1}
+                        type="問題"
                     />
-                ))}
+                    <div ref={contentMeasureRef} className="flex-1 min-h-0 overflow-hidden">
+                        <div ref={measureRef} className="mt-6 space-y-6">
+                            {problems.map((problem, index) => (
+                                <PrintProblemItem
+                                    key={problem.id}
+                                    problem={problem}
+                                    index={index}
+                                    customId={problem.customId}
+                                    isMeasurement={true}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                    <Footer />
+                </div>
             </div>
 
             {/* Hidden Answer Sheet Measurement Container */}
@@ -257,6 +279,7 @@ export function PrintLayout({ studentName, subjectName, problems, studentLoginId
         break-after: page;
         position: relative;
         box-sizing: border-box;
+        overflow: hidden;
     }
 
     .print-page:last-child {
