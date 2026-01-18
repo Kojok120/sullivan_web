@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus } from 'lucide-react';
 import { ProblemList } from './components/problem-list';
 import { ProblemDialog } from './components/problem-dialog';
@@ -26,6 +27,7 @@ interface ProblemManagerProps {
     initialQuery: string;
     sortBy: string;
     sortOrder: 'asc' | 'desc';
+    subjects: { id: string; name: string }[];
 }
 
 export function ProblemManager({
@@ -34,7 +36,8 @@ export function ProblemManager({
     currentPage,
     initialQuery,
     sortBy,
-    sortOrder
+    sortOrder,
+    subjects
 }: ProblemManagerProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -72,6 +75,8 @@ export function ProblemManager({
         return `/admin/problems?${params.toString()}`;
     };
 
+    const selectedSubjectId = searchParams.get('subjectId') || 'ALL';
+
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
         startTransition(() => {
@@ -101,19 +106,43 @@ export function ProblemManager({
         });
     };
 
+    const handleSubjectFilter = (subjectId: string) => {
+        startTransition(() => {
+            updateParams({
+                subjectId: subjectId === 'ALL' ? undefined : subjectId,
+                page: '1'
+            });
+        });
+    };
+
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center gap-4">
-                <form onSubmit={handleSearch} className="flex gap-2 flex-1 max-w-sm">
-                    <Input
-                        placeholder="問題文、解答、ID、単元名で検索..."
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                    />
-                    <Button type="submit" disabled={isPending}>
-                        検索
-                    </Button>
-                </form>
+            <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-1">
+                    <form onSubmit={handleSearch} className="flex gap-2 w-full sm:max-w-sm">
+                        <Input
+                            placeholder="問題文、解答、ID、単元名で検索..."
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                        />
+                        <Button type="submit" disabled={isPending}>
+                            検索
+                        </Button>
+                    </form>
+                    <Select value={selectedSubjectId} onValueChange={handleSubjectFilter}>
+                        <SelectTrigger className="w-full sm:w-[200px]">
+                            <SelectValue placeholder="科目" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="ALL">全科目</SelectItem>
+                            {subjects.map(subject => (
+                                <SelectItem key={subject.id} value={subject.id}>
+                                    {subject.name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
 
                 <div className="flex gap-2">
                     <Button onClick={() => setIsBulkDialogOpen(true)} variant="outline">

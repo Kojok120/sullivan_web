@@ -27,6 +27,17 @@ function buildProblemWhereSql({
         conditions.push(Prisma.sql`p."grade" = ${filters.grade}`);
     }
 
+    if (filters.subjectId) {
+        conditions.push(Prisma.sql`
+            EXISTS (
+                SELECT 1
+                FROM "_CoreProblemToProblem" cpp
+                JOIN "CoreProblem" cp ON cp.id = cpp."A"
+                WHERE cpp."B" = p.id AND cp."subjectId" = ${filters.subjectId}
+            )
+        `);
+    }
+
     if (filters.coreProblemId) {
         conditions.push(Prisma.sql`
             EXISTS (
@@ -62,7 +73,7 @@ function buildProblemWhereSql({
         return Prisma.empty;
     }
 
-    return Prisma.sql`WHERE ${Prisma.join(conditions, Prisma.raw(' AND '))}`;
+    return Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`;
 }
 
 export async function getProblems(
@@ -96,10 +107,19 @@ export async function getProblems(
             where.grade = filters.grade;
         }
 
+        const andConditions: Prisma.ProblemWhereInput[] = [];
+        if (filters.subjectId) {
+            andConditions.push({
+                coreProblems: { some: { subjectId: filters.subjectId } }
+            });
+        }
         if (filters.coreProblemId) {
-            where.coreProblems = {
-                some: { id: filters.coreProblemId }
-            };
+            andConditions.push({
+                coreProblems: { some: { id: filters.coreProblemId } }
+            });
+        }
+        if (andConditions.length > 0) {
+            where.AND = andConditions;
         }
 
 
@@ -238,6 +258,7 @@ export async function getProblems(
                 where: {
                     AND: [
                         filters.grade ? { grade: filters.grade } : {},
+                        filters.subjectId ? { coreProblems: { some: { subjectId: filters.subjectId } } } : {},
                         filters.coreProblemId ? { coreProblems: { some: { id: filters.coreProblemId } } } : {},
                         { customId: { equals: search, mode: 'insensitive' } } // Strict equality
                     ]
