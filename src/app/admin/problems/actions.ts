@@ -6,15 +6,72 @@ import { requireAdmin } from '@/lib/auth';
 import { Prisma } from '@prisma/client';
 import { bulkCreateProblemsCore, createProblemCore, deleteProblemsWithRelations } from '@/lib/problem-service';
 
+type ProblemFilters = {
+    grade?: string;
+    subjectId?: string;
+    coreProblemId?: string;
+};
+
+function buildProblemWhereSql({
+    search,
+    filters,
+    excludeIds = [],
+}: {
+    search?: string;
+    filters: ProblemFilters;
+    excludeIds?: string[];
+}) {
+    const conditions: Prisma.Sql[] = [];
+
+    if (filters.grade) {
+        conditions.push(Prisma.sql`p."grade" = ${filters.grade}`);
+    }
+
+    if (filters.coreProblemId) {
+        conditions.push(Prisma.sql`
+            EXISTS (
+                SELECT 1
+                FROM "_CoreProblemToProblem" cpp
+                WHERE cpp."B" = p.id AND cpp."A" = ${filters.coreProblemId}
+            )
+        `);
+    }
+
+    if (search) {
+        const like = `%${search}%`;
+        conditions.push(Prisma.sql`
+            (
+                p."question" ILIKE ${like}
+                OR p."answer" ILIKE ${like}
+                OR p."customId" ILIKE ${like}
+                OR EXISTS (
+                    SELECT 1
+                    FROM "_CoreProblemToProblem" cpp
+                    JOIN "CoreProblem" cp ON cp.id = cpp."A"
+                    WHERE cpp."B" = p.id AND cp."name" ILIKE ${like}
+                )
+            )
+        `);
+    }
+
+    if (excludeIds.length > 0) {
+        conditions.push(Prisma.sql`p.id NOT IN (${Prisma.join(excludeIds)})`);
+    }
+
+    if (conditions.length === 0) {
+        return Prisma.empty;
+    }
+
+    return Prisma.sql`WHERE ${Prisma.join(conditions, Prisma.raw(' AND '))}`;
+}
+
 export async function getProblems(
     page: number = 1,
     limit: number = 20,
     search: string = '',
-    filters: {
-        grade?: string;
-        subjectId?: string; // Filter by subject via CoreProblem relation could be complex, maybe later
-        coreProblemId?: string;
-    } = {}
+    filters: ProblemFilters = {},
+    sortBy: 'updatedAt' | 'createdAt' | 'customId' = 'updatedAt',
+    sortOrder: 'asc' | 'desc' = 'desc'
 ) {
     await requireAdmin();
     try {
@@ -47,6 +104,79 @@ export async function getProblems(
 
 
         const skip = (page - 1) * limit;
+        const isCustomIdSort = sortBy === 'customId';
+        const orderDirection = sortOrder === 'asc' ? 'ASC' : 'DESC';
+        const orderBy: Prisma.ProblemOrderByWithRelationInput[] =
+            sortBy === 'createdAt'
+                ? [{ createdAt: sortOrder }, { id: 'asc' }]
+                : [{ updatedAt: sortOrder }, { id: 'asc' }];
+
+        const fetchProblemsByIds = async (ids: string[]) => {
+            if (ids.length === 0) return [];
+            const problems = await prisma.problem.findMany({
+                where: { id: { in: ids } },
+                include: {
+                    coreProblems: {
+                        include: {
+                            subject: true
+                        }
+                    }
+                }
+            });
+            const problemMap = new Map(problems.map(p => [p.id, p]));
+            return ids.map(id => problemMap.get(id)).filter(Boolean);
+        };
+
+        const fetchCustomIdSortedIds = async ({
+            searchTerm,
+            excludeIds,
+            take,
+            offset
+        }: {
+            searchTerm?: string;
+            excludeIds?: string[];
+            take: number;
+            offset: number;
+        }) => {
+            const whereSql = buildProblemWhereSql({
+                search: searchTerm,
+                filters,
+                excludeIds
+            });
+            const rows = await prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+                SELECT p.id
+                FROM "Problem" p
+                ${whereSql}
+                ORDER BY
+                    CASE WHEN p."customId" IS NULL THEN 1 ELSE 0 END ASC,
+                    upper(split_part(p."customId", '-', 1)) ${Prisma.raw(orderDirection)},
+                    substring(p."customId" from '^[^-]+-([0-9]+)$')::int ${Prisma.raw(orderDirection)} NULLS LAST,
+                    p.id ASC
+                LIMIT ${take}
+                OFFSET ${offset}
+            `);
+            return rows.map(row => row.id);
+        };
+
+        const countCustomIdSorted = async ({
+            searchTerm,
+            excludeIds
+        }: {
+            searchTerm?: string;
+            excludeIds?: string[];
+        }) => {
+            const whereSql = buildProblemWhereSql({
+                search: searchTerm,
+                filters,
+                excludeIds
+            });
+            const rows = await prisma.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
+                SELECT COUNT(*)::bigint AS count
+                FROM "Problem" p
+                ${whereSql}
+            `);
+            return Number(rows[0]?.count || 0);
+        };
 
         // Partial match query (exclude exact matches to avoid duplicates if we were to just concat,
         // but since we page, we need a more robust strategy or just acceptable approximation)
@@ -131,8 +261,16 @@ export async function getProblems(
                 ]
             };
 
-            const partialTotal = await prisma.problem.count({ where: partialWhere });
-            total = exactMatchIds.length + partialTotal;
+            if (isCustomIdSort) {
+                const partialTotal = await countCustomIdSorted({
+                    searchTerm: search,
+                    excludeIds: exactMatchIds
+                });
+                total = exactMatchIds.length + partialTotal;
+            } else {
+                const partialTotal = await prisma.problem.count({ where: partialWhere });
+                total = exactMatchIds.length + partialTotal;
+            }
 
             // Pagination logic considering the injected exact matches
             // If we are on page 1, we show Exact matches + (limit - exact) partials.
@@ -144,19 +282,29 @@ export async function getProblems(
                 exactMatches = exactMatchProblems;
                 const remainingLimit = limit - exactMatches.length;
                 if (remainingLimit > 0) {
-                    partialMatches = await prisma.problem.findMany({
-                        where: partialWhere,
-                        include: {
-                            coreProblems: {
-                                include: {
-                                    subject: true
+                    if (isCustomIdSort) {
+                        const ids = await fetchCustomIdSortedIds({
+                            searchTerm: search,
+                            excludeIds: exactMatchIds,
+                            take: remainingLimit,
+                            offset: 0
+                        });
+                        partialMatches = await fetchProblemsByIds(ids);
+                    } else {
+                        partialMatches = await prisma.problem.findMany({
+                            where: partialWhere,
+                            include: {
+                                coreProblems: {
+                                    include: {
+                                        subject: true
+                                    }
                                 }
-                            }
-                        },
-                        orderBy: { updatedAt: 'desc' },
-                        take: remainingLimit,
-                        skip: 0
-                    });
+                            },
+                            orderBy,
+                            take: remainingLimit,
+                            skip: 0
+                        });
+                    }
                 }
             } else {
                 // Page > 1
@@ -166,24 +314,47 @@ export async function getProblems(
 
                 const effectiveSkip = Math.max(0, (page - 1) * limit - exactCount);
 
-                partialMatches = await prisma.problem.findMany({
-                    where: partialWhere,
-                    include: {
-                        coreProblems: {
-                            include: {
-                                subject: true
-                            }
+                if (isCustomIdSort) {
+                    const ids = await fetchCustomIdSortedIds({
+                        searchTerm: search,
+                        excludeIds: exactMatchIds,
+                        take: limit,
+                        offset: effectiveSkip
+                    });
+                    partialMatches = await fetchProblemsByIds(ids);
+                } else {
+                    partialMatches = await prisma.problem.findMany({
+                        where: partialWhere,
+                        include: {
+                            coreProblems: {
+                                include: {
+                                    subject: true
+                                }
+                            },
                         },
-                    },
-                    orderBy: { updatedAt: 'desc' },
-                    take: limit,
-                    skip: effectiveSkip
-                });
+                        orderBy,
+                        take: limit,
+                        skip: effectiveSkip
+                    });
+                }
             }
 
             return { success: true, problems: [...exactMatches, ...partialMatches], total, page, limit };
 
         } else {
+            if (isCustomIdSort) {
+                const [ids, total] = await Promise.all([
+                    fetchCustomIdSortedIds({
+                        searchTerm: '',
+                        take: limit,
+                        offset: skip
+                    }),
+                    countCustomIdSorted({ searchTerm: '' })
+                ]);
+                const problems = await fetchProblemsByIds(ids);
+                return { success: true, problems, total, page, limit };
+            }
+
             // Standard behavior without search
             const [problems, total] = await Promise.all([
                 prisma.problem.findMany({
@@ -195,7 +366,7 @@ export async function getProblems(
                             }
                         }
                     },
-                    orderBy: { updatedAt: 'desc' },
+                    orderBy,
                     skip,
                     take: limit,
                 }),

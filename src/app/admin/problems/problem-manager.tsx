@@ -24,20 +24,58 @@ interface ProblemManagerProps {
     totalCount: number;
     currentPage: number;
     initialQuery: string;
+    sortBy: string;
+    sortOrder: 'asc' | 'desc';
 }
 
-export function ProblemManager({ initialProblems, totalCount, currentPage, initialQuery }: ProblemManagerProps) {
+export function ProblemManager({
+    initialProblems,
+    totalCount,
+    currentPage,
+    initialQuery,
+    sortBy,
+    sortOrder
+}: ProblemManagerProps) {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [isPending, startTransition] = useTransition();
     const [query, setQuery] = useState(initialQuery);
     const [selectedProblem, setSelectedProblem] = useState<ProblemWithRelations | null>(null);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isBulkDialogOpen, setIsBulkDialogOpen] = useState(false);
 
+    const updateParams = (updates: Record<string, string | undefined>) => {
+        const params = new URLSearchParams(searchParams.toString());
+
+        Object.entries(updates).forEach(([key, value]) => {
+            if (value === undefined || value === '') {
+                params.delete(key);
+            } else {
+                params.set(key, value);
+            }
+        });
+
+        router.push(`/admin/problems?${params.toString()}`);
+    };
+
+    const buildHref = (updates: Record<string, string | undefined>) => {
+        const params = new URLSearchParams(searchParams.toString());
+
+        Object.entries(updates).forEach(([key, value]) => {
+            if (value === undefined || value === '') {
+                params.delete(key);
+            } else {
+                params.set(key, value);
+            }
+        });
+
+        return `/admin/problems?${params.toString()}`;
+    };
+
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
         startTransition(() => {
-            router.push(`/admin/problems?q=${encodeURIComponent(query)}&page=1`);
+            updateParams({ q: query, page: '1' });
         });
     };
 
@@ -54,6 +92,13 @@ export function ProblemManager({ initialProblems, totalCount, currentPage, initi
     const handleSuccess = () => {
         setIsDialogOpen(false);
         router.refresh();
+    };
+
+    const handleSort = (column: string) => {
+        const newOrder = sortBy === column && sortOrder === 'asc' ? 'desc' : 'asc';
+        startTransition(() => {
+            updateParams({ sortBy: column, sortOrder: newOrder });
+        });
     };
 
     return (
@@ -84,6 +129,9 @@ export function ProblemManager({ initialProblems, totalCount, currentPage, initi
             <ProblemList
                 problems={initialProblems}
                 onEdit={handleEdit}
+                sortBy={sortBy}
+                sortOrder={sortOrder}
+                onSort={handleSort}
             />
 
             <div className="flex justify-between items-center text-sm text-muted-foreground">
@@ -91,7 +139,7 @@ export function ProblemManager({ initialProblems, totalCount, currentPage, initi
                 <div className="flex gap-2 items-center">
                     {currentPage > 1 ? (
                         <Button variant="outline" size="sm" asChild>
-                            <Link href={`/admin/problems?q=${encodeURIComponent(query)}&page=${currentPage - 1}`}>
+                            <Link href={buildHref({ page: String(currentPage - 1) })}>
                                 前へ
                             </Link>
                         </Button>
@@ -105,7 +153,7 @@ export function ProblemManager({ initialProblems, totalCount, currentPage, initi
                     </span>
                     {currentPage * 20 < totalCount ? (
                         <Button variant="outline" size="sm" asChild>
-                            <Link href={`/admin/problems?q=${encodeURIComponent(query)}&page=${currentPage + 1}`}>
+                            <Link href={buildHref({ page: String(currentPage + 1) })}>
                                 次へ
                             </Link>
                         </Button>

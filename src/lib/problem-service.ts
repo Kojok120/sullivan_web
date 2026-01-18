@@ -225,43 +225,38 @@ export async function bulkCreateProblemsCore(
         const batch = problemsWithSubject.slice(i, i + batchSize);
 
         try {
-            await client.$transaction(async (tx: any) => {
-                const createPromises = batch.map(p => {
-                    let customId: string | undefined;
+            const createOperations = batch.map(p => {
+                let customId: string | undefined;
 
-                    if (p.subjectId) {
-                        const ids = customIdsBySubject.get(p.subjectId);
-                        const idx = subjectIndexes.get(p.subjectId) || 0;
-                        if (ids && ids[idx]) {
-                            customId = ids[idx];
-                            subjectIndexes.set(p.subjectId, idx + 1);
+                if (p.subjectId) {
+                    const ids = customIdsBySubject.get(p.subjectId);
+                    const idx = subjectIndexes.get(p.subjectId) || 0;
+                    if (ids && ids[idx]) {
+                        customId = ids[idx];
+                        subjectIndexes.set(p.subjectId, idx + 1);
+                    }
+                }
+
+                const order = assignOrder ? nextOrder++ : 0;
+
+                return client.problem.create({
+                    data: {
+                        question: p.question,
+                        answer: p.answer,
+                        acceptedAnswers: p.acceptedAnswers || [],
+                        grade: p.grade,
+                        videoUrl: p.videoUrl,
+                        customId,
+                        order,
+                        coreProblems: {
+                            connect: p.coreProblemIds.map(id => ({ id }))
                         }
                     }
-
-                    const order = assignOrder ? nextOrder++ : 0;
-
-                    return tx.problem.create({
-                        data: {
-                            question: p.question,
-                            answer: p.answer,
-                            acceptedAnswers: p.acceptedAnswers || [],
-                            grade: p.grade,
-                            videoUrl: p.videoUrl,
-                            customId,
-                            order,
-                            coreProblems: {
-                                connect: p.coreProblemIds.map(id => ({ id }))
-                            }
-                        }
-                    });
                 });
-
-                await Promise.all(createPromises);
-                createdCount += batch.length;
-            }, {
-                maxWait: 10000,
-                timeout: 20000
             });
+
+            await client.$transaction(createOperations);
+            createdCount += batch.length;
         } catch (error) {
             warnings.push(`バッチ処理エラー (${i + 1}〜${Math.min(i + batchSize, totalProblems)}件目): ${error}`);
             warnings.push('エラーのため処理を中断しました。');

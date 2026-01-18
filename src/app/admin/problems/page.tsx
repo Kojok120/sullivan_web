@@ -8,18 +8,29 @@ export const dynamic = 'force-dynamic';
 export default async function ProblemsPage({
     searchParams,
 }: {
-    searchParams: Promise<{ page?: string; q?: string; grade?: string; coreProblemId?: string }>;
+    searchParams: Promise<{ page?: string; q?: string; grade?: string; coreProblemId?: string; sortBy?: string; sortOrder?: string }>;
 }) {
     // In Next.js 15+, searchParams is a Promise
     const params = await searchParams;
     const page = Number(params.page) || 1;
     const query = params.q || '';
+    const sortBy = params.sortBy === 'customId' || params.sortBy === 'createdAt' || params.sortBy === 'updatedAt'
+        ? params.sortBy
+        : 'updatedAt';
+    const sortOrder = params.sortOrder === 'asc' ? 'asc' : 'desc';
 
     // Initial data fetch
-    const { problems, total, error } = await getProblems(page, 20, query, {
-        grade: params.grade,
-        coreProblemId: params.coreProblemId
-    });
+    const { problems, total, error } = await getProblems(
+        page,
+        20,
+        query,
+        {
+            grade: params.grade,
+            coreProblemId: params.coreProblemId
+        },
+        sortBy,
+        sortOrder
+    );
 
     if (error) {
         return <div className="p-8 text-red-500">{error}</div>;
@@ -34,9 +45,10 @@ export default async function ProblemsPage({
                     totalCount={total || 0}
                     currentPage={page}
                     initialQuery={query}
+                    sortBy={sortBy}
+                    sortOrder={sortOrder}
                 />
             </Suspense>
         </div>
     );
 }
-

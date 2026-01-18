@@ -2,7 +2,7 @@
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Pencil, Trash2, CheckSquare, Square } from 'lucide-react';
+import { Pencil, Trash2, CheckSquare, Square, ArrowUpDown } from 'lucide-react';
 import { Problem } from '@prisma/client';
 import { Badge } from '@/components/ui/badge';
 import { deleteStandaloneProblem, bulkDeleteProblems } from '../actions';
@@ -32,9 +32,12 @@ interface ProblemWithRelations extends Problem {
 interface ProblemListProps {
     problems: ProblemWithRelations[];
     onEdit: (problem: ProblemWithRelations) => void;
+    sortBy: string;
+    sortOrder: 'asc' | 'desc';
+    onSort: (column: string) => void;
 }
 
-export function ProblemList({ problems, onEdit }: ProblemListProps) {
+export function ProblemList({ problems, onEdit, sortBy, sortOrder, onSort }: ProblemListProps) {
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
     const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -94,6 +97,11 @@ export function ProblemList({ problems, onEdit }: ProblemListProps) {
         }
     };
 
+    const SortIcon = ({ column }: { column: string }) => {
+        if (sortBy !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />;
+        return <ArrowUpDown className={`ml-2 h-4 w-4 ${sortOrder === 'asc' ? 'text-primary' : 'text-primary/80'}`} />;
+    };
+
     return (
         <>
             {/* Bulk Actions Header */}
@@ -135,7 +143,14 @@ export function ProblemList({ problems, onEdit }: ProblemListProps) {
                     <TableHeader>
                         <TableRow>
                             <TableHead className="w-[50px]"></TableHead>
-                            <TableHead className="w-[100px]">ID</TableHead>
+                            <TableHead
+                                className="w-[120px] cursor-pointer hover:bg-muted/50"
+                                onClick={() => onSort('customId')}
+                            >
+                                <div className="flex items-center">
+                                    ID <SortIcon column="customId" />
+                                </div>
+                            </TableHead>
                             <TableHead>問題文</TableHead>
                             <TableHead>解答</TableHead>
                             <TableHead>所属コア問題</TableHead>
