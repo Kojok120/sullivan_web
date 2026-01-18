@@ -145,7 +145,7 @@ export function PrintLayout({ studentName, subjectName, problems, studentLoginId
                         type="問題"
                     />
                     <div ref={contentMeasureRef} className="flex-1 min-h-0 overflow-hidden">
-                        <div ref={measureRef} className="mt-6 space-y-6">
+                        <div ref={measureRef} className="mt-6 space-y-4">
                             {problems.map((problem, index) => (
                                 <PrintProblemItem
                                     key={problem.id}
@@ -209,7 +209,7 @@ export function PrintLayout({ studentName, subjectName, problems, studentLoginId
                                     totalPages={totalPages}
                                     type="問題"
                                 />
-                                <div className="flex-1 mt-6 space-y-6">
+                                <div className="flex-1 mt-6 space-y-4">
                                     {pageProblems.map((problem, i) => (
                                         <PrintProblemItem
                                             key={problem.id}
