@@ -259,8 +259,10 @@ curl -X POST <WEB_URL>/api/drive/watch/setup \
   -H "Authorization: Bearer <INTERNAL_API_SECRET>"
 ```
 
-継続運用では `/api/drive/watch/renew` を定期実行します。  
+継続運用では `/api/drive/watch/renew?check=1` を定期実行します。  
+`check=1` は Drive の取りこぼし対策として定期的に `checkDriveForNewFiles` を実行します。  
 `DRIVE_WEBHOOK_TOKEN` を変更した場合は再度 `/api/drive/watch/setup` を実行してください。
+Supabase Realtime は通知用途のみで、採点トリガーには使われません（Drive Webhook または `/api/grading/check` が入口）。
 
 ---
 

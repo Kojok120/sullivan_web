@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { watchDriveFolder, stopWatching } from '@/lib/drive-webhook-manager';
 import { saveWatchState, getWatchState, clearWatchState } from '@/lib/drive-watch-state';
+import { checkDriveForNewFiles } from '@/lib/grading-service';
+import { acquireGradingLock, releaseGradingLock } from '@/lib/grading-lock';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +16,9 @@ const RENEW_THRESHOLD_MS = 6 * 60 * 60 * 1000;
  */
 export async function POST(request: Request) {
     try {
+        const url = new URL(request.url);
+        const shouldCheck = ['1', 'true'].includes(url.searchParams.get('check') || '');
+
         const authHeader = request.headers.get('Authorization');
         if (authHeader !== `Bearer ${process.env.INTERNAL_API_SECRET}`) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -37,6 +42,9 @@ export async function POST(request: Request) {
             if (timeUntilExpiry > RENEW_THRESHOLD_MS) {
                 const hoursRemaining = Math.round(timeUntilExpiry / 1000 / 60 / 60);
                 console.log(`Watch still valid for ${hoursRemaining} hours. Skipping renewal.`);
+                if (shouldCheck) {
+                    await runDriveCheck('renew-skip');
+                }
                 return NextResponse.json({
                     success: true,
                     action: 'skipped',
@@ -68,6 +76,9 @@ export async function POST(request: Request) {
 
         const expiresAt = new Date(Number(result.expiration)).toISOString();
         console.log(`Watch renewed successfully. New expiration: ${expiresAt}`);
+        if (shouldCheck) {
+            await runDriveCheck('renewed');
+        }
 
         return NextResponse.json({
             success: true,
@@ -117,5 +128,22 @@ export async function DELETE() {
             { success: false, error: message },
             { status: 500 }
         );
+    }
+}
+
+async function runDriveCheck(reason: string) {
+    const lockAcquired = await acquireGradingLock();
+    if (!lockAcquired) {
+        console.log(`[DriveCheck] Skipped (${reason}): lock active.`);
+        return;
+    }
+
+    try {
+        console.log(`[DriveCheck] Starting (${reason}).`);
+        await checkDriveForNewFiles();
+    } catch (error) {
+        console.error(`[DriveCheck] Failed (${reason}):`, error);
+    } finally {
+        await releaseGradingLock();
     }
 }

@@ -1,15 +1,25 @@
 #!/bin/bash
+set -euo pipefail
 
-# Configuration
-JOB_NAME="sullivan-drive-watch-renew"
-SCHEDULE="0 */6 * * *" # Every 6 hours to ensure renewal within 24h expiry cap
-URI="https://sullivan-app-97352275682.asia-northeast1.run.app/api/drive/watch/setup"
-REGION="asia-northeast1"
-PROJECT_ID="sullivan-dev-480803"
+# Optional .env loader
+if [ -n "${ENV_FILE:-}" ] && [ -f "$ENV_FILE" ]; then
+  export $(grep -v '^#' "$ENV_FILE" | xargs)
+fi
 
-# Secret (Should be loaded from env or safe storage, but for this setup script we use the known secret)
-# In production, consider using OIDC authentication, but for now we use the Internal Secret header as per current architecture.
-INTERNAL_API_SECRET="98be48a0ac6a87a01f2097ce78c71a379f1b90f407408115dcb66ce543b583c7"
+# Configuration (override via env vars)
+JOB_NAME="${JOB_NAME:-sullivan-drive-watch-renew}"
+SCHEDULE="${SCHEDULE:-0 */6 * * *}" # Every 6 hours to renew before expiry
+REGION="${REGION:-asia-northeast1}"
+PROJECT_ID="${GOOGLE_CLOUD_PROJECT_ID:-${PROJECT_ID:-}}"
+APP_URL="${APP_URL:-}"
+INTERNAL_API_SECRET="${INTERNAL_API_SECRET:-}"
+
+if [ -z "$APP_URL" ] || [ -z "$PROJECT_ID" ] || [ -z "$INTERNAL_API_SECRET" ]; then
+  echo "Missing required env. Set APP_URL, GOOGLE_CLOUD_PROJECT_ID (or PROJECT_ID), and INTERNAL_API_SECRET."
+  exit 1
+fi
+
+URI="${APP_URL%/}/api/drive/watch/renew?check=1"
 
 echo "Creating/Updating Cloud Scheduler Job: $JOB_NAME"
 
