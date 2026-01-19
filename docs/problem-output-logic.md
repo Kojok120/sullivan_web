@@ -80,11 +80,11 @@
 
 - QR内容は以下のJSONをエンコード（可能なら圧縮形式を使用）:
   ```json
-  { "sid": "<studentId>", "pids": ["<problemId>", "..."] }
+  { "s": "<studentLoginId>", "p": "<problemId>,<problemId>,..." }
   ```
   もしくは圧縮形式:
   ```json
-  { "sid": "<studentId>", "sub": "<prefix>", "nos": [1, 2] }
+  { "s": "<studentLoginId>", "c": "<prefix>|1-2" }
   ```
 - いずれの形式でも後段の採点処理で「生徒ID × 問題ID群」を復元可能。
 
@@ -112,7 +112,7 @@
 - 先頭4バイトのマジックバイトでPDF判定し、PDFはローカルQR解析をスキップ。
 - ローカル解析は `scripts/qr_reader.py` を `/usr/bin/python3` で実行（画像のみ）。
 - 失敗時は Gemini による QR 解析 (`scanQRWithGemini`) をフォールバック。
-- QRは `{ sid, pids }` 形式で、`pids` は `Problem.id` または `Problem.customId` を許容。
+- QRは短縮形式 `{ s, p }` / `{ s, c }` を使用。
 
 ### 6.5 Gemini採点
 - `Problem` を `id` / `customId` で取得し、QR順にソート。

@@ -24,7 +24,6 @@ const MAX_PAGE_HEIGHT_PX = 900; // Approximate pixel height for A4 content area 
 
 export function PrintLayout({ studentName, subjectName, problems, studentLoginId }: PrintLayoutProps) {
     const router = useRouter();
-    const dateStr = new Date().toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
 
     const [paginatedProblems, setPaginatedProblems] = useState<(Problem & { customId?: string | null })[][]>([]);
     const [isCalculating, setIsCalculating] = useState(true);
@@ -99,15 +98,15 @@ export function PrintLayout({ studentName, subjectName, problems, studentLoginId
             const problemIds = limitedProblems.map(p => p.customId || p.id);
             const compressed = compressProblemIds(problemIds);
             const qrData = {
-                sid: studentLoginId,
+                s: studentLoginId,
                 ...compressed
             };
             const json = JSON.stringify(qrData);
             try {
                 const url = await QRCode.toDataURL(json, {
-                    errorCorrectionLevel: 'H',
+                    errorCorrectionLevel: 'M',
                     width: 300,
-                    margin: 2
+                    margin: 4
                 });
                 setQrCodeDataUrl(url);
             } catch (e) {
@@ -140,7 +139,6 @@ export function PrintLayout({ studentName, subjectName, problems, studentLoginId
                         studentName={studentName}
                         studentLoginId={studentLoginId}
                         subjectName={subjectName}
-                        date={dateStr}
                         pageNum={1}
                         totalPages={1}
                         type="問題"
@@ -206,7 +204,6 @@ export function PrintLayout({ studentName, subjectName, problems, studentLoginId
                                     studentName={studentName}
                                     studentLoginId={studentLoginId}
                                     subjectName={subjectName}
-                                    date={dateStr}
                                     pageNum={pageIndex + 1}
                                     totalPages={totalPages}
                                     type="問題"
@@ -232,19 +229,18 @@ export function PrintLayout({ studentName, subjectName, problems, studentLoginId
                             studentName={studentName}
                             studentLoginId={studentLoginId}
                             subjectName={subjectName}
-                            date={dateStr}
                             pageNum={totalPages}
                             totalPages={totalPages}
                             type="解答用紙"
                         />
 
                         {qrCodeDataUrl && (
-                            <div className="absolute top-[10mm] right-[10mm] w-24 h-24">
+                            <div className="absolute top-[10mm] right-[10mm] w-25 h-25">
                                 <img src={qrCodeDataUrl} alt="QR" className="w-full h-full" />
                             </div>
                         )}
 
-                        <div className="flex-1 mt-6">
+                        <div className="flex-1 mt-8">
                             <div className="flex flex-col gap-8">
                                 {finalProblems.map((problem, index) => (
                                     <div key={problem.id} className="flex gap-4 items-end break-inside-avoid">
@@ -317,15 +313,14 @@ export function PrintLayout({ studentName, subjectName, problems, studentLoginId
     );
 }
 
-function Header({ studentName, studentLoginId, subjectName, date, pageNum, totalPages, type }: {
-    studentName: string, studentLoginId: string, subjectName: string, date: string, pageNum: number, totalPages: number, type: string
+function Header({ studentName, studentLoginId, subjectName, pageNum, totalPages, type }: {
+    studentName: string, studentLoginId: string, subjectName: string, pageNum: number, totalPages: number, type: string
 }) {
     return (
         <div className="border-b-2 border-gray-800 pb-2 flex justify-between items-end">
             <div className="flex gap-8 items-end">
                 <h1 className="text-2xl font-bold">{subjectName} {type}</h1>
                 <div className="text-xl font-bold">氏名：{studentName}（ID: {studentLoginId}）</div>
-                <div className="text-sm font-medium mb-1">実施日: {date}</div>
             </div>
             <div className="flex gap-6 text-sm font-medium">
                 <div>{pageNum} / {totalPages}</div>

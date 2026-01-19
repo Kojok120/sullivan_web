@@ -22,11 +22,11 @@ async function main() {
         
 TASK: Decode the QR code and return ONLY its raw content.
 
-The QR code contains a JSON string like: {"sid":"xxx","pids":["yyy","zzz"]}
+The QR code contains a JSON string like: {"s":"S0001","c":"E|1-3,5"} or {"s":"S0001","p":"E-1,E-2"}
 
 CRITICAL RULES:
 1. You MUST actually decode the QR code pattern, do NOT guess or fabricate the content
-2. The "sid" field contains a CUID starting with "cm" followed by ~24 alphanumeric chars
+2. The "s" field contains the student Login ID (e.g. "S0001")
 3. If you cannot read the QR code, respond with: {"error": "cannot_read_qr"}
 4. Return ONLY the JSON, no explanation
 

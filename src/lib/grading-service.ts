@@ -41,22 +41,16 @@ function getGenAI() {
     return genAI;
 }
 
-import { QRData, compressProblemIds } from '@/lib/qr-utils';
+import { QRData, compressProblemIds, expandProblemIds } from '@/lib/qr-utils';
 
 // Deprecated local getDrive removed in favor of shared getDriveClient
 function getDrive() {
     return getDriveClient();
 }
 
-
-function expandProblemIds(data: QRData): string[] {
-    if (data.pids && data.pids.length > 0) {
-        return data.pids;
-    }
-    if (data.sub && data.nos) {
-        return data.nos.map(n => `${data.sub}-${n}`);
-    }
-    return [];
+function getStudentIdFromQr(qrData: QRData | null): string | null {
+    if (!qrData) return null;
+    return qrData.s || null;
 }
 
 // 1. Generate QR Code
@@ -65,16 +59,16 @@ export async function generateQRCode(studentId: string, problemIds: string[]): P
     const compressed = compressProblemIds(problemIds);
 
     const data: QRData = {
-        sid: studentId,
+        s: studentId,
         ...compressed
     };
 
     const json = JSON.stringify(data);
-    // Increase robustness: High error correction and reasonable resolution
+    // Balance robustness and density with moderate error correction
     return await QRCode.toDataURL(json, {
-        errorCorrectionLevel: 'H',
+        errorCorrectionLevel: 'M',
         width: 300, // Ensure sufficient resolution
-        margin: 2
+        margin: 4
     });
 }
 
@@ -184,7 +178,8 @@ export async function processFile(fileId: string, fileName: string) {
         const prepared = await prepareFileForGemini(destPath);
         const qrData = await extractQrDataFromFile(destPath, prepared);
 
-        if (!qrData || !qrData.sid) {
+        const studentId = getStudentIdFromQr(qrData);
+        if (!studentId) {
             console.error("Failed to extract QR data (Local & AI) from", destPath);
             await renameFile(fileId, `[ERROR] ${fileName}`);
             await finalizeFailure('QR data not found');
@@ -193,12 +188,12 @@ export async function processFile(fileId: string, fileName: string) {
         }
 
         // SECURITY: Mask student ID in logs (show only last 4 chars)
-        const pidsCount = qrData.pids ? qrData.pids.length : (qrData.nos ? qrData.nos.length : 0);
-        console.log(`QR Found: Student=...${qrData.sid.slice(-4)}, Problems=${pidsCount}`);
+        const pidsCount = qrData ? expandProblemIds(qrData).length : 0;
+        console.log(`QR Found: Student=...${studentId.slice(-4)}, Problems=${pidsCount}`);
 
         const user = await resolveUserFromQr(qrData);
         if (!user) {
-            console.error(`User for QR ID ${qrData.sid} not found in DB (checked loginId and id).`);
+            console.error(`User for QR ID ${studentId} not found in DB (checked loginId and id).`);
             await renameFile(fileId, `[ERROR] ${fileName}`);
             await finalizeFailure('User not found');
             await fs.promises.unlink(destPath);
@@ -567,7 +562,7 @@ async function extractQrDataFromFile(filePath: string, prepared: PreparedFile): 
         console.log("Skipping local QR read for PDF file.");
     }
 
-    if (!qrData || !qrData.sid) {
+    if (!getStudentIdFromQr(qrData)) {
         console.log("Local QR read failed/skipped. Attempting to scan QR with Gemini...");
         const modelName = process.env.GEMINI_MODEL || "gemini-2.5-pro";
         const model = getGenAI().getGenerativeModel({ model: modelName });
@@ -580,7 +575,8 @@ async function extractQrDataFromFile(filePath: string, prepared: PreparedFile): 
 async function resolveUserFromQr(qrData: QRData) {
     // [NEW] Resolve User (Strict loginId only)
     // User requested to rely solely on loginId (e.g. S0001) for persistence.
-    const userId = qrData.sid;
+    const userId = getStudentIdFromQr(qrData);
+    if (!userId) return null;
     return await prisma.user.findUnique({
         where: { loginId: userId }
     });
@@ -591,6 +587,7 @@ async function gradeWithGemini(prepared: PreparedFile, qrData: QRData, userId: s
         const modelName = process.env.GEMINI_MODEL || "gemini-2.5-pro";
         console.log("Using Gemini Model:", modelName);
         const model = getGenAI().getGenerativeModel({ model: modelName });
+        const studentId = getStudentIdFromQr(qrData) || 'unknown';
 
         // 1. Fetch Full Problem Context from DB
         const extractedPids = expandProblemIds(qrData);
@@ -633,7 +630,7 @@ async function gradeWithGemini(prepared: PreparedFile, qrData: QRData, userId: s
         const gradingPrompt = `
         You are an expert teacher grading a student's answer sheet.
         
-        **Student ID**: ${qrData.sid}
+        **Student ID**: ${studentId}
         
         **Task**:
         1.  Analyze the image/document of the answer sheet.
@@ -705,18 +702,16 @@ async function scanQRWithGemini(model: any, base64Data: string, mimeType: string
         1. Decode the QR code.
         2. Extract the JSON data from the QR code.
 
-        The expected JSON structure (it might be compressed):
+        The expected JSON structure:
         {
-            "sid": "student_id_string",
-            "pids": ["pid1", "pid2"] // Legacy format
-            // OR Compressed Format:
-            "sub": "SubjectPrefix", // e.g. "E"
-            "nos": [1, 2, 5...]     // Numbers, which combine with sub to form IDs (e.g. "E-1")
+            "s": "student_login_id",
+            "c": "E|1-3,5" // Compressed format (prefix|ranges)
+            // OR full list:
+            "p": "E-1,E-2,E-3"
         }
 
         IMPORTANT:
-        - The "sid" is the student Identifier. It can be a Login ID (e.g. "S0001") or a CUID (e.g. "cm...").
-        - If you see "S0001", use it as the sid.
+        - The "s" is the student Login ID (e.g. "S0001").
         
         Return ONLY the JSON object found in the QR code. Do not fabricate data.
         `;
@@ -1092,7 +1087,7 @@ async function notifyErrorForFile(fileId: string, fileName: string, reason: stri
             qrData = await scanQRWithGemini(model, prepared.base64Data, prepared.mimeType);
         }
 
-        if (qrData && qrData.sid) {
+        if (getStudentIdFromQr(qrData)) {
             const user = await resolveUserFromQr(qrData);
             if (user) {
                 console.log(`Notifying user ${user.id} of error: ${reason}`);

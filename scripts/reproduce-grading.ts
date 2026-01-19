@@ -1,6 +1,7 @@
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { prisma } from '../src/lib/prisma';
+import { expandProblemIds, QRData } from '../src/lib/qr-utils';
 import fs from 'fs';
 import path from 'path';
 
@@ -28,7 +29,7 @@ async function reproduceGrading(imagePath: string) {
         Return ONLY the JSON object found.
     `;
 
-    let qrData: any = {};
+    let qrData: QRData = {};
     try {
         const qrResult = await model.generateContent([
             qrPrompt,
@@ -42,20 +43,21 @@ async function reproduceGrading(imagePath: string) {
     }
 
     // FALLBACK IF QR FAILS (For debugging specifically)
-    if (!qrData.pids || !Array.isArray(qrData.pids)) {
+    if (expandProblemIds(qrData).length === 0) {
         console.warn("!! QR Scan did not return PIDs. Using FALLBACK IDs for debugging !!");
-        qrData.sid = "S0001"; // Assuming Test Student ID if needed, or fetch from DB
+        qrData.s = "S0001"; // Assuming Test Student ID if needed, or fetch from DB
         // Based on the user's uploaded image content and previous logs
-        qrData.pids = ["E-1", "E-26", "E-27", "E-40", "E-42", "E-45", "E-51"];
+        qrData.p = "E-1,E-26,E-27,E-40,E-42,E-45,E-51";
     }
 
     // Resolve Student ID if needed (S0001 -> UUID)
     const student = await prisma.user.findFirst({ where: { loginId: 'S0001' } });
     const studentId = student ? student.id : "unknown-student-id";
 
-    console.log(`\nFetching problems: ${qrData.pids.join(', ')}`);
+    const problemIds = expandProblemIds(qrData);
+    console.log(`\nFetching problems: ${problemIds.join(', ')}`);
     const problems = await prisma.problem.findMany({
-        where: { OR: [{ id: { in: qrData.pids } }, { customId: { in: qrData.pids } }] },
+        where: { OR: [{ id: { in: problemIds } }, { customId: { in: problemIds } }] },
         include: { coreProblems: true }
     });
 
@@ -72,7 +74,7 @@ async function reproduceGrading(imagePath: string) {
     const gradingPrompt = `
         You are an expert teacher grading a student's answer sheet.
         
-        **Student ID**: ${qrData.sid}
+        **Student ID**: ${qrData.s || 'unknown'}
         
         **Task**:
         1.  Analyze the image/document of the answer sheet.
