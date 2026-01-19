@@ -1,6 +1,5 @@
 import { prisma } from '@/lib/prisma';
 import { selectProblemsForPrint } from '@/lib/print-algo';
-import { naturalSort } from '@/lib/utils';
 import { Problem } from '@prisma/client';
 
 type PrintData = {
@@ -27,11 +26,8 @@ export async function getPrintData(userId: string, subjectId: string): Promise<P
         return null;
     }
 
-    problems.sort((a, b) => {
-        const idA = a.customId || a.id;
-        const idB = b.customId || b.id;
-        return naturalSort(idA, idB);
-    });
+    // スコア順を維持（未回答問題が優先される）
+    // customIdソートは削除 - 学習効果を最大化するため
 
     return {
         studentName: student.name || student.loginId,
