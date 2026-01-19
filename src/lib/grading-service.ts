@@ -177,9 +177,7 @@ export async function processFile(fileId: string, fileName: string) {
 
         const prepared = await prepareFileForGemini(destPath);
         const qrData = await extractQrDataFromFile(destPath, prepared);
-
-        const studentId = getStudentIdFromQr(qrData);
-        if (!studentId) {
+        if (!qrData) {
             console.error("Failed to extract QR data (Local & AI) from", destPath);
             await renameFile(fileId, `[ERROR] ${fileName}`);
             await finalizeFailure('QR data not found');
@@ -187,8 +185,17 @@ export async function processFile(fileId: string, fileName: string) {
             return;
         }
 
+        const studentId = getStudentIdFromQr(qrData);
+        if (!studentId) {
+            console.error("QR data missing student ID for", destPath);
+            await renameFile(fileId, `[ERROR] ${fileName}`);
+            await finalizeFailure('Student ID not found');
+            await fs.promises.unlink(destPath);
+            return;
+        }
+
         // SECURITY: Mask student ID in logs (show only last 4 chars)
-        const pidsCount = qrData ? expandProblemIds(qrData).length : 0;
+        const pidsCount = expandProblemIds(qrData).length;
         console.log(`QR Found: Student=...${studentId.slice(-4)}, Problems=${pidsCount}`);
 
         const user = await resolveUserFromQr(qrData);
@@ -1087,16 +1094,18 @@ async function notifyErrorForFile(fileId: string, fileName: string, reason: stri
             qrData = await scanQRWithGemini(model, prepared.base64Data, prepared.mimeType);
         }
 
-        if (getStudentIdFromQr(qrData)) {
-            const user = await resolveUserFromQr(qrData);
-            if (user) {
-                console.log(`Notifying user ${user.id} of error: ${reason}`);
-                await emitRealtimeEvent({
-                    userId: user.id,
-                    type: 'grading_failed',
-                    payload: { fileName, reason },
-                });
-            }
+        if (!qrData) return;
+        const studentId = getStudentIdFromQr(qrData);
+        if (!studentId) return;
+
+        const user = await resolveUserFromQr(qrData);
+        if (user) {
+            console.log(`Notifying user ${user.id} of error: ${reason}`);
+            await emitRealtimeEvent({
+                userId: user.id,
+                type: 'grading_failed',
+                payload: { fileName, reason },
+            });
         }
     } catch (error) {
         console.warn(`Could not extract user for error notification (${fileName}):`, error);

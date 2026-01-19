@@ -45,6 +45,11 @@
 }
 
 :root {
+  --font-geist-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji",
+    "Segoe UI Emoji", "Segoe UI Symbol";
+  --font-geist-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
   --radius: 0.75rem; /* 12px */
   --background: #F9FAFB; /* Gray 50 */
   --foreground: #111827; /* Gray 900 */
