@@ -138,6 +138,7 @@ export function PrintLayout({ studentName, subjectName, problems, studentLoginId
                 <div className="h-full flex flex-col">
                     <Header
                         studentName={studentName}
+                        studentLoginId={studentLoginId}
                         subjectName={subjectName}
                         date={dateStr}
                         pageNum={1}
@@ -203,6 +204,7 @@ export function PrintLayout({ studentName, subjectName, problems, studentLoginId
                             <div key={pageIndex} className={`print-page p-[15mm] relative flex flex-col ${pageIndex > 0 ? 'break-before-page' : ''}`}>
                                 <Header
                                     studentName={studentName}
+                                    studentLoginId={studentLoginId}
                                     subjectName={subjectName}
                                     date={dateStr}
                                     pageNum={pageIndex + 1}
@@ -226,7 +228,15 @@ export function PrintLayout({ studentName, subjectName, problems, studentLoginId
 
                     {/* Answer Sheet Page (Always Last Page) */}
                     <div className="print-page p-[15mm] relative flex flex-col break-before-page answer-sheet-page">
-                        <Header studentName={studentName} subjectName={subjectName} date={dateStr} pageNum={totalPages} totalPages={totalPages} type="解答用紙" />
+                        <Header
+                            studentName={studentName}
+                            studentLoginId={studentLoginId}
+                            subjectName={subjectName}
+                            date={dateStr}
+                            pageNum={totalPages}
+                            totalPages={totalPages}
+                            type="解答用紙"
+                        />
 
                         {qrCodeDataUrl && (
                             <div className="absolute top-[10mm] right-[10mm] w-24 h-24">
@@ -307,14 +317,14 @@ export function PrintLayout({ studentName, subjectName, problems, studentLoginId
     );
 }
 
-function Header({ studentName, subjectName, date, pageNum, totalPages, type }: {
-    studentName: string, subjectName: string, date: string, pageNum: number, totalPages: number, type: string
+function Header({ studentName, studentLoginId, subjectName, date, pageNum, totalPages, type }: {
+    studentName: string, studentLoginId: string, subjectName: string, date: string, pageNum: number, totalPages: number, type: string
 }) {
     return (
         <div className="border-b-2 border-gray-800 pb-2 flex justify-between items-end">
             <div className="flex gap-8 items-end">
                 <h1 className="text-2xl font-bold">{subjectName} {type}</h1>
-                <div className="text-xl font-bold">氏名：{studentName}</div>
+                <div className="text-xl font-bold">氏名：{studentName}（ID: {studentLoginId}）</div>
                 <div className="text-sm font-medium mb-1">実施日: {date}</div>
             </div>
             <div className="flex gap-6 text-sm font-medium">
