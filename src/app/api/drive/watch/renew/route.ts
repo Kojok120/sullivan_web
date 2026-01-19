@@ -11,8 +11,8 @@ const RENEW_THRESHOLD_MS = 6 * 60 * 60 * 1000;
 
 /**
  * POST /api/drive/watch/renew
- * Called by Cloud Scheduler every 12 hours to renew the Drive watch.
- * Google Drive watches expire after ~24 hours, so we renew proactively.
+ * Called by Cloud Scheduler every 6 hours to renew the Drive watch.
+ * Google Drive watches expire within ~24 hours, so we renew proactively.
  */
 export async function POST(request: Request) {
     try {

@@ -138,7 +138,7 @@ erDiagram
 
 ### 5.3. Drive Watch 管理
 * **初回登録**: `/api/drive/watch/setup` を手動実行。
-* **更新**: `/api/drive/watch/renew` を12時間ごとに実行（Cloud Scheduler推奨）。
+* **更新**: `/api/drive/watch/renew` を6時間ごとに実行（Cloud Scheduler推奨）。
 * **状態保存**: `drive-watch-state.ts` でUpstash Redisへ保存。
 
 ## 6. 開発ガイドライン
