@@ -360,25 +360,57 @@ async function archiveProcessedFile(fileId: string, studentId: string, problemId
         const monthId = await ensureFolder(month, yearId);
         const dayId = await ensureFolder(day, monthId);
 
-        // 6. Move & Rename File
+        // 6. Move & Rename File (Safe 2-Step)
         const driveClient = getDrive();
-        // We need to retrieve the current parents to remove them
-        const file = await driveClient.files.get({ fileId, fields: 'parents' });
-        const previousParents = file.data.parents?.join(',') || '';
 
+        // a. Get current parents
+        const file = await driveClient.files.get({ fileId, fields: 'parents' });
+        const previousParents = file.data.parents || [];
+
+        // b. Add new parent
+        console.log(`[Archive] Adding parent ${dayId} to file ${fileId}...`);
         await driveClient.files.update({
             fileId,
             addParents: dayId,
-            removeParents: previousParents,
-            requestBody: { name: newFileName },
-            fields: 'id, parents, name'
+            fields: 'id, parents'
         });
-        console.log(`Moved and Renamed file to: ${newFileName}`);
+
+        // c. Verify parent added
+        const verify = await driveClient.files.get({ fileId, fields: 'parents' });
+        const currentParents = verify.data.parents || [];
+
+        if (!currentParents.includes(dayId)) {
+            throw new Error(`Failed to add parent ${dayId}. Current parents: ${currentParents.join(', ')}`);
+        }
+
+        // d. Remove old parents & Rename
+        console.log(`[Archive] Parent verified. Removing old parents and renaming to ${newFileName}...`);
+
+        // Remove all previous parents that are NOT the new dayId (just in case they overlap)
+        const parentsToRemove = previousParents.filter((p: string) => p !== dayId).join(',');
+
+        if (parentsToRemove) {
+            await driveClient.files.update({
+                fileId,
+                removeParents: parentsToRemove,
+                requestBody: { name: newFileName },
+                fields: 'id, name'
+            });
+        } else {
+            // Just rename if no parents to remove
+            await driveClient.files.update({
+                fileId,
+                requestBody: { name: newFileName },
+                fields: 'id, name'
+            });
+        }
+
+        console.log(`[Archive] SUCCESS: File moved to ${newFileName}`);
 
     } catch (error) {
         console.error('Error archiving file:', error);
         // Fallback to rename if archiving fails
-        await renameFile(fileId, `[PROCESSED] (Archive Failed)`);
+        await renameFile(fileId, `[PROCESSED] (Archive Failed) ${originalFileName}`);
     }
 }
 
@@ -417,17 +449,47 @@ async function triggerGradingJob(fileId: string, fileName: string) {
 }
 
 // Helper to find or create a folder
+// Helper to find or create a folder
 const folderCache = new Map<string, string>(); // Cache folder IDs key="${name}:${parentId}"
 
 async function ensureFolder(name: string, parentId: string): Promise<string> {
     const cacheKey = `${name}:${parentId}`;
+
+    // 1. Check Cache with Verification
     if (folderCache.has(cacheKey)) {
-        return folderCache.get(cacheKey)!;
+        const cachedId = folderCache.get(cacheKey)!;
+        try {
+            const driveClient = getDrive();
+            // Lightweight check: Get only 'trashed' status
+            const check = await driveClient.files.get({
+                fileId: cachedId,
+                fields: 'trashed'
+            });
+
+            if (!check.data.trashed) {
+                return cachedId;
+            }
+            console.log(`[FolderCache] Cached folder '${name}' (${cachedId}) is trashed. Invalidating.`);
+            folderCache.delete(cacheKey);
+        } catch (error: any) {
+            // 404 Not Found implies it's gone
+            if (error.code === 404 || (error.response && error.response.status === 404)) {
+                console.log(`[FolderCache] Cached folder '${name}' (${cachedId}) not found (404). Invalidating.`);
+                folderCache.delete(cacheKey);
+            } else {
+                console.warn(`[FolderCache] Error checking folder '${name}' (${cachedId}):`, error.message);
+                // Allow proceeding to list/create if check fails uniquely? 
+                // Alternatively, assume it might be valid but API error?
+                // Safer to try finding it again.
+                folderCache.delete(cacheKey);
+            }
+        }
     }
 
     try {
         const driveClient = getDrive();
-        // Check if exists
+
+        // 2. Search for existing folder
         const q = `mimeType='application/vnd.google-apps.folder' and name='${name}' and '${parentId}' in parents and trashed=false`;
         const res = await driveClient.files.list({
             q,
@@ -441,7 +503,8 @@ async function ensureFolder(name: string, parentId: string): Promise<string> {
             return id;
         }
 
-        // Create if not exists
+        // 3. Create if not exists
+        console.log(`[Folder] Creating new folder: '${name}' in '${parentId}'`);
         const fileMetadata = {
             name,
             mimeType: 'application/vnd.google-apps.folder',
