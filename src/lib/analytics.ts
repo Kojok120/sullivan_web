@@ -462,15 +462,8 @@ export async function getSessionDetails(groupId: string, userId?: string) {
                 }
             }
         },
-        orderBy: { problem: { order: 'asc' } } // or custom order logic
-    }).then(items => {
-        // Natural Sort by customId
-        const { naturalSort } = require('@/lib/utils');
-        return items.sort((a, b) => {
-            const idA = a.problem.customId || a.problem.id;
-            const idB = b.problem.customId || b.problem.id;
-            return naturalSort(idA, idB);
-        });
+        // ID順（挿入順）で並べる = 問題用紙と同じ順序
+        orderBy: { id: 'asc' }
     });
 }
 
