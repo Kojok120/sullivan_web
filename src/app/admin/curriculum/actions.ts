@@ -21,7 +21,10 @@ export async function getSubjects() {
 }
 
 // --- CoreProblems ---
-export async function createCoreProblem(data: { name: string; subjectId: string; order: number }) {
+// 講義動画の型
+export type LectureVideo = { title: string; url: string };
+
+export async function createCoreProblem(data: { name: string; subjectId: string; order: number; lectureVideos?: LectureVideo[] }) {
     await requireAdmin();
     try {
         const coreProblem = await prisma.coreProblem.create({
@@ -29,6 +32,7 @@ export async function createCoreProblem(data: { name: string; subjectId: string;
                 name: data.name,
                 subjectId: data.subjectId,
                 order: data.order,
+                lectureVideos: data.lectureVideos ?? undefined,
             },
         });
         revalidatePath('/admin/curriculum');
@@ -39,7 +43,7 @@ export async function createCoreProblem(data: { name: string; subjectId: string;
     }
 }
 
-export async function updateCoreProblem(id: string, data: { name?: string; order?: number }) {
+export async function updateCoreProblem(id: string, data: { name?: string; order?: number; lectureVideos?: LectureVideo[] }) {
     await requireAdmin();
     try {
         const coreProblem = await prisma.coreProblem.update({
@@ -83,25 +87,27 @@ export async function bulkDeleteCoreProblems(ids: string[]) {
     }
 }
 
-export async function bulkCreateCoreProblems(subjectId: string, names: string[]) {
+export async function bulkCreateCoreProblems(subjectId: string, items: { name: string; lectureVideos?: LectureVideo[] }[]) {
     await requireAdmin();
     try {
         // Filter unique names locally first
-        const uniqueNames = Array.from(new Set(names));
+        const uniqueItems = items.filter((item, index, self) =>
+            index === self.findIndex(t => t.name === item.name)
+        );
 
         // Find existing names in this subject
         const existingProblems = await prisma.coreProblem.findMany({
             where: {
                 subjectId,
-                name: { in: uniqueNames }
+                name: { in: uniqueItems.map(i => i.name) }
             },
             select: { name: true }
         });
         const existingNameSet = new Set(existingProblems.map(p => p.name));
 
-        const newNames = uniqueNames.filter(name => !existingNameSet.has(name));
+        const newItems = uniqueItems.filter(item => !existingNameSet.has(item.name));
 
-        if (newNames.length === 0) {
+        if (newItems.length === 0) {
             return { success: true, count: 0, warnings: ['全てのCoreProblemは既に存在します'] };
         }
 
@@ -113,10 +119,11 @@ export async function bulkCreateCoreProblems(subjectId: string, names: string[])
         let order = (lastProblem?.order || 0) + 1;
 
         await prisma.$transaction(
-            newNames.map(name =>
+            newItems.map(item =>
                 prisma.coreProblem.create({
                     data: {
-                        name,
+                        name: item.name,
+                        lectureVideos: item.lectureVideos ?? undefined,
                         subjectId,
                         order: order++
                     }
@@ -130,7 +137,7 @@ export async function bulkCreateCoreProblems(subjectId: string, names: string[])
             ? [`${existingNameSet.size}件のCoreProblemは既に存在するためスキップされました`]
             : [];
 
-        return { success: true, count: newNames.length, warnings };
+        return { success: true, count: newItems.length, warnings };
     } catch (error) {
         console.error('Failed to bulk create core problems:', error);
         return { error: '一括登録に失敗しました' };

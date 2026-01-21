@@ -22,7 +22,7 @@ import { useState, useEffect } from 'react';
 import { reorderCoreProblems, createCoreProblem, deleteCoreProblem, updateCoreProblem, bulkDeleteCoreProblems } from '../actions';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { GripVertical, Plus, Trash2, Pencil, Check, X, CheckSquare, Square } from 'lucide-react';
+import { GripVertical, Plus, Trash2, Pencil, Check, X, CheckSquare, Square, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -36,6 +36,15 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 
 interface CoreProblemListProps {
     subjectId: string;
@@ -70,11 +79,30 @@ function SortableCoreProblemItem({ coreProblem, isSelected, isChecked, onSelect,
     const [isEditing, setIsEditing] = useState(false);
     const [editName, setEditName] = useState(coreProblem.name);
 
+    // 講義動画の編集ステート
+    const [editVideos, setEditVideos] = useState<{ title: string; url: string }[]>([]);
+
+    useEffect(() => {
+        if (isEditing) {
+            setEditVideos((coreProblem.lectureVideos as { title: string; url: string }[] | null) || []);
+            setEditName(coreProblem.name);
+        }
+    }, [isEditing, coreProblem]);
+
+    // 講義動画の配列（表示用）
+    const lectureVideos = (coreProblem.lectureVideos as { title: string; url: string }[] | null) || [];
+
     const handleSave = async (e?: React.FormEvent) => {
         e?.preventDefault();
         if (editName.trim() === '') return;
 
-        const result = await updateCoreProblem(coreProblem.id, { name: editName });
+        // 空の動画エントリを除外
+        const validVideos = editVideos.filter(v => v.title.trim() !== '' && v.url.trim() !== '');
+
+        const result = await updateCoreProblem(coreProblem.id, {
+            name: editName,
+            lectureVideos: validVideos.length > 0 ? validVideos : undefined,
+        });
         if (result.success) {
             toast.success('更新しました');
             setIsEditing(false);
@@ -83,79 +111,150 @@ function SortableCoreProblemItem({ coreProblem, isSelected, isChecked, onSelect,
         }
     };
 
+    const addVideo = () => {
+        setEditVideos([...editVideos, { title: '', url: '' }]);
+    };
+
+    const removeVideo = (index: number) => {
+        setEditVideos(editVideos.filter((_, i) => i !== index));
+    };
+
+    const updateVideo = (index: number, field: 'title' | 'url', value: string) => {
+        const newVideos = [...editVideos];
+        newVideos[index] = { ...newVideos[index], [field]: value };
+        setEditVideos(newVideos);
+    };
+
     return (
         <div ref={setNodeRef} style={style} className="mb-2">
             <div
                 className={cn(
-                    "group flex items-center gap-2 p-2 rounded-md border bg-card hover:bg-accent/50 transition-colors cursor-pointer",
+                    "group flex flex-col gap-2 p-2 rounded-md border bg-card hover:bg-accent/50 transition-colors cursor-pointer",
                     isSelected && "bg-accent border-primary ring-1 ring-primary"
                 )}
                 onClick={() => !isEditing && onSelect()}
             >
-                {/* Checkbox */}
-                <div onClick={(e) => e.stopPropagation()}>
-                    <Checkbox
-                        checked={isChecked}
-                        onCheckedChange={(checked) => onCheckChange(checked === true)}
-                        className="mr-1"
-                    />
-                </div>
+                <div className="flex items-center gap-2 w-full">
+                    {/* Checkbox */}
+                    <div onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                            checked={isChecked}
+                            onCheckedChange={(checked) => onCheckChange(checked === true)}
+                            className="mr-1"
+                        />
+                    </div>
 
-                {/* Drag Handle */}
-                <div {...attributes} {...listeners} className="text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing p-1">
-                    <GripVertical className="h-4 w-4" />
-                </div>
+                    {/* Drag Handle */}
+                    <div {...attributes} {...listeners} className="text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing p-1">
+                        <GripVertical className="h-4 w-4" />
+                    </div>
 
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                    {isEditing ? (
-                        <form onSubmit={handleSave} className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                            <Input
-                                value={editName}
-                                onChange={e => setEditName(e.target.value)}
-                                className="h-7 text-sm"
-                                autoFocus
-                            />
-                            <Button type="submit" size="icon" variant="ghost" className="h-7 w-7">
-                                <Check className="h-3 w-3 text-green-600" />
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                        {isEditing ? (
+                            <form onSubmit={handleSave} className="flex flex-col gap-2" onClick={e => e.stopPropagation()}>
+                                <div className="flex items-center gap-1">
+                                    <Input
+                                        value={editName}
+                                        onChange={e => setEditName(e.target.value)}
+                                        className="h-8 text-sm font-medium"
+                                        placeholder="CoreProblem名"
+                                        autoFocus
+                                    />
+                                </div>
+
+                                <div className="space-y-2 pl-2 border-l-2 border-muted mt-1">
+                                    <div className="text-xs font-semibold text-muted-foreground">講義動画</div>
+                                    {editVideos.map((video, index) => (
+                                        <div key={index} className="flex items-center gap-1">
+                                            <Input
+                                                value={video.title}
+                                                onChange={e => updateVideo(index, 'title', e.target.value)}
+                                                className="h-7 text-xs w-1/3"
+                                                placeholder="タイトル (例: 導入編)"
+                                            />
+                                            <Input
+                                                value={video.url}
+                                                onChange={e => updateVideo(index, 'url', e.target.value)}
+                                                className="h-7 text-xs flex-1"
+                                                placeholder="YouTube URL"
+                                            />
+                                            <Button
+                                                type="button"
+                                                size="icon"
+                                                variant="ghost"
+                                                className="h-7 w-7 text-muted-foreground hover:text-red-500"
+                                                onClick={() => removeVideo(index)}
+                                            >
+                                                <X className="h-3 w-3" />
+                                            </Button>
+                                        </div>
+                                    ))}
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={addVideo}
+                                        className="h-6 text-xs w-full"
+                                    >
+                                        <Plus className="h-3 w-3 mr-1" /> 動画を追加
+                                    </Button>
+                                </div>
+
+                                <div className="flex items-center gap-2 justify-end mt-2">
+                                    <Button type="button" size="sm" variant="ghost" onClick={() => setIsEditing(false)}>
+                                        キャンセル
+                                    </Button>
+                                    <Button type="submit" size="sm" variant="default">
+                                        保存
+                                    </Button>
+                                </div>
+                            </form>
+                        ) : (
+                            <div>
+                                <div className="font-medium text-sm truncate">{coreProblem.name}</div>
+                                {lectureVideos.length > 0 && (
+                                    <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
+                                        {lectureVideos.map((v, i) => (
+                                            <div key={i} className="flex items-center gap-1 text-xs text-blue-600">
+                                                <Video className="h-3 w-3" />
+                                                <span className="truncate max-w-[150px]">{v.title}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Actions */}
+                    {!isEditing && (
+                        <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity self-start">
+                            <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setIsEditing(true);
+                                }}
+                            >
+                                <Pencil className="h-3 w-3" />
                             </Button>
-                            <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={() => setIsEditing(false)}>
-                                <X className="h-3 w-3 text-red-600" />
+                            <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7 text-muted-foreground hover:text-red-600"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onDeleteRequest(coreProblem.id);
+                                }}
+                            >
+                                <Trash2 className="h-3 w-3" />
                             </Button>
-                        </form>
-                    ) : (
-                        <div className="font-medium text-sm truncate">{coreProblem.name}</div>
+                        </div>
                     )}
                 </div>
-
-                {/* Actions */}
-                {!isEditing && (
-                    <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setEditName(coreProblem.name);
-                                setIsEditing(true);
-                            }}
-                        >
-                            <Pencil className="h-3 w-3" />
-                        </Button>
-                        <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7 text-muted-foreground hover:text-red-600"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onDeleteRequest(coreProblem.id);
-                            }}
-                        >
-                            <Trash2 className="h-3 w-3" />
-                        </Button>
-                    </div>
-                )}
             </div>
         </div>
     );
@@ -217,22 +316,43 @@ export function CoreProblemList({ subjectId, coreProblems, selectedId, onSelect 
         }
     };
 
-    const handleCreate = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+    const [newVideos, setNewVideos] = useState<{ title: string; url: string }[]>([]);
+
+    const handleCreate = async () => {
         if (!newName.trim()) return;
+
+        const validVideos = newVideos.filter(v => v.title.trim() !== '' && v.url.trim() !== '');
 
         const result = await createCoreProblem({
             name: newName,
             subjectId,
             order: items.length + 1,
+            lectureVideos: validVideos.length > 0 ? validVideos : undefined,
         });
 
         if (result.success) {
             toast.success('作成しました');
             setNewName('');
+            setNewVideos([]);
+            setIsCreateDialogOpen(false);
         } else {
             toast.error(result.error);
         }
+    };
+
+    const addNewVideo = () => {
+        setNewVideos([...newVideos, { title: '', url: '' }]);
+    };
+
+    const removeNewVideo = (index: number) => {
+        setNewVideos(newVideos.filter((_, i) => i !== index));
+    };
+
+    const updateNewVideo = (index: number, field: 'title' | 'url', value: string) => {
+        const updated = [...newVideos];
+        updated[index] = { ...updated[index], [field]: value };
+        setNewVideos(updated);
     };
 
     const handleDeleteConfirm = async () => {
@@ -364,17 +484,83 @@ export function CoreProblemList({ subjectId, coreProblems, selectedId, onSelect 
 
                 {/* Quick Add Footer */}
                 <div className="pt-2 mt-2 border-t sticky bottom-0 bg-background">
-                    <form onSubmit={handleCreate} className="flex gap-2">
-                        <Input
-                            placeholder="新しい単元/コア問題を追加..."
-                            value={newName}
-                            onChange={(e) => setNewName(e.target.value)}
-                            className="h-9 text-sm"
-                        />
-                        <Button type="submit" size="icon" className="h-9 w-9 shrink-0">
-                            <Plus className="h-4 w-4" />
-                        </Button>
-                    </form>
+                    <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                        <DialogTrigger asChild>
+                            <Button className="w-full flex items-center justify-center gap-2">
+                                <Plus className="h-4 w-4" />
+                                新しいCoreProblemを追加
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>新規CoreProblem作成</DialogTitle>
+                                <DialogDescription>
+                                    新しい単元を作成します。講義動画の設定も可能です。
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4 py-2">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">CoreProblem名</label>
+                                    <Input
+                                        placeholder="現在完了形など"
+                                        value={newName}
+                                        onChange={(e) => setNewName(e.target.value)}
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-sm font-medium">講義動画</label>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={addNewVideo}
+                                            className="h-6 text-xs"
+                                        >
+                                            <Plus className="h-3 w-3 mr-1" /> 追加
+                                        </Button>
+                                    </div>
+                                    <div className="space-y-2 max-h-[200px] overflow-y-auto border rounded-md p-2">
+                                        {newVideos.length === 0 && (
+                                            <div className="text-xs text-muted-foreground text-center py-2">
+                                                動画は登録されていません
+                                            </div>
+                                        )}
+                                        {newVideos.map((video, index) => (
+                                            <div key={index} className="flex items-center gap-1">
+                                                <Input
+                                                    value={video.title}
+                                                    onChange={e => updateNewVideo(index, 'title', e.target.value)}
+                                                    className="h-8 text-xs w-1/3"
+                                                    placeholder="タイトル"
+                                                />
+                                                <Input
+                                                    value={video.url}
+                                                    onChange={e => updateNewVideo(index, 'url', e.target.value)}
+                                                    className="h-8 text-xs flex-1"
+                                                    placeholder="URL"
+                                                />
+                                                <Button
+                                                    type="button"
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    className="h-8 w-8 text-muted-foreground hover:text-red-500"
+                                                    onClick={() => removeNewVideo(index)}
+                                                >
+                                                    <X className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                            <DialogFooter>
+                                <Button variant="ghost" onClick={() => setIsCreateDialogOpen(false)}>キャンセル</Button>
+                                <Button onClick={handleCreate} disabled={!newName.trim()}>作成</Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
                 </div>
             </div>
 

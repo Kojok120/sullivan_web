@@ -14,6 +14,8 @@ export async function fetchSubjects(options?: { includeCoreProblems?: boolean })
                     order: true,
                     createdAt: true,
                     updatedAt: true,
+                    subjectId: true,
+                    lectureVideos: true,
                 }
             } : undefined
         }

@@ -1203,6 +1203,12 @@ export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: strin
             if (currentIndex !== -1 && currentIndex < subjectCps.length - 1) {
                 const nextCp = subjectCps[currentIndex + 1];
 
+                // 講義動画を取得するためにCoreProblemの詳細を取得
+                const nextCpDetails = await prisma.coreProblem.findUnique({
+                    where: { id: nextCp.id },
+                    select: { lectureVideos: true }
+                });
+
                 // Unlock Next CP
                 await prisma.userCoreProblemState.upsert({
                     where: {
@@ -1221,7 +1227,26 @@ export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: strin
                         isUnlocked: true
                     }
                 });
-                console.log(`Unlocked CoreProblem ${nextCp.name} for user ${userId}`);
+                console.log(`Unlocked CoreProblem ${nextCp.name} for user ${userId}. Preparing to emit event...`);
+
+                // 講義動画情報の確認ログ
+                console.log(`  -> LectureVideos found: ${nextCpDetails?.lectureVideos ? 'YES' : 'NO'}`);
+
+                // アンロック通知イベントを発行
+                try {
+                    await emitRealtimeEvent({
+                        userId,
+                        type: 'core_problem_unlocked',
+                        payload: {
+                            coreProblemId: nextCp.id,
+                            coreProblemName: nextCp.name,
+                            lectureVideos: nextCpDetails?.lectureVideos || null
+                        }
+                    });
+                    console.log(`Emitted core_problem_unlocked event for user ${userId}, CP ${nextCp.name}, Payload size: ${JSON.stringify(nextCpDetails?.lectureVideos).length}`);
+                } catch (e) {
+                    console.error('[Realtime] Failed to emit core_problem_unlocked event:', e);
+                }
             } else {
                 console.log(`  -> No next CP found (or is last).`);
             }

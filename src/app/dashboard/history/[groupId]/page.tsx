@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { ArrowLeft, PlayCircle, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VideoPlayerDialog } from "@/components/video-player-dialog"; // Client component we need to make
+import { LectureVideoButton } from "@/components/lecture-video-button";
 
 export default async function SessionDetailsPage({ params }: { params: Promise<{ groupId: string }> }) {
     const session = await getSession();
@@ -54,6 +55,11 @@ export default async function SessionDetailsPage({ params }: { params: Promise<{
                     const isCorrect = item.evaluation === 'A' || item.evaluation === 'B';
                     const videoUrl = item.problem.videoUrl;
 
+                    // CoreProblemの講義動画（最初のCoreProblemから取得）
+                    const coreProblem = item.problem.coreProblems[0];
+                    const lectureVideos = (coreProblem?.lectureVideos as { title: string; url: string }[] | null) || [];
+                    const coreProblemName = coreProblem?.name || '単元不明';
+
                     return (
                         <Card key={item.id} className={!isCorrect ? "border-l-4 border-l-red-500" : ""}>
                             <CardHeader className="flex flex-row items-start justify-between pb-2">
@@ -97,18 +103,28 @@ export default async function SessionDetailsPage({ params }: { params: Promise<{
                                     </p>
                                 </div>
 
-                                {/* Video Action */}
-                                {videoUrl && (
-                                    <div className="flex justify-end pt-2">
-                                        <VideoPlayerDialog
-                                            videoUrl={videoUrl}
-                                            historyId={item.id}
-                                            isWatched={item.isVideoWatched}
-                                            isRequired={!isCorrect}
-                                            playlist={!isCorrect ? requiredVideos : undefined}
-                                        />
+                                {/* Video Actions - 講義動画（左）と復習動画（右）*/}
+                                <div className="flex justify-between items-center pt-2">
+                                    <div>
+                                        {lectureVideos.length > 0 && (
+                                            <LectureVideoButton
+                                                videos={lectureVideos}
+                                                coreProblemName={coreProblemName}
+                                            />
+                                        )}
                                     </div>
-                                )}
+                                    <div>
+                                        {videoUrl && (
+                                            <VideoPlayerDialog
+                                                videoUrl={videoUrl}
+                                                historyId={item.id}
+                                                isWatched={item.isVideoWatched}
+                                                isRequired={!isCorrect}
+                                                playlist={!isCorrect ? requiredVideos : undefined}
+                                            />
+                                        )}
+                                    </div>
+                                </div>
                             </CardContent>
                         </Card>
                     );
@@ -117,3 +133,4 @@ export default async function SessionDetailsPage({ params }: { params: Promise<{
         </div>
     );
 }
+

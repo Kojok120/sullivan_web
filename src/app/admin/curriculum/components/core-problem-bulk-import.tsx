@@ -5,9 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Check } from 'lucide-react';
+import { Loader2, Check, Video } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { bulkCreateCoreProblems } from '../actions';
+import { bulkCreateCoreProblems, type LectureVideo } from '../actions';
 import { toast } from 'sonner';
 
 interface CoreProblemBulkImportProps {
@@ -16,6 +16,7 @@ interface CoreProblemBulkImportProps {
 
 interface ParsedItem {
     name: string;
+    lectureVideos: LectureVideo[];
     isValid: boolean;
 }
 
@@ -30,14 +31,35 @@ export function CoreProblemBulkImport({ subjectId }: CoreProblemBulkImportProps)
         if (!rawText.trim()) return;
 
         const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
-        const uniqueNames = Array.from(new Set(lines)); // Client-side unique check
 
-        const items: ParsedItem[] = uniqueNames.map(name => ({
-            name,
-            isValid: true, // Names are generally valid if not empty
-        }));
+        // TSV形式をパース: 名前[TAB]タイトル1[TAB]URL1[TAB]タイトル2[TAB]URL2...
+        const items: ParsedItem[] = lines.map(line => {
+            const parts = line.split('\t');
+            const name = parts[0]?.trim() || '';
 
-        setParsedData(items);
+            // タイトルとURLのペアをパース
+            const lectureVideos: LectureVideo[] = [];
+            for (let i = 1; i < parts.length; i += 2) {
+                const title = parts[i]?.trim();
+                const url = parts[i + 1]?.trim();
+                if (title && url) {
+                    lectureVideos.push({ title, url });
+                }
+            }
+
+            return {
+                name,
+                lectureVideos,
+                isValid: name.length > 0,
+            };
+        });
+
+        // 重複を除去（名前ベース）
+        const uniqueItems = items.filter((item, index, self) =>
+            index === self.findIndex(t => t.name === item.name)
+        );
+
+        setParsedData(uniqueItems.filter(i => i.isValid));
         setStep('preview');
     };
 
@@ -45,8 +67,11 @@ export function CoreProblemBulkImport({ subjectId }: CoreProblemBulkImportProps)
         if (parsedData.length === 0) return;
 
         startTransition(async () => {
-            const names = parsedData.map(d => d.name);
-            const result = await bulkCreateCoreProblems(subjectId, names);
+            const items = parsedData.map(d => ({
+                name: d.name,
+                lectureVideos: d.lectureVideos.length > 0 ? d.lectureVideos : undefined,
+            }));
+            const result = await bulkCreateCoreProblems(subjectId, items);
 
             if (result.success) {
                 if (result.warnings && result.warnings.length > 0) {
@@ -67,23 +92,25 @@ export function CoreProblemBulkImport({ subjectId }: CoreProblemBulkImportProps)
         });
     };
 
+    const totalVideoCount = parsedData.reduce((acc, d) => acc + d.lectureVideos.length, 0);
+
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
                 <Button variant="outline">一括登録</Button>
             </DialogTrigger>
-            <DialogContent className="max-w-xl">
+            <DialogContent className="max-w-3xl">
                 <DialogHeader>
                     <DialogTitle>CoreProblem一括登録</DialogTitle>
                     <DialogDescription>
-                        CoreProblem名を改行区切りで入力してください。
+                        TSV形式: 名前[TAB]動画タイトル1[TAB]動画URL1[TAB]動画タイトル2[TAB]動画URL2...
                     </DialogDescription>
                 </DialogHeader>
 
                 {step === 'input' && (
                     <div className="space-y-4">
                         <Textarea
-                            placeholder={`CoreProblem A\nCoreProblem B\nCoreProblem C`}
+                            placeholder={`現在完了形\t導入編\thttps://youtu.be/xxxxx\t演習編\thttps://youtu.be/yyyyy\n過去分詞\t基礎\thttps://youtu.be/zzzzz\n関係代名詞`}
                             className="h-64 font-mono text-sm whitespace-pre"
                             value={rawText}
                             onChange={(e) => setRawText(e.target.value)}
@@ -102,6 +129,7 @@ export function CoreProblemBulkImport({ subjectId }: CoreProblemBulkImportProps)
                                     <TableRow>
                                         <TableHead className="w-[50px]">状態</TableHead>
                                         <TableHead>CoreProblem名</TableHead>
+                                        <TableHead>講義動画</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -111,6 +139,20 @@ export function CoreProblemBulkImport({ subjectId }: CoreProblemBulkImportProps)
                                                 <Check className="w-4 h-4 text-green-500" />
                                             </TableCell>
                                             <TableCell>{item.name}</TableCell>
+                                            <TableCell className="max-w-[300px]">
+                                                {item.lectureVideos.length > 0 ? (
+                                                    <div className="space-y-1">
+                                                        {item.lectureVideos.map((v, j) => (
+                                                            <div key={j} className="flex items-center gap-1 text-xs text-blue-600">
+                                                                <Video className="w-3 h-3 flex-shrink-0" />
+                                                                <span className="truncate">{v.title}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-muted-foreground text-xs">なし</span>
+                                                )}
+                                            </TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
@@ -119,6 +161,7 @@ export function CoreProblemBulkImport({ subjectId }: CoreProblemBulkImportProps)
                         <Alert>
                             <AlertDescription>
                                 ※ 同名のCoreProblemが既に存在する場合はスキップされます。
+                                {totalVideoCount > 0 && ` 講義動画: 計${totalVideoCount}件`}
                             </AlertDescription>
                         </Alert>
                     </div>

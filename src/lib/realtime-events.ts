@@ -4,7 +4,8 @@ import { Prisma } from '@prisma/client';
 export type RealtimeEventType =
   | 'grading_completed'
   | 'grading_failed'
-  | 'gamification_update';
+  | 'gamification_update'
+  | 'core_problem_unlocked';
 
 type RealtimeEventInput = {
   userId: string;

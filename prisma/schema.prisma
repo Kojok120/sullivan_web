@@ -19,15 +19,16 @@ model Subject {
 }
 
 model CoreProblem {
-  id             String                 @id @default(cuid())
-  name           String
-  subjectId      String
-  subject        Subject                @relation(fields: [subjectId], references: [id])
-  problems       Problem[]
-  userStates     UserCoreProblemState[]
-  order          Int
-  createdAt      DateTime               @default(now())
-  updatedAt      DateTime               @updatedAt
+  id              String                 @id @default(cuid())
+  name            String
+  subjectId       String
+  subject         Subject                @relation(fields: [subjectId], references: [id])
+  problems        Problem[]
+  userStates      UserCoreProblemState[]
+  order           Int
+  lectureVideos   Json?                  // 講義動画 [{ title: string, url: string }]
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
 }
 
 model Problem {

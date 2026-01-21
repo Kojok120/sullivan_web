@@ -7,6 +7,7 @@ import { SubjectPrintButtons } from "@/components/print/subject-print-buttons";
 import { StampOverlay } from "@/components/grading/stamp-overlay";
 import { AchievementOverlay } from "@/components/gamification/achievement-overlay";
 import { LevelUpOverlay } from "@/components/gamification/level-up-overlay";
+import { CoreProblemUnlockOverlay } from "@/components/gamification/core-problem-unlock-overlay";
 
 export default async function Home() {
     const session = await getSession();
@@ -20,6 +21,7 @@ export default async function Home() {
                 <StampOverlay />
                 <AchievementOverlay />
                 <LevelUpOverlay />
+                <CoreProblemUnlockOverlay />
                 <h1 className="text-3xl font-bold text-foreground tracking-tight mb-2">
                     ホーム
                 </h1>
