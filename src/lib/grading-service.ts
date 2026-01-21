@@ -475,6 +475,95 @@ type GradingResult = {
     userAnswer: string;
 };
 
+// Validation types for grading response
+type GradingValidationResult = {
+    isValid: boolean;
+    errors: string[];
+    validatedResults: GradingResult[];
+};
+
+// Problem type for grading context (subset of Prisma Problem)
+type ProblemForGrading = {
+    id: string;
+    customId: string | null;
+    question: string;
+    answer: string | null;
+    acceptedAnswers: string[];
+    coreProblems: { id: string; name: string }[];
+};
+
+/**
+ * Validates Gemini's grading response and converts index-based results to problemId-based results.
+ * This ensures that the response matches the expected structure and all indices are valid.
+ */
+function validateGradingResponse(
+    resultsJson: any[],
+    problems: ProblemForGrading[],
+    userId: string
+): GradingValidationResult {
+    const errors: string[] = [];
+    const validatedResults: GradingResult[] = [];
+    const expectedCount = problems.length;
+
+    // 1. Check if response is an array
+    if (!Array.isArray(resultsJson)) {
+        return { isValid: false, errors: ["Response is not an array"], validatedResults: [] };
+    }
+
+    // 2. Check result count
+    if (resultsJson.length !== expectedCount) {
+        errors.push(`Expected ${expectedCount} results, got ${resultsJson.length}`);
+    }
+
+    // 3. Validate each result and check for duplicates
+    const seenIndices = new Set<number>();
+
+    for (const r of resultsJson) {
+        const idx = r.problemIndex;
+
+        // Index range check
+        if (typeof idx !== 'number' || idx < 0 || idx >= expectedCount) {
+            errors.push(`Invalid problemIndex: ${idx} (expected 0-${expectedCount - 1})`);
+            continue;
+        }
+
+        // Duplicate check
+        if (seenIndices.has(idx)) {
+            errors.push(`Duplicate problemIndex: ${idx}`);
+            continue;
+        }
+        seenIndices.add(idx);
+
+        // Evaluation value check
+        if (!['A', 'B', 'C', 'D'].includes(r.evaluation)) {
+            errors.push(`Invalid evaluation for index ${idx}: ${r.evaluation}`);
+            continue;
+        }
+
+        // Convert index to actual problem ID
+        const problem = problems[idx];
+        validatedResults.push({
+            studentId: userId,
+            problemId: problem.id,  // Convert index to actual problemId
+            userAnswer: r.studentAnswer || "(空欄)",
+            evaluation: r.evaluation,
+            isCorrect: r.evaluation === 'A' || r.evaluation === 'B',
+            feedback: r.feedback || "",
+            badCoreProblemIds: []  // Not used in new schema for simplicity
+        });
+    }
+
+    // 4. Check for missing indices
+    for (let i = 0; i < expectedCount; i++) {
+        if (!seenIndices.has(i)) {
+            errors.push(`Missing problemIndex: ${i}`);
+        }
+    }
+
+    const isValid = errors.length === 0 && validatedResults.length === expectedCount;
+    return { isValid, errors, validatedResults };
+}
+
 // Local QR Reader using Python OpenCV via child_process
 import { spawn } from 'child_process';
 
@@ -522,7 +611,11 @@ async function readQRCodeLocally(filePath: string): Promise<QRData | null> {
         }
 
         try {
-            const json = JSON.parse(trimmed) as QRData;
+            const json = normalizeQrData(JSON.parse(trimmed));
+            if (!json) {
+                console.warn("Python returned invalid QR data:", trimmed);
+                return null;
+            }
             console.log("Local QR Read Success (Python OpenCV):", json);
             return json;
         } catch (e) {
@@ -569,8 +662,11 @@ async function extractQrDataFromFile(filePath: string, prepared: PreparedFile): 
         console.log("Skipping local QR read for PDF file.");
     }
 
-    if (!getStudentIdFromQr(qrData)) {
-        console.log("Local QR read failed/skipped. Attempting to scan QR with Gemini...");
+    const hasStudentId = !!getStudentIdFromQr(qrData);
+    const hasProblems = qrData ? expandProblemIds(qrData).length > 0 : false;
+
+    if (!hasStudentId || !hasProblems) {
+        console.log("Local QR read failed/skipped or incomplete. Attempting to scan QR with Gemini...");
         const modelName = process.env.GEMINI_MODEL || "gemini-2.5-pro";
         const model = getGenAI().getGenerativeModel({ model: modelName });
         qrData = await scanQRWithGemini(model, prepared.base64Data, prepared.mimeType);
@@ -589,116 +685,179 @@ async function resolveUserFromQr(qrData: QRData) {
     });
 }
 
-async function gradeWithGemini(prepared: PreparedFile, qrData: QRData, userId: string): Promise<GradingResult[] | null> {
-    try {
-        const modelName = process.env.GEMINI_MODEL || "gemini-2.5-pro";
-        console.log("Using Gemini Model:", modelName);
-        const model = getGenAI().getGenerativeModel({ model: modelName });
-        const studentId = getStudentIdFromQr(qrData) || 'unknown';
+async function gradeWithGemini(
+    prepared: PreparedFile,
+    qrData: QRData,
+    userId: string,
+    maxRetries: number = 2
+): Promise<GradingResult[] | null> {
+    const modelName = process.env.GEMINI_MODEL || "gemini-2.5-pro";
+    console.log("Using Gemini Model:", modelName);
 
-        // 1. Fetch Full Problem Context from DB
-        const extractedPids = expandProblemIds(qrData);
-        const uniquePids = Array.from(new Set(extractedPids));
+    // 1. Fetch Full Problem Context from DB
+    const extractedPids = expandProblemIds(qrData);
+    const uniquePids = Array.from(new Set(extractedPids));
 
-        console.log(`Fetching problems from DB for IDs: ${uniquePids.join(', ')}`);
-        const problems = await prisma.problem.findMany({
-            where: {
-                OR: [
-                    { id: { in: uniquePids as string[] } },
-                    { customId: { in: uniquePids as string[] } }
-                ]
-            },
-            include: { coreProblems: true } // Include CoreProblems for context
-        });
+    console.log(`Fetching problems from DB for IDs: ${uniquePids.join(', ')}`);
+    const problems = await prisma.problem.findMany({
+        where: {
+            OR: [
+                { id: { in: uniquePids as string[] } },
+                { customId: { in: uniquePids as string[] } }
+            ]
+        },
+        include: { coreProblems: true }
+    });
 
-        // SORTING FIX: Sort problems to match the order in uniquePids (QR order)
-        problems.sort((a, b) => {
-            const indexA = uniquePids.findIndex((pid: any) => pid === a.id || pid === a.customId);
-            const indexB = uniquePids.findIndex((pid: any) => pid === b.id || pid === b.customId);
-            return indexA - indexB;
-        });
+    // Sort problems to match the order in uniquePids (QR order)
+    problems.sort((a, b) => {
+        const indexA = uniquePids.findIndex((pid: any) => pid === a.id || pid === a.customId);
+        const indexB = uniquePids.findIndex((pid: any) => pid === b.id || pid === b.customId);
+        return indexA - indexB;
+    });
 
-        console.log(`Fetched and sorted ${problems.length} problems from DB.`);
+    console.log(`Fetched and sorted ${problems.length} problems from DB.`);
 
-        if (problems.length === 0) {
-            console.error("No problems found in DB for IDs:", uniquePids);
-            return null;
-        }
-
-        const problemContexts = problems.map(p => ({
-            id: p.id,
-            question: p.question,
-            correctAnswer: p.answer,
-            acceptedAnswers: p.acceptedAnswers,
-            coreProblems: p.coreProblems.map(cp => ({ id: cp.id, name: cp.name }))
-        }));
-
-        // 2. Construct Prompt with FULL Context
-        const gradingPrompt = `
-        You are an expert teacher grading a student's answer sheet.
-        
-        **Student ID**: ${studentId}
-        
-        **Task**:
-        1.  Analyze the image/document of the answer sheet.
-        2.  Identify the student's handwritten answer for EACH of the following problems.
-        3.  Grade each answer based on the provided "Correct Answer" and "Accepted Answers".
-            - If "Correct Answer" is null or empty, evaluate the student's answer based on the "Question" content and your general knowledge.
-        4.  Provide a specific, helpful feedback in Japanese.
-        5.  **CRITICAL**: If the student is INCORRECT (C or D), you MUST identify the root cause from the provided "Related CoreProblems". Select the CoreProblem ID that best explains the student's misunderstanding.
-
-        **Problem List** (Use this strictly):
-        ${JSON.stringify(problemContexts, null, 2)}
-
-        **Output Format**:
-        Return ONLY a JSON array of objects. Do not include markdown formatting like \`\`\`json.
-        [
-            {
-                "problemId": "problem_id_from_list",
-                "studentAnswer": "transcribed_text",
-                "evaluation": "A" | "B" | "C" | "D",
-                "feedback": "Japanese feedback text",
-                "badCoreProblemIds": ["core_problem_id_cause"] (Empty if correct)
-            },
-            ...
-        ]
-        `;
-
-        console.log("Calling Gemini generateContent for grading...");
-        const result = await model.generateContent([
-            gradingPrompt,
-            {
-                inlineData: {
-                    data: prepared.base64Data,
-                    mimeType: prepared.mimeType
-                }
-            }
-        ]);
-
-        const text = result.response.text();
-        console.log("Gemini Grading Response:", text);
-
-        const resultsJson = parseJSON(text);
-
-        if (!Array.isArray(resultsJson)) {
-            console.error("Gemini returned invalid JSON structure", text);
-            return null;
-        }
-
-        return resultsJson.map((r: any) => ({
-            studentId: userId,
-            problemId: r.problemId,
-            userAnswer: r.studentAnswer || "(空欄)",
-            evaluation: r.evaluation,
-            isCorrect: r.evaluation === 'A' || r.evaluation === 'B',
-            feedback: r.feedback,
-            badCoreProblemIds: r.badCoreProblemIds || []
-        }));
-
-    } catch (error) {
-        console.error("Gemini Grading Error:", error);
+    if (problems.length === 0) {
+        console.error("No problems found in DB for IDs:", uniquePids);
         return null;
     }
+
+    // Convert to ProblemForGrading type
+    const problemsForGrading: ProblemForGrading[] = problems.map(p => ({
+        id: p.id,
+        customId: p.customId,
+        question: p.question,
+        answer: p.answer,
+        acceptedAnswers: p.acceptedAnswers,
+        coreProblems: p.coreProblems.map(cp => ({ id: cp.id, name: cp.name }))
+    }));
+
+    // 2. Build problem contexts with INDEX instead of ID
+    const problemContexts = problemsForGrading.map((p, index) => ({
+        index: index,
+        displayId: p.customId || `Q${index + 1}`,
+        question: p.question,
+        correctAnswer: p.answer,
+        acceptedAnswers: p.acceptedAnswers,
+    }));
+
+    // 3. Define responseSchema for structured output
+    const gradingResponseSchema = {
+        type: "array" as const,
+        items: {
+            type: "object" as const,
+            properties: {
+                problemIndex: {
+                    type: "integer" as const,
+                    description: "問題のインデックス（0始まり、問題リストの順序に対応）"
+                },
+                studentAnswer: {
+                    type: "string" as const,
+                    description: "生徒の解答をそのまま転記"
+                },
+                evaluation: {
+                    type: "string" as const,
+                    enum: ["A", "B", "C", "D"],
+                    description: "A=完璧, B=ほぼ正解, C=部分的に正解, D=不正解"
+                },
+                feedback: {
+                    type: "string" as const,
+                    description: "日本語でのフィードバック"
+                }
+            },
+            required: ["problemIndex", "studentAnswer", "evaluation", "feedback"]
+        }
+    };
+
+    // 4. Create model with structured output configuration
+    const model = getGenAI().getGenerativeModel({
+        model: modelName,
+        generationConfig: {
+            responseMimeType: "application/json",
+            responseSchema: gradingResponseSchema
+        } as any  // Type assertion needed for responseSchema
+    });
+
+    // 5. Build enhanced prompt
+    const gradingPrompt = `
+あなたは英語教師として、生徒の解答用紙を採点してください。
+
+## 重要な指示
+
+1. 画像/PDFを分析し、生徒の手書き解答を読み取ってください
+2. 以下の問題リストは、解答用紙に記載された問題と **同じ順序** で並んでいます
+3. 解答用紙の1番目の解答は problemIndex=0 に対応します
+4. 各解答を対応する問題の正解と照らし合わせて採点してください
+5. **必ず** ${problemContexts.length}件の結果を返してください
+
+## 採点基準
+
+- **A**: 完璧な解答
+- **B**: 軽微なミス（大文字小文字、ピリオドなど）があるがほぼ正解
+- **C**: 部分的に正しいが重要な間違いがある
+- **D**: 不正解または空欄
+
+## 問題リスト（順序厳守、${problemContexts.length}問）
+
+${JSON.stringify(problemContexts, null, 2)}
+
+## 出力ルール
+
+- problemIndex は 0 から ${problemContexts.length - 1} までの整数を使用
+- feedback は必ず日本語で、具体的で励みになる内容にしてください
+- 空欄の場合は studentAnswer に "(空欄)" と記載
+- すべての問題に対して結果を返してください
+`;
+
+    // 6. Retry loop
+    let lastErrors: string[] = [];
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            if (attempt > 0) {
+                console.log(`Grading retry attempt ${attempt}/${maxRetries}`);
+                // Wait before retry to avoid rate limiting
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+
+            console.log(`Calling Gemini generateContent for grading (attempt ${attempt})...`);
+            const result = await model.generateContent([
+                gradingPrompt,
+                {
+                    inlineData: {
+                        data: prepared.base64Data,
+                        mimeType: prepared.mimeType
+                    }
+                }
+            ]);
+
+            const text = result.response.text();
+            console.log(`Gemini Grading Response (attempt ${attempt}):`, text);
+
+            const resultsJson = parseJSON(text);
+
+            // Validate response using the new validation function
+            const validation = validateGradingResponse(resultsJson, problemsForGrading, userId);
+
+            if (validation.isValid) {
+                console.log(`Grading validated successfully on attempt ${attempt}`);
+                return validation.validatedResults;
+            }
+
+            // Validation failed
+            lastErrors = validation.errors;
+            console.warn(`Grading validation failed (attempt ${attempt}):`, validation.errors);
+
+        } catch (error) {
+            console.error(`Grading attempt ${attempt} failed with error:`, error);
+            lastErrors = [String(error)];
+        }
+    }
+
+    // All retries failed
+    console.error(`All ${maxRetries + 1} grading attempts failed. Last errors:`, lastErrors);
+    return null;
 }
 
 // Helper: Scan QR with Gemini
@@ -714,11 +873,12 @@ async function scanQRWithGemini(model: any, base64Data: string, mimeType: string
             "s": "student_login_id",
             "c": "E|1-3,5" // Compressed format (prefix|ranges)
             // OR full list:
-            "p": "E-1,E-2,E-3"
+            "p": "E-1,E-2,E-3" // Comma-separated string, NOT an array
         }
 
         IMPORTANT:
         - The "s" is the student Login ID (e.g. "S0001").
+        - If you include "p", return it as a comma-separated string (not a JSON array).
         
         Return ONLY the JSON object found in the QR code. Do not fabricate data.
         `;
@@ -735,12 +895,59 @@ async function scanQRWithGemini(model: any, base64Data: string, mimeType: string
         ]);
         const text = result.response.text();
         console.log("Gemini QR Scan Response:", text);
-        return parseJSON(text);
+        const parsed = parseJSON(text);
+        return normalizeQrData(parsed);
 
     } catch (e) {
         console.error("Gemini QR Scan Error:", e);
         return null;
     }
+}
+
+function normalizeQrData(raw: any): QRData | null {
+    if (!raw || typeof raw !== 'object') return null;
+
+    const normalized: QRData = {};
+
+    if (raw.s !== undefined && raw.s !== null) {
+        normalized.s = String(raw.s).trim();
+    }
+
+    if (raw.c !== undefined && raw.c !== null) {
+        normalized.c = String(raw.c).trim();
+    }
+
+    if (raw.p !== undefined && raw.p !== null) {
+        if (Array.isArray(raw.p)) {
+            const list = raw.p.map((id: any) => String(id).trim()).filter(Boolean);
+            if (list.length > 0) {
+                normalized.p = list.join(',');
+            }
+        } else if (typeof raw.p === 'string') {
+            const trimmed = raw.p.trim();
+            let parsedArray = false;
+            if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+                try {
+                    const parsed = JSON.parse(trimmed);
+                    if (Array.isArray(parsed)) {
+                        parsedArray = true;
+                        const list = parsed.map((id: any) => String(id).trim()).filter(Boolean);
+                        if (list.length > 0) {
+                            normalized.p = list.join(',');
+                        }
+                    }
+                } catch {
+                    // Fall back to raw string when JSON parsing fails.
+                }
+            }
+            if (!normalized.p && !parsedArray) {
+                normalized.p = trimmed;
+            }
+        }
+    }
+
+    if (!normalized.s && !normalized.p && !normalized.c) return null;
+    return normalized;
 }
 
 function parseJSON(text: string): any {

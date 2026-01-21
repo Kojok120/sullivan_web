@@ -1,7 +1,7 @@
 
 export type QRData = {
     s?: string; // Student ID (LoginID)
-    p?: string; // Comma-separated full IDs
+    p?: string | string[]; // Comma-separated full IDs or array of IDs
     c?: string; // Compressed format: "<prefix>|<ranges>"
 };
 
@@ -40,7 +40,14 @@ export function compressProblemIds(ids: string[]): Partial<QRData> {
 
 export function expandProblemIds(data: QRData): string[] {
     if (data.p) {
-        return data.p.split(',').map((id) => id.trim()).filter(Boolean);
+        // Handle both string and array formats (Gemini may return either)
+        if (Array.isArray(data.p)) {
+            return data.p.map((id: string) => String(id).trim()).filter(Boolean);
+        }
+        if (typeof data.p === 'string') {
+            return data.p.split(',').map((id: string) => id.trim()).filter(Boolean);
+        }
+        return [];
     }
 
     if (data.c) {

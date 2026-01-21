@@ -405,13 +405,14 @@ export async function getLearningSessions(userId: string, limit = 10, offset = 0
                 WHEN lh.evaluation IN ('C', 'D') 
                 AND lh."isVideoWatched" = false 
                 AND p."videoUrl" IS NOT NULL 
+                AND p."videoUrl" != ''
                 THEN lh.id 
             END) as "unwatchedMistakeCount"
         FROM "LearningHistory" lh
         JOIN "Problem" p ON lh."problemId" = p.id
         WHERE lh."userId" = ${userId} AND lh."groupId" IS NOT NULL
         GROUP BY lh."groupId"
-        ${onlyUnreviewed ? Prisma.sql`HAVING COUNT(DISTINCT CASE WHEN lh.evaluation IN ('C', 'D') AND lh."isVideoWatched" = false AND p."videoUrl" IS NOT NULL THEN lh.id END) > 0` : Prisma.empty}
+        ${onlyUnreviewed ? Prisma.sql`HAVING COUNT(DISTINCT CASE WHEN lh.evaluation IN ('C', 'D') AND lh."isVideoWatched" = false AND p."videoUrl" IS NOT NULL AND p."videoUrl" != '' THEN lh.id END) > 0` : Prisma.empty}
         ORDER BY "date" DESC
         LIMIT ${limit}
         OFFSET ${offset}
@@ -552,7 +553,7 @@ export async function getUnwatchedCount(userId: string): Promise<number> {
             isVideoWatched: false,
             evaluation: { in: ['C', 'D'] }, // Only count incorrect ones
             problem: {
-                videoUrl: { not: null } // Only if video exists
+                videoUrl: { not: null, notIn: [''] } // Only if video exists (not null and not empty)
             }
         }
     });

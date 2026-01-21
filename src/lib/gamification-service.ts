@@ -269,6 +269,7 @@ async function checkAchievements(tx: any, userId: string, currentStreak: number,
                                 WHEN lh.evaluation IN ('C', 'D') 
                                 AND lh."isVideoWatched" = false 
                                 AND p."videoUrl" IS NOT NULL 
+                                AND p."videoUrl" != ''
                                 THEN 1 
                             END) = 0
                     ) as completed_sessions

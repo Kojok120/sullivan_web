@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import YouTube from "react-youtube";
 import {
@@ -52,6 +52,11 @@ export function VideoPlayerDialog({
     const [watched, setWatched] = useState(initialIsWatched);
     const [loading, setLoading] = useState(false);
     const router = useRouter();
+
+    // Sync watched state when prop changes (e.g., after router.refresh())
+    useEffect(() => {
+        setWatched(initialIsWatched);
+    }, [initialIsWatched]);
 
     // Reset index when opening specific video
     const handleOpenChange = (newOpen: boolean) => {
