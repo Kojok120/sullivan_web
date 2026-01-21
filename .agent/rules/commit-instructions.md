@@ -1,5 +1,6 @@
 ---
-trigger: always_on
+trigger: model_decision
+description: when committing
 ---
 
 # コミットメッセージ作成ガイド
@@ -75,4 +76,3 @@ BREAKING CHANGE: レスポンスの構造が変わったため、クライアン
 - **絵文字**: 使用しない
 - **句点**: ヘッダー(1 行目)の末尾に句点(。)を付けない
 - **文体**: 簡潔に記述する(「〜を追加」「〜を修正」など)
-
