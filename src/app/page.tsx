@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { SessionList } from "./dashboard/components/session-list";
 import { getSubjectProgress } from "@/lib/analytics";
 import { History } from "lucide-react";
-import { StudentPrintDialog } from "@/components/print/student-print-dialog";
+import { SubjectPrintButtons } from "@/components/print/subject-print-buttons";
 import { StampOverlay } from "@/components/grading/stamp-overlay";
 import { AchievementOverlay } from "@/components/gamification/achievement-overlay";
 import { LevelUpOverlay } from "@/components/gamification/level-up-overlay";
@@ -28,8 +28,8 @@ export default async function Home() {
                 </p>
             </header>
 
-            <section className="mb-8 flex justify-end">
-                <StudentPrintDialog subjects={subjectProgress} />
+            <section className="mb-8">
+                <SubjectPrintButtons subjects={subjectProgress} />
             </section>
 
             <section>
