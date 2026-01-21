@@ -47,7 +47,7 @@ export function ProblemManager({
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isBulkDialogOpen, setIsBulkDialogOpen] = useState(false);
 
-    const updateParams = (updates: Record<string, string | undefined>) => {
+    const buildParams = (updates: Record<string, string | undefined>) => {
         const params = new URLSearchParams(searchParams.toString());
 
         Object.entries(updates).forEach(([key, value]) => {
@@ -58,20 +58,16 @@ export function ProblemManager({
             }
         });
 
+        return params;
+    };
+
+    const updateParams = (updates: Record<string, string | undefined>) => {
+        const params = buildParams(updates);
         router.push(`/admin/problems?${params.toString()}`);
     };
 
     const buildHref = (updates: Record<string, string | undefined>) => {
-        const params = new URLSearchParams(searchParams.toString());
-
-        Object.entries(updates).forEach(([key, value]) => {
-            if (value === undefined || value === '') {
-                params.delete(key);
-            } else {
-                params.set(key, value);
-            }
-        });
-
+        const params = buildParams(updates);
         return `/admin/problems?${params.toString()}`;
     };
 

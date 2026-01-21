@@ -6,13 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { X, Loader2 } from 'lucide-react';
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Loader2 } from 'lucide-react';
 import { Problem } from '@prisma/client';
 import { createStandaloneProblem, updateStandaloneProblem } from '../actions';
-import { getSubjects } from '../../curriculum/actions';
 import { toast } from 'sonner';
+import { CoreProblemSelector, SelectedCoreProblem } from './core-problem-selector';
 
 interface ProblemWithRelations extends Problem {
     coreProblems: {
@@ -36,19 +34,10 @@ export function ProblemDialog({ open, onOpenChange, problem, onSuccess }: Proble
     const [answer, setAnswer] = useState('');
     const [grade, setGrade] = useState('');
     const [videoUrl, setVideoUrl] = useState('');
-    const [coreProblems, setCoreProblems] = useState<{ id: string, name?: string, subject?: { name: string } }[]>([]);
-
-    const [subjects, setSubjects] = useState<{ id: string, name: string, coreProblems: { id: string, name: string }[] }[]>([]);
+    const [coreProblems, setCoreProblems] = useState<SelectedCoreProblem[]>([]);
 
     useEffect(() => {
         if (open) {
-            // Fetch subjects for the dropdown
-            getSubjects().then(res => {
-                if (res.success && res.subjects) {
-                    setSubjects(res.subjects);
-                }
-            });
-
             if (problem) {
                 setQuestion(problem.question);
                 setAnswer(problem.answer || '');
@@ -91,16 +80,6 @@ export function ProblemDialog({ open, onOpenChange, problem, onSuccess }: Proble
     };
 
 
-
-    const addCoreProblem = (cp: { id: string, name: string, subject: { name: string } }) => {
-        if (!coreProblems.find(existing => existing.id === cp.id)) {
-            setCoreProblems([...coreProblems, cp]);
-        }
-    };
-
-    const removeCoreProblem = (id: string) => {
-        setCoreProblems(coreProblems.filter(cp => cp.id !== id));
-    };
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -155,67 +134,11 @@ export function ProblemDialog({ open, onOpenChange, problem, onSuccess }: Proble
                     {/* Core Problem Association Section */}
                     <div className="space-y-3 pt-4 border-t">
                         <Label>紐付け（コア問題・単元）</Label>
-
-                        {/* Selected List */}
-                        <div className="flex flex-wrap gap-2 mb-2 p-3 border rounded-md min-h-[50px] bg-muted/10">
-                            {coreProblems.length === 0 && <span className="text-muted-foreground text-sm py-1">紐付けなし</span>}
-                            {coreProblems.map(cp => (
-                                <Badge key={cp.id} variant="secondary" className="flex items-center gap-1 pl-2 pr-1 py-1">
-                                    <span>{cp.subject?.name || '??'} &gt; {cp.name || 'Unknown'}</span>
-                                    <button
-                                        type="button"
-                                        onClick={() => removeCoreProblem(cp.id)}
-                                        className="rounded-full hover:bg-destructive hover:text-destructive-foreground p-0.5"
-                                    >
-                                        <X className="w-3 h-3" />
-                                    </button>
-                                </Badge>
-                            ))}
-                        </div>
-
-                        {/* Select Add */}
-                        <div className="flex gap-2">
-                            <Select
-                                onValueChange={(val) => {
-                                    // Find the selected cp
-                                    for (const subj of subjects) {
-                                        const found = subj.coreProblems.find(cp => cp.id === val);
-                                        if (found) {
-                                            addCoreProblem({ id: found.id, name: found.name, subject: { name: subj.name } });
-                                            break;
-                                        }
-                                    }
-                                }}
-                            >
-                                <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="単元・コア問題を選択して追加" />
-                                </SelectTrigger>
-                                <SelectContent className="max-h-[300px]">
-                                    {subjects.map((subject) => (
-                                        <SelectGroup key={subject.id}>
-                                            <SelectLabel className="sticky top-0 bg-background z-10">{subject.name}</SelectLabel>
-                                            {subject.coreProblems && subject.coreProblems.length > 0 ? (
-                                                subject.coreProblems.map((cp) => {
-                                                    const isSelected = coreProblems.some(existing => existing.id === cp.id);
-                                                    return (
-                                                        <SelectItem
-                                                            key={cp.id}
-                                                            value={cp.id}
-                                                            disabled={isSelected}
-                                                            className="pl-6"
-                                                        >
-                                                            {cp.name} {isSelected && '(追加済)'}
-                                                        </SelectItem>
-                                                    );
-                                                })
-                                            ) : (
-                                                <div className="p-2 text-xs text-muted-foreground pl-6">問題なし</div>
-                                            )}
-                                        </SelectGroup>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
+                        <CoreProblemSelector
+                            selected={coreProblems}
+                            onChange={setCoreProblems}
+                            active={open}
+                        />
                     </div>
 
                     <DialogFooter>

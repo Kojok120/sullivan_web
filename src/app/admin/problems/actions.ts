@@ -12,6 +12,53 @@ type ProblemFilters = {
     coreProblemId?: string;
 };
 
+function buildProblemWhere(filters: ProblemFilters, search?: string): Prisma.ProblemWhereInput {
+    const where: Prisma.ProblemWhereInput = {};
+
+    if (search) {
+        where.OR = [
+            { question: { contains: search, mode: 'insensitive' } },
+            { answer: { contains: search, mode: 'insensitive' } },
+            { customId: { contains: search, mode: 'insensitive' } },
+            {
+                coreProblems: {
+                    some: {
+                        name: { contains: search, mode: 'insensitive' }
+                    }
+                }
+            },
+        ];
+    }
+
+    if (filters.grade) {
+        where.grade = filters.grade;
+    }
+
+    const andConditions: Prisma.ProblemWhereInput[] = [];
+    if (filters.subjectId) {
+        andConditions.push({
+            coreProblems: { some: { subjectId: filters.subjectId } }
+        });
+    }
+    if (filters.coreProblemId) {
+        andConditions.push({
+            coreProblems: { some: { id: filters.coreProblemId } }
+        });
+    }
+    if (andConditions.length > 0) {
+        where.AND = andConditions;
+    }
+
+    return where;
+}
+
+function buildExactMatchWhere(filters: ProblemFilters, search: string): Prisma.ProblemWhereInput {
+    return {
+        ...buildProblemWhere(filters),
+        customId: { equals: search, mode: 'insensitive' }
+    };
+}
+
 function buildProblemWhereSql({
     search,
     filters,
@@ -86,42 +133,14 @@ export async function getProblems(
 ) {
     await requireAdmin();
     try {
-        const where: Prisma.ProblemWhereInput = {};
-
-        if (search) {
-            where.OR = [
-                { question: { contains: search, mode: 'insensitive' } },
-                { answer: { contains: search, mode: 'insensitive' } },
-                { customId: { contains: search, mode: 'insensitive' } },
-                {
-                    coreProblems: {
-                        some: {
-                            name: { contains: search, mode: 'insensitive' }
-                        }
-                    }
-                },
-            ];
-        }
-
-        if (filters.grade) {
-            where.grade = filters.grade;
-        }
-
-        const andConditions: Prisma.ProblemWhereInput[] = [];
-        if (filters.subjectId) {
-            andConditions.push({
-                coreProblems: { some: { subjectId: filters.subjectId } }
-            });
-        }
-        if (filters.coreProblemId) {
-            andConditions.push({
-                coreProblems: { some: { id: filters.coreProblemId } }
-            });
-        }
-        if (andConditions.length > 0) {
-            where.AND = andConditions;
-        }
-
+        const where = buildProblemWhere(filters, search);
+        const include: Prisma.ProblemInclude = {
+            coreProblems: {
+                include: {
+                    subject: true
+                }
+            }
+        };
 
         const skip = (page - 1) * limit;
         const isCustomIdSort = sortBy === 'customId';
@@ -135,13 +154,7 @@ export async function getProblems(
             if (ids.length === 0) return [];
             const problems = await prisma.problem.findMany({
                 where: { id: { in: ids } },
-                include: {
-                    coreProblems: {
-                        include: {
-                            subject: true
-                        }
-                    }
-                }
+                include
             });
             const problemMap = new Map(problems.map(p => [p.id, p]));
             return ids.map(id => problemMap.get(id)).filter(Boolean);
@@ -255,21 +268,8 @@ export async function getProblems(
             // Let's Find specific exact match ID(s).
 
             const exactMatchProblems = await prisma.problem.findMany({
-                where: {
-                    AND: [
-                        filters.grade ? { grade: filters.grade } : {},
-                        filters.subjectId ? { coreProblems: { some: { subjectId: filters.subjectId } } } : {},
-                        filters.coreProblemId ? { coreProblems: { some: { id: filters.coreProblemId } } } : {},
-                        { customId: { equals: search, mode: 'insensitive' } } // Strict equality
-                    ]
-                },
-                include: {
-                    coreProblems: {
-                        include: {
-                            subject: true
-                        }
-                    }
-                }
+                where: buildExactMatchWhere(filters, search),
+                include
             });
 
             const exactMatchIds = exactMatchProblems.map(p => p.id);
@@ -314,13 +314,7 @@ export async function getProblems(
                     } else {
                         partialMatches = await prisma.problem.findMany({
                             where: partialWhere,
-                            include: {
-                                coreProblems: {
-                                    include: {
-                                        subject: true
-                                    }
-                                }
-                            },
+                            include,
                             orderBy,
                             take: remainingLimit,
                             skip: 0
@@ -346,13 +340,7 @@ export async function getProblems(
                 } else {
                     partialMatches = await prisma.problem.findMany({
                         where: partialWhere,
-                        include: {
-                            coreProblems: {
-                                include: {
-                                    subject: true
-                                }
-                            },
-                        },
+                        include,
                         orderBy,
                         take: limit,
                         skip: effectiveSkip
@@ -380,13 +368,7 @@ export async function getProblems(
             const [problems, total] = await Promise.all([
                 prisma.problem.findMany({
                     where,
-                    include: {
-                        coreProblems: {
-                            include: {
-                                subject: true
-                            }
-                        }
-                    },
+                    include,
                     orderBy,
                     skip,
                     take: limit,
@@ -419,31 +401,6 @@ export async function getProblemById(id: string) {
     } catch (error) {
         console.error('Failed to fetch problem:', error);
         return { error: '問題の取得に失敗しました' };
-    }
-}
-
-export async function searchCoreProblems(query: string) {
-    await requireAdmin();
-    try {
-        const coreProblems = await prisma.coreProblem.findMany({
-            where: {
-                OR: [
-                    { name: { contains: query, mode: 'insensitive' } },
-                ]
-            },
-            include: {
-                subject: true
-            },
-            orderBy: [
-                { subject: { order: 'asc' } },
-                { order: 'asc' }
-            ],
-            take: 20
-        });
-        return { success: true, coreProblems };
-    } catch (error) {
-        console.error('Failed to search core problems:', error);
-        return { error: 'CoreProblemの検索に失敗しました' };
     }
 }
 

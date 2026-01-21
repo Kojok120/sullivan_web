@@ -3,9 +3,9 @@
 import { LearningSession } from '@/lib/analytics';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowRight, BookOpen, CheckCircle, AlertCircle, Filter } from 'lucide-react';
+import { ArrowRight, CheckCircle, AlertCircle, Filter } from 'lucide-react';
 import { Button } from "@/components/ui/button";
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { fetchMySessions, markSessionReviewed } from '@/app/actions';
 import { DateDisplay } from '@/components/ui/date-display';
 import { Badge } from "@/components/ui/badge";
@@ -36,15 +36,6 @@ export function SessionListClient({ initialSessions }: { initialSessions: Learni
         } finally {
             setLoading(false);
         }
-    }, []);
-
-    // Effect to trigger reload when filter changes
-    // We skip the first render if possible, but simpler to just call reload if state changes.
-    // However, initialSessions is "All". If user clicks toggle, we fetch.
-    useEffect(() => {
-        // Only fetch if strict mode mounting doesn't mess us up, 
-        // or just rely on the toggle handler?
-        // Let's use the toggle handler to be explicit and avoid double fetching on mount.
     }, []);
 
     const handleFilterChange = (checked: boolean) => {

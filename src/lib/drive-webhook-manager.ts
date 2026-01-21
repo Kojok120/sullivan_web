@@ -42,8 +42,7 @@ export async function watchDriveFolder(webhookUrl: string): Promise<{ resourceId
     };
 }
 
-// stopWatching removed as it was unused.
-// If needed for cleanup cron jobs in future, implement using Google Drive API directly.
+// stopWatching is used by the renewal flow to clean up existing channels.
 
 export async function stopWatching(channelId: string, resourceId: string): Promise<void> {
     const drive = getDrive();

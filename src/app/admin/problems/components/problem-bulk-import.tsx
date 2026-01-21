@@ -7,12 +7,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Check, AlertTriangle, Loader2, X, Search } from 'lucide-react';
+import { Check, AlertTriangle, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { searchCoreProblems, bulkCreateStandaloneProblems, bulkSearchCoreProblems } from '../actions';
+import { bulkCreateStandaloneProblems, bulkSearchCoreProblems } from '../actions';
 import { toast } from 'sonner';
 import { parseProblemTSV } from '@/lib/tsv-parser';
+import { CoreProblemSelector, SelectedCoreProblem } from './core-problem-selector';
 
 interface BulkImportDialogProps {
     open: boolean;
@@ -40,34 +40,11 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
     const [lastWarnings, setLastWarnings] = useState<string[]>([]);
     const [showWarningsDialog, setShowWarningsDialog] = useState(false);
 
-    // Core Problem Association Logic (Reused from ProblemDialog roughly)
-    const [coreProblems, setCoreProblems] = useState<{ id: string, name: string, subject: { name: string } }[]>([]);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [searchResults, setSearchResults] = useState<{ id: string, name: string, subject: { name: string } }[]>([]);
-    const [isSearching, setIsSearching] = useState(false);
+    // Shared CoreProblem selection
+    const [coreProblems, setCoreProblems] = useState<SelectedCoreProblem[]>([]);
 
     // Map of CoreProblem name -> CoreProblem data (auto-resolved)
     const [resolvedCoreProblems, setResolvedCoreProblems] = useState<Map<string, { id: string, name: string, subject: { name: string } }>>(new Map());
-
-    const handleSearch = async () => {
-        if (!searchQuery.trim()) return;
-        setIsSearching(true);
-        const { coreProblems: results } = await searchCoreProblems(searchQuery);
-        if (results) {
-            setSearchResults(results as any);
-        }
-        setIsSearching(false);
-    };
-
-    const addCoreProblem = (cp: { id: string, name: string, subject: { name: string } }) => {
-        if (!coreProblems.find(existing => existing.id === cp.id)) {
-            setCoreProblems([...coreProblems, cp]);
-        }
-    };
-
-    const removeCoreProblem = (id: string) => {
-        setCoreProblems(coreProblems.filter(cp => cp.id !== id));
-    };
 
     // parseTSV is now imported from @/lib/tsv-parser
 
@@ -220,7 +197,7 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
                             <div className="space-y-3 p-3 border rounded bg-muted/10">
                                 <Label>追加の紐付け設定 (一括)</Label>
                                 <div className="text-sm text-muted-foreground mb-2">
-                                    ペーストしたデータのCoreProblem列から自動で紐付けされます。追加で紐付けしたい場合は下で検索してください。
+                                    ペーストしたデータのCoreProblem列から自動で紐付けされます。追加で紐付けしたい場合は下で選択してください。
                                 </div>
 
                                 {/* Auto-resolved CoreProblems */}
@@ -237,45 +214,13 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
                                     </div>
                                 )}
 
-                                {/* CoreProblem Selection Logic */}
-                                <div className="flex flex-wrap gap-2 mb-2 p-2 bg-background border rounded min-h-[40px]">
-                                    {coreProblems.length === 0 && <span className="text-muted-foreground text-xs py-1">追加の紐付けなし</span>}
-                                    {coreProblems.map(cp => (
-                                        <Badge key={cp.id} variant="secondary" className="flex items-center gap-1">
-                                            <span>{cp.subject?.name} &gt; {cp.name}</span>
-                                            <button onClick={() => removeCoreProblem(cp.id)}><X className="w-3 h-3" /></button>
-                                        </Badge>
-                                    ))}
-                                </div>
-
-                                <div className="flex gap-2">
-                                    <Input
-                                        className="h-8 text-sm"
-                                        placeholder="コア問題を検索..."
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleSearch())}
-                                    />
-                                    <Button size="sm" variant="secondary" onClick={handleSearch} disabled={isSearching}>
-                                        <Search className="w-3 h-3" />
-                                    </Button>
-                                </div>
-                                {searchResults.length > 0 && searchQuery && (
-                                    <div className="border rounded-md p-2 max-h-32 overflow-y-auto bg-card">
-                                        {searchResults.map(cp => {
-                                            const isSelected = coreProblems.some(existing => existing.id === cp.id);
-                                            return (
-                                                <div
-                                                    key={cp.id}
-                                                    className={`text-xs p-1.5 rounded cursor-pointer hover:bg-accent ${isSelected ? 'opacity-50' : ''}`}
-                                                    onClick={() => !isSelected && addCoreProblem(cp)}
-                                                >
-                                                    {cp.subject?.name} &gt; {cp.name}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                )}
+                                <CoreProblemSelector
+                                    selected={coreProblems}
+                                    onChange={setCoreProblems}
+                                    active={open && step === 'preview'}
+                                    emptyText="追加の紐付けなし"
+                                    placeholder="単元・コア問題を選択して追加"
+                                />
                             </div>
 
                             <div className="border rounded-md flex-1 overflow-auto">

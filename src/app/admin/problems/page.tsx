@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import { getProblems, searchCoreProblems } from './actions';
+import { getProblems } from './actions';
 import { ProblemManager } from './problem-manager';
 import { getSubjects } from '../curriculum/actions';
 

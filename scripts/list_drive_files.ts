@@ -1,7 +1,6 @@
 
 import { google } from 'googleapis';
 import path from 'path';
-import fs from 'fs';
 
 // Load env
 import * as dotenv from 'dotenv';
