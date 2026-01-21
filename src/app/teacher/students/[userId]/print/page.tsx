@@ -8,19 +8,19 @@ export default async function PrintPage({
     searchParams,
 }: {
     params: { userId: string };
-    searchParams: { subjectId?: string };
+    searchParams: { subjectId?: string; coreProblemId?: string };
 }) {
     const session = await getSession();
     if (!session || (session.role !== 'TEACHER' && session.role !== 'ADMIN')) redirect('/login');
 
     const { userId } = await params;
-    const { subjectId } = await searchParams;
+    const { subjectId, coreProblemId } = await searchParams;
 
     if (!subjectId) {
         redirect(`/teacher/students/${userId}`);
     }
 
-    const data = await getPrintData(userId, subjectId);
+    const data = await getPrintData(userId, subjectId, coreProblemId);
     if (!data) {
         return <div>Data not found</div>;
     }

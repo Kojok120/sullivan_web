@@ -3,7 +3,7 @@
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 
-import { requireAdmin } from '@/lib/auth';
+import { requireAdmin, getSession } from '@/lib/auth';
 import { bulkCreateProblemsCore, createProblemCore, deleteProblemsWithRelations } from '@/lib/problem-service';
 
 // --- Subjects ---
@@ -24,6 +24,25 @@ export async function getSubjects() {
 // 講義動画の型
 export type LectureVideo = { title: string; url: string };
 
+export async function getCoreProblemsForSubject(subjectId: string) {
+    const session = await getSession();
+    if (!session || (session.role !== 'TEACHER' && session.role !== 'ADMIN')) {
+        return { error: 'Unauthorized' };
+    }
+
+    try {
+        const coreProblems = await prisma.coreProblem.findMany({
+            where: { subjectId },
+            orderBy: { order: 'asc' },
+            select: { id: true, name: true }
+        });
+        return { success: true, coreProblems };
+    } catch (error) {
+        console.error('Failed to get core problems', error);
+        return { error: 'Failed to fetch core problems' };
+    }
+}
+
 export async function createCoreProblem(data: { name: string; subjectId: string; order: number; lectureVideos?: LectureVideo[] }) {
     await requireAdmin();
     try {
@@ -32,7 +51,7 @@ export async function createCoreProblem(data: { name: string; subjectId: string;
                 name: data.name,
                 subjectId: data.subjectId,
                 order: data.order,
-                lectureVideos: data.lectureVideos ?? undefined,
+                lectureVideos: (data.lectureVideos ?? undefined) as any,
             },
         });
         revalidatePath('/admin/curriculum');
@@ -123,7 +142,7 @@ export async function bulkCreateCoreProblems(subjectId: string, items: { name: s
                 prisma.coreProblem.create({
                     data: {
                         name: item.name,
-                        lectureVideos: item.lectureVideos ?? undefined,
+                        lectureVideos: (item.lectureVideos ?? undefined) as any,
                         subjectId,
                         order: order++
                     }

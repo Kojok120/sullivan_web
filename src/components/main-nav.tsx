@@ -42,6 +42,12 @@ export function MainNav({ role }: { role?: string }) {
                                     ホーム
                                 </Link>
                                 <Link
+                                    href="/unit-focus"
+                                    className={pathname.startsWith("/unit-focus") ? "text-foreground" : "text-foreground/60 transition-colors hover:text-foreground"}
+                                >
+                                    単元集中
+                                </Link>
+                                <Link
                                     href="/dashboard"
                                     className={pathname === "/dashboard" ? "text-foreground" : "text-foreground/60 transition-colors hover:text-foreground"}
                                 >

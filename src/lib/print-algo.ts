@@ -22,6 +22,7 @@ type ScoredProblem = {
 export async function selectProblemsForPrint(
     userId: string,
     subjectId: string,
+    coreProblemId?: string,
     count: number = 30
 ): Promise<Problem[]> {
 
@@ -29,15 +30,29 @@ export async function selectProblemsForPrint(
     // Unified Logic via progression.ts
     const unlockedCoreProblemIds = await getUnlockedCoreProblemIds(userId, subjectId);
 
+    // If a specific CoreProblem is requested, check if it's unlocked (optional, depending on strictness)
+    // For now, we allow printing even if locked? No, "unlocked only" was in spec "鍵がかかっている...グレーアウト".
+    // Theoretically the UI prevents it, but good to be safe.
+    // If a specific CoreProblem is requested, we allow printing even if it is locked.
+    // So we skip the early return check.
+
     // 2. Fetch Candidate Problems
-    const candidateProblems = await prisma.problem.findMany({
-        where: {
-            coreProblems: {
-                some: {
-                    id: { in: Array.from(unlockedCoreProblemIds) }
-                }
+    // If coreProblemId is set, filter by that.
+    const whereCondition: any = {
+        coreProblems: {
+            some: {
+                id: coreProblemId // If specific unit, get problems for it (regardless of lock)
+                    ? coreProblemId
+                    : { in: Array.from(unlockedCoreProblemIds) } // Otherwise, unlocked only
             }
-        },
+        }
+    };
+    // Note: Previous code was manually constructing whereCondition differently, but this is cleaner.
+    // However, let's respect the existing structure if possible or just replace the block.
+    // existing structure used whereCondition object.
+
+    const candidateProblems = await prisma.problem.findMany({
+        where: whereCondition,
         include: {
             coreProblems: {
                 include: { userStates: { where: { userId } } }
@@ -45,8 +60,15 @@ export async function selectProblemsForPrint(
         }
     });
 
-    // Filter: ALL CoreProblems must be unlocked
+    // Filter logic
     const validProblems = candidateProblems.filter(p => {
+        // If specific unit is requested, we accept the problem if it belongs to that unit.
+        // We don't care if it belongs to OTHER locked units (shared problems).
+        if (coreProblemId) {
+            return p.coreProblems.some(cp => cp.id === coreProblemId);
+        }
+
+        // Standard case: ALL CoreProblems must be unlocked
         return p.coreProblems.every(cp => unlockedCoreProblemIds.has(cp.id));
     });
 
@@ -100,10 +122,5 @@ export async function selectProblemsForPrint(
     scoredProblems.sort((a, b) => b.score - a.score);
 
     // 6. Select top 'count'
-    // Note: 'problem' in ScoredProblem includes 'coreProblems', but we return strict Problem[] type.
-    // The caller might expect vanilla Problem, or Problem with coreProblems.
-    // The previous implementation returned `sp.problem`.
-    // The `validProblems` have `coreProblems` included. This is usually fine to pass as Problem in Prisma world (type superset).
-    // But to be clean we can return as is.
     return scoredProblems.slice(0, count).map(sp => sp.problem);
 }

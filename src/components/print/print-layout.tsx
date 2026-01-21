@@ -319,8 +319,8 @@ function Header({ studentName, studentLoginId, subjectName, pageNum, totalPages,
     return (
         <div className="border-b-2 border-gray-800 pb-2 flex justify-between items-end">
             <div className="flex gap-8 items-end">
-                <h1 className="text-2xl font-bold">{subjectName} {type}</h1>
-                <div className="text-xl font-bold">氏名：{studentName}（ID: {studentLoginId}）</div>
+                <h1 className="text-lg font-bold">{subjectName} {type}</h1>
+                <div className="text-base font-bold">氏名：{studentName}（ID: {studentLoginId}）</div>
             </div>
             <div className="flex gap-6 text-sm font-medium">
                 <div>{pageNum} / {totalPages}</div>

@@ -9,8 +9,12 @@ type PrintData = {
     problems: Problem[];
 };
 
-export async function getPrintData(userId: string, subjectId: string): Promise<PrintData | null> {
-    const [student, subject, problems] = await Promise.all([
+export async function getPrintData(
+    userId: string,
+    subjectId: string,
+    coreProblemId?: string
+): Promise<PrintData | null> {
+    const promises: Promise<any>[] = [
         prisma.user.findUnique({
             where: { id: userId },
             select: { name: true, loginId: true }
@@ -19,11 +23,31 @@ export async function getPrintData(userId: string, subjectId: string): Promise<P
             where: { id: subjectId },
             select: { name: true }
         }),
-        selectProblemsForPrint(userId, subjectId)
-    ]);
+        selectProblemsForPrint(userId, subjectId, coreProblemId)
+    ];
+
+    if (coreProblemId) {
+        promises.push(
+            prisma.coreProblem.findUnique({
+                where: { id: coreProblemId },
+                select: { name: true }
+            })
+        );
+    }
+
+    const results = await Promise.all(promises);
+    const student = results[0];
+    const subject = results[1];
+    const problems = results[2];
+    const coreProblem = coreProblemId ? results[3] : null;
 
     if (!student || !subject) {
         return null;
+    }
+
+    let subjectName = subject.name;
+    if (coreProblem) {
+        subjectName = `${subject.name} - ${coreProblem.name}`;
     }
 
     // スコア順を維持（未回答問題が優先される）
@@ -32,7 +56,7 @@ export async function getPrintData(userId: string, subjectId: string): Promise<P
     return {
         studentName: student.name || student.loginId,
         studentLoginId: student.loginId,
-        subjectName: subject.name,
+        subjectName: subjectName,
         problems
     };
 }
