@@ -50,8 +50,8 @@ export function SessionListClient({ initialSessions }: { initialSessions: Learni
             if (newSessions.length === 0) {
                 setHasMore(false);
             } else {
-                setSessions([...sessions, ...newSessions]);
-                setOffset(offset + newSessions.length);
+                setSessions((prev) => [...prev, ...newSessions]);
+                setOffset((prev) => prev + newSessions.length);
                 if (newSessions.length < 10) {
                     setHasMore(false);
                 }

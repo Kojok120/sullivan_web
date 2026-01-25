@@ -196,11 +196,45 @@ export async function createUser(data: { name: string; role: Role; password?: st
 
     try {
         const { createUser: createUserService } = await import('@/lib/user-service');
+        // If password is not provided, generate one but we need to know it to create Supabase user
+        // user-service generates one if missing, but returns the user object with hashed password.
+        // We need the raw password for Supabase creation.
+        // So we should generate it here if missing.
+
+        const rawPassword = result.data.password || Math.random().toString(36).slice(-8); // Simple fallback, or use user-service logic if exposed
+
+        // Actually `user-service` `createUser` accepts optional password and generates it if missing.
+        // But it hashes it immediately.
+        // We need raw password for Supabase.
+        // Let's modify the flow: Pass explicit password to service.
+
+        const finalPassword = result.data.password || Math.random().toString(36).slice(-8);
+
         const user = await createUserService({
             ...result.data,
+            password: finalPassword,
             group: result.data.group,
             classroomId: result.data.classroomId
         } as any);
+
+        // Register in Supabase
+        const { createOrUpdateSupabaseUser } = await import('@/lib/auth-admin');
+        const email = `${user.loginId}@sullivan-internal.local`;
+
+        const authResult = await createOrUpdateSupabaseUser({
+            email,
+            password: finalPassword,
+            role: user.role,
+            loginId: user.loginId,
+            name: user.name || '',
+            prismaUserId: user.id
+        });
+
+        if (authResult.error) {
+            // Rollback Prisma
+            await prisma.user.delete({ where: { id: user.id } });
+            return { error: `Auth作成失敗: ${authResult.error}` };
+        }
 
         revalidatePath('/admin/users');
         return { success: true, user };

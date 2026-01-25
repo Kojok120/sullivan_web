@@ -41,81 +41,23 @@ export async function signupAction(prevState: any, formData: FormData) {
             classroomId
         });
 
-        // 4. Register in Supabase (using Admin API to skip email confirmation)
-        const { createAdminClient } = await import('@/lib/supabase/admin');
-        const supabaseAdmin = createAdminClient();
+        // 4. Register in Supabase (using shared Admin logic)
+        const { createOrUpdateSupabaseUser } = await import('@/lib/auth-admin');
         const email = `${user.loginId}@sullivan-internal.local`;
 
-        const { error: supabaseError } = await supabaseAdmin.auth.admin.createUser({
+        const authResult = await createOrUpdateSupabaseUser({
             email,
             password,
-            email_confirm: true, // Confirm email automatically
-            // SECURITY: Use app_metadata (not user_metadata) for authorization data
-            // app_metadata cannot be modified by the user
-            app_metadata: {
-                role,
-                loginId: user.loginId,
-                name: user.name,
-                prismaUserId: user.id,
-            },
-            user_metadata: {
-                isDefaultPassword: true,
-            },
+            role,
+            loginId: user.loginId,
+            name: user.name || '',
+            prismaUserId: user.id
         });
 
-        if (supabaseError) {
-            if (supabaseError.code === 'email_exists') {
-                const { data, error: listError } = await supabaseAdmin.auth.admin.listUsers({
-                    page: 1,
-                    perPage: 1000,
-                });
-
-                if (listError || !data?.users) {
-                    await prisma.user.delete({ where: { id: user.id } });
-                    console.error('Supabase listUsers failed:', listError);
-                    return { error: 'アカウント作成に失敗しました(Auth)。' };
-                }
-
-                const normalizedEmail = email.toLowerCase();
-                const existing = data.users.find(
-                    (u) => (u.email || '').toLowerCase() === normalizedEmail
-                );
-                if (!existing) {
-                    await prisma.user.delete({ where: { id: user.id } });
-                    console.error('Supabase user not found for email:', email);
-                    return { error: 'アカウント作成に失敗しました(Auth)。' };
-                }
-
-                const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-                    existing.id,
-                    {
-                        password,
-                        email_confirm: true,
-                        app_metadata: {
-                            role,
-                            loginId: user.loginId,
-                            name: user.name,
-                            prismaUserId: user.id,
-                        },
-                        user_metadata: {
-                            ...(existing.user_metadata || {}),
-                            isDefaultPassword: true,
-                        },
-                    }
-                );
-
-                if (updateError) {
-                    await prisma.user.delete({ where: { id: user.id } });
-                    console.error('Supabase update failed:', updateError);
-                    return { error: 'アカウント作成に失敗しました(Auth)。' };
-                }
-
-                return { success: true, loginId: user.loginId };
-            }
-
+        if (authResult.error) {
             // Rollback: Delete Prisma user if Supabase registration fails
             await prisma.user.delete({ where: { id: user.id } });
-            console.error('Supabase registration failed:', supabaseError);
+            console.error('Supabase registration failed:', authResult.error);
             return { error: 'アカウント作成に失敗しました(Auth)。' };
         }
 

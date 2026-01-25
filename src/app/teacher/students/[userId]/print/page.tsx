@@ -1,7 +1,7 @@
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { PrintLayout } from '@/components/print/print-layout';
-import { getPrintData } from '@/lib/print-service';
+import { getPrintDataFromParams } from '@/lib/print-service';
 
 export default async function PrintPage({
     params,
@@ -14,16 +14,12 @@ export default async function PrintPage({
     if (!session || (session.role !== 'TEACHER' && session.role !== 'ADMIN')) redirect('/login');
 
     const { userId } = await params;
-    const { subjectId, coreProblemId, sets } = await searchParams;
+    const data = await getPrintDataFromParams(userId, await searchParams);
 
-    if (!subjectId) {
-        redirect(`/teacher/students/${userId}`);
+    if (!data) {
+        if (!(await searchParams).subjectId) redirect(`/teacher/students/${userId}`);
+        return <div>Data not found</div>;
     }
-
-    const setsCount = sets ? parseInt(sets, 10) : 1;
-    const safeSets = Math.min(Math.max(setsCount, 1), 10);
-
-    const data = await getPrintData(userId, subjectId, coreProblemId, safeSets);
     if (!data) {
         return <div>Data not found</div>;
     }

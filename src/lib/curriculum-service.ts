@@ -26,8 +26,43 @@ export async function fetchSubjects(options?: { includeCoreProblems?: boolean })
 export function getSubjectPrefix(subjectName: string): string {
     if (subjectName.includes('英語')) return 'E';
     if (subjectName.includes('国語')) return 'J';
-    if (subjectName.includes('数学')) return 'S';
+    if (subjectName.includes('数学')) return 'M';
     return subjectName.charAt(0).toUpperCase();
+}
+
+export interface SubjectConfig {
+    letter: string;
+    bgColor: string;
+    hoverColor: string;
+    label: string;
+}
+
+export function getSubjectConfig(subjectName: string): SubjectConfig | null {
+    if (subjectName.includes('英語')) {
+        return {
+            letter: 'E',
+            bgColor: 'bg-orange-500',
+            hoverColor: 'hover:bg-orange-600',
+            label: '英語',
+        };
+    }
+    if (subjectName.includes('数学')) {
+        return {
+            letter: 'M',
+            bgColor: 'bg-blue-500',
+            hoverColor: 'hover:bg-blue-600',
+            label: '数学',
+        };
+    }
+    if (subjectName.includes('国語')) {
+        return {
+            letter: 'J',
+            bgColor: 'bg-green-500',
+            hoverColor: 'hover:bg-green-600',
+            label: '国語',
+        };
+    }
+    return null;
 }
 
 export async function getMaxCustomIdNumber(prefix: string, client: any = prisma): Promise<number> {

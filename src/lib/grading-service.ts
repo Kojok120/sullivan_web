@@ -86,6 +86,25 @@ export async function generateQRCode(studentId: string, problemIds: string[]): P
 }
 
 // 2. Poll Drive for New Files
+import { acquireGradingLock, releaseGradingLock } from '@/lib/grading-lock';
+
+export async function secureDriveCheck(reason: string) {
+    const lockAcquired = await acquireGradingLock();
+    if (!lockAcquired) {
+        console.log(`[DriveCheck] Skipped (${reason}): lock active.`);
+        return;
+    }
+
+    try {
+        console.log(`[DriveCheck] Starting (${reason}).`);
+        await checkDriveForNewFiles();
+    } catch (error) {
+        console.error(`[DriveCheck] Failed (${reason}):`, error);
+    } finally {
+        await releaseGradingLock();
+    }
+}
+
 export async function checkDriveForNewFiles() {
     if (!DRIVE_FOLDER_ID) {
         console.error('DRIVE_FOLDER_ID is not set');

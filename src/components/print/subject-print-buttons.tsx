@@ -11,34 +11,7 @@ interface SubjectPrintButtonsProps {
     subjects: Subject[];
 }
 
-// 科目名から略称と色を決定するヘルパー関数
-function getSubjectConfig(subjectName: string): { letter: string; bgColor: string; hoverColor: string; label: string } | null {
-    if (subjectName.includes('英語')) {
-        return {
-            letter: 'E',
-            bgColor: 'bg-orange-500',
-            hoverColor: 'hover:bg-orange-600',
-            label: '英語',
-        };
-    }
-    if (subjectName.includes('数学')) {
-        return {
-            letter: 'M',
-            bgColor: 'bg-blue-500',
-            hoverColor: 'hover:bg-blue-600',
-            label: '数学',
-        };
-    }
-    if (subjectName.includes('国語')) {
-        return {
-            letter: 'J',
-            bgColor: 'bg-green-500',
-            hoverColor: 'hover:bg-green-600',
-            label: '国語',
-        };
-    }
-    return null;
-}
+import { getSubjectConfig } from '@/lib/curriculum-service';
 
 export function SubjectPrintButtons({ subjects }: SubjectPrintButtonsProps) {
     // 科目の順番を E → M → J の順に固定

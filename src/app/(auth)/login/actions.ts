@@ -1,6 +1,5 @@
 'use server';
 
-import { prisma } from '@/lib/prisma';
 // Removed unused imports
 import { redirect } from 'next/navigation';
 

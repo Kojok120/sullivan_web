@@ -74,3 +74,16 @@ export async function getPrintData(
         problemSets // Chunked sets
     };
 }
+
+export async function getPrintDataFromParams(
+    userId: string,
+    searchParams: { subjectId?: string; coreProblemId?: string; sets?: string }
+) {
+    const { subjectId, coreProblemId, sets } = searchParams;
+    if (!subjectId) return null;
+
+    const setsCount = sets ? parseInt(sets, 10) : 1;
+    const safeSets = Math.min(Math.max(setsCount, 1), 10);
+
+    return await getPrintData(userId, subjectId, coreProblemId, safeSets);
+}

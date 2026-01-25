@@ -24,18 +24,7 @@ interface LectureVideoButtonProps {
     coreProblemName: string;
 }
 
-// YouTubeのURLからビデオIDを抽出
-function getYouTubeId(url: string): string | null {
-    const patterns = [
-        /(?:youtu\.be\/|youtube\.com\/watch\?v=|youtube\.com\/embed\/)([^&\n?#]+)/,
-        /^([a-zA-Z0-9_-]{11})$/
-    ];
-    for (const pattern of patterns) {
-        const match = url.match(pattern);
-        if (match) return match[1];
-    }
-    return null;
-}
+import { getYouTubeId } from '@/lib/youtube';
 
 export function LectureVideoButton({ videos, coreProblemName }: LectureVideoButtonProps) {
     const [isOpen, setIsOpen] = useState(false);

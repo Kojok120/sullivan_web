@@ -3,6 +3,7 @@ import { watchDriveFolder, stopWatching } from '@/lib/drive-webhook-manager';
 import { saveWatchState, getWatchState, clearWatchState } from '@/lib/drive-watch-state';
 import { checkDriveForNewFiles } from '@/lib/grading-service';
 import { acquireGradingLock, releaseGradingLock } from '@/lib/grading-lock';
+import { secureDriveCheck } from '@/lib/grading-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,7 +44,7 @@ export async function POST(request: Request) {
                 const hoursRemaining = Math.round(timeUntilExpiry / 1000 / 60 / 60);
                 console.log(`Watch still valid for ${hoursRemaining} hours. Skipping renewal.`);
                 if (shouldCheck) {
-                    await runDriveCheck('renew-skip');
+                    await secureDriveCheck('renew-skip');
                 }
                 return NextResponse.json({
                     success: true,
@@ -77,7 +78,7 @@ export async function POST(request: Request) {
         const expiresAt = new Date(Number(result.expiration)).toISOString();
         console.log(`Watch renewed successfully. New expiration: ${expiresAt}`);
         if (shouldCheck) {
-            await runDriveCheck('renewed');
+            await secureDriveCheck('renewed');
         }
 
         return NextResponse.json({
@@ -131,19 +132,5 @@ export async function DELETE() {
     }
 }
 
-async function runDriveCheck(reason: string) {
-    const lockAcquired = await acquireGradingLock();
-    if (!lockAcquired) {
-        console.log(`[DriveCheck] Skipped (${reason}): lock active.`);
-        return;
-    }
 
-    try {
-        console.log(`[DriveCheck] Starting (${reason}).`);
-        await checkDriveForNewFiles();
-    } catch (error) {
-        console.error(`[DriveCheck] Failed (${reason}):`, error);
-    } finally {
-        await releaseGradingLock();
-    }
-}
+

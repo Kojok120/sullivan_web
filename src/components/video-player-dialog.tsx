@@ -16,6 +16,7 @@ import {
 import { PlayCircle, CheckCircle, ArrowRight } from "lucide-react";
 import { markVideoWatched } from "@/app/actions";
 import { useRouter } from "next/navigation";
+import { getYouTubeId, getEmbedUrl } from '@/lib/youtube';
 
 interface VideoItem {
     historyId: string;
@@ -120,28 +121,9 @@ export function VideoPlayerDialog({
     // Assuming videoUrl might be "https://youtu.be/..." or "https://www.youtube.com/watch?v=..."
     // or direct file.
 
-    const getYouTubeId = (url: string) => {
-        if (!url) return null;
-        if (url.includes('youtu.be')) {
-            return url.split('/').pop()?.split('?')[0] || null;
-        }
-        if (url.includes('youtube.com')) {
-            const urlParams = new URLSearchParams(new URL(url).search);
-            return urlParams.get('v') || null;
-        }
-        return null;
-    };
+
 
     const youTubeId = getYouTubeId(currentVideo.videoUrl);
-
-    // Fallback for non-youtube URLs (original logic sort of)
-    const getEmbedUrl = (url: string) => {
-        if (url.includes('youtube.com') || url.includes('youtu.be')) {
-            const id = getYouTubeId(url);
-            return `https://www.youtube.com/embed/${id}`;
-        }
-        return url;
-    };
 
     // Only used if not using react-youtube component (fallback)
     const embedUrl = getEmbedUrl(currentVideo.videoUrl);
