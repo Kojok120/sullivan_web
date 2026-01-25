@@ -48,6 +48,19 @@ function getDrive() {
     return getDriveClient();
 }
 
+/**
+ * Loads a prompt from a markdown file in the instructions directory.
+ * Replaces {{key}} placeholders with values from the variables object.
+ */
+function loadPrompt(filename: string, variables: Record<string, any> = {}): string {
+    const filePath = path.join(process.cwd(), 'instructions', filename);
+    let content = fs.readFileSync(filePath, 'utf-8');
+    for (const [key, value] of Object.entries(variables)) {
+        content = content.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
+    }
+    return content;
+}
+
 function getStudentIdFromQr(qrData: QRData | null): string | null {
     if (!qrData) return null;
     return qrData.s || null;
@@ -780,35 +793,12 @@ async function gradeWithGemini(
     });
 
     // 5. Build enhanced prompt
-    const gradingPrompt = `
-あなたは英語教師として、生徒の解答用紙を採点してください。
-
-## 重要な指示
-
-1. 画像/PDFを分析し、生徒の手書き解答を読み取ってください
-2. 以下の問題リストは、解答用紙に記載された問題と **同じ順序** で並んでいます
-3. 解答用紙の1番目の解答は problemIndex=0 に対応します
-4. 各解答を対応する問題の正解と照らし合わせて採点してください
-5. **必ず** ${problemContexts.length}件の結果を返してください
-
-## 採点基準
-
-- **A**: 完璧な解答
-- **B**: 軽微なミス（大文字小文字、ピリオドなど）があるがほぼ正解
-- **C**: 部分的に正しいが重要な間違いがある
-- **D**: 不正解または空欄
-
-## 問題リスト（順序厳守、${problemContexts.length}問）
-
-${JSON.stringify(problemContexts, null, 2)}
-
-## 出力ルール
-
-- problemIndex は 0 から ${problemContexts.length - 1} までの整数を使用
-- feedback は必ず日本語で、具体的で励みになる内容にしてください
-- 空欄の場合は studentAnswer に "(空欄)" と記載
-- すべての問題に対して結果を返してください
-`;
+    // 5. Build enhanced prompt
+    const gradingPrompt = loadPrompt('grading-prompt.md', {
+        problemCount: problemContexts.length,
+        problemContexts: JSON.stringify(problemContexts, null, 2),
+        maxIndex: problemContexts.length - 1
+    });
 
     // 6. Retry loop
     let lastErrors: string[] = [];
@@ -863,25 +853,7 @@ ${JSON.stringify(problemContexts, null, 2)}
 // Helper: Scan QR with Gemini
 async function scanQRWithGemini(model: any, base64Data: string, mimeType: string): Promise<QRData | null> {
     try {
-        const prompt = `
-        Analyze this document. There is a QR code on it containing JSON data.
-        1. Decode the QR code.
-        2. Extract the JSON data from the QR code.
-
-        The expected JSON structure:
-        {
-            "s": "student_login_id",
-            "c": "E|1-3,5" // Compressed format (prefix|ranges)
-            // OR full list:
-            "p": "E-1,E-2,E-3" // Comma-separated string, NOT an array
-        }
-
-        IMPORTANT:
-        - The "s" is the student Login ID (e.g. "S0001").
-        - If you include "p", return it as a comma-separated string (not a JSON array).
-        
-        Return ONLY the JSON object found in the QR code. Do not fabricate data.
-        `;
+        const prompt = loadPrompt('qr-scan-prompt.md');
         // ...
 
         const result = await model.generateContent([
