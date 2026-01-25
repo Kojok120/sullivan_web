@@ -9,6 +9,8 @@ const signupSchema = z.object({
     name: z.string().min(1, '名前を入力してください'),
     password: z.string().min(8, 'パスワードは8文字以上で入力してください'),
     role: z.nativeEnum(Role),
+    group: z.string().optional(),
+    classroomId: z.string().optional(),
 });
 
 export async function signupAction(prevState: any, formData: FormData) {
@@ -16,6 +18,8 @@ export async function signupAction(prevState: any, formData: FormData) {
         name: formData.get('name') as string,
         password: formData.get('password') as string,
         role: formData.get('role') as Role,
+        group: formData.get('group') as string || undefined,
+        classroomId: formData.get('classroomId') as string || undefined,
     };
 
     const result = signupSchema.safeParse(rawData);
@@ -24,7 +28,7 @@ export async function signupAction(prevState: any, formData: FormData) {
         return { error: result.error.errors[0].message };
     }
 
-    const { name, password, role } = result.data;
+    const { name, password, role, group, classroomId } = result.data;
 
     // 3. Create user using service to ensure consistent ID generation
     try {
@@ -33,6 +37,8 @@ export async function signupAction(prevState: any, formData: FormData) {
             name,
             password,
             role, // Use the role selected in UI
+            group,
+            classroomId
         });
 
         // 4. Register in Supabase (using Admin API to skip email confirmation)

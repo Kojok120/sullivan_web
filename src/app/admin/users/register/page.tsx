@@ -1,113 +1,33 @@
-'use client';
+import { prisma } from '@/lib/prisma';
+import { RegisterForm } from './register-form';
 
-import { useActionState, useState } from 'react';
-import { signupAction } from './actions';
-import { Button } from '@/components/ui/button';
-import { ChevronLeft, Eye, EyeOff } from 'lucide-react';
-import Link from 'next/link';
+export const dynamic = 'force-dynamic';
 
-export default function RegisterUserPage() {
-    const [state, action, pending] = useActionState(signupAction, undefined);
-    const [showPassword, setShowPassword] = useState(false);
+export default async function RegisterUserPage() {
+    // Fetch all classrooms with their groups
+    const classrooms = await prisma.classroom.findMany({
+        select: {
+            id: true,
+            name: true,
+            groups: true,
+        },
+        orderBy: { name: 'asc' },
+    });
+
+    // Also get all distinct groups in case we need a fallback or for other roles if ever needed
+    // The previous logic in user-list.tsx flattened them. We can do the same here or just pass the classrooms.
+    // However, RegisterForm.tsx expects `allGroups`.
+
+    // Flatten all groups from classrooms to get a list of all unique groups
+    const allGroupsSet = new Set<string>();
+    classrooms.forEach(c => c.groups.forEach(g => allGroupsSet.add(g)));
+    const allGroups = Array.from(allGroupsSet).map(g => ({ id: g, name: g })).sort((a, b) => a.name.localeCompare(b.name));
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col items-center py-12 px-4 sm:px-6 lg:px-8">
-            <div className="w-full max-w-md space-y-8">
-                <div>
-                    <Link href="/admin/users" className="flex items-center text-sm text-gray-500 hover:text-gray-700 mb-4">
-                        <ChevronLeft className="h-4 w-4 mr-1" />
-                        ユーザー一覧に戻る
-                    </Link>
-                    <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-                        新規ユーザー登録
-                    </h2>
-                    <p className="mt-2 text-center text-sm text-gray-600">
-                        生徒、講師、管理者アカウントを作成します
-                    </p>
-                </div>
-
-                <div className="mt-8 bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-                    {state?.success ? (
-                        <div className="text-center">
-                            <div className="mb-4 rounded-md bg-green-50 p-4 text-green-700">
-                                <p className="font-bold">登録が完了しました！</p>
-                                <p className="mt-2">発行されたログインID:</p>
-                                <p className="text-2xl font-mono font-bold">{state.loginId}</p>
-                            </div>
-                            <p className="mb-6 text-sm text-gray-600">
-                                このIDをユーザーに伝えてください。<br />
-                                ユーザーはIDと設定したパスワードでログインできます。
-                            </p>
-                            <div className="flex flex-col gap-3">
-                                <Button
-                                    onClick={() => window.location.reload()}
-                                    className="w-full bg-blue-600 hover:bg-blue-700"
-                                >
-                                    続けて登録する
-                                </Button>
-                                <Link href="/admin/users" className="w-full">
-                                    <Button variant="outline" className="w-full">
-                                        ユーザー一覧へ戻る
-                                    </Button>
-                                </Link>
-                            </div>
-                        </div>
-                    ) : (
-                        <form action={action} className="space-y-6" autoComplete="off">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">お名前</label>
-                                <input
-                                    name="name"
-                                    type="text"
-                                    required
-                                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">パスワード</label>
-                                <div className="relative mt-1">
-                                    <input
-                                        name="password"
-                                        type={showPassword ? 'text' : 'password'}
-                                        required
-                                        minLength={8}
-                                        className="block w-full rounded-md border border-gray-300 px-3 py-2 pr-10 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowPassword((prev) => !prev)}
-                                        aria-label={showPassword ? 'パスワードを非表示' : 'パスワードを表示'}
-                                        aria-pressed={showPassword}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md text-gray-500 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                                    >
-                                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                    </button>
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">役割</label>
-                                <select
-                                    name="role"
-                                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                                >
-                                    <option value="STUDENT">生徒</option>
-                                    <option value="TEACHER">講師</option>
-                                    <option value="PARENT">保護者</option>
-                                    <option value="ADMIN">管理者</option>
-                                </select>
-                            </div>
-                            {state?.error && <p className="text-sm text-red-500">{state.error}</p>}
-                            <Button
-                                type="submit"
-                                disabled={pending}
-                                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                            >
-                                {pending ? '作成中...' : 'ユーザーを作成'}
-                            </Button>
-                        </form>
-                    )}
-                </div>
-            </div>
-        </div>
+        <RegisterForm
+            classrooms={classrooms}
+            allGroups={allGroups}
+        />
     );
 }
+
