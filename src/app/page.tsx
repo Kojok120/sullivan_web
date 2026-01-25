@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { SessionList } from "./dashboard/components/session-list";
 import { getSubjectProgress } from "@/lib/analytics";
 import { History } from "lucide-react";
-import { SubjectPrintButtons } from "@/components/print/subject-print-buttons";
+import { PrintSelector } from "@/components/print/print-selector";
 import { StampOverlay } from "@/components/grading/stamp-overlay";
 import { AchievementOverlay } from "@/components/gamification/achievement-overlay";
 import { LevelUpOverlay } from "@/components/gamification/level-up-overlay";
@@ -31,7 +31,7 @@ export default async function Home() {
             </header>
 
             <section className="mb-8">
-                <SubjectPrintButtons subjects={subjectProgress} />
+                <PrintSelector subjects={subjectProgress} />
             </section>
 
             <section>

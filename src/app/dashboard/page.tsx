@@ -11,7 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 import { Heatmap } from '@/components/gamification/heatmap';
 import { Badge } from '@/components/ui/badge';
-import { PrintSelector } from './print-selector';
+import { PrintSelector } from '@/components/print/print-selector';
 
 export default async function DashboardPage() {
     const session = await getSession();

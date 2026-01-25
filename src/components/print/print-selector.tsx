@@ -8,14 +8,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
-interface Subject {
+export interface PrintSubject {
     subjectId: string;
     subjectName: string;
-    progressPercentage: number;
+    // progressPercentage is optional as it's not used in logic, but passing it is fine
+    progressPercentage?: number;
 }
 
 interface PrintSelectorProps {
-    subjects: Subject[];
+    subjects: PrintSubject[];
 }
 
 export function PrintSelector({ subjects }: PrintSelectorProps) {
@@ -30,11 +31,15 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
         return { color: 'bg-gray-500', label: '?', full: name };
     };
 
+    const incrementSets = () => setSets(prev => Math.min(prev + 1, 10));
+    const decrementSets = () => setSets(prev => Math.max(prev - 1, 1));
+
     const handleSubjectClick = (id: string) => {
         if (selectedSubjectId === id) {
-            setSelectedSubjectId(null);
-            setSets(1);
+            // Already selected -> Increment sets
+            incrementSets();
         } else {
+            // New selection -> Select and reset sets
             setSelectedSubjectId(id);
             setSets(1);
         }
@@ -44,9 +49,6 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
         if (!selectedSubjectId) return;
         router.push(`/dashboard/print?subjectId=${selectedSubjectId}&sets=${sets}`);
     };
-
-    const incrementSets = () => setSets(prev => Math.min(prev + 1, 10));
-    const decrementSets = () => setSets(prev => Math.max(prev - 1, 1));
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -63,14 +65,14 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                     >
                         <Card
                             className={cn(
-                                "cursor-pointer transition-all duration-300 border-2 overflow-hidden h-full",
-                                isSelected ? "border-gray-800 shadow-lg scale-105 ring-2 ring-offset-2 ring-gray-800" : "border-transparent hover:scale-105 hover:shadow-md"
+                                "cursor-pointer transition-all duration-300 border-none overflow-hidden h-full shadow-md",
+                                isSelected ? "shadow-xl scale-105 ring-2 ring-offset-2 ring-gray-800" : "hover:scale-105 hover:shadow-lg"
                             )}
                             onClick={() => handleSubjectClick(subject.subjectId)}
                         >
                             <CardContent className={cn("p-6 flex flex-col items-center justify-center min-h-[160px]", style.color)}>
-                                <span className="text-6xl font-black text-white mb-2">{style.label}</span>
-                                <span className="text-white/90 font-medium tracking-wider">{style.full}</span>
+                                <span className="text-6xl font-black text-white mb-2 select-none">{style.label}</span>
+                                <span className="text-white/90 font-medium tracking-wider select-none">{style.full}</span>
                             </CardContent>
 
                             {/* Overlay for non-selected items when one is selected */}

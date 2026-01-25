@@ -404,7 +404,7 @@ export async function getLearningSessions(userId: string, limit = 10, offset = 0
         WHERE lh."userId" = ${userId} AND lh."groupId" IS NOT NULL
         GROUP BY lh."groupId", s.name, cp.name
         ${onlyUnreviewed ? Prisma.sql`HAVING COUNT(DISTINCT CASE WHEN lh.evaluation IN ('C', 'D') AND lh."isVideoWatched" = false AND p."videoUrl" IS NOT NULL AND p."videoUrl" != '' THEN lh.id END) > 0` : Prisma.empty}
-        ORDER BY "date" DESC
+        ORDER BY "date" DESC, lh."groupId" DESC
         LIMIT ${limit}
         OFFSET ${offset}
     `;

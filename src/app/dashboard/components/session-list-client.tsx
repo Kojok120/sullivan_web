@@ -50,7 +50,11 @@ export function SessionListClient({ initialSessions }: { initialSessions: Learni
             if (newSessions.length === 0) {
                 setHasMore(false);
             } else {
-                setSessions((prev) => [...prev, ...newSessions]);
+                setSessions((prev) => {
+                    const existingIds = new Set(prev.map(s => s.groupId));
+                    const filteredNew = newSessions.filter(s => !existingIds.has(s.groupId));
+                    return [...prev, ...filteredNew];
+                });
                 setOffset((prev) => prev + newSessions.length);
                 if (newSessions.length < 10) {
                     setHasMore(false);
