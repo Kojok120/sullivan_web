@@ -23,6 +23,8 @@ type FilterCondition =
     | { type: 'search'; value: string }
     | { type: 'excludeIds'; value: string[] };
 
+const SEARCH_SCALAR_FIELDS = ['question', 'answer', 'customId'] as const;
+
 function buildFilterConditions(
     filters: ProblemFilters,
     search?: string,
@@ -73,9 +75,9 @@ function conditionsToPrismaWhere(conditions: FilterCondition[]): Prisma.ProblemW
                 break;
             case 'search':
                 where.OR = [
-                    { question: { contains: cond.value, mode: 'insensitive' } },
-                    { answer: { contains: cond.value, mode: 'insensitive' } },
-                    { customId: { contains: cond.value, mode: 'insensitive' } },
+                    ...SEARCH_SCALAR_FIELDS.map(field => ({
+                        [field]: { contains: cond.value, mode: 'insensitive' as const }
+                    })),
                     {
                         coreProblems: {
                             some: {
@@ -130,11 +132,13 @@ function conditionsToSql(conditions: FilterCondition[]): Prisma.Sql {
                 break;
             case 'search':
                 const like = `%${cond.value}%`;
+                const scalarConditions = SEARCH_SCALAR_FIELDS.map(
+                    field => Prisma.sql`p.${Prisma.raw(`"${field}"`)} ILIKE ${like}`
+                );
+
                 sqlConditions.push(Prisma.sql`
                     (
-                        p."question" ILIKE ${like}
-                        OR p."answer" ILIKE ${like}
-                        OR p."customId" ILIKE ${like}
+                        ${Prisma.join(scalarConditions, ' OR ')}
                         OR EXISTS (
                             SELECT 1
                             FROM "_CoreProblemToProblem" cpp

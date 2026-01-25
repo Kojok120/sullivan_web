@@ -163,7 +163,9 @@ export async function processFile(fileId: string, fileName: string) {
         return;
     }
 
+    let destPath = "";
     let jobFinalized = false;
+
     const finalizeFailure = async (message: string) => {
         if (jobFinalized) return;
         jobFinalized = true;
@@ -182,11 +184,24 @@ export async function processFile(fileId: string, fileName: string) {
             return;
         }
 
+        // Define destPath early for finally block usage
+        // Note: We need to initialize it. We'll set it properly inside the flow, 
+        // but we need the variable available for finally block if we weren't using the specific scoping.
+        // Actually, let's keep the variable declaration where it is but move the try-catch wrapper?
+        // Refactoring to wrap the file operations specifically or ensure destPath is accessible.
+        // Let's rely on `destPath` being defined in the scope if we hoist the declaration or move the try block.
+        // To be safe and clean, let's declare destPath before the main try block of file processing if possible,
+        // OR simply rely on the fact that file processing creates it.
+        // Review point: "catch では destPath にアクセスできず". 
+        // The original code defined destPath inside `try`. 
+        // We will move it up.
+
+
         // Download file
-        const destPath = path.join(os.tmpdir(), fileName);
-        if (!fs.existsSync(path.dirname(destPath))) {
-            await fs.promises.mkdir(path.dirname(destPath), { recursive: true });
-        }
+        destPath = path.join(os.tmpdir(), fileName);
+
+        // Ensure parent dir exists (rarely needed for tmpdir but good practice)
+        await fs.promises.mkdir(path.dirname(destPath), { recursive: true });
 
         const dest = fs.createWriteStream(destPath);
 
@@ -207,13 +222,13 @@ export async function processFile(fileId: string, fileName: string) {
         const stats = await fs.promises.stat(destPath);
         console.log(`Downloaded ${fileName}: ${stats.size} bytes`);
 
+
         const prepared = await prepareFileForGemini(destPath);
-        const qrData = await extractQrDataFromFile(destPath, prepared);
+        const qrData = await getQrDataWithFallback(destPath, prepared);
         if (!qrData) {
             console.error("Failed to extract QR data (Local & AI) from", destPath);
             await renameFile(fileId, `[ERROR] ${fileName}`);
             await finalizeFailure('QR data not found');
-            await fs.promises.unlink(destPath);
             return;
         }
 
@@ -222,7 +237,6 @@ export async function processFile(fileId: string, fileName: string) {
             console.error("QR data missing student ID for", destPath);
             await renameFile(fileId, `[ERROR] ${fileName}`);
             await finalizeFailure('Student ID not found');
-            await fs.promises.unlink(destPath);
             return;
         }
 
@@ -235,7 +249,6 @@ export async function processFile(fileId: string, fileName: string) {
             console.error(`User for QR ID ${studentId} not found in DB (checked loginId and id).`);
             await renameFile(fileId, `[ERROR] ${fileName}`);
             await finalizeFailure('User not found');
-            await fs.promises.unlink(destPath);
             return;
         }
 
@@ -296,9 +309,10 @@ export async function processFile(fileId: string, fileName: string) {
         }
 
         // Cleanup
-        await fs.promises.unlink(destPath);
 
     } catch (error) {
+        // ... (error handling remains here, but we ensure unlink is in finally)
+
         const message = error instanceof Error ? error.message : 'Unknown error';
         console.error(`Error processing file ${fileId}:`, error);
         await renameFile(fileId, `[ERROR] ${fileName}`);
@@ -311,6 +325,14 @@ export async function processFile(fileId: string, fileName: string) {
             console.error(`Failed to notify for error file ${fileName}:`, e);
         }
     } finally {
+        // Robust cleanup: Always try to unlink if path exists
+        try {
+            if (fs.existsSync(destPath)) {
+                await fs.promises.unlink(destPath);
+            }
+        } catch (cleanupError) {
+            console.error(`[Cleanup] Failed to unlink ${destPath}:`, cleanupError);
+        }
         await releaseGradingFileLock(fileId);
     }
 }
@@ -685,9 +707,9 @@ async function prepareFileForGemini(filePath: string): Promise<PreparedFile> {
     };
 }
 
-async function extractQrDataFromFile(filePath: string, prepared: PreparedFile): Promise<QRData | null> {
+async function getQrDataWithFallback(filePath: string, prepared: PreparedFile): Promise<QRData | null> {
+    // 1. Try Local
     let qrData: QRData | null = null;
-
     if (!prepared.isPdfHeader) {
         qrData = await readQRCodeLocally(filePath);
     } else {
@@ -697,6 +719,7 @@ async function extractQrDataFromFile(filePath: string, prepared: PreparedFile): 
     const hasStudentId = !!getStudentIdFromQr(qrData);
     const hasProblems = qrData ? expandProblemIds(qrData).length > 0 : false;
 
+    // 2. Fallback to Gemini
     if (!hasStudentId || !hasProblems) {
         console.log("Local QR read failed/skipped or incomplete. Attempting to scan QR with Gemini...");
         const modelName = process.env.GEMINI_MODEL || "gemini-2.5-pro";
@@ -705,6 +728,11 @@ async function extractQrDataFromFile(filePath: string, prepared: PreparedFile): 
     }
 
     return qrData;
+}
+
+// Deprecated/Wrapper for backward compatibility if needed, else used as the implementation
+async function extractQrDataFromFile(filePath: string, prepared: PreparedFile): Promise<QRData | null> {
+    return getQrDataWithFallback(filePath, prepared);
 }
 
 async function resolveUserFromQr(qrData: QRData) {
@@ -742,9 +770,15 @@ async function gradeWithGemini(
     });
 
     // Sort problems to match the order in uniquePids (QR order)
+    // Optimization: Create a Map for O(1) lookup
+    const idToIndexMap = new Map<string, number>();
+    uniquePids.forEach((pid, index) => {
+        idToIndexMap.set(String(pid), index);
+    });
+
     problems.sort((a, b) => {
-        const indexA = uniquePids.findIndex((pid: any) => pid === a.id || pid === a.customId);
-        const indexB = uniquePids.findIndex((pid: any) => pid === b.id || pid === b.customId);
+        const indexA = idToIndexMap.get(a.id) ?? idToIndexMap.get(a.customId || '') ?? Number.MAX_SAFE_INTEGER;
+        const indexB = idToIndexMap.get(b.id) ?? idToIndexMap.get(b.customId || '') ?? Number.MAX_SAFE_INTEGER;
         return indexA - indexB;
     });
 
@@ -985,33 +1019,56 @@ export async function recordGradingResults(results: GradingResult[]) {
             }))
         });
 
-        // 2. Update UserProblemState (Batch)
+        // 2. Update UserProblemState (Batch Optimized)
         // Fetch current states using TX
         const currentStates = await tx.userProblemState.findMany({
             where: { userId, problemId: { in: problemIds } }
         });
         const stateMap = new Map(currentStates.map(s => [s.problemId, s]));
 
+        const newStates: any[] = [];
+        const updatePromises: any[] = [];
+
         for (const r of results) {
             const currentState = stateMap.get(r.problemId);
-            const currentPriority = currentState?.priority || 0;
-            const newPriority = calculateNewPriority(currentPriority, r.evaluation);
 
-            await tx.userProblemState.upsert({
-                where: { userId_problemId: { userId, problemId: r.problemId } },
-                create: {
+            if (!currentState) {
+                // New State -> Add to batch create list
+                const newPriority = calculateNewPriority(0, r.evaluation);
+                newStates.push({
                     userId,
                     problemId: r.problemId,
                     isCleared: r.isCorrect,
                     lastAnsweredAt: new Date(),
                     priority: newPriority
-                },
-                update: {
-                    isCleared: r.isCorrect,
-                    lastAnsweredAt: new Date(),
-                    priority: newPriority
-                }
+                });
+            } else {
+                // Existing State -> Add to update promise list
+                const currentPriority = currentState.priority || 0;
+                const newPriority = calculateNewPriority(currentPriority, r.evaluation);
+                updatePromises.push(
+                    tx.userProblemState.update({
+                        where: { userId_problemId: { userId, problemId: r.problemId } },
+                        data: {
+                            isCleared: r.isCorrect,
+                            lastAnsweredAt: new Date(),
+                            priority: newPriority
+                        }
+                    })
+                );
+            }
+        }
+
+        // Execute Batch Create
+        if (newStates.length > 0) {
+            await tx.userProblemState.createMany({
+                data: newStates
             });
+        }
+
+        // Execute Updates
+        if (updatePromises.length > 0) {
+            await Promise.all(updatePromises);
         }
 
         // 3. Update UserCoreProblemState (Batch / Aggregated)
@@ -1105,7 +1162,8 @@ export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: strin
             subject: {
                 include: {
                     coreProblems: {
-                        select: { id: true, order: true, name: true }, // Min selection for next finder
+                        // [Optimization] lectureVideos is a scalar, so it's included by default.
+                        // We just order them.
                         orderBy: { order: 'asc' }
                     }
                 }
@@ -1114,8 +1172,6 @@ export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: strin
     });
 
     if (cpDetails.length === 0) return;
-
-
 
     // === OPTIMIZATION: Batch fetch all user states upfront ===
 
@@ -1194,11 +1250,9 @@ export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: strin
             if (currentIndex !== -1 && currentIndex < subjectCps.length - 1) {
                 const nextCp = subjectCps[currentIndex + 1];
 
-                // 講義動画を取得するためにCoreProblemの詳細を取得
-                const nextCpDetails = await prisma.coreProblem.findUnique({
-                    where: { id: nextCp.id },
-                    select: { lectureVideos: true }
-                });
+                // Unlock Next CP
+                // [Optimization] Use pre-fetched lecture videos from nextCp (which is from subject.coreProblems)
+                const lectureVideos = nextCp.lectureVideos;
 
                 // Unlock Next CP
                 await prisma.userCoreProblemState.upsert({
@@ -1221,7 +1275,7 @@ export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: strin
                 console.log(`Unlocked CoreProblem ${nextCp.name} for user ${userId}. Preparing to emit event...`);
 
                 // 講義動画情報の確認ログ
-                console.log(`  -> LectureVideos found: ${nextCpDetails?.lectureVideos ? 'YES' : 'NO'}`);
+                console.log(`  -> LectureVideos found: ${lectureVideos ? 'YES' : 'NO'}`);
 
                 // アンロック通知イベントを発行
                 try {
@@ -1231,10 +1285,10 @@ export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: strin
                         payload: {
                             coreProblemId: nextCp.id,
                             coreProblemName: nextCp.name,
-                            lectureVideos: nextCpDetails?.lectureVideos || null
+                            lectureVideos: lectureVideos || null
                         }
                     });
-                    console.log(`Emitted core_problem_unlocked event for user ${userId}, CP ${nextCp.name}, Payload size: ${JSON.stringify(nextCpDetails?.lectureVideos).length}`);
+                    console.log(`Emitted core_problem_unlocked event for user ${userId}, CP ${nextCp.name}`);
                 } catch (e) {
                     console.error('[Realtime] Failed to emit core_problem_unlocked event:', e);
                 }
@@ -1308,14 +1362,9 @@ async function notifyErrorForFile(fileId: string, fileName: string, reason: stri
         });
 
         const prepared = await prepareFileForGemini(destPath);
-        // Try local QR first
-        let qrData = await readQRCodeLocally(destPath);
-        if (!qrData && !prepared.isPdfHeader) {
-            // Fallback to Gemini if needed
-            const modelName = process.env.GEMINI_MODEL || "gemini-2.5-pro";
-            const model = getGenAI().getGenerativeModel({ model: modelName });
-            qrData = await scanQRWithGemini(model, prepared.base64Data, prepared.mimeType);
-        }
+
+        // Unified Logic
+        const qrData = await getQrDataWithFallback(destPath, prepared);
 
         if (!qrData) return;
         const studentId = getStudentIdFromQr(qrData);
