@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { Problem } from "@prisma/client";
+import { Problem, Prisma } from "@prisma/client";
 import { getUnlockedCoreProblemIds } from "@/lib/progression";
 
 export const PRINT_CONFIG = {
@@ -16,8 +16,8 @@ export const PRINT_CONFIG = {
 type ScoredProblem = {
     problem: Problem;
     score: number;
-    reason: 'forgetting' | 'weakness' | 'new' | 'priority';
 };
+
 
 export async function selectProblemsForPrint(
     userId: string,
@@ -30,63 +30,61 @@ export async function selectProblemsForPrint(
     // Unified Logic via progression.ts
     const unlockedCoreProblemIds = await getUnlockedCoreProblemIds(userId, subjectId);
 
-    // If a specific CoreProblem is requested, check if it's unlocked (optional, depending on strictness)
-    // For now, we allow printing even if locked? No, "unlocked only" was in spec "鍵がかかっている...グレーアウト".
-    // Theoretically the UI prevents it, but good to be safe.
-    // If a specific CoreProblem is requested, we allow printing even if it is locked.
-    // So we skip the early return check.
+    // 2. Fetch Candidate Problems with Integrated Filtering & User State
+    // DB側で厳密にフィルタリングを行う
 
-    // 2. Fetch Candidate Problems
-    // If coreProblemId is set, filter by that.
-    const whereCondition: any = {
-        coreProblems: {
-            some: {
-                id: coreProblemId // If specific unit, get problems for it (regardless of lock)
-                    ? coreProblemId
-                    : { in: Array.from(unlockedCoreProblemIds) } // Otherwise, unlocked only
-            }
-        }
-    };
-    // Note: Previous code was manually constructing whereCondition differently, but this is cleaner.
-    // However, let's respect the existing structure if possible or just replace the block.
-    // existing structure used whereCondition object.
+    const whereCondition: Prisma.ProblemWhereInput = {};
+
+    if (coreProblemId) {
+        // 特定のUnitが指定された場合:
+        // そのUnitに属する問題を抽出 (他のUnitがロックされていても関係ないという要件であればこれ)
+        whereCondition.coreProblems = {
+            some: { id: coreProblemId }
+        };
+    } else {
+        // 通常印刷（おまかせ）の場合:
+        // 紐づく「全ての」CoreProblemがUnlockedでなければならない
+        // unlockedCoreProblemIdsに含まれないCoreProblemを持つ問題を除外する
+        // => coreProblemsの全てがunlockedCoreProblemIdsに含まれる
+
+        // Prismaの every は「空配列の場合もtrue」になる仕様があるが、
+        // CoreProblemを持たない問題は存在しない前提（データ整合性）。
+        // もし存在する場合、それが出題されて良いかは議論があるが、今回は「CoreProblemを持っている」前提で進める。
+
+        whereCondition.coreProblems = {
+            every: {
+                id: { in: Array.from(unlockedCoreProblemIds) }
+            },
+            // 念のため、少なくとも1つのCoreProblemを持つことを条件に入れる場合:
+            // some: { id: { in: Array.from(unlockedCoreProblemIds) } }
+            // をANDで組み合わせることもできるが、everyだけで十分フィルタ効果はある。
+        };
+    }
 
     const candidateProblems = await prisma.problem.findMany({
         where: whereCondition,
         include: {
             coreProblems: {
                 include: { userStates: { where: { userId } } }
+            },
+            // UserProblemStateを一緒に取得 (1:N relation name is 'userStates')
+            userStates: {
+                where: { userId },
+                take: 1
             }
         }
     });
 
-    // Filter logic
-    const validProblems = candidateProblems.filter(p => {
-        // If specific unit is requested, we accept the problem if it belongs to that unit.
-        // We don't care if it belongs to OTHER locked units (shared problems).
-        if (coreProblemId) {
-            return p.coreProblems.some(cp => cp.id === coreProblemId);
-        }
+    // 3. (Removed) JS Filter logic is no longer needed as DB handles it.
+    // However, if strict consistency is needed regarding "must have at least one core problem", we could check here.
+    // Assuming DB constraint ensures problem has coreProblems or logic allows orphans.
 
-        // Standard case: ALL CoreProblems must be unlocked
-        return p.coreProblems.every(cp => unlockedCoreProblemIds.has(cp.id));
-    });
-
-    if (validProblems.length === 0) return [];
-
-    // 3. Fetch User State for these problems (for scoring)
-    const validProblemIds = validProblems.map(p => p.id);
-    const userProblemStates = await prisma.userProblemState.findMany({
-        where: {
-            userId,
-            problemId: { in: validProblemIds }
-        }
-    });
-    const problemStateMap = new Map(userProblemStates.map(s => [s.problemId, s]));
+    if (candidateProblems.length === 0) return [];
 
     // 4. Calculate Score
-    const scoredProblems: ScoredProblem[] = validProblems.map(problem => {
-        const state = problemStateMap.get(problem.id);
+    const scoredProblems: ScoredProblem[] = candidateProblems.map(problem => {
+        // Integrated userState
+        const state = problem.userStates[0];
         let score = 0;
 
         // Base Score: CoreProblem Priorities
@@ -115,7 +113,7 @@ export async function selectProblemsForPrint(
             score += timeScore;
         }
 
-        return { problem, score, reason: 'new' };
+        return { problem, score };
     });
 
     // 5. Sort by score descending

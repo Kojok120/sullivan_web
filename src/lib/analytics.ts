@@ -360,6 +360,8 @@ export async function getLearningSessions(userId: string, limit = 10, offset = 0
     // Using subquery to get Subject name without row multiplication.
     // Using COUNT(DISTINCT lh.id) to avoid duplicate counting.
 
+    // CTEを使用して各グループの最初のproblemIdを1回だけ取得
+    // その後SubjectとCoreProblemをJOINで取得（相関サブクエリを排除）
     const sessions = await prisma.$queryRaw<Array<{
         groupId: string;
         date: Date;
@@ -370,34 +372,19 @@ export async function getLearningSessions(userId: string, limit = 10, offset = 0
         unreadCount: bigint;
         unwatchedMistakeCount: bigint;
     }>>`
+        WITH GroupFirstProblem AS (
+            SELECT DISTINCT ON ("groupId") 
+                "groupId", 
+                "problemId"
+            FROM "LearningHistory"
+            WHERE "userId" = ${userId} AND "groupId" IS NOT NULL
+            ORDER BY "groupId", id ASC
+        )
         SELECT 
             lh."groupId",
             MAX(lh."answeredAt") as "date",
-            (
-                SELECT s.name 
-                FROM "_CoreProblemToProblem" cpp
-                JOIN "CoreProblem" cp ON cpp."A" = cp.id
-                JOIN "Subject" s ON cp."subjectId" = s.id
-                WHERE cpp."B" = (
-                    SELECT lh2."problemId" 
-                    FROM "LearningHistory" lh2 
-                    WHERE lh2."groupId" = lh."groupId" 
-                    LIMIT 1
-                )
-                LIMIT 1
-            ) as "subjectName",
-            (
-                SELECT cp.name 
-                FROM "_CoreProblemToProblem" cpp
-                JOIN "CoreProblem" cp ON cpp."A" = cp.id
-                WHERE cpp."B" = (
-                    SELECT lh2."problemId" 
-                    FROM "LearningHistory" lh2 
-                    WHERE lh2."groupId" = lh."groupId" 
-                    LIMIT 1
-                )
-                LIMIT 1
-            ) as "coreProblemName",
+            s.name as "subjectName",
+            cp.name as "coreProblemName",
             COUNT(DISTINCT lh.id) as "total",
             COUNT(DISTINCT CASE WHEN lh.evaluation IN ('A', 'B') THEN lh.id END) as "correct",
             COUNT(CASE WHEN lh."isStudentReviewed" = false THEN 1 END) as "unreadCount",
@@ -410,8 +397,12 @@ export async function getLearningSessions(userId: string, limit = 10, offset = 0
             END) as "unwatchedMistakeCount"
         FROM "LearningHistory" lh
         JOIN "Problem" p ON lh."problemId" = p.id
+        LEFT JOIN GroupFirstProblem gfp ON lh."groupId" = gfp."groupId"
+        LEFT JOIN "_CoreProblemToProblem" cpp ON gfp."problemId" = cpp."B"
+        LEFT JOIN "CoreProblem" cp ON cpp."A" = cp.id
+        LEFT JOIN "Subject" s ON cp."subjectId" = s.id
         WHERE lh."userId" = ${userId} AND lh."groupId" IS NOT NULL
-        GROUP BY lh."groupId"
+        GROUP BY lh."groupId", s.name, cp.name
         ${onlyUnreviewed ? Prisma.sql`HAVING COUNT(DISTINCT CASE WHEN lh.evaluation IN ('C', 'D') AND lh."isVideoWatched" = false AND p."videoUrl" IS NOT NULL AND p."videoUrl" != '' THEN lh.id END) > 0` : Prisma.empty}
         ORDER BY "date" DESC
         LIMIT ${limit}

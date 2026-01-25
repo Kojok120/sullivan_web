@@ -12,39 +12,85 @@ type ProblemFilters = {
     coreProblemId?: string;
 };
 
-function buildProblemWhere(filters: ProblemFilters, search?: string): Prisma.ProblemWhereInput {
-    const where: Prisma.ProblemWhereInput = {};
+/**
+ * フィルタ条件の単一ソース
+ * ここで定義した条件がPrisma形式とSQL形式の両方に変換される
+ */
+type FilterCondition =
+    | { type: 'grade'; value: string }
+    | { type: 'subjectId'; value: string }
+    | { type: 'coreProblemId'; value: string }
+    | { type: 'search'; value: string }
+    | { type: 'excludeIds'; value: string[] };
 
-    if (search) {
-        where.OR = [
-            { question: { contains: search, mode: 'insensitive' } },
-            { answer: { contains: search, mode: 'insensitive' } },
-            { customId: { contains: search, mode: 'insensitive' } },
-            {
-                coreProblems: {
-                    some: {
-                        name: { contains: search, mode: 'insensitive' }
-                    }
-                }
-            },
-        ];
-    }
+function buildFilterConditions(
+    filters: ProblemFilters,
+    search?: string,
+    excludeIds?: string[]
+): FilterCondition[] {
+    const conditions: FilterCondition[] = [];
 
     if (filters.grade) {
-        where.grade = filters.grade;
+        conditions.push({ type: 'grade', value: filters.grade });
     }
-
-    const andConditions: Prisma.ProblemWhereInput[] = [];
     if (filters.subjectId) {
-        andConditions.push({
-            coreProblems: { some: { subjectId: filters.subjectId } }
-        });
+        conditions.push({ type: 'subjectId', value: filters.subjectId });
     }
     if (filters.coreProblemId) {
-        andConditions.push({
-            coreProblems: { some: { id: filters.coreProblemId } }
-        });
+        conditions.push({ type: 'coreProblemId', value: filters.coreProblemId });
     }
+    if (search) {
+        conditions.push({ type: 'search', value: search });
+    }
+    if (excludeIds && excludeIds.length > 0) {
+        conditions.push({ type: 'excludeIds', value: excludeIds });
+    }
+
+    return conditions;
+}
+
+/**
+ * 条件をPrisma WhereInput形式に変換
+ */
+function conditionsToPrismaWhere(conditions: FilterCondition[]): Prisma.ProblemWhereInput {
+    const where: Prisma.ProblemWhereInput = {};
+    const andConditions: Prisma.ProblemWhereInput[] = [];
+
+    for (const cond of conditions) {
+        switch (cond.type) {
+            case 'grade':
+                where.grade = cond.value;
+                break;
+            case 'subjectId':
+                andConditions.push({
+                    coreProblems: { some: { subjectId: cond.value } }
+                });
+                break;
+            case 'coreProblemId':
+                andConditions.push({
+                    coreProblems: { some: { id: cond.value } }
+                });
+                break;
+            case 'search':
+                where.OR = [
+                    { question: { contains: cond.value, mode: 'insensitive' } },
+                    { answer: { contains: cond.value, mode: 'insensitive' } },
+                    { customId: { contains: cond.value, mode: 'insensitive' } },
+                    {
+                        coreProblems: {
+                            some: {
+                                name: { contains: cond.value, mode: 'insensitive' }
+                            }
+                        }
+                    },
+                ];
+                break;
+            case 'excludeIds':
+                where.id = { notIn: cond.value };
+                break;
+        }
+    }
+
     if (andConditions.length > 0) {
         where.AND = andConditions;
     }
@@ -52,9 +98,76 @@ function buildProblemWhere(filters: ProblemFilters, search?: string): Prisma.Pro
     return where;
 }
 
+/**
+ * 条件をSQL WHERE句に変換
+ */
+function conditionsToSql(conditions: FilterCondition[]): Prisma.Sql {
+    const sqlConditions: Prisma.Sql[] = [];
+
+    for (const cond of conditions) {
+        switch (cond.type) {
+            case 'grade':
+                sqlConditions.push(Prisma.sql`p."grade" = ${cond.value}`);
+                break;
+            case 'subjectId':
+                sqlConditions.push(Prisma.sql`
+                    EXISTS (
+                        SELECT 1
+                        FROM "_CoreProblemToProblem" cpp
+                        JOIN "CoreProblem" cp ON cp.id = cpp."A"
+                        WHERE cpp."B" = p.id AND cp."subjectId" = ${cond.value}
+                    )
+                `);
+                break;
+            case 'coreProblemId':
+                sqlConditions.push(Prisma.sql`
+                    EXISTS (
+                        SELECT 1
+                        FROM "_CoreProblemToProblem" cpp
+                        WHERE cpp."B" = p.id AND cpp."A" = ${cond.value}
+                    )
+                `);
+                break;
+            case 'search':
+                const like = `%${cond.value}%`;
+                sqlConditions.push(Prisma.sql`
+                    (
+                        p."question" ILIKE ${like}
+                        OR p."answer" ILIKE ${like}
+                        OR p."customId" ILIKE ${like}
+                        OR EXISTS (
+                            SELECT 1
+                            FROM "_CoreProblemToProblem" cpp
+                            JOIN "CoreProblem" cp ON cp.id = cpp."A"
+                            WHERE cpp."B" = p.id AND cp."name" ILIKE ${like}
+                        )
+                    )
+                `);
+                break;
+            case 'excludeIds':
+                sqlConditions.push(Prisma.sql`p.id NOT IN (${Prisma.join(cond.value)})`);
+                break;
+        }
+    }
+
+    if (sqlConditions.length === 0) {
+        return Prisma.empty;
+    }
+
+    return Prisma.sql`WHERE ${Prisma.join(sqlConditions, ' AND ')}`;
+}
+
+// 後方互換性のためのラッパー関数
+function buildProblemWhere(filters: ProblemFilters, search?: string): Prisma.ProblemWhereInput {
+    const conditions = buildFilterConditions(filters, search);
+    return conditionsToPrismaWhere(conditions);
+}
+
 function buildExactMatchWhere(filters: ProblemFilters, search: string): Prisma.ProblemWhereInput {
+    const baseConditions = buildFilterConditions(filters);
+    const where = conditionsToPrismaWhere(baseConditions);
     return {
-        ...buildProblemWhere(filters),
+        ...where,
         customId: { equals: search, mode: 'insensitive' }
     };
 }
@@ -68,59 +181,8 @@ function buildProblemWhereSql({
     filters: ProblemFilters;
     excludeIds?: string[];
 }) {
-    const conditions: Prisma.Sql[] = [];
-
-    if (filters.grade) {
-        conditions.push(Prisma.sql`p."grade" = ${filters.grade}`);
-    }
-
-    if (filters.subjectId) {
-        conditions.push(Prisma.sql`
-            EXISTS (
-                SELECT 1
-                FROM "_CoreProblemToProblem" cpp
-                JOIN "CoreProblem" cp ON cp.id = cpp."A"
-                WHERE cpp."B" = p.id AND cp."subjectId" = ${filters.subjectId}
-            )
-        `);
-    }
-
-    if (filters.coreProblemId) {
-        conditions.push(Prisma.sql`
-            EXISTS (
-                SELECT 1
-                FROM "_CoreProblemToProblem" cpp
-                WHERE cpp."B" = p.id AND cpp."A" = ${filters.coreProblemId}
-            )
-        `);
-    }
-
-    if (search) {
-        const like = `%${search}%`;
-        conditions.push(Prisma.sql`
-            (
-                p."question" ILIKE ${like}
-                OR p."answer" ILIKE ${like}
-                OR p."customId" ILIKE ${like}
-                OR EXISTS (
-                    SELECT 1
-                    FROM "_CoreProblemToProblem" cpp
-                    JOIN "CoreProblem" cp ON cp.id = cpp."A"
-                    WHERE cpp."B" = p.id AND cp."name" ILIKE ${like}
-                )
-            )
-        `);
-    }
-
-    if (excludeIds.length > 0) {
-        conditions.push(Prisma.sql`p.id NOT IN (${Prisma.join(excludeIds)})`);
-    }
-
-    if (conditions.length === 0) {
-        return Prisma.empty;
-    }
-
-    return Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`;
+    const conditions = buildFilterConditions(filters, search, excludeIds);
+    return conditionsToSql(conditions);
 }
 
 export async function getProblems(

@@ -24,6 +24,29 @@ export type BulkCreateOptions = {
 };
 
 /**
+ * CoreProblem情報などからsubjectIdを解決する
+ * 優先順位: 1. data.subjectId, 2. coreProblemIds[0]の所属Subject
+ */
+async function resolveSubjectId(
+    data: { subjectId?: string; coreProblemIds: string[] },
+    tx: any = prisma
+): Promise<string | undefined> {
+    if (data.subjectId) {
+        return data.subjectId;
+    }
+    if (data.coreProblemIds.length > 0) {
+        const firstCP = await tx.coreProblem.findUnique({
+            where: { id: data.coreProblemIds[0] },
+            select: { subjectId: true }
+        });
+        if (firstCP) {
+            return firstCP.subjectId;
+        }
+    }
+    return undefined;
+}
+
+/**
  * 問題作成の共通ロジック
  * @param data 問題データ
  * @param tx Prismaトランザクション（オプション）
@@ -35,19 +58,10 @@ export async function createProblemCore(
     // customId生成
     let customId: string | undefined;
 
-    // subjectIdが明示的に指定されている場合はそれを使用
-    if (data.subjectId) {
-        customId = await getNextCustomId(data.subjectId, tx);
-    }
-    // そうでなければ、最初のCoreProblemからsubjectIdを取得
-    else if (data.coreProblemIds.length > 0) {
-        const firstCP = await tx.coreProblem.findUnique({
-            where: { id: data.coreProblemIds[0] },
-            include: { subject: true }
-        });
-        if (firstCP) {
-            customId = await getNextCustomId(firstCP.subjectId, tx);
-        }
+    const subjectId = await resolveSubjectId(data, tx);
+
+    if (subjectId) {
+        customId = await getNextCustomId(subjectId, tx);
     }
 
     // order取得（指定がない場合は自動採番）
