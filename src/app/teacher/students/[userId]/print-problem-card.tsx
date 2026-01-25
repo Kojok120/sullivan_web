@@ -20,6 +20,7 @@ interface PrintProblemCardProps {
 export function PrintProblemCard({ userId, subjects }: PrintProblemCardProps) {
     const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
     const [selectedCoreProblemId, setSelectedCoreProblemId] = useState<string>('');
+    const [sets, setSets] = useState<number>(1);
     const [coreProblems, setCoreProblems] = useState<{ id: string; name: string }[]>([]);
     const [loading, setLoading] = useState(false);
     const [fetchingCoreProblems, setFetchingCoreProblems] = useState(false);
@@ -30,6 +31,7 @@ export function PrintProblemCard({ userId, subjects }: PrintProblemCardProps) {
         if (!selectedSubjectId) {
             setCoreProblems([]);
             setSelectedCoreProblemId('');
+            setSets(1);
             return;
         }
 
@@ -54,7 +56,7 @@ export function PrintProblemCard({ userId, subjects }: PrintProblemCardProps) {
     const handlePrint = () => {
         if (!selectedSubjectId) return;
         setLoading(true);
-        let url = `/teacher/students/${userId}/print?subjectId=${selectedSubjectId}`;
+        let url = `/teacher/students/${userId}/print?subjectId=${selectedSubjectId}&sets=${sets}`;
         if (selectedCoreProblemId && selectedCoreProblemId !== 'all') {
             url += `&coreProblemId=${selectedCoreProblemId}`;
         }
@@ -100,6 +102,26 @@ export function PrintProblemCard({ userId, subjects }: PrintProblemCardProps) {
                                 {coreProblems.map((cp) => (
                                     <SelectItem key={cp.id} value={cp.id}>
                                         {cp.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-xs font-medium text-muted-foreground">セット数 (1-10)</label>
+                        <Select
+                            value={sets.toString()}
+                            onValueChange={(val) => setSets(parseInt(val))}
+                            disabled={!selectedSubjectId}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="セット数" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+                                    <SelectItem key={num} value={num.toString()}>
+                                        {num} セット ({num * 10}問)
                                     </SelectItem>
                                 ))}
                             </SelectContent>

@@ -11,6 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 import { Heatmap } from '@/components/gamification/heatmap';
 import { Badge } from '@/components/ui/badge';
+import { PrintSelector } from './print-selector';
 
 export default async function DashboardPage() {
     const session = await getSession();
@@ -121,37 +122,41 @@ export default async function DashboardPage() {
                     <Heatmap data={dailyActivity} />
                 </div>
 
-                {/* Subject Progress */}
-                <Card className="col-span-3">
-                    <CardHeader>
-                        <CardTitle>教科別進捗</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-8">
-                            {subjectProgress.map((subject) => (
-                                <div key={subject.subjectId} className="space-y-2">
-                                    <div className="flex items-center justify-between text-sm">
-                                        <div className="font-medium">{subject.subjectName}</div>
-                                        <div className="flex items-center gap-2">
+                {/* Subject Progress & Printing */}
+                <div className="col-span-3 space-y-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>学習プリント印刷</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <PrintSelector subjects={subjectProgress} />
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>教科別進捗</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-6">
+                                {subjectProgress.map((subject) => (
+                                    <div key={subject.subjectId} className="space-y-2">
+                                        <div className="flex items-center justify-between text-sm">
+                                            <div className="font-medium">{subject.subjectName}</div>
                                             <div className="text-muted-foreground">{subject.progressPercentage}%</div>
-                                            <Link href={`/dashboard/print?subjectId=${subject.subjectId}`} title="問題を印刷">
-                                                <Button variant="ghost" size="icon" className="h-6 w-6">
-                                                    <Printer className="h-4 w-4" />
-                                                </Button>
-                                            </Link>
                                         </div>
+                                        <Progress value={subject.progressPercentage} />
                                     </div>
-                                    <Progress value={subject.progressPercentage} />
-                                </div>
-                            ))}
-                            {subjectProgress.length === 0 && (
-                                <div className="text-sm text-muted-foreground text-center py-4">
-                                    まだ学習データがありません
-                                </div>
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
+                                ))}
+                                {subjectProgress.length === 0 && (
+                                    <div className="text-sm text-muted-foreground text-center py-4">
+                                        まだ学習データがありません
+                                    </div>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
             </div>
         </div>
     );

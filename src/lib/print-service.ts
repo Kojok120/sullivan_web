@@ -7,13 +7,18 @@ type PrintData = {
     studentLoginId: string;
     subjectName: string;
     problems: Problem[];
+    problemSets: Problem[][];
 };
 
 export async function getPrintData(
     userId: string,
     subjectId: string,
-    coreProblemId?: string
+    coreProblemId?: string,
+    sets: number = 1
 ): Promise<PrintData | null> {
+    const PROBLEMS_PER_SET = 10;
+    const totalCount = sets * PROBLEMS_PER_SET;
+
     const promises: Promise<any>[] = [
         prisma.user.findUnique({
             where: { id: userId },
@@ -23,7 +28,7 @@ export async function getPrintData(
             where: { id: subjectId },
             select: { name: true }
         }),
-        selectProblemsForPrint(userId, subjectId, coreProblemId)
+        selectProblemsForPrint(userId, subjectId, coreProblemId, totalCount)
     ];
 
     if (coreProblemId) {
@@ -38,7 +43,7 @@ export async function getPrintData(
     const results = await Promise.all(promises);
     const student = results[0];
     const subject = results[1];
-    const problems = results[2];
+    const problems = results[2] as Problem[];
     const coreProblem = coreProblemId ? results[3] : null;
 
     if (!student || !subject) {
@@ -50,13 +55,22 @@ export async function getPrintData(
         subjectName = `${subject.name} - ${coreProblem.name}`;
     }
 
-    // スコア順を維持（未回答問題が優先される）
-    // customIdソートは削除 - 学習効果を最大化するため
+    // Chunking problems into sets
+    const problemSets: Problem[][] = [];
+    for (let i = 0; i < sets; i++) {
+        const start = i * PROBLEMS_PER_SET;
+        const end = start + PROBLEMS_PER_SET;
+        const setProblems = problems.slice(start, end);
+        if (setProblems.length > 0) {
+            problemSets.push(setProblems);
+        }
+    }
 
     return {
         studentName: student.name || student.loginId,
         studentLoginId: student.loginId,
         subjectName: subjectName,
-        problems
+        problems, // Flattened list for backward compatibility
+        problemSets // Chunked sets
     };
 }
