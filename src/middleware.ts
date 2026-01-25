@@ -54,6 +54,11 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL('/admin', request.url));
     }
 
+    // Redirect TEACHER users from root to /teacher
+    if (user && userRole === 'TEACHER' && request.nextUrl.pathname === '/') {
+        return NextResponse.redirect(new URL('/teacher', request.url));
+    }
+
     return supabaseResponse;
 }
 
