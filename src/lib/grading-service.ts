@@ -156,55 +156,35 @@ export async function checkDriveForNewFiles() {
 
 
 // 3. Process File (Now Exported for API Route)
-export async function processFile(fileId: string, fileName: string) {
-    const lockAcquired = await acquireGradingFileLock(fileId);
-    if (!lockAcquired) {
-        console.log(`[Lock] File ${fileId} is already being processed. Skipping.`);
-        return;
-    }
 
-    let destPath = "";
-    let jobFinalized = false;
+// Helper to consolidate File I/O and QR Analysis
+type AnalyzedFile = {
+    destPath: string;
+    prepared: PreparedFile;
+    qrData: QRData | null;
+    studentId: string | null;
+    user: any | null; // Prisma User
+    cleanup: () => Promise<void>;
+};
 
-    const finalizeFailure = async (message: string) => {
-        if (jobFinalized) return;
-        jobFinalized = true;
-        await markGradingJobFailed(fileId, message);
-    };
-    const finalizeSuccess = async () => {
-        if (jobFinalized) return;
-        jobFinalized = true;
-        await markGradingJobCompleted(fileId);
+async function downloadAndAnalyzeFile(fileId: string, fileName: string): Promise<AnalyzedFile> {
+    const destPath = path.join(os.tmpdir(), fileName);
+
+    const cleanup = async () => {
+        try {
+            if (fs.existsSync(destPath)) {
+                await fs.promises.unlink(destPath);
+            }
+        } catch (cleanupError) {
+            console.error(`[Cleanup] Failed to unlink ${destPath}:`, cleanupError);
+        }
     };
 
     try {
-        const claim = await claimGradingJob(fileId, fileName);
-        if (!claim.shouldProcess) {
-            console.log(`[Idempotency] Skip file ${fileId} (${claim.reason ?? 'unknown'}).`);
-            return;
-        }
-
-        // Define destPath early for finally block usage
-        // Note: We need to initialize it. We'll set it properly inside the flow, 
-        // but we need the variable available for finally block if we weren't using the specific scoping.
-        // Actually, let's keep the variable declaration where it is but move the try-catch wrapper?
-        // Refactoring to wrap the file operations specifically or ensure destPath is accessible.
-        // Let's rely on `destPath` being defined in the scope if we hoist the declaration or move the try block.
-        // To be safe and clean, let's declare destPath before the main try block of file processing if possible,
-        // OR simply rely on the fact that file processing creates it.
-        // Review point: "catch では destPath にアクセスできず". 
-        // The original code defined destPath inside `try`. 
-        // We will move it up.
-
-
-        // Download file
-        destPath = path.join(os.tmpdir(), fileName);
-
-        // Ensure parent dir exists (rarely needed for tmpdir but good practice)
+        // Ensure parent dir exists
         await fs.promises.mkdir(path.dirname(destPath), { recursive: true });
 
         const dest = fs.createWriteStream(destPath);
-
         const driveClient = getDrive();
         const res = await driveClient.files.get(
             { fileId, alt: 'media' },
@@ -222,9 +202,58 @@ export async function processFile(fileId: string, fileName: string) {
         const stats = await fs.promises.stat(destPath);
         console.log(`Downloaded ${fileName}: ${stats.size} bytes`);
 
-
         const prepared = await prepareFileForGemini(destPath);
         const qrData = await getQrDataWithFallback(destPath, prepared);
+
+        const studentId = getStudentIdFromQr(qrData);
+        let user = null;
+        if (qrData) {
+            user = await resolveUserFromQr(qrData);
+        }
+
+        return { destPath, prepared, qrData, studentId, user, cleanup };
+
+    } catch (error) {
+        await cleanup();
+        throw error;
+    }
+}
+
+export async function processFile(fileId: string, fileName: string) {
+    const lockAcquired = await acquireGradingFileLock(fileId);
+    if (!lockAcquired) {
+        console.log(`[Lock] File ${fileId} is already being processed. Skipping.`);
+        return;
+    }
+
+    let destPath = "";
+    let jobFinalized = false;
+
+    const finalizeFailure = async (message: string) => {
+        if (jobFinalized) return;
+        jobFinalized = true;
+        await markGradingJobFailed(fileId, message);
+    };
+
+    const finalizeSuccess = async () => {
+        if (jobFinalized) return;
+        jobFinalized = true;
+        await markGradingJobCompleted(fileId);
+    };
+
+    let cleanupFn = async () => { };
+
+    try {
+        const claim = await claimGradingJob(fileId, fileName);
+        if (!claim.shouldProcess) {
+            console.log(`[Idempotency] Skip file ${fileId} (${claim.reason ?? 'unknown'}).`);
+            return;
+        }
+
+        // Use helper for download and analysis
+        const { destPath, prepared, qrData, studentId, user, cleanup } = await downloadAndAnalyzeFile(fileId, fileName);
+        cleanupFn = cleanup;
+
         if (!qrData) {
             console.error("Failed to extract QR data (Local & AI) from", destPath);
             await renameFile(fileId, `[ERROR] ${fileName}`);
@@ -232,7 +261,6 @@ export async function processFile(fileId: string, fileName: string) {
             return;
         }
 
-        const studentId = getStudentIdFromQr(qrData);
         if (!studentId) {
             console.error("QR data missing student ID for", destPath);
             await renameFile(fileId, `[ERROR] ${fileName}`);
@@ -240,11 +268,10 @@ export async function processFile(fileId: string, fileName: string) {
             return;
         }
 
-        // SECURITY: Mask student ID in logs (show only last 4 chars)
+        // SECURITY: Mask student ID in logs
         const pidsCount = expandProblemIds(qrData).length;
         console.log(`QR Found: Student=...${studentId.slice(-4)}, Problems=${pidsCount}`);
 
-        const user = await resolveUserFromQr(qrData);
         if (!user) {
             console.error(`User for QR ID ${studentId} not found in DB (checked loginId and id).`);
             await renameFile(fileId, `[ERROR] ${fileName}`);
@@ -308,11 +335,7 @@ export async function processFile(fileId: string, fileName: string) {
             }
         }
 
-        // Cleanup
-
     } catch (error) {
-        // ... (error handling remains here, but we ensure unlink is in finally)
-
         const message = error instanceof Error ? error.message : 'Unknown error';
         console.error(`Error processing file ${fileId}:`, error);
         await renameFile(fileId, `[ERROR] ${fileName}`);
@@ -325,14 +348,7 @@ export async function processFile(fileId: string, fileName: string) {
             console.error(`Failed to notify for error file ${fileName}:`, e);
         }
     } finally {
-        // Robust cleanup: Always try to unlink if path exists
-        try {
-            if (fs.existsSync(destPath)) {
-                await fs.promises.unlink(destPath);
-            }
-        } catch (cleanupError) {
-            console.error(`[Cleanup] Failed to unlink ${destPath}:`, cleanupError);
-        }
+        await cleanupFn();
         await releaseGradingFileLock(fileId);
     }
 }
@@ -1348,29 +1364,12 @@ export async function checkStuckFiles() {
 
 // Helper to download, scan QR, and notify error
 async function notifyErrorForFile(fileId: string, fileName: string, reason: string) {
-    const destPath = path.join(os.tmpdir(), `notify_${fileName}`);
+    let cleanupFn = async () => { };
     try {
-        const driveClient = getDrive();
-        const res = await driveClient.files.get(
-            { fileId, alt: 'media' },
-            { responseType: 'stream' }
-        );
+        const notifyFileName = `notify_${fileName}`;
+        const { user, cleanup } = await downloadAndAnalyzeFile(fileId, notifyFileName);
+        cleanupFn = cleanup;
 
-        const dest = fs.createWriteStream(destPath);
-        await new Promise((resolve, reject) => {
-            res.data.pipe(dest).on('error', reject).on('finish', resolve);
-        });
-
-        const prepared = await prepareFileForGemini(destPath);
-
-        // Unified Logic
-        const qrData = await getQrDataWithFallback(destPath, prepared);
-
-        if (!qrData) return;
-        const studentId = getStudentIdFromQr(qrData);
-        if (!studentId) return;
-
-        const user = await resolveUserFromQr(qrData);
         if (user) {
             console.log(`Notifying user ${user.id} of error: ${reason}`);
             await emitRealtimeEvent({
@@ -1382,6 +1381,6 @@ async function notifyErrorForFile(fileId: string, fileName: string, reason: stri
     } catch (error) {
         console.warn(`Could not extract user for error notification (${fileName}):`, error);
     } finally {
-        if (fs.existsSync(destPath)) await fs.promises.unlink(destPath).catch(() => { });
+        await cleanupFn();
     }
 }

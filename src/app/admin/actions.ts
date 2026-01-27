@@ -32,63 +32,9 @@ export async function resetPassword(userId: string, password: string) {
 
         // Find Supabase user by email (mapped from loginId)
         const email = `${prismaUser.loginId}@sullivan-internal.local`;
-        const { data: { users }, error: searchError } = await supabase.auth.admin.listUsers();
 
-        // listUsers might be slow if many users. better to search? or assume ID?
-        // Actually, we don't store Supabase ID in Prisma (we store Prisma ID in Supabase).
-        // So we must lookup by email.
-        // Efficient way: listUsers can filter? No, standard listUsers doesn't filter by email easily in JS client?
-        // Actually, we can just use the email map logic if it's consistent.
-        // But updateUserById needs the UUID.
-
-        // Better: Store supabase_id in Prisma? No, we decided not to change schema significantly yet.
-        // Let's search by email.
-
-        // Note: listUsers() returns a list. If we have thousands, this is bad.
-        // Alternative: creating a user with same email fails? No.
-        // supabase.auth.admin.getUserById() -> needs ID.
-
-        // Wait, if we use the mapping `[loginId]@...`, is there any other way?
-        // If we strictly maintain the email map, we can rely on it.
-        // But we need the UID.
-
-        // Actually... we can fetch the user by logging in? No.
-
-        // Let's assume we iterate? No.
-        // OK, I'll use `listUsers` but in a production app with many users this is bad.
-        // Is there a better way?
-        // supabase.auth.admin.createUser will fail if exists.
-
-        // Retrying `listUsers`: does it support search?
-        // documentation says `listUsers` is paginated.
-
-        // Let's try to grab the user ID using a trick?
-        // No.
-
-        // Okay, for now I will fetch users and filter.
-
-        // But wait! When we create the user `admin.createUser`, it returns the user object with ID.
-        // We didn't save it back to Prisma.
-
-        // Correct approach for now: Filter `listUsers`.
-        // If efficient lookup is needed later, we should add `supabaseId` to Prisma User model.
-
-        // Let's proceed with finding user by email in the list.
-
-        const { data, error: listError } = await supabase.auth.admin.listUsers({
-            page: 1,
-            perPage: 1000 // Temporary limit
-        });
-
-        if (listError || !data.users) {
-            console.error(listError);
-            return { success: false, error: 'Supabaseユーザーの取得に失敗しました' };
-        }
-
-        const normalizedEmail = email.toLowerCase();
-        const supabaseUser = data.users.find(
-            (u) => (u.email || '').toLowerCase() === normalizedEmail
-        );
+        const { findSupabaseUserByEmail } = await import('@/lib/auth-admin');
+        const supabaseUser = await findSupabaseUserByEmail(email);
 
         if (!supabaseUser) {
             return { success: false, error: 'Supabaseユーザーが見つかりません' };
@@ -195,49 +141,21 @@ export async function createUser(data: { name: string; role: Role; password?: st
     }
 
     try {
-        const { createUser: createUserService } = await import('@/lib/user-service');
-        // If password is not provided, generate one but we need to know it to create Supabase user
-        // user-service generates one if missing, but returns the user object with hashed password.
-        // We need the raw password for Supabase creation.
-        // So we should generate it here if missing.
-
-        const rawPassword = result.data.password || Math.random().toString(36).slice(-8); // Simple fallback, or use user-service logic if exposed
-
-        // Actually `user-service` `createUser` accepts optional password and generates it if missing.
-        // But it hashes it immediately.
-        // We need raw password for Supabase.
-        // Let's modify the flow: Pass explicit password to service.
-
-        const finalPassword = result.data.password || Math.random().toString(36).slice(-8);
-
-        const user = await createUserService({
-            ...result.data,
-            password: finalPassword,
+        const { registerUser } = await import('@/lib/user-registration-service');
+        const regResult = await registerUser({
+            name: result.data.name,
+            role: result.data.role,
+            password: result.data.password,
             group: result.data.group,
             classroomId: result.data.classroomId
-        } as any);
-
-        // Register in Supabase
-        const { createOrUpdateSupabaseUser } = await import('@/lib/auth-admin');
-        const email = `${user.loginId}@sullivan-internal.local`;
-
-        const authResult = await createOrUpdateSupabaseUser({
-            email,
-            password: finalPassword,
-            role: user.role,
-            loginId: user.loginId,
-            name: user.name || '',
-            prismaUserId: user.id
         });
 
-        if (authResult.error) {
-            // Rollback Prisma
-            await prisma.user.delete({ where: { id: user.id } });
-            return { error: `Auth作成失敗: ${authResult.error}` };
+        if (regResult.error || !regResult.user) {
+            return { error: regResult.error };
         }
 
         revalidatePath('/admin/users');
-        return { success: true, user };
+        return { success: true, user: regResult.user };
     } catch (error) {
         console.error('Failed to create user:', error);
         return { error: 'ユーザーの作成に失敗しました' };

@@ -115,8 +115,9 @@ export async function processGamificationUpdates(
             }
         });
 
-        // 4. Check Achievements (Streak & Solve Count)
-        const unlockedAchievements = await checkAchievements(tx, userId, currentStreak);
+        // 4. Check Achievements (Streak & Solve Count & Perfect & Core Unlock)
+        const isPerfect = results.every(r => r.isCorrect);
+        const unlockedAchievements = await checkAchievements(tx, userId, currentStreak, false, isPerfect);
 
         // Add Achievement XP
         let achievementXp = 0;
@@ -162,7 +163,7 @@ export async function processVideoWatch(userId: string): Promise<GamificationUpd
         const user = await tx.user.findUniqueOrThrow({ where: { id: userId } });
 
         // Check Video Achievements
-        const unlockedAchievements = await checkAchievements(tx, userId, user.currentStreak, true);
+        const unlockedAchievements = await checkAchievements(tx, userId, user.currentStreak, true, false);
 
         // Add Achievement XP
         let achievementXp = 0;
@@ -198,7 +199,7 @@ export async function processVideoWatch(userId: string): Promise<GamificationUpd
 }
 
 // Helper to check achievements
-async function checkAchievements(tx: any, userId: string, currentStreak: number, isVideoCheck = false) {
+async function checkAchievements(tx: any, userId: string, currentStreak: number, isVideoCheck = false, isPerfectSession = false) {
     const unlockedAchievements: Achievement[] = [];
 
     // Optimize: Get user's unlocked achievement IDs first
@@ -215,6 +216,10 @@ async function checkAchievements(tx: any, userId: string, currentStreak: number,
     let totalSolvedCount = -1;
     let totalVideoCount = -1;
     let totalReviewCount = -1;
+    let totalPerfectCount = -1;
+
+    // Pre-fetch core problem counts if needed for efficiency, or fetch on demand
+    // For now, fetch on demand as these achievements are few.
 
     for (const achievement of pendingAchievements) {
         let isUnlocked = false;
@@ -279,6 +284,63 @@ async function checkAchievements(tx: any, userId: string, currentStreak: number,
             }
             const target = parseInt(achievement.slug.replace('review-', ''));
             if (!isNaN(target) && totalReviewCount >= target) isUnlocked = true;
+        }
+
+        // Perfect Logic
+        if (achievement.slug.startsWith('perfect-')) {
+            // First, if this session is NOT perfect and we need perfect, we rely on history.
+            // If this session IS perfect, we count it + history (or just rely on history logic if it includes current)
+            // Since this runs within transaction after saving results, history SHOULD theoretically include current session if it was saved?
+            // processGamificationUpdates calls this AFTER updates (but wait, results are not saved to LearningHistory in that function directly? 
+            // processGamificationUpdates is called from grading-service AFTER recordGradingResults, so DB should be up to date.)
+
+            if (totalPerfectCount === -1) {
+                // Count sessions (groups) where all answers were correct (no C or D)
+                const countResult = await tx.$queryRaw`
+                    SELECT COUNT(*) as count FROM (
+                        SELECT lh."groupId"
+                        FROM "LearningHistory" lh
+                        WHERE lh."userId" = ${userId} AND lh."groupId" IS NOT NULL
+                        GROUP BY lh."groupId"
+                        HAVING COUNT(CASE WHEN lh.evaluation IN ('C', 'D') THEN 1 END) = 0
+                    ) as perfect_sessions
+                `;
+                totalPerfectCount = Number((countResult as any)[0]?.count || 0);
+            }
+
+            const target = parseInt(achievement.slug.replace('perfect-', ''));
+            if (!isNaN(target) && totalPerfectCount >= target) isUnlocked = true;
+        }
+
+        // Core Unlock Logic (Subject Master)
+        if (achievement.slug.startsWith('core-unlock-')) {
+            const slugSuffix = achievement.slug.replace('core-unlock-', '');
+            let subjectName = '';
+            // Map slug suffix to Japanese Subject Name (as per seed.ts)
+            if (slugSuffix === 'english') subjectName = '英語';
+            else if (slugSuffix === 'math') subjectName = '数学';
+            else if (slugSuffix === 'japanese') subjectName = '国語'; // Assuming this might exist
+
+            if (subjectName) {
+                // Check if user has unlocked ALL core problems for this subject
+                const subject = await tx.subject.findUnique({
+                    where: { name: subjectName },
+                    include: { coreProblems: true }
+                });
+
+                if (subject && subject.coreProblems.length > 0) {
+                    const totalCoreProblems = subject.coreProblems.length;
+                    const unlockedCount = await tx.userCoreProblemState.count({
+                        where: {
+                            userId,
+                            coreProblemId: { in: subject.coreProblems.map((cp: any) => cp.id) },
+                            isUnlocked: true
+                        }
+                    });
+
+                    if (unlockedCount >= totalCoreProblems) isUnlocked = true;
+                }
+            }
         }
 
         if (isUnlocked) {

@@ -1,13 +1,13 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
+import { getSession, isTeacherOrAdmin } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 import { GuidanceType } from '@prisma/client';
 
 export async function updateStudentProfile(userId: string, formData: FormData) {
     const session = await getSession();
-    if (!session || (session.role !== 'TEACHER' && session.role !== 'ADMIN')) {
+    if (!isTeacherOrAdmin(session)) {
         return { error: '権限がありません' };
     }
 
@@ -65,7 +65,7 @@ export async function updateStudentProfile(userId: string, formData: FormData) {
 
 export async function addGuidanceRecord(userId: string, formData: FormData) {
     const session = await getSession();
-    if (!session || (session.role !== 'TEACHER' && session.role !== 'ADMIN')) {
+    if (!isTeacherOrAdmin(session)) {
         return { error: '権限がありません' };
     }
 
@@ -107,7 +107,7 @@ export async function addGuidanceRecord(userId: string, formData: FormData) {
 
 export async function deleteGuidanceRecord(recordId: string, studentId: string) {
     const session = await getSession();
-    if (!session || (session.role !== 'TEACHER' && session.role !== 'ADMIN')) {
+    if (!isTeacherOrAdmin(session)) {
         return { error: '権限がありません' };
     }
 

@@ -30,38 +30,22 @@ export async function signupAction(prevState: any, formData: FormData) {
 
     const { name, password, role, group, classroomId } = result.data;
 
-    // 3. Create user using service to ensure consistent ID generation
+    // 3. Register user using shared service
     try {
-        const { createUser } = await import('@/lib/user-service');
-        const user = await createUser({
+        const { registerUser } = await import('@/lib/user-registration-service');
+        const regResult = await registerUser({
             name,
             password,
-            role, // Use the role selected in UI
+            role,
             group,
             classroomId
         });
 
-        // 4. Register in Supabase (using shared Admin logic)
-        const { createOrUpdateSupabaseUser } = await import('@/lib/auth-admin');
-        const email = `${user.loginId}@sullivan-internal.local`;
-
-        const authResult = await createOrUpdateSupabaseUser({
-            email,
-            password,
-            role,
-            loginId: user.loginId,
-            name: user.name || '',
-            prismaUserId: user.id
-        });
-
-        if (authResult.error) {
-            // Rollback: Delete Prisma user if Supabase registration fails
-            await prisma.user.delete({ where: { id: user.id } });
-            console.error('Supabase registration failed:', authResult.error);
-            return { error: 'アカウント作成に失敗しました(Auth)。' };
+        if (regResult.error || !regResult.user) {
+            return { error: regResult.error };
         }
 
-        return { success: true, loginId: user.loginId };
+        return { success: true, loginId: regResult.user.loginId };
     } catch (error) {
         console.error(error);
         return { error: 'ユーザー作成に失敗しました。もう一度お試しください。' };

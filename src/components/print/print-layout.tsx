@@ -81,7 +81,7 @@ export function PrintLayout({ studentName, subjectName, problems, studentLoginId
                     const answerRow = answerMeasureRef.current.firstElementChild as HTMLElement;
                     if (answerRow) {
                         const rowHeight = answerRow.offsetHeight;
-                        const gap = 32; // gap-8 = 2rem = 32px
+                        const gap = 48; // gap-12 = 3rem = 48px
                         const maxQuestions = Math.floor((availableHeight + gap) / (rowHeight + gap));
                         safeLimit = Math.min(currentSetProblems.length, maxQuestions);
                     }
@@ -280,8 +280,8 @@ export function PrintLayout({ studentName, subjectName, problems, studentLoginId
                                         </div>
                                     )}
 
-                                    <div className="flex-1 mt-8">
-                                        <div className="flex flex-col gap-8">
+                                    <div className="flex-1 mt-16">
+                                        <div className="flex flex-col gap-12">
                                             {flatSetProblems.map((problem, index) => (
                                                 <div key={problem.id} className="flex gap-4 items-end break-inside-avoid">
                                                     <div className="font-bold min-w-[5.5rem] text-right text-xl whitespace-nowrap shrink-0">{problem.customId || index + 1}.</div>

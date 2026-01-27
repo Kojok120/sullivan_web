@@ -42,20 +42,7 @@ export async function createOrUpdateSupabaseUser({
 
     // If user exists, try to update
     if (createError.code === 'email_exists') {
-        const { data: listData, error: listError } = await supabaseAdmin.auth.admin.listUsers({
-            page: 1,
-            perPage: 1000,
-        });
-
-        if (listError || !listData?.users) {
-            console.error('Supabase listUsers failed:', listError);
-            return { error: 'Failed to check existing user' };
-        }
-
-        const normalizedEmail = email.toLowerCase();
-        const existing = listData.users.find(
-            (u) => (u.email || '').toLowerCase() === normalizedEmail
-        );
+        const existing = await findSupabaseUserByEmail(email);
 
         if (!existing) {
             console.error('Supabase user not found for email:', email);
@@ -90,4 +77,51 @@ export async function createOrUpdateSupabaseUser({
 
     console.error('Supabase registration failed:', createError);
     return { error: createError.message };
+}
+
+/**
+ * Finds a Supabase user by email with pagination support.
+ * Essential for apps with > 50 users (default limit).
+ */
+export async function findSupabaseUserByEmail(email: string) {
+    const supabaseAdmin = createAdminClient();
+    const normalizedEmail = email.toLowerCase();
+
+    let page = 1;
+    const perPage = 50; // Use default or manageable chunk
+    let hasMore = true;
+
+    // TODO: Ideally we should use search if supported, or rely on ID mapping.
+    // Since listUsers doesn't support email filter on server-side JS client easily (unlike generic filtering),
+    // we paginate. 
+    // Optimization: If we have thousands of users, this is still O(N).
+    // A better approach in the future is to store `supabase_id` in Prisma `User` table.
+
+    while (hasMore) {
+        const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers({
+            page,
+            perPage,
+        });
+
+        if (error || !users || users.length === 0) {
+            break;
+        }
+
+        const found = users.find(u => (u.email || '').toLowerCase() === normalizedEmail);
+        if (found) return found;
+
+        if (users.length < perPage) {
+            hasMore = false;
+        } else {
+            page++;
+        }
+
+        // Safety break to prevent infinite loops or timeout on really large DBs without better search
+        if (page > 50) {
+            console.warn('findSupabaseUserByEmail: Exceeded 50 pages search limit. User might not be found.');
+            break;
+        }
+    }
+
+    return null;
 }

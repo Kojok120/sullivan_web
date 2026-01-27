@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useMemo } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -45,6 +45,9 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
 
     // Map of CoreProblem name -> CoreProblem data (auto-resolved)
     const [resolvedCoreProblems, setResolvedCoreProblems] = useState<Map<string, { id: string, name: string, subject: { name: string } }>>(new Map());
+
+    const validItems = useMemo(() => parsedData.filter(p => p.isValid), [parsedData]);
+    const validCount = validItems.length;
 
     // parseTSV is now imported from @/lib/tsv-parser
 
@@ -98,8 +101,7 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
     };
 
     const handleExecute = () => {
-        const validItems = parsedData.filter(p => p.isValid);
-        if (validItems.length === 0) return;
+        if (validCount === 0) return;
 
         startTransition(async () => {
             const problems = validItems.map(p => {
@@ -286,9 +288,9 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
                         ) : (
                             <>
                                 <Button variant="ghost" onClick={() => setStep('input')}>戻る</Button>
-                                <Button onClick={handleExecute} disabled={isPending || parsedData.filter(p => p.isValid).length === 0}>
+                                <Button onClick={handleExecute} disabled={isPending || validCount === 0}>
                                     {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                                    登録実行 ({parsedData.filter(p => p.isValid).length}件)
+                                    登録実行 ({validCount}件)
                                 </Button>
                             </>
                         )}

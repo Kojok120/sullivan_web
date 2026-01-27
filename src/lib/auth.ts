@@ -45,6 +45,18 @@ export async function requireAdmin() {
     return session;
 }
 
+export function isTeacherOrAdmin(session: SessionPayload | null): session is SessionPayload {
+    return !!session && (session.role === 'TEACHER' || session.role === 'ADMIN');
+}
+
+export async function requireTeacherOrAdmin() {
+    const session = await getSession();
+    if (!isTeacherOrAdmin(session)) {
+        throw new Error('Unauthorized');
+    }
+    return session;
+}
+
 export async function hashPassword(password: string) {
     return await bcrypt.hash(password, 10);
 }

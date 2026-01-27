@@ -1,4 +1,4 @@
-import { getSession } from '@/lib/auth';
+import { getSession, isTeacherOrAdmin } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -21,7 +21,7 @@ export default async function TeacherStudentDetailPage({
     params: { userId: string };
 }) {
     const session = await getSession();
-    if (!session || (session.role !== 'TEACHER' && session.role !== 'ADMIN')) redirect('/login');
+    if (!isTeacherOrAdmin(session)) redirect('/login');
 
     const { userId } = await params;
 

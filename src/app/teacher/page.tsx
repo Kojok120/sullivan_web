@@ -1,4 +1,4 @@
-import { getSession } from '@/lib/auth';
+import { getSession, isTeacherOrAdmin } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 // Table imports removed as they are unused
@@ -15,7 +15,7 @@ export default async function TeacherDashboardPage({
     searchParams: Promise<{ q?: string }>;
 }) {
     const session = await getSession();
-    if (!session || (session.role !== 'TEACHER' && session.role !== 'ADMIN')) redirect('/login');
+    if (!isTeacherOrAdmin(session)) redirect('/login');
 
     const { q: query } = await searchParams;
 
