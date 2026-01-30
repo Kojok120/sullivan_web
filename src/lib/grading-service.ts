@@ -1180,6 +1180,11 @@ export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: strin
                     coreProblems: {
                         // [Optimization] lectureVideos is a scalar, so it's included by default.
                         // We just order them.
+                        include: {
+                            _count: {
+                                select: { problems: true }
+                            }
+                        },
                         orderBy: { order: 'asc' }
                     }
                 }
@@ -1264,49 +1269,64 @@ export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: strin
             console.log(`  -> Index: ${currentIndex} / ${subjectCps.length}`);
 
             if (currentIndex !== -1 && currentIndex < subjectCps.length - 1) {
-                const nextCp = subjectCps[currentIndex + 1];
+                let nextIndex = currentIndex + 1;
 
-                // Unlock Next CP
-                // [Optimization] Use pre-fetched lecture videos from nextCp (which is from subject.coreProblems)
-                const lectureVideos = nextCp.lectureVideos;
+                // [MODIFIED] Recursive Unlock Logic
+                // If the next CP has 0 problems, unlock it AND continue to the next one.
+                while (nextIndex < subjectCps.length) {
+                    const nextCp = subjectCps[nextIndex];
 
-                // Unlock Next CP
-                await prisma.userCoreProblemState.upsert({
-                    where: {
-                        userId_coreProblemId: {
+                    // Unlock Next CP
+                    await prisma.userCoreProblemState.upsert({
+                        where: {
+                            userId_coreProblemId: {
+                                userId,
+                                coreProblemId: nextCp.id
+                            }
+                        },
+                        create: {
                             userId,
-                            coreProblemId: nextCp.id
-                        }
-                    },
-                    create: {
-                        userId,
-                        coreProblemId: nextCp.id,
-                        isUnlocked: true,
-                        priority: 0
-                    },
-                    update: {
-                        isUnlocked: true
-                    }
-                });
-                console.log(`Unlocked CoreProblem ${nextCp.name} for user ${userId}. Preparing to emit event...`);
-
-                // 講義動画情報の確認ログ
-                console.log(`  -> LectureVideos found: ${lectureVideos ? 'YES' : 'NO'}`);
-
-                // アンロック通知イベントを発行
-                try {
-                    await emitRealtimeEvent({
-                        userId,
-                        type: 'core_problem_unlocked',
-                        payload: {
                             coreProblemId: nextCp.id,
-                            coreProblemName: nextCp.name,
-                            lectureVideos: lectureVideos || null
+                            isUnlocked: true,
+                            priority: 0
+                        },
+                        update: {
+                            isUnlocked: true
                         }
                     });
-                    console.log(`Emitted core_problem_unlocked event for user ${userId}, CP ${nextCp.name}`);
-                } catch (e) {
-                    console.error('[Realtime] Failed to emit core_problem_unlocked event:', e);
+                    console.log(`Unlocked CoreProblem ${nextCp.name} (recursive).`);
+
+                    // 講義動画情報の確認ログ
+                    console.log(`  -> LectureVideos found: ${nextCp.lectureVideos ? 'YES' : 'NO'}`);
+
+                    // アンロック通知イベントを発行
+                    try {
+                        await emitRealtimeEvent({
+                            userId,
+                            type: 'core_problem_unlocked',
+                            payload: {
+                                coreProblemId: nextCp.id,
+                                coreProblemName: nextCp.name,
+                                lectureVideos: nextCp.lectureVideos || null
+                            }
+                        });
+                        console.log(`Emitted core_problem_unlocked event for user ${userId}, CP ${nextCp.name}`);
+                    } catch (e) {
+                        console.error('[Realtime] Failed to emit core_problem_unlocked event:', e);
+                    }
+
+                    // Count checks to see if we should stop
+                    // Note: We need to rely on the fetched count.
+                    const pCount = (nextCp as any)._count?.problems ?? 0;
+
+                    if (pCount > 0) {
+                        console.log(`  -> CP ${nextCp.name} has ${pCount} problems. Stopping recursion.`);
+                        // We found a unit with problems, so we stop unlocking further.
+                        break;
+                    } else {
+                        console.log(`  -> CP ${nextCp.name} has 0 problems. Continuing to next CP...`);
+                        nextIndex++;
+                    }
                 }
             } else {
                 console.log(`  -> No next CP found (or is last).`);
