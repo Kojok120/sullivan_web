@@ -15,6 +15,7 @@ export interface CreateProblemData {
     coreProblemIds: string[];
     order?: number;
     subjectId?: string; // customId生成に使用
+    masterNumber?: number;
 }
 
 export type BulkCreateOptions = {
@@ -80,6 +81,7 @@ export async function createProblemCore(
             answer: data.answer,
             acceptedAnswers: data.acceptedAnswers || [],
             grade: data.grade,
+            masterNumber: data.masterNumber,
             videoUrl: data.videoUrl,
             customId,
             order,
@@ -259,6 +261,7 @@ export async function bulkCreateProblemsCore(
                         answer: p.answer,
                         acceptedAnswers: p.acceptedAnswers || [],
                         grade: p.grade,
+                        masterNumber: p.masterNumber,
                         videoUrl: p.videoUrl,
                         customId,
                         order,
@@ -279,4 +282,84 @@ export async function bulkCreateProblemsCore(
     }
 
     return { count: createdCount, warnings };
+}
+
+/**
+ * 問題の一括作成・更新 (Upsert)
+ * masterNumberが一致する既存問題があれば更新、なければ新規作成
+ */
+export async function bulkUpsertProblemsCore(
+    problems: CreateProblemData[],
+    options: BulkCreateOptions = {},
+    client: any = prisma
+): Promise<{ createdCount: number; updatedCount: number; warnings: string[] }> {
+    const warnings: string[] = [];
+    if (problems.length === 0) return { createdCount: 0, updatedCount: 0, warnings };
+
+    // 1. Identify existing masterNumbers
+    const inputMasterNumbers = problems
+        .map(p => p.masterNumber)
+        .filter((n): n is number => n !== undefined && n !== null);
+
+    const existingProblemsMap = new Map<number, string>(); // masterNumber -> problemId
+
+    if (inputMasterNumbers.length > 0) {
+        const existing = await client.problem.findMany({
+            where: { masterNumber: { in: inputMasterNumbers } },
+            select: { id: true, masterNumber: true }
+        });
+        existing.forEach((p: any) => existingProblemsMap.set(p.masterNumber!, p.id));
+    }
+
+    const toCreate: CreateProblemData[] = [];
+    const toUpdate: (CreateProblemData & { id: string })[] = [];
+
+    for (const p of problems) {
+        if (p.masterNumber && existingProblemsMap.has(p.masterNumber)) {
+            toUpdate.push({ ...p, id: existingProblemsMap.get(p.masterNumber)! });
+        } else {
+            toCreate.push(p);
+        }
+    }
+
+    // 2. Handle Creations
+    let createdCount = 0;
+    if (toCreate.length > 0) {
+        const createResult = await bulkCreateProblemsCore(toCreate, options, client);
+        createdCount = createResult.count;
+        warnings.push(...createResult.warnings);
+    }
+
+    // 3. Handle Updates
+    let updatedCount = 0;
+    if (toUpdate.length > 0) {
+        const batchSize = options.batchSize || 50;
+        for (let i = 0; i < toUpdate.length; i += batchSize) {
+            const batch = toUpdate.slice(i, i + batchSize);
+            try {
+                const updateOperations = batch.map(p => {
+                    return client.problem.update({
+                        where: { id: p.id },
+                        data: {
+                            question: p.question,
+                            answer: p.answer,
+                            acceptedAnswers: p.acceptedAnswers || [],
+                            grade: p.grade,
+                            videoUrl: p.videoUrl,
+                            coreProblems: {
+                                set: p.coreProblemIds.map(id => ({ id }))
+                            }
+                        }
+                    });
+                });
+
+                await client.$transaction(updateOperations);
+                updatedCount += batch.length;
+            } catch (error) {
+                warnings.push(`更新バッチ処理エラー (${i + 1}〜${Math.min(i + batchSize, toUpdate.length)}件目): ${error}`);
+            }
+        }
+    }
+
+    return { createdCount, updatedCount, warnings };
 }

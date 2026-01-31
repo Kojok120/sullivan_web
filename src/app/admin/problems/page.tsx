@@ -28,7 +28,7 @@ export default async function ProblemsPage({
         : [];
 
     // Initial data fetch
-    const { problems, total, error } = await getProblems(
+    const result = await getProblems(
         page,
         20,
         query,
@@ -41,16 +41,18 @@ export default async function ProblemsPage({
         sortOrder
     );
 
-    if (error) {
-        return <div className="p-8 text-red-500">{error}</div>;
+    if (!result || 'error' in result) {
+        return <div className="p-8 text-red-500">{result?.error || 'Unknown error'}</div>;
     }
+
+    const { problems, total } = result;
 
     return (
         <div className="container mx-auto py-8">
             <h1 className="text-2xl font-bold mb-6">問題管理</h1>
             <Suspense fallback={<div>Loading...</div>}>
                 <ProblemManager
-                    initialProblems={problems || []}
+                    initialProblems={problems as any}
                     totalCount={total || 0}
                     currentPage={page}
                     initialQuery={query}

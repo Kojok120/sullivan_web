@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Check, AlertTriangle, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { bulkCreateStandaloneProblems, bulkSearchCoreProblems } from '../actions';
+import { bulkUpsertStandaloneProblems, bulkSearchCoreProblems, searchProblemsByMasterNumbers } from '../actions';
 import { toast } from 'sonner';
 import { parseProblemTSV } from '@/lib/tsv-parser';
 import { CoreProblemSelector, SelectedCoreProblem } from './core-problem-selector';
@@ -21,6 +21,7 @@ interface BulkImportDialogProps {
 }
 
 interface ParsedProblem {
+    masterNumber?: number;
     question: string;
     answer: string;
     acceptedAnswers?: string[];
@@ -30,6 +31,7 @@ interface ParsedProblem {
     coreProblemNames?: string[];
     isValid: boolean;
     error?: string;
+    existingProblem?: any;
 }
 
 export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDialogProps) {
@@ -46,7 +48,58 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
     // Map of CoreProblem name -> CoreProblem data (auto-resolved)
     const [resolvedCoreProblems, setResolvedCoreProblems] = useState<Map<string, { id: string, name: string, subject: { name: string } }>>(new Map());
 
-    const validItems = useMemo(() => parsedData.filter(p => p.isValid), [parsedData]);
+    const visibleItems = useMemo(() => {
+        return parsedData.filter(row => {
+            const isUpdate = !!row.existingProblem;
+            // New items are always visible
+            if (!isUpdate) return true;
+
+            const old = row.existingProblem;
+
+            // Diff checks
+            const isQuestionChanged = old.question !== row.question;
+            const isAnswerChanged = (old.answer || '') !== (row.answer || '');
+            const isGradeChanged = (old.grade || '') !== (row.grade || '');
+            // const isVideoChanged = (old.videoUrl || '') !== (row.videoUrl || ''); // Video URL comparison strictly?
+            // Handle null/empty string normalization for videoUrl
+            const oldVideo = old.videoUrl || '';
+            const newVideo = row.videoUrl || '';
+            const isVideoChanged = oldVideo !== newVideo;
+
+            // Core problem diff logic
+            let isCpChanged = false;
+            const newIds = new Set<string>();
+            // Add manual selections
+            coreProblems.forEach(cp => newIds.add(cp.id));
+
+            // Add row specific resolved
+            if (row.coreProblemNames) {
+                row.coreProblemNames.forEach(name => {
+                    const resolved = resolvedCoreProblems.get(name);
+                    if (resolved) newIds.add(resolved.id);
+                });
+            } else if (row.coreProblemName) {
+                const resolved = resolvedCoreProblems.get(row.coreProblemName);
+                if (resolved) newIds.add(resolved.id);
+            }
+
+            const oldIds = new Set(old.coreProblems.map((cp: any) => cp.id));
+
+            if (newIds.size !== oldIds.size) isCpChanged = true;
+            else {
+                for (const id of newIds) {
+                    if (!oldIds.has(id)) {
+                        isCpChanged = true;
+                        break;
+                    }
+                }
+            }
+
+            return isQuestionChanged || isAnswerChanged || isGradeChanged || isVideoChanged || isCpChanged;
+        });
+    }, [parsedData, coreProblems, resolvedCoreProblems]);
+
+    const validItems = useMemo(() => visibleItems.filter(p => p.isValid), [visibleItems]);
     const validCount = validItems.length;
 
     // parseTSV is now imported from @/lib/tsv-parser
@@ -69,6 +122,7 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
             }
 
             return {
+                masterNumber: row.masterNumber,
                 question: row.question,
                 answer: row.answer,
                 acceptedAnswers: row.acceptedAnswers.length > 0 ? row.acceptedAnswers : undefined,
@@ -96,7 +150,25 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
         }
         setResolvedCoreProblems(newResolvedMap);
 
-        setParsedData(parsed);
+        // [Upsert] Existing problems lookup
+        const masterNumbers = parsed.map(p => p.masterNumber).filter((n): n is number => n !== undefined && n !== null);
+        const uniqueMasterNumbers = Array.from(new Set(masterNumbers));
+
+        let existingMap = new Map<number, any>();
+        if (uniqueMasterNumbers.length > 0) {
+            const { problems } = await searchProblemsByMasterNumbers(uniqueMasterNumbers);
+            if (problems) {
+                problems.forEach(p => existingMap.set(p.masterNumber!, p));
+            }
+        }
+
+        // Attach existing data to parsed rows
+        const enhancedParsed = parsed.map(p => ({
+            ...p,
+            existingProblem: p.masterNumber ? existingMap.get(p.masterNumber) : undefined
+        }));
+
+        setParsedData(enhancedParsed);
         setStep('preview');
     };
 
@@ -128,6 +200,7 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
                 }
 
                 return {
+                    masterNumber: p.masterNumber,
                     question: p.question,
                     answer: p.answer,
                     acceptedAnswers: p.acceptedAnswers,
@@ -137,10 +210,10 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
                 };
             });
 
-            const result = await bulkCreateStandaloneProblems(problems);
+            const result = await bulkUpsertStandaloneProblems(problems);
 
             if (result.success) {
-                toast.success(`${result.count}件の問題を作成しました`, {
+                toast.success(`${result.createdCount}件作成、${result.updatedCount}件更新しました`, {
                     style: { background: '#3b82f6', color: 'white' }
                 });
                 if (result.warnings && result.warnings.length > 0) {
@@ -171,9 +244,10 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
             <Dialog open={open} onOpenChange={onOpenChange}>
                 <DialogContent className="!max-w-none w-[95vw] h-[90vh] flex flex-col overflow-hidden">
                     <DialogHeader>
-                        <DialogTitle>問題の一括登録</DialogTitle>
+                        <DialogTitle>問題の一括登録・更新</DialogTitle>
                         <DialogDescription>
-                            Excelやスプレッドシートからコピー＆ペーストで一括登録できます。
+                            Excelやスプレッドシートからコピー＆ペーストで一括登録・更新できます。<br />
+                            マスタ内問題番号が既存の場合は更新、新規の場合は作成されます。
                         </DialogDescription>
                     </DialogHeader>
 
@@ -182,11 +256,11 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
                             <Alert>
                                 <AlertTitle>フォーマット</AlertTitle>
                                 <AlertDescription>
-                                    タブ区切り: [学年] [CoreProblem名] [問題文] [正解] [別解(任意)] [動画URL(任意)]
+                                    タブ区切り: [マスタ内問題番号(任意)] [学年] [CoreProblem名] [問題文] [正解] [別解(任意)] [動画URL(任意)]
                                 </AlertDescription>
                             </Alert>
                             <Textarea
-                                placeholder={`例:\n中1\tbe動詞の文_肯定文\t私は新入生です I (A) a new student.\tA: am\t\thttps://youtube.com/...`}
+                                placeholder={`例:\n1001\t中1\tbe動詞の文_肯定文\t私は新入生です I (A) a new student.\tA: am\t\thttps://youtube.com/...`}
                                 value={rawInput}
                                 onChange={(e) => setRawInput(e.target.value)}
                                 className="font-mono text-sm flex-1 min-h-[300px]"
@@ -230,6 +304,8 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead className="w-[50px]">状態</TableHead>
+                                            <TableHead>タイプ</TableHead>
+                                            <TableHead>マスタNo</TableHead>
                                             <TableHead>学年</TableHead>
                                             <TableHead>コア問題</TableHead>
                                             <TableHead>問題文</TableHead>
@@ -239,41 +315,96 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {parsedData.map((row, i) => (
-                                            <TableRow key={i} className={!row.isValid ? 'bg-destructive/10' : ''}>
-                                                <TableCell>
-                                                    {row.isValid ? (
-                                                        <Check className="w-4 h-4 text-green-500" />
-                                                    ) : (
-                                                        <span title={row.error}>
-                                                            <AlertTriangle className="w-4 h-4 text-red-500" />
-                                                        </span>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell>{row.grade}</TableCell>
-                                                <TableCell className="max-w-[150px]">
-                                                    {row.coreProblemNames && row.coreProblemNames.length > 0 ? (
-                                                        <div className="flex flex-wrap gap-1">
-                                                            {row.coreProblemNames.map(name => {
-                                                                const isResolved = resolvedCoreProblems.has(name);
-                                                                return (
-                                                                    <span key={name} className={`text-xs px-1 rounded border ${isResolved ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
-                                                                        {name}
-                                                                        {!isResolved && ' (?)'}
-                                                                    </span>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    ) : (
-                                                        row.coreProblemName || '-'
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="max-w-[200px] truncate" title={row.question}>{row.question}</TableCell>
-                                                <TableCell className="max-w-[100px] truncate" title={row.answer}>{row.answer}</TableCell>
-                                                <TableCell className="max-w-[80px] truncate">{row.acceptedAnswers?.join(', ')}</TableCell>
-                                                <TableCell className="max-w-[80px] truncate">{row.videoUrl}</TableCell>
-                                            </TableRow>
-                                        ))}
+                                        {visibleItems.map((row, i) => {
+                                            const isUpdate = !!row.existingProblem;
+                                            const old = row.existingProblem;
+
+                                            // Diff checks (Re-calculate for highlighting, or extracted?)
+                                            // Since we already filtered, we know if it's update, it MUST have changes.
+                                            // But we still need to know WHICH fields changed for highlighting.
+
+                                            let isQuestionChanged = false;
+                                            let isAnswerChanged = false;
+                                            let isGradeChanged = false;
+                                            let isVideoChanged = false;
+                                            let isCpChanged = false;
+
+                                            if (isUpdate) {
+                                                isQuestionChanged = old.question !== row.question;
+                                                isAnswerChanged = (old.answer || '') !== (row.answer || '');
+                                                isGradeChanged = (old.grade || '') !== (row.grade || '');
+                                                const oldVideo = old.videoUrl || '';
+                                                const newVideo = row.videoUrl || '';
+                                                isVideoChanged = oldVideo !== newVideo;
+
+                                                const newIds = new Set<string>();
+                                                coreProblems.forEach(cp => newIds.add(cp.id));
+                                                if (row.coreProblemNames) {
+                                                    row.coreProblemNames.forEach(name => {
+                                                        const resolved = resolvedCoreProblems.get(name);
+                                                        if (resolved) newIds.add(resolved.id);
+                                                    });
+                                                } else if (row.coreProblemName) {
+                                                    const resolved = resolvedCoreProblems.get(row.coreProblemName);
+                                                    if (resolved) newIds.add(resolved.id);
+                                                }
+
+                                                const oldIds = new Set(old.coreProblems.map((cp: any) => cp.id));
+                                                if (newIds.size !== oldIds.size) isCpChanged = true;
+                                                else {
+                                                    for (const id of newIds) {
+                                                        if (!oldIds.has(id)) {
+                                                            isCpChanged = true;
+                                                            break;
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            return (
+                                                <TableRow key={i} className={!row.isValid ? 'bg-destructive/10' : ''}>
+                                                    <TableCell>
+                                                        {row.isValid ? (
+                                                            <Check className="w-4 h-4 text-green-500" />
+                                                        ) : (
+                                                            <span title={row.error}>
+                                                                <AlertTriangle className="w-4 h-4 text-red-500" />
+                                                            </span>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {isUpdate ? (
+                                                            <Badge variant="secondary" className="bg-orange-100 text-orange-800 hover:bg-orange-100">更新</Badge>
+                                                        ) : (
+                                                            <Badge variant="outline" className="bg-blue-50 text-blue-800 hover:bg-blue-50">新規</Badge>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell className="font-mono">{row.masterNumber || '-'}</TableCell>
+                                                    <TableCell className={isGradeChanged ? 'bg-blue-50 text-blue-700 font-medium' : ''}>{row.grade}</TableCell>
+                                                    <TableCell className={`max-w-[150px] ${isCpChanged ? 'bg-blue-50' : ''}`}>
+                                                        {row.coreProblemNames && row.coreProblemNames.length > 0 ? (
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {row.coreProblemNames.map(name => {
+                                                                    const isResolved = resolvedCoreProblems.has(name);
+                                                                    return (
+                                                                        <span key={name} className={`text-xs px-1 rounded border ${isResolved ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
+                                                                            {name}
+                                                                            {!isResolved && ' (?)'}
+                                                                        </span>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        ) : (
+                                                            row.coreProblemName || '-'
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell className={`max-w-[200px] truncate ${isQuestionChanged ? 'bg-blue-50 text-blue-700 font-medium' : ''}`} title={row.question}>{row.question}</TableCell>
+                                                    <TableCell className={`max-w-[100px] truncate ${isAnswerChanged ? 'bg-blue-50 text-blue-700 font-medium' : ''}`} title={row.answer}>{row.answer}</TableCell>
+                                                    <TableCell className="max-w-[80px] truncate">{row.acceptedAnswers?.join(', ')}</TableCell>
+                                                    <TableCell className={`max-w-[80px] truncate ${isVideoChanged ? 'bg-blue-50 text-blue-700 font-medium' : ''}`}>{row.videoUrl}</TableCell>
+                                                </TableRow>
+                                            );
+                                        })}
                                     </TableBody>
                                 </Table>
                             </div>

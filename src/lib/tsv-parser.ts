@@ -77,6 +77,7 @@ export function parseTSV(input: string): string[][] {
  * カラム: [学年] [CoreProblem名] [問題文] [正解] [別解(任意)] [動画URL(任意)]
  */
 export interface ParsedProblemRow {
+    masterNumber?: number; // 新規: マスタ内問題番号
     grade: string;
     coreProblemName: string;
     coreProblemNames: string[]; // 複数対応 (改行・カンマ区切り)
@@ -89,22 +90,32 @@ export interface ParsedProblemRow {
 export function parseProblemTSV(input: string, skipHeader = true): ParsedProblemRow[] {
     const rows = parseTSV(input);
 
-    // Skip header row if it contains "学年" or "CoreProblem"
+    // Skip header row if it contains "マスタ内問題番号" or similar
     const dataRows = skipHeader
         ? rows.filter(cols => {
             const firstCol = cols[0];
-            return firstCol !== '学年' && !firstCol?.toLowerCase().includes('coreproblem');
+            return !firstCol?.includes('マスタ') && !firstCol?.includes('学年');
         })
         : rows;
 
     return dataRows.map(cols => {
-        // 0: Grade, 1: CoreProblem(s), 2: Question, 3: Answer, 4: Accepted (opt), 5: Video (opt)
-        const grade = cols[0] || '';
-        const cpRaw = cols[1] || '';
-        const question = cols[2] || '';
-        const answer = cols[3] || '';
-        const acceptedRaw = cols[4] || '';
-        const videoUrl = cols[5] || '';
+        // New Format:
+        // 0: MasterNumber, 1: Grade, 2: CoreProblem(s), 3: Question, 4: Answer, 5: Accepted (opt), 6: Video (opt)
+
+        let masterNumber: number | undefined;
+        if (cols[0]) {
+            const parsed = parseInt(cols[0].replace(/[^\d]/g, ''), 10);
+            if (!isNaN(parsed)) {
+                masterNumber = parsed;
+            }
+        }
+
+        const grade = cols[1] || '';
+        const cpRaw = cols[2] || '';
+        const question = cols[3] || '';
+        const answer = cols[4] || '';
+        const acceptedRaw = cols[5] || '';
+        const videoUrl = cols[6] || '';
 
         // Parse CoreProblem names (can be comma or newline separated)
         const coreProblemNames = cpRaw.split(/[,\n、]+/).map(s => s.trim()).filter(Boolean);
@@ -116,6 +127,7 @@ export function parseProblemTSV(input: string, skipHeader = true): ParsedProblem
             : [];
 
         return {
+            masterNumber,
             grade,
             coreProblemName,
             coreProblemNames,

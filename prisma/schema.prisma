@@ -38,6 +38,7 @@ model Problem {
   customId        String?            @unique // Custom ID (e.g., E-1, S-10)
   acceptedAnswers String[]           @default([]) // 許容解答（複数）
   grade           String?            // 学年 (e.g., "中1", "高2")
+  masterNumber    Int?               @unique // マスタ内問題番号
   coreProblems    CoreProblem[]
   order           Int // Chain order
   videoUrl        String? // For C/D feedback

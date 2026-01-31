@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/alert-dialog';
 
 interface ProblemWithRelations extends Problem {
+    masterNumber: number | null; // Explicitly add specific field if not picked up
     coreProblems: {
         id: string;
         name: string;
@@ -144,7 +145,15 @@ export function ProblemList({ problems, onEdit, sortBy, sortOrder, onSort }: Pro
                         <TableRow>
                             <TableHead className="w-[50px]"></TableHead>
                             <TableHead
-                                className="w-[120px] cursor-pointer hover:bg-muted/50"
+                                className="w-[100px] cursor-pointer hover:bg-muted/50"
+                                onClick={() => onSort('masterNumber')}
+                            >
+                                <div className="flex items-center">
+                                    マスタNo <SortIcon column="masterNumber" />
+                                </div>
+                            </TableHead>
+                            <TableHead
+                                className="w-[120px] cursor-pointer hover:bg-muted/50" // kept ID column just in case
                                 onClick={() => onSort('customId')}
                             >
                                 <div className="flex items-center">
@@ -160,7 +169,7 @@ export function ProblemList({ problems, onEdit, sortBy, sortOrder, onSort }: Pro
                     <TableBody>
                         {problems.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                                     問題が見つかりませんでした
                                 </TableCell>
                             </TableRow>
@@ -173,7 +182,8 @@ export function ProblemList({ problems, onEdit, sortBy, sortOrder, onSort }: Pro
                                             onCheckedChange={(checked) => handleCheckChange(problem.id, checked === true)}
                                         />
                                     </TableCell>
-                                    <TableCell className="font-mono text-xs">{problem.customId || '-'}</TableCell>
+                                    <TableCell className="font-mono text-sm font-bold">{problem.masterNumber || '-'}</TableCell>
+                                    <TableCell className="font-mono text-xs text-muted-foreground">{problem.customId || '-'}</TableCell>
                                     <TableCell className="min-w-[200px] whitespace-pre-wrap" title={problem.question}>
                                         {problem.question}
                                     </TableCell>

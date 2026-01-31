@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { CoreProblemSelector, SelectedCoreProblem } from './core-problem-selector';
 
 interface ProblemWithRelations extends Problem {
+    masterNumber: number | null;
     coreProblems: {
         id: string;
         name: string;
@@ -33,6 +34,7 @@ export function ProblemDialog({ open, onOpenChange, problem, onSuccess }: Proble
     const [question, setQuestion] = useState('');
     const [answer, setAnswer] = useState('');
     const [grade, setGrade] = useState('');
+    const [masterNumber, setMasterNumber] = useState<number | undefined>(undefined);
     const [videoUrl, setVideoUrl] = useState('');
     const [coreProblems, setCoreProblems] = useState<SelectedCoreProblem[]>([]);
 
@@ -42,6 +44,7 @@ export function ProblemDialog({ open, onOpenChange, problem, onSuccess }: Proble
                 setQuestion(problem.question);
                 setAnswer(problem.answer || '');
                 setGrade(problem.grade || '');
+                setMasterNumber(problem.masterNumber || undefined);
                 setVideoUrl(problem.videoUrl || '');
                 setCoreProblems(problem.coreProblems || []);
             } else {
@@ -49,6 +52,7 @@ export function ProblemDialog({ open, onOpenChange, problem, onSuccess }: Proble
                 setQuestion('');
                 setAnswer('');
                 setGrade('');
+                setMasterNumber(undefined);
                 setVideoUrl('');
                 setCoreProblems([]);
             }
@@ -62,6 +66,7 @@ export function ProblemDialog({ open, onOpenChange, problem, onSuccess }: Proble
                 question,
                 answer,
                 grade: grade || undefined,
+                masterNumber,
                 videoUrl: videoUrl || undefined,
                 coreProblemIds: coreProblems.map(cp => cp.id),
             };
@@ -92,15 +97,26 @@ export function ProblemDialog({ open, onOpenChange, problem, onSuccess }: Proble
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit} className="space-y-6 py-4">
-                    <div className="space-y-2">
-                        <Label>問題文</Label>
-                        <Textarea
-                            required
-                            value={question}
-                            onChange={e => setQuestion(e.target.value)}
-                            placeholder="問題文を入力してください"
-                            rows={3}
-                        />
+                    <div className="flex space-x-4">
+                        <div className="flex-1 space-y-2">
+                            <Label>マスタ内問題番号 (任意)</Label>
+                            <Input
+                                type="number"
+                                value={masterNumber || ''}
+                                onChange={e => setMasterNumber(e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                                placeholder="例: 1001"
+                            />
+                        </div>
+                        <div className="flex-[3] space-y-2">
+                            <Label>問題文</Label>
+                            <Textarea
+                                required
+                                value={question}
+                                onChange={e => setQuestion(e.target.value)}
+                                placeholder="問題文を入力してください"
+                                rows={3}
+                            />
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
