@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Printer, ArrowLeft, PlayCircle, Video as VideoIcon, Lock } from "lucide-react";
 import Link from "next/link";
-import YouTube from "react-youtube";
+import { FullScreenVideoPlayer } from "@/components/full-screen-video-player";
 import { CoreProblem, Subject } from "@prisma/client";
 
 interface VideoData {
@@ -20,19 +20,8 @@ interface UnitFocusDetailClientProps {
 }
 
 export function UnitFocusDetailClient({ coreProblem, lectureVideos, isUnlocked }: UnitFocusDetailClientProps) {
-    const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
-
-    const getYouTubeId = (url: string) => {
-        if (!url) return null;
-        if (url.includes('youtu.be')) {
-            return url.split('/').pop()?.split('?')[0] || null;
-        }
-        if (url.includes('youtube.com')) {
-            const urlParams = new URLSearchParams(new URL(url).search);
-            return urlParams.get('v') || null;
-        }
-        return null;
-    };
+    const [isVideoOpen, setIsVideoOpen] = useState(false);
+    const [startIndex, setStartIndex] = useState(0);
 
     // Lock screen removed as per requirement to allow printing for all units.
     /*
@@ -44,9 +33,6 @@ export function UnitFocusDetailClient({ coreProblem, lectureVideos, isUnlocked }
         );
     }
     */
-
-    const currentVideo = lectureVideos[currentVideoIndex];
-    const youTubeId = currentVideo ? getYouTubeId(currentVideo.url) : null;
 
     return (
         <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -81,56 +67,65 @@ export function UnitFocusDetailClient({ coreProblem, lectureVideos, isUnlocked }
                         </CardHeader>
                         <CardContent className="p-0">
                             {lectureVideos.length > 0 ? (
-                                <div>
-                                    <div className="aspect-video bg-black w-full">
-                                        {youTubeId ? (
-                                            <YouTube
-                                                videoId={youTubeId}
-                                                className="w-full h-full"
-                                                iframeClassName="w-full h-full"
-                                                opts={{
-                                                    width: '100%',
-                                                    height: '100%',
-                                                    playerVars: {
-                                                        autoplay: 0,
-                                                        rel: 0,
-                                                        modestbranding: 1,
-                                                    },
-                                                }}
-                                            />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center text-white">
-                                                <p>動画の読み込みに失敗しました。</p>
-                                            </div>
-                                        )}
+                                <div className="p-6">
+                                    {/* Main Play Button (starts from beginning) */}
+                                    <div className="aspect-video bg-black/5 w-full flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-200 mb-4 group cursor-pointer hover:bg-black/10 transition-colors"
+                                        onClick={() => {
+                                            setStartIndex(0);
+                                            setIsVideoOpen(true);
+                                        }}>
+                                        <PlayCircle className="w-16 h-16 text-blue-500 mb-2 group-hover:scale-110 transition-transform" />
+                                        <p className="font-semibold text-lg text-blue-700">再生する</p>
+                                        <p className="text-sm text-muted-foreground">{lectureVideos[0].title}</p>
                                     </div>
 
-                                    {/* Video List / Selector if multiple */}
+                                    <Button
+                                        className="w-full text-lg py-6 gap-2 mb-4"
+                                        size="lg"
+                                        onClick={() => {
+                                            setStartIndex(0);
+                                            setIsVideoOpen(true);
+                                        }}
+                                    >
+                                        <PlayCircle className="w-6 h-6" />
+                                        講義動画を見る {lectureVideos.length > 1 && `(${lectureVideos.length})`}
+                                    </Button>
+
+                                    {/* Individual Video Selection List */}
                                     {lectureVideos.length > 1 && (
-                                        <div className="border-t p-4 bg-muted/20">
-                                            <p className="text-sm font-medium mb-2 text-muted-foreground">動画リスト:</p>
-                                            <div className="flex flex-wrap gap-2">
+                                        <div className="border-t pt-4 mt-2">
+                                            <p className="text-sm font-medium mb-3 text-muted-foreground">動画を選んで再生:</p>
+                                            <div className="space-y-2">
                                                 {lectureVideos.map((video, idx) => (
                                                     <Button
                                                         key={idx}
-                                                        variant={currentVideoIndex === idx ? "default" : "outline"}
-                                                        size="sm"
-                                                        onClick={() => setCurrentVideoIndex(idx)}
-                                                        className="text-xs gap-2"
+                                                        variant="outline"
+                                                        className="w-full justify-start h-auto py-3 px-4 text-left font-normal hover:bg-muted/50"
+                                                        onClick={() => {
+                                                            setStartIndex(idx);
+                                                            setIsVideoOpen(true);
+                                                        }}
                                                     >
-                                                        <VideoIcon className="w-3 h-3" />
-                                                        {video.title || `動画 ${idx + 1}`}
+                                                        <VideoIcon className="w-4 h-4 mr-3 flex-shrink-0 text-muted-foreground" />
+                                                        <span className="truncate">{video.title || `講義動画 ${idx + 1}`}</span>
+                                                        <span className="ml-auto text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                                                            No. {idx + 1}
+                                                        </span>
                                                     </Button>
                                                 ))}
                                             </div>
                                         </div>
                                     )}
-                                    <div className="p-4 bg-white">
-                                        <h3 className="font-semibold text-lg mb-1">{currentVideo?.title}</h3>
-                                        <p className="text-sm text-muted-foreground">
-                                            動画を見て重要なポイントを確認しましょう。
-                                        </p>
-                                    </div>
+
+                                    <FullScreenVideoPlayer
+                                        isOpen={isVideoOpen}
+                                        onClose={() => setIsVideoOpen(false)}
+                                        initialIndex={startIndex}
+                                        playlist={lectureVideos.map(v => ({
+                                            title: v.title || coreProblem.name,
+                                            url: v.url
+                                        }))}
+                                    />
                                 </div>
                             ) : (
                                 <div className="p-12 text-center text-muted-foreground bg-muted/10">

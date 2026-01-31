@@ -158,7 +158,7 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
         if (uniqueMasterNumbers.length > 0) {
             const { problems } = await searchProblemsByMasterNumbers(uniqueMasterNumbers);
             if (problems) {
-                problems.forEach(p => existingMap.set(p.masterNumber!, p));
+                problems.forEach((p: any) => existingMap.set(p.masterNumber!, p));
             }
         }
 

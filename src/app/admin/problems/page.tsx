@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 export default async function ProblemsPage({
     searchParams,
 }: {
-    searchParams: Promise<{ page?: string; q?: string; grade?: string; coreProblemId?: string; subjectId?: string; sortBy?: string; sortOrder?: string }>;
+    searchParams: Promise<{ page?: string; q?: string; grade?: string; coreProblemId?: string; subjectId?: string; sortBy?: string; sortOrder?: string; video?: string }>;
 }) {
     // In Next.js 15+, searchParams is a Promise
     const params = await searchParams;
@@ -35,7 +35,8 @@ export default async function ProblemsPage({
         {
             grade: params.grade,
             coreProblemId: params.coreProblemId,
-            subjectId: params.subjectId
+            subjectId: params.subjectId,
+            video: params.video === 'exists' || params.video === 'none' ? params.video : undefined
         },
         sortBy,
         sortOrder

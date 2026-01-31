@@ -163,13 +163,14 @@ export function ProblemList({ problems, onEdit, sortBy, sortOrder, onSort }: Pro
                             <TableHead>問題文</TableHead>
                             <TableHead>解答</TableHead>
                             <TableHead>所属コア問題</TableHead>
+                            <TableHead className="w-[60px]">動画</TableHead>
                             <TableHead className="w-[100px]">操作</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {problems.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                                     問題が見つかりませんでした
                                 </TableCell>
                             </TableRow>
@@ -201,6 +202,23 @@ export function ProblemList({ problems, onEdit, sortBy, sortOrder, onSort }: Pro
                                                 <span className="text-muted-foreground text-xs">-</span>
                                             )}
                                         </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        {problem.videoUrl ? (
+                                            <a
+                                                href={problem.videoUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center justify-center text-blue-500 hover:text-blue-700"
+                                                title={problem.videoUrl}
+                                            >
+                                                <div className="w-5 h-5 flex items-center justify-center border border-current rounded-full">
+                                                    <div className="w-0 h-0 border-l-[6px] border-l-current border-y-[4px] border-y-transparent ml-0.5" />
+                                                </div>
+                                            </a>
+                                        ) : (
+                                            <span className="text-muted-foreground text-xs">-</span>
+                                        )}
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-2">

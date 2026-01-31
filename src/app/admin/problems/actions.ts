@@ -10,6 +10,7 @@ type ProblemFilters = {
     grade?: string;
     subjectId?: string;
     coreProblemId?: string;
+    video?: 'exists' | 'none';
 };
 
 /**
@@ -21,7 +22,8 @@ type FilterCondition =
     | { type: 'subjectId'; value: string }
     | { type: 'coreProblemId'; value: string }
     | { type: 'search'; value: string }
-    | { type: 'excludeIds'; value: string[] };
+    | { type: 'excludeIds'; value: string[] }
+    | { type: 'video'; value: 'exists' | 'none' };
 
 const SEARCH_SCALAR_FIELDS = ['question', 'answer', 'customId'] as const;
 
@@ -40,6 +42,9 @@ function buildFilterConditions(
     }
     if (filters.coreProblemId) {
         conditions.push({ type: 'coreProblemId', value: filters.coreProblemId });
+    }
+    if (filters.video) {
+        conditions.push({ type: 'video', value: filters.video });
     }
     if (search) {
         conditions.push({ type: 'search', value: search });
@@ -72,6 +77,25 @@ function conditionsToPrismaWhere(conditions: FilterCondition[]): Prisma.ProblemW
                 andConditions.push({
                     coreProblems: { some: { id: cond.value } }
                 });
+                break;
+            case 'video':
+                if (cond.value === 'exists') {
+                    // videoUrl is not null AND videoUrl is not empty string
+                    andConditions.push({
+                        videoUrl: { not: null },
+                    });
+                    andConditions.push({
+                        videoUrl: { not: '' }
+                    });
+                } else {
+                    // videoUrl is null OR videoUrl is empty string
+                    andConditions.push({
+                        OR: [
+                            { videoUrl: null },
+                            { videoUrl: '' }
+                        ]
+                    });
+                }
                 break;
             case 'search':
                 where.OR = [
@@ -129,6 +153,13 @@ function conditionsToSql(conditions: FilterCondition[]): Prisma.Sql {
                         WHERE cpp."B" = p.id AND cpp."A" = ${cond.value}
                     )
                 `);
+                break;
+            case 'video':
+                if (cond.value === 'exists') {
+                    sqlConditions.push(Prisma.sql`p."videoUrl" IS NOT NULL AND p."videoUrl" != ''`);
+                } else {
+                    sqlConditions.push(Prisma.sql`(p."videoUrl" IS NULL OR p."videoUrl" = '')`);
+                }
                 break;
             case 'search':
                 const like = `%${cond.value}%`;

@@ -13,6 +13,7 @@ import { BulkImportDialog } from './components/problem-bulk-import';
 import { Problem } from '@prisma/client';
 
 interface ProblemWithRelations extends Problem {
+    masterNumber: number | null; // Match ProblemList expectation
     coreProblems: {
         id: string;
         name: string;
@@ -72,6 +73,7 @@ export function ProblemManager({
     };
 
     const selectedSubjectId = searchParams.get('subjectId') || 'ALL';
+    const selectedVideoFilter = searchParams.get('video') || 'ALL';
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
@@ -111,6 +113,15 @@ export function ProblemManager({
         });
     };
 
+    const handleVideoFilter = (value: string) => {
+        startTransition(() => {
+            updateParams({
+                video: value === 'ALL' ? undefined : value,
+                page: '1'
+            });
+        });
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
@@ -136,6 +147,16 @@ export function ProblemManager({
                                     {subject.name}
                                 </SelectItem>
                             ))}
+                        </SelectContent>
+                    </Select>
+                    <Select value={selectedVideoFilter} onValueChange={handleVideoFilter}>
+                        <SelectTrigger className="w-full sm:w-[150px]">
+                            <SelectValue placeholder="動画" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="ALL">動画：全件</SelectItem>
+                            <SelectItem value="exists">動画あり</SelectItem>
+                            <SelectItem value="none">動画なし</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
