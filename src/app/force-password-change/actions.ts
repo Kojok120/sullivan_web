@@ -1,16 +1,7 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
-import { z } from 'zod';
 import { redirect } from 'next/navigation';
-
-const updatePasswordSchema = z.object({
-    newPassword: z.string().min(8, '新しいパスワードは8文字以上で入力してください'),
-    confirmPassword: z.string().min(1, '確認用パスワードを入力してください'),
-}).refine((data) => data.newPassword === data.confirmPassword, {
-    message: '新しいパスワードが一致しません',
-    path: ['confirmPassword'],
-});
+import { passwordUpdateSchema, updateUserPassword } from '@/lib/password-service';
 
 export async function forceUpdatePassword(prevState: any, formData: FormData) {
     const rawData = {
@@ -18,7 +9,7 @@ export async function forceUpdatePassword(prevState: any, formData: FormData) {
         confirmPassword: formData.get('confirmPassword') as string,
     };
 
-    const result = updatePasswordSchema.safeParse(rawData);
+    const result = passwordUpdateSchema.safeParse(rawData);
 
     if (!result.success) {
         return { error: result.error.errors[0].message };
@@ -26,18 +17,12 @@ export async function forceUpdatePassword(prevState: any, formData: FormData) {
 
     const { newPassword } = result.data;
 
-    const supabase = await createClient();
+    const updateResult = await updateUserPassword(newPassword);
 
-    // Update password and clear the isDefaultPassword flag
-    const { error: updateError } = await supabase.auth.updateUser({
-        password: newPassword,
-        data: { isDefaultPassword: false }
-    });
-
-    if (updateError) {
-        console.error(updateError);
-        return { error: 'パスワードの更新に失敗しました' };
+    if (!updateResult.success) {
+        return { error: updateResult.error };
     }
 
     redirect('/');
 }
+

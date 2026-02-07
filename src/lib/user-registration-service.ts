@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { Role } from '@prisma/client';
 import { createOrUpdateSupabaseUser } from '@/lib/auth-admin';
 import { createUser as createPrismaUser } from '@/lib/user-service';
+import crypto from 'crypto';
 
 export interface RegisterUserParams {
     name: string;
@@ -22,8 +23,8 @@ export async function registerUser({
     group,
     classroomId
 }: RegisterUserParams) {
-    // 1. Determine password (or generate if missing, though typically UI provides it or we generate it here)
-    const finalPassword = password || Math.random().toString(36).slice(-8);
+    // 1. Determine password (using crypto.randomBytes for security)
+    const finalPassword = password || crypto.randomBytes(8).toString('base64url').slice(0, 12);
 
     // 2. Create User in Prisma
     let user;
@@ -31,7 +32,6 @@ export async function registerUser({
         user = await createPrismaUser({
             name,
             role,
-            password: finalPassword,
             group,
             classroomId
         });

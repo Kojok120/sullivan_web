@@ -3,7 +3,7 @@
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { Role } from '@prisma/client';
-import { requireAdmin, hashPassword } from '@/lib/auth';
+import { requireAdmin } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function resetPassword(userId: string, password: string) {
@@ -124,13 +124,6 @@ const createUserSchema = z.object({
     classroomId: z.string().optional(),
 });
 
-const updateUserSchema = z.object({
-    name: z.string().optional(),
-    role: z.nativeEnum(Role).optional(),
-    password: z.string().optional(),
-    group: z.string().optional(),
-    classroomId: z.string().optional(),
-});
 
 export async function createUser(data: { name: string; role: Role; password?: string; group?: string; classroomId?: string }) {
     await requireAdmin();
@@ -162,7 +155,7 @@ export async function createUser(data: { name: string; role: Role; password?: st
     }
 }
 
-export async function updateUser(id: string, data: { name?: string; role?: Role; password?: string; group?: string; classroomId?: string }) {
+export async function updateUser(id: string, data: { name?: string; role?: Role; group?: string; classroomId?: string }) {
     await requireAdmin();
     try {
         const updateData: any = {
@@ -171,10 +164,6 @@ export async function updateUser(id: string, data: { name?: string; role?: Role;
             group: data.group,
             classroomId: data.classroomId
         };
-
-        if (data.password) {
-            updateData.password = await hashPassword(data.password);
-        }
 
         // Remove undefined fields
         Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);

@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { watchDriveFolder, stopWatching } from '@/lib/drive-webhook-manager';
 import { saveWatchState, getWatchState, clearWatchState } from '@/lib/drive-watch-state';
-import { checkDriveForNewFiles } from '@/lib/grading-service';
-import { acquireGradingLock, releaseGradingLock } from '@/lib/grading-lock';
 import { secureDriveCheck } from '@/lib/grading-service';
 
 export const dynamic = 'force-dynamic';

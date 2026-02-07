@@ -1,7 +1,6 @@
 import 'dotenv/config';
 import { PrismaClient, Role } from '@prisma/client';
 import { createClient } from '@supabase/supabase-js';
-import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
@@ -10,11 +9,11 @@ const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const supabaseAdmin = supabaseUrl && supabaseServiceRoleKey
   ? createClient(supabaseUrl, supabaseServiceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    })
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  })
   : null;
 
 const DEFAULT_PASSWORD = 'password123';
@@ -34,7 +33,6 @@ async function upsertPrismaUser({
   group,
   classroomId,
 }: SeedUser) {
-  const hashedPassword = await bcrypt.hash(DEFAULT_PASSWORD, 10);
   return await prisma.user.upsert({
     where: { loginId },
     update: {
@@ -42,7 +40,6 @@ async function upsertPrismaUser({
       role,
       group: group ?? null,
       classroomId: classroomId ?? null,
-      password: hashedPassword,
     },
     create: {
       loginId,
@@ -50,7 +47,6 @@ async function upsertPrismaUser({
       role,
       group: group ?? null,
       classroomId: classroomId ?? null,
-      password: hashedPassword,
     },
   });
 }

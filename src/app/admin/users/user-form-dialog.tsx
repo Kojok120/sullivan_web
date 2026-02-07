@@ -106,7 +106,6 @@ export function UserFormDialog({
                 result = await updateUser(user.id, {
                     name: formData.name,
                     role: formData.role,
-                    password: formData.password || undefined,
                     group: formData.groupId || undefined,
                     classroomId: formData.classroomId || undefined,
                 });

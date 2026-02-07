@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server';
-import * as bcrypt from 'bcryptjs';
 
 export type SessionPayload = {
     userId: string;
@@ -57,10 +56,3 @@ export async function requireTeacherOrAdmin() {
     return session;
 }
 
-export async function hashPassword(password: string) {
-    return await bcrypt.hash(password, 10);
-}
-
-export async function verifyPassword(password: string, hash: string) {
-    return await bcrypt.compare(password, hash);
-}
