@@ -14,16 +14,21 @@ import { ProfileCard } from './profile-card';
 import { GuidanceList } from './guidance-list';
 import { PrintProblemCard } from './print-problem-card';
 import { DateDisplay } from '@/components/ui/date-display';
+import { SessionList } from '@/app/dashboard/components/session-list';
 
 export default async function TeacherStudentDetailPage({
     params,
+    searchParams,
 }: {
     params: { userId: string };
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
     const session = await getSession();
     if (!isTeacherOrAdmin(session)) redirect('/login');
 
     const { userId } = await params;
+    const query = await searchParams;
+    const defaultTab = (typeof query.tab === 'string' && ['overview', 'history', 'profile'].includes(query.tab)) ? query.tab : 'overview';
 
     const dashboardData = await getStudentDashboardData(userId);
 
@@ -59,7 +64,7 @@ export default async function TeacherStudentDetailPage({
                 </div>
             </div>
 
-            <Tabs defaultValue="overview" className="space-y-4">
+            <Tabs defaultValue={defaultTab} className="space-y-4">
                 <TabsList>
                     <TabsTrigger value="overview">学習状況</TabsTrigger>
                     <TabsTrigger value="history">学習履歴ログ</TabsTrigger>
@@ -183,50 +188,7 @@ export default async function TeacherStudentDetailPage({
                 </TabsContent>
 
                 <TabsContent value="history">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>直近の学習履歴</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-4">
-                                {recentHistory.map((history) => (
-                                    <div key={history.id} className="flex flex-col space-y-2 border-b pb-4 last:border-0">
-                                        <div className="flex items-center justify-between">
-                                            <div className="font-medium text-sm">
-                                                {history.problem.coreProblems[0]?.name || 'Unknown CoreProblem'}
-                                                <span className="ml-2 text-xs font-normal text-muted-foreground">
-                                                    ({history.problem.coreProblems[0]?.subject.name || 'Unknown Subject'})
-                                                </span>
-                                            </div>
-                                            <div className="text-xs text-muted-foreground">
-                                                <DateDisplay date={history.answeredAt} showTime />
-                                            </div>
-                                        </div>
-                                        <div className="text-sm bg-muted/50 p-3 rounded-md">
-                                            Q: {history.problem.question}
-                                        </div>
-                                        <div className="flex items-center gap-4 text-sm">
-                                            <Badge variant={
-                                                history.evaluation === 'A' ? 'default' :
-                                                    history.evaluation === 'B' ? 'secondary' :
-                                                        history.evaluation === 'C' ? 'outline' : 'destructive'
-                                            }>
-                                                評価: {history.evaluation}
-                                            </Badge>
-                                            {history.userAnswer && (
-                                                <span className="text-muted-foreground">回答: {history.userAnswer}</span>
-                                            )}
-                                        </div>
-                                        {history.feedback && (
-                                            <div className="text-xs text-muted-foreground bg-blue-50 p-2 rounded border border-blue-100">
-                                                <span className="font-bold text-blue-600">AI:</span> {history.feedback}
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        </CardContent>
-                    </Card>
+                    <SessionList userId={student.id} basePath={`/teacher/students/${student.id}/history`} />
                 </TabsContent>
 
                 <TabsContent value="profile" className="space-y-4">

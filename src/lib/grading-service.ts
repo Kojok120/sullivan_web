@@ -1273,6 +1273,9 @@ export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: strin
                 while (nextIndex < subjectCps.length) {
                     const nextCp = subjectCps[nextIndex];
 
+                    // 講義動画があるかどうかでisLectureWatchedの初期値を決定
+                    const hasLectureVideos = Array.isArray(nextCp.lectureVideos) && nextCp.lectureVideos.length > 0;
+
                     // Unlock Next CP
                     await prisma.userCoreProblemState.upsert({
                         where: {
@@ -1285,7 +1288,9 @@ export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: strin
                             userId,
                             coreProblemId: nextCp.id,
                             isUnlocked: true,
-                            priority: 0
+                            priority: 0,
+                            // 講義動画がない場合はtrue（視聴不要）、ある場合はfalse（視聴必須）
+                            isLectureWatched: !hasLectureVideos
                         },
                         update: {
                             isUnlocked: true

@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Printer, ArrowLeft, PlayCircle, Video as VideoIcon, Lock } from "lucide-react";
+import { Printer, ArrowLeft, PlayCircle, Video as VideoIcon, Lock, CheckCircle2, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { FullScreenVideoPlayer } from "@/components/full-screen-video-player";
 import { CoreProblem, Subject } from "@prisma/client";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface VideoData {
     title: string;
@@ -17,22 +19,57 @@ interface UnitFocusDetailClientProps {
     coreProblem: CoreProblem & { subject: Subject };
     lectureVideos: VideoData[];
     isUnlocked: boolean;
+    isLectureWatched: boolean;
 }
 
-export function UnitFocusDetailClient({ coreProblem, lectureVideos, isUnlocked }: UnitFocusDetailClientProps) {
+// 講義動画視聴完了を記録
+async function markLectureAsWatched(coreProblemId: string): Promise<boolean> {
+    try {
+        const response = await fetch('/api/lecture-watched', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ coreProblemId })
+        });
+        return response.ok;
+    } catch {
+        console.error('Failed to mark lecture as watched');
+        return false;
+    }
+}
+
+export function UnitFocusDetailClient({ coreProblem, lectureVideos, isUnlocked, isLectureWatched }: UnitFocusDetailClientProps) {
+    const router = useRouter();
     const [isVideoOpen, setIsVideoOpen] = useState(false);
     const [startIndex, setStartIndex] = useState(0);
+    const [isWatched, setIsWatched] = useState(isLectureWatched);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [watchedCount, setWatchedCount] = useState(0);
+    const totalVideos = lectureVideos.length;
 
-    // Lock screen removed as per requirement to allow printing for all units.
-    /*
-    if (!isUnlocked) {
-        return (
-            <div className="container mx-auto px-4 py-12 text-center">
-               ...
-            </div>
-        );
-    }
-    */
+    // 動画終了時のハンドラ
+    const handleVideoEnd = async () => {
+        const newCount = watchedCount + 1;
+        setWatchedCount(newCount);
+
+        // 最後の動画を視聴したら視聴完了を記録
+        if (newCount >= totalVideos && !isWatched) {
+            setIsSubmitting(true);
+            const success = await markLectureAsWatched(coreProblem.id);
+            if (success) {
+                setIsWatched(true);
+                router.refresh(); // ページを更新して最新データを取得
+            }
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleVideoClose = () => {
+        setIsVideoOpen(false);
+        setWatchedCount(0); // リセット
+    };
+
+    const hasVideos = lectureVideos.length > 0;
+    const needsWatching = hasVideos && !isWatched;
 
     return (
         <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -52,43 +89,79 @@ export function UnitFocusDetailClient({ coreProblem, lectureVideos, isUnlocked }
                 <h1 className="text-3xl font-bold tracking-tight">{coreProblem.name}</h1>
             </div>
 
+            {/* 未視聴の講義動画がある場合の警告 */}
+            {needsWatching && (
+                <Alert className="mb-6 bg-amber-50 border-amber-200 text-amber-800">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>講義動画を視聴してください</AlertTitle>
+                    <AlertDescription>
+                        講義動画を視聴するまで、この単元の問題は「おまかせ」モードで出題されません。
+                        下の「講義動画を見る」ボタンから動画を最後まで視聴してください。
+                    </AlertDescription>
+                </Alert>
+            )}
+
+            {/* 視聴完了済みの場合の表示 */}
+            {hasVideos && isWatched && (
+                <Alert className="mb-6 bg-green-50 border-green-200 text-green-800">
+                    <CheckCircle2 className="h-4 w-4" />
+                    <AlertTitle>講義動画視聴済み</AlertTitle>
+                    <AlertDescription>
+                        この単元の講義動画は視聴済みです。復習のため再度視聴することもできます。
+                    </AlertDescription>
+                </Alert>
+            )}
+
             <div className="grid gap-8">
                 {/* 1. Video Section */}
                 <section>
-                    <Card className="overflow-hidden border-2 border-primary/10 shadow-lg">
+                    <Card className={`overflow-hidden shadow-lg ${needsWatching ? 'border-2 border-amber-400' : 'border-2 border-primary/10'}`}>
                         <CardHeader className="bg-muted/30 pb-4">
                             <CardTitle className="flex items-center gap-2">
-                                <PlayCircle className="w-5 h-5 text-blue-600" />
+                                <PlayCircle className={`w-5 h-5 ${needsWatching ? 'text-amber-600' : 'text-blue-600'}`} />
                                 講義動画を視聴
+                                {needsWatching && <span className="text-xs bg-amber-500 text-white px-2 py-0.5 rounded-full ml-2">必須</span>}
                             </CardTitle>
                             <CardDescription>
-                                ポイントを動画で確認して理解を深めましょう
+                                {needsWatching
+                                    ? '最後まで視聴すると問題が解禁されます'
+                                    : 'ポイントを動画で確認して理解を深めましょう'}
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="p-0">
                             {lectureVideos.length > 0 ? (
                                 <div className="p-6">
                                     {/* Main Play Button (starts from beginning) */}
-                                    <div className="aspect-video bg-black/5 w-full flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-200 mb-4 group cursor-pointer hover:bg-black/10 transition-colors"
+                                    <div className={`aspect-video w-full flex flex-col items-center justify-center rounded-lg border-2 border-dashed mb-4 group cursor-pointer transition-colors ${needsWatching
+                                        ? 'bg-amber-50 border-amber-300 hover:bg-amber-100'
+                                        : 'bg-black/5 border-gray-200 hover:bg-black/10'
+                                        }`}
                                         onClick={() => {
                                             setStartIndex(0);
                                             setIsVideoOpen(true);
                                         }}>
-                                        <PlayCircle className="w-16 h-16 text-blue-500 mb-2 group-hover:scale-110 transition-transform" />
-                                        <p className="font-semibold text-lg text-blue-700">再生する</p>
+                                        <PlayCircle className={`w-16 h-16 mb-2 group-hover:scale-110 transition-transform ${needsWatching ? 'text-amber-500' : 'text-blue-500'
+                                            }`} />
+                                        <p className={`font-semibold text-lg ${needsWatching ? 'text-amber-700' : 'text-blue-700'}`}>
+                                            {needsWatching ? '今すぐ視聴する' : '再生する'}
+                                        </p>
                                         <p className="text-sm text-muted-foreground">{lectureVideos[0].title}</p>
                                     </div>
 
                                     <Button
-                                        className="w-full text-lg py-6 gap-2 mb-4"
+                                        className={`w-full text-lg py-6 gap-2 mb-4 ${needsWatching
+                                            ? 'bg-amber-500 hover:bg-amber-600'
+                                            : ''
+                                            }`}
                                         size="lg"
+                                        disabled={isSubmitting}
                                         onClick={() => {
                                             setStartIndex(0);
                                             setIsVideoOpen(true);
                                         }}
                                     >
                                         <PlayCircle className="w-6 h-6" />
-                                        講義動画を見る {lectureVideos.length > 1 && `(${lectureVideos.length})`}
+                                        {isSubmitting ? '処理中...' : `講義動画を見る ${lectureVideos.length > 1 ? `(${lectureVideos.length})` : ''}`}
                                     </Button>
 
                                     {/* Individual Video Selection List */}
@@ -119,12 +192,14 @@ export function UnitFocusDetailClient({ coreProblem, lectureVideos, isUnlocked }
 
                                     <FullScreenVideoPlayer
                                         isOpen={isVideoOpen}
-                                        onClose={() => setIsVideoOpen(false)}
+                                        onClose={handleVideoClose}
                                         initialIndex={startIndex}
                                         playlist={lectureVideos.map(v => ({
                                             title: v.title || coreProblem.name,
                                             url: v.url
                                         }))}
+                                        onVideoEnd={handleVideoEnd}
+                                        autoCloseOnLastVideoEnd={true}
                                     />
                                 </div>
                             ) : (
@@ -139,14 +214,21 @@ export function UnitFocusDetailClient({ coreProblem, lectureVideos, isUnlocked }
 
                 {/* 2. Print Section */}
                 <section>
-                    <Card className="border-2 border-primary/20 bg-primary/5 shadow-md">
+                    <Card className={`border-2 shadow-md ${needsWatching ? 'border-gray-200 bg-gray-50 opacity-60' : 'border-primary/20 bg-primary/5'}`}>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
-                                <Printer className="w-6 h-6 text-primary" />
+                                {needsWatching ? (
+                                    <Lock className="w-6 h-6 text-gray-400" />
+                                ) : (
+                                    <Printer className="w-6 h-6 text-primary" />
+                                )}
                                 問題を印刷する
+                                {needsWatching && <span className="text-xs bg-gray-400 text-white px-2 py-0.5 rounded-full ml-2">講義動画視聴後</span>}
                             </CardTitle>
                             <CardDescription>
-                                この単元の問題を出題します
+                                {needsWatching
+                                    ? '講義動画を視聴すると印刷できるようになります'
+                                    : 'この単元の問題を出題します'}
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -154,10 +236,19 @@ export function UnitFocusDetailClient({ coreProblem, lectureVideos, isUnlocked }
                                 size="lg"
                                 className="w-full sm:w-auto text-lg py-6 gap-3 shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5"
                                 asChild
+                                disabled={needsWatching}
                             >
-                                <Link href={`/dashboard/print?subjectId=${coreProblem.subjectId}&coreProblemId=${coreProblem.id}`}>
-                                    <Printer className="w-5 h-5" />
-                                    今すぐ問題を印刷する
+                                <Link
+                                    href={needsWatching ? '#' : `/dashboard/print?subjectId=${coreProblem.subjectId}&coreProblemId=${coreProblem.id}`}
+                                    onClick={(e) => needsWatching && e.preventDefault()}
+                                    className={needsWatching ? 'pointer-events-none' : ''}
+                                >
+                                    {needsWatching ? (
+                                        <Lock className="w-5 h-5" />
+                                    ) : (
+                                        <Printer className="w-5 h-5" />
+                                    )}
+                                    {needsWatching ? '講義動画を視聴してください' : '今すぐ問題を印刷する'}
                                 </Link>
                             </Button>
                         </CardContent>

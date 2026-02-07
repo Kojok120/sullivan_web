@@ -1,9 +1,9 @@
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { getStudentStats, getSubjectProgress, getDailyActivity, getUnwatchedCount } from '@/lib/analytics';
+import { getStudentStats, getSubjectProgress, getDailyActivity, getUnwatchedCount, getUnwatchedLectures } from '@/lib/analytics';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Activity, Trophy, Target, Printer, AlertTriangle, Zap } from 'lucide-react';
+import { Activity, Trophy, Target, Printer, AlertTriangle, Zap, PlayCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { ActivityChart } from './activity-chart';
 import Link from 'next/link';
@@ -17,11 +17,12 @@ export default async function DashboardPage() {
     const session = await getSession();
     if (!session) redirect('/login');
 
-    const [stats, subjectProgress, dailyActivity, unwatchedCount] = await Promise.all([
+    const [stats, subjectProgress, dailyActivity, unwatchedCount, unwatchedLectures] = await Promise.all([
         getStudentStats(session.userId),
         getSubjectProgress(session.userId),
         getDailyActivity(session.userId, 365), // Fetch 1 year for heatmap
-        getUnwatchedCount(session.userId)
+        getUnwatchedCount(session.userId),
+        getUnwatchedLectures(session.userId)
     ]);
 
     // Calculate XP Progress
@@ -68,6 +69,33 @@ export default async function DashboardPage() {
                                     ホームへ移動する
                                 </span>
                             </Link>
+                        </AlertDescription>
+                    </Alert>
+                </div>
+            )}
+
+            {/* Unwatched Lecture Alert */}
+            {unwatchedLectures.length > 0 && (
+                <div className="mb-8">
+                    <Alert className="bg-amber-50 border-amber-200 text-amber-800">
+                        <PlayCircle className="h-4 w-4" />
+                        <AlertTitle>講義動画を視聴してください</AlertTitle>
+                        <AlertDescription className="mt-2">
+                            <span>
+                                以下の単元の講義動画が未視聴です。講義動画を視聴するまで、その単元の問題は出題されません。
+                            </span>
+                            <ul className="mt-2 space-y-1">
+                                {unwatchedLectures.map((lecture) => (
+                                    <li key={lecture.coreProblemId}>
+                                        <Link href={`/unit-focus/${lecture.coreProblemId}`} className="flex items-center gap-2 hover:underline">
+                                            <span className="font-bold">{lecture.subjectName}</span>
+                                            <span>-</span>
+                                            <span>{lecture.coreProblemName}</span>
+                                            <span className="text-amber-600">→</span>
+                                        </Link>
+                                    </li>
+                                ))}
+                            </ul>
                         </AlertDescription>
                     </Alert>
                 </div>

@@ -76,3 +76,59 @@ export async function getUnlockedCoreProblemIds(userId: string, subjectId: strin
 
     return unlockedIds;
 }
+
+/**
+ * 「学習可能な」CoreProblem IDを取得する。
+ * 条件: isUnlocked = true かつ (isLectureWatched = true または 講義動画がない)
+ * 印刷出題時などに使用する。
+ */
+export async function getReadyCoreProblemIds(userId: string, subjectId: string): Promise<Set<string>> {
+    // 1. Fetch all CoreProblems for the subject with lectureVideos info
+    const coreProblems = await prisma.coreProblem.findMany({
+        where: { subjectId },
+        orderBy: { order: 'asc' },
+        select: { id: true, order: true, lectureVideos: true }
+    });
+
+    if (coreProblems.length === 0) return new Set();
+
+    // 2. Fetch User States (unlocked ones)
+    const userStates = await prisma.userCoreProblemState.findMany({
+        where: {
+            userId,
+            coreProblemId: { in: coreProblems.map(cp => cp.id) },
+            isUnlocked: true
+        },
+        select: { coreProblemId: true, isLectureWatched: true }
+    });
+
+    const stateMap = new Map(userStates.map(s => [s.coreProblemId, s]));
+
+    const readyIds = new Set<string>();
+
+    for (const cp of coreProblems) {
+        const state = stateMap.get(cp.id);
+        const hasLectureVideos = Array.isArray(cp.lectureVideos) && cp.lectureVideos.length > 0;
+
+        // 最初の単元は常にReady
+        if (cp.order === coreProblems[0].order) {
+            // 最初の単元でも講義動画がある場合は視聴必須
+            if (!hasLectureVideos) {
+                readyIds.add(cp.id);
+            } else if (state?.isLectureWatched) {
+                readyIds.add(cp.id);
+            }
+            continue;
+        }
+
+        // アンロック済みでない場合はスキップ
+        if (!state) continue;
+
+        // 講義動画がない場合、または視聴済みの場合はReady
+        if (!hasLectureVideos || state.isLectureWatched) {
+            readyIds.add(cp.id);
+        }
+    }
+
+    return readyIds;
+}

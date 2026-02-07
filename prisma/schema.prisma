@@ -154,13 +154,15 @@ model UserProblemState {
 }
 
 model UserCoreProblemState {
-  id            String      @id @default(cuid())
-  userId        String
-  user          User        @relation(fields: [userId], references: [id])
-  coreProblemId String
-  coreProblem   CoreProblem @relation(fields: [coreProblemId], references: [id])
-  priority      Int         @default(0) // ポイント
-  isUnlocked    Boolean     @default(false)
+  id               String      @id @default(cuid())
+  userId           String
+  user             User        @relation(fields: [userId], references: [id])
+  coreProblemId    String
+  coreProblem      CoreProblem @relation(fields: [coreProblemId], references: [id])
+  priority         Int         @default(0) // ポイント
+  isUnlocked       Boolean     @default(false)
+  isLectureWatched Boolean     @default(true) // 講義動画視聴済みフラグ（既存データはtrue）
+  lectureWatchedAt DateTime?                  // 視聴完了日時
 
   @@unique([userId, coreProblemId])
 }

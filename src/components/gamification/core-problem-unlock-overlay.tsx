@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { Button } from '@/components/ui/button';
-import { Trophy, X, Star, Play } from 'lucide-react';
-import YouTube from 'react-youtube';
+import { Trophy, Star, Play, CheckCircle2 } from 'lucide-react';
+import YouTube, { YouTubeEvent } from 'react-youtube';
 
 // 講義動画の型
 interface LectureVideo {
@@ -44,6 +44,21 @@ async function markCoreProblemUnlockAsSeen(eventId: string): Promise<void> {
     }
 }
 
+// 講義動画視聴完了を記録
+async function markLectureAsWatched(coreProblemId: string): Promise<boolean> {
+    try {
+        const response = await fetch('/api/lecture-watched', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ coreProblemId })
+        });
+        return response.ok;
+    } catch {
+        console.error('Failed to mark lecture as watched');
+        return false;
+    }
+}
+
 // YouTubeのURLからビデオIDを抽出
 function getYouTubeId(url: string): string | null {
     const patterns = [
@@ -62,6 +77,8 @@ export function CoreProblemUnlockOverlay() {
     const [current, setCurrent] = useState<UnlockedCoreProblem | null>(null);
     const [showVideo, setShowVideo] = useState(false);
     const [selectedVideoIndex, setSelectedVideoIndex] = useState(0);
+    const [videoEnded, setVideoEnded] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
         const checkUnlocks = async () => {
@@ -86,11 +103,12 @@ export function CoreProblemUnlockOverlay() {
             setCurrent(next);
             setShowVideo(false);
             setSelectedVideoIndex(0);
+            setVideoEnded(false);
             triggerConfetti();
         }
     }, [queue, current]);
 
-    const handleClose = async () => {
+    const handleClose = useCallback(async () => {
         if (!current) return;
 
         // Mark as seen in background
@@ -100,11 +118,37 @@ export function CoreProblemUnlockOverlay() {
         setQueue((prev) => prev.slice(1));
         setCurrent(null);
         setShowVideo(false);
+        setVideoEnded(false);
+    }, [current]);
+
+    // 「理解しました」ボタン押下時
+    const handleUnderstood = async () => {
+        if (!current || isSubmitting) return;
+
+        setIsSubmitting(true);
+        try {
+            const success = await markLectureAsWatched(current.coreProblemId);
+            if (success) {
+                await handleClose();
+            } else {
+                // エラー時も閉じる（再試行の機会は単元フォーカスページで）
+                await handleClose();
+            }
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     const handleWatchVideo = (index: number) => {
         setSelectedVideoIndex(index);
         setShowVideo(true);
+        setVideoEnded(false);
+    };
+
+    // 動画終了時のハンドラ
+    const handleVideoEnd = (event: YouTubeEvent) => {
+        console.log('[CP_UNLOCK] Video ended', event);
+        setVideoEnded(true);
     };
 
     const triggerConfetti = () => {
@@ -130,6 +174,7 @@ export function CoreProblemUnlockOverlay() {
     const videos = current?.lectureVideos || [];
     const selectedVideo = videos[selectedVideoIndex];
     const youtubeId = selectedVideo ? getYouTubeId(selectedVideo.url) : null;
+    const hasVideos = videos.length > 0;
 
     return (
         <AnimatePresence>
@@ -151,15 +196,8 @@ export function CoreProblemUnlockOverlay() {
                         <div className="absolute inset-0 bg-green-400 rounded-full blur-3xl opacity-20 animate-pulse"></div>
 
                         <div className="bg-gradient-to-br from-green-100 to-white text-center p-8 rounded-3xl shadow-2xl relative border-4 border-green-400">
-                            {/* Close button */}
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="absolute top-2 right-2 text-green-600 hover:bg-green-200 rounded-full"
-                                onClick={handleClose}
-                            >
-                                <X className="h-6 w-6" />
-                            </Button>
+                            {/* Xボタンは講義動画がない場合のみ表示 */}
+                            {/* 講義動画がある場合は動画視聴後に「理解しました」で閉じる */}
 
                             {!showVideo ? (
                                 <>
@@ -191,7 +229,9 @@ export function CoreProblemUnlockOverlay() {
                                             {current.coreProblemName}
                                         </h3>
                                         <p className="text-gray-600 font-medium">
-                                            おめでとうございます！新しい学習内容が開放されました。
+                                            {hasVideos
+                                                ? 'まずは講義動画を視聴してください。'
+                                                : 'おめでとうございます！新しい学習内容が開放されました。'}
                                         </p>
                                     </motion.div>
 
@@ -211,9 +251,12 @@ export function CoreProblemUnlockOverlay() {
                                         transition={{ delay: 1.0 }}
                                         className="mt-6 space-y-3"
                                     >
-                                        {/* 複数動画がある場合はリスト表示 */}
-                                        {videos.length > 0 && (
+                                        {/* 講義動画がある場合はリスト表示 */}
+                                        {hasVideos && (
                                             <div className="space-y-2">
+                                                <p className="text-sm text-amber-600 font-medium mb-2">
+                                                    ※ 講義動画の視聴が必須です
+                                                </p>
                                                 {videos.map((video, index) => (
                                                     <Button
                                                         key={index}
@@ -227,14 +270,17 @@ export function CoreProblemUnlockOverlay() {
                                                 ))}
                                             </div>
                                         )}
-                                        <Button
-                                            size="lg"
-                                            variant={videos.length > 0 ? "outline" : "default"}
-                                            className={`w-full font-bold text-lg rounded-xl shadow-lg transform transition hover:-translate-y-1 active:scale-95 ${videos.length === 0 ? 'bg-green-500 hover:bg-green-600 text-white' : ''}`}
-                                            onClick={handleClose}
-                                        >
-                                            {videos.length > 0 ? '後で見る' : 'やったね！'}
-                                        </Button>
+
+                                        {/* 講義動画がない場合のみ「やったね！」ボタンを表示 */}
+                                        {!hasVideos && (
+                                            <Button
+                                                size="lg"
+                                                className="w-full bg-green-500 hover:bg-green-600 text-white font-bold text-lg rounded-xl shadow-lg transform transition hover:-translate-y-1 active:scale-95"
+                                                onClick={handleClose}
+                                            >
+                                                やったね！
+                                            </Button>
+                                        )}
                                     </motion.div>
                                 </>
                             ) : (
@@ -255,28 +301,40 @@ export function CoreProblemUnlockOverlay() {
                                                     },
                                                 }}
                                                 className="w-full h-full"
+                                                onEnd={handleVideoEnd}
                                             />
                                         </div>
                                     )}
-                                    <div className="flex gap-2">
-                                        {videos.length > 1 && (
+
+                                    {/* 動画終了後に「理解しました」ボタンを表示 */}
+                                    {videoEnded ? (
+                                        <div className="space-y-2">
                                             <Button
                                                 size="lg"
-                                                variant="outline"
-                                                className="flex-1"
-                                                onClick={() => setShowVideo(false)}
+                                                className="w-full bg-green-500 hover:bg-green-600 text-white font-bold text-lg rounded-xl shadow-lg transform transition hover:-translate-y-1 active:scale-95"
+                                                onClick={handleUnderstood}
+                                                disabled={isSubmitting}
                                             >
-                                                他の動画を見る
+                                                <CheckCircle2 className="h-5 w-5 mr-2" />
+                                                {isSubmitting ? '処理中...' : '理解しました！'}
                                             </Button>
-                                        )}
-                                        <Button
-                                            size="lg"
-                                            className="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold text-lg rounded-xl shadow-lg"
-                                            onClick={handleClose}
-                                        >
-                                            閉じる
-                                        </Button>
-                                    </div>
+                                            {videos.length > 1 && (
+                                                <Button
+                                                    size="lg"
+                                                    variant="outline"
+                                                    className="w-full"
+                                                    onClick={() => setShowVideo(false)}
+                                                    disabled={isSubmitting}
+                                                >
+                                                    他の動画も見る
+                                                </Button>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="text-center text-gray-500 text-sm">
+                                            <p>動画を最後まで視聴すると「理解しました」ボタンが表示されます</p>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>

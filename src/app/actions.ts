@@ -1,6 +1,6 @@
 "use server";
 
-import { getSession, logout } from "@/lib/auth";
+import { getSession, logout, isTeacherOrAdmin } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { processVideoWatch, toGamificationPayload } from "@/lib/gamification-service";
@@ -50,11 +50,20 @@ export async function markVideoWatched(historyId: string) {
 
 import { getLearningSessions, markSessionAsReviewed } from "@/lib/analytics";
 
-export async function fetchMySessions(offset: number, limit: number, filter?: { onlyUnreviewed?: boolean }) {
+export async function fetchUserSessions(offset: number, limit: number, filter?: { onlyUnreviewed?: boolean }, targetUserId?: string) {
     const session = await getSession();
     if (!session) throw new Error("Unauthorized");
 
-    return await getLearningSessions(session.userId, limit, offset, filter?.onlyUnreviewed);
+    // 講師・管理者は他ユーザーのセッションを取得可能
+    let userId = session.userId;
+    if (targetUserId && targetUserId !== session.userId) {
+        if (!isTeacherOrAdmin(session)) {
+            throw new Error("Unauthorized: 他ユーザーのセッションを閲覧する権限がありません");
+        }
+        userId = targetUserId;
+    }
+
+    return await getLearningSessions(userId, limit, offset, filter?.onlyUnreviewed);
 }
 
 export async function markSessionReviewed(groupId: string) {

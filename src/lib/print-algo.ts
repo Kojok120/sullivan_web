@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { Problem, Prisma } from "@prisma/client";
-import { getUnlockedCoreProblemIds } from "@/lib/progression";
+import { getReadyCoreProblemIds } from "@/lib/progression";
 
 export const PRINT_CONFIG = {
     // Weights for scoring
@@ -26,9 +26,9 @@ export async function selectProblemsForPrint(
     count: number = 30
 ): Promise<Problem[]> {
 
-    // 1. Determine Unlocked CoreProblems
+    // 1. Determine Ready CoreProblems (unlocked + lecture watched)
     // Unified Logic via progression.ts
-    const unlockedCoreProblemIds = await getUnlockedCoreProblemIds(userId, subjectId);
+    const readyCoreProblemIds = await getReadyCoreProblemIds(userId, subjectId);
 
     // 2. Fetch Candidate Problems with Integrated Filtering & User State
     // DB側で厳密にフィルタリングを行う
@@ -43,21 +43,16 @@ export async function selectProblemsForPrint(
         };
     } else {
         // 通常印刷（おまかせ）の場合:
-        // 紐づく「全ての」CoreProblemがUnlockedでなければならない
-        // unlockedCoreProblemIdsに含まれないCoreProblemを持つ問題を除外する
-        // => coreProblemsの全てがunlockedCoreProblemIdsに含まれる
+        // 紐づく「全ての」CoreProblemがReadyでなければならない
+        // （アンロック済み かつ 講義動画視聴済みまたは講義動画なし）
 
         // Prismaの every は「空配列の場合もtrue」になる仕様があるが、
         // CoreProblemを持たない問題は存在しない前提（データ整合性）。
-        // もし存在する場合、それが出題されて良いかは議論があるが、今回は「CoreProblemを持っている」前提で進める。
 
         whereCondition.coreProblems = {
             every: {
-                id: { in: Array.from(unlockedCoreProblemIds) }
+                id: { in: Array.from(readyCoreProblemIds) }
             },
-            // 念のため、少なくとも1つのCoreProblemを持つことを条件に入れる場合:
-            // some: { id: { in: Array.from(unlockedCoreProblemIds) } }
-            // をANDで組み合わせることもできるが、everyだけで十分フィルタ効果はある。
         };
     }
 

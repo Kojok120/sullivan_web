@@ -29,6 +29,7 @@ export default async function UnitFocusDetailPage({
 
     const state = coreProblem.userStates[0];
     const isUnlocked = state?.isUnlocked ?? false;
+    const isLectureWatched = state?.isLectureWatched ?? true; // デフォルトはtrue（既存ユーザー対応）
 
     // Security check: if locked, redirect or show error?
     // User requested "unlocked ... selectable, locked ... grayed out".
@@ -46,6 +47,7 @@ export default async function UnitFocusDetailPage({
             coreProblem={coreProblem}
             lectureVideos={lectureVideos}
             isUnlocked={isUnlocked}
+            isLectureWatched={isLectureWatched}
         />
     );
 }

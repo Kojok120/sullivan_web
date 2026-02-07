@@ -550,3 +550,43 @@ export async function getUnwatchedCount(userId: string): Promise<number> {
     });
     return count;
 }
+
+export type UnwatchedLecture = {
+    coreProblemId: string;
+    coreProblemName: string;
+    subjectName: string;
+};
+
+/**
+ * 未視聴の講義動画がある単元を取得する
+ * 条件: isUnlocked = true かつ isLectureWatched = false かつ 講義動画がある
+ */
+export async function getUnwatchedLectures(userId: string): Promise<UnwatchedLecture[]> {
+    // アンロック済みだが講義動画未視聴の単元を取得
+    const states = await prisma.userCoreProblemState.findMany({
+        where: {
+            userId,
+            isUnlocked: true,
+            isLectureWatched: false
+        },
+        include: {
+            coreProblem: {
+                include: {
+                    subject: true
+                }
+            }
+        }
+    });
+
+    // 講義動画がある単元のみをフィルタリング
+    return states
+        .filter(s => {
+            const videos = s.coreProblem.lectureVideos;
+            return Array.isArray(videos) && videos.length > 0;
+        })
+        .map(s => ({
+            coreProblemId: s.coreProblem.id,
+            coreProblemName: s.coreProblem.name,
+            subjectName: s.coreProblem.subject.name
+        }));
+}

@@ -6,13 +6,19 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowRight, CheckCircle, AlertCircle, Filter } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { useState, useCallback } from 'react';
-import { fetchMySessions, markSessionReviewed } from '@/app/actions';
+import { fetchUserSessions, markSessionReviewed } from '@/app/actions';
 import { DateDisplay } from '@/components/ui/date-display';
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 
-export function SessionListClient({ initialSessions }: { initialSessions: LearningSession[] }) {
+type SessionListClientProps = {
+    initialSessions: LearningSession[];
+    userId: string;
+    basePath: string;
+};
+
+export function SessionListClient({ initialSessions, userId, basePath }: SessionListClientProps) {
     // Initial sessions are unfiltered.
     // If we want to filter from start, we might need to fetch again, 
     // but the default is usually "All".
@@ -27,7 +33,7 @@ export function SessionListClient({ initialSessions }: { initialSessions: Learni
         setLoading(true);
         try {
             // Reset offset and fetch first batch
-            const newSessions = await fetchMySessions(0, 10, { onlyUnreviewed: filterUnreviewed });
+            const newSessions = await fetchUserSessions(0, 10, { onlyUnreviewed: filterUnreviewed }, userId);
             setSessions(newSessions);
             setOffset(newSessions.length);
             setHasMore(newSessions.length === 10);
@@ -46,7 +52,7 @@ export function SessionListClient({ initialSessions }: { initialSessions: Learni
     const loadMore = async () => {
         setLoading(true);
         try {
-            const newSessions = await fetchMySessions(offset, 10, { onlyUnreviewed: showUnreviewedOnly });
+            const newSessions = await fetchUserSessions(offset, 10, { onlyUnreviewed: showUnreviewedOnly }, userId);
             if (newSessions.length === 0) {
                 setHasMore(false);
             } else {
@@ -100,7 +106,7 @@ export function SessionListClient({ initialSessions }: { initialSessions: Learni
                 return (
                     <Link
                         key={session.groupId}
-                        href={`/dashboard/history/${session.groupId}`}
+                        href={`${basePath}/${session.groupId}`}
                         onClick={() => {
                             // Only mark as reviewed if it's a simple "read" check, 
                             // but for video watching, the status update happens when video is watched.
