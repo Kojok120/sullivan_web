@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Lock, Unlock, PlayCircle, BookOpen } from "lucide-react";
+import { getSubjectConfig } from "@/lib/subject-config";
 
 interface CoreProblemData {
     id: string;
@@ -33,11 +34,9 @@ export function UnitFocusListClient({ subjects }: UnitFocusListClientProps) {
             <Tabs defaultValue={initialSubjectId} className="w-full space-y-6">
                 <TabsList className="w-full flex justify-start h-auto flex-wrap gap-2 bg-transparent p-0">
                     {subjects.map((subject) => {
-                        // Determine color based on subject name (similar to previous logic)
-                        let colorClass = "bg-gray-500";
-                        if (subject.name.includes("英語")) colorClass = "bg-orange-500";
-                        else if (subject.name.includes("数学")) colorClass = "bg-blue-500";
-                        else if (subject.name.includes("国語")) colorClass = "bg-green-500";
+                        // 共通モジュールから色を取得
+                        const config = getSubjectConfig(subject.name);
+                        const colorClass = config.bgColor;
 
                         return (
                             <TabsTrigger

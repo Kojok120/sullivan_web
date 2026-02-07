@@ -1,4 +1,9 @@
 import { prisma } from '@/lib/prisma';
+import { getSubjectPrefix } from '@/lib/subject-config';
+
+// Re-export for backward compatibility
+export { getSubjectPrefix, getSubjectConfig } from '@/lib/subject-config';
+export type { SubjectConfig } from '@/lib/subject-config';
 
 export async function fetchSubjects(options?: { includeCoreProblems?: boolean }) {
     const includeCoreProblems = options?.includeCoreProblems ?? false;
@@ -22,48 +27,6 @@ export async function fetchSubjects(options?: { includeCoreProblems?: boolean })
     });
 }
 
-// Helper to determine prefix from subject name
-export function getSubjectPrefix(subjectName: string): string {
-    if (subjectName.includes('英語')) return 'E';
-    if (subjectName.includes('国語')) return 'J';
-    if (subjectName.includes('数学')) return 'M';
-    return subjectName.charAt(0).toUpperCase();
-}
-
-export interface SubjectConfig {
-    letter: string;
-    bgColor: string;
-    hoverColor: string;
-    label: string;
-}
-
-export function getSubjectConfig(subjectName: string): SubjectConfig | null {
-    if (subjectName.includes('英語')) {
-        return {
-            letter: 'E',
-            bgColor: 'bg-orange-500',
-            hoverColor: 'hover:bg-orange-600',
-            label: '英語',
-        };
-    }
-    if (subjectName.includes('数学')) {
-        return {
-            letter: 'M',
-            bgColor: 'bg-blue-500',
-            hoverColor: 'hover:bg-blue-600',
-            label: '数学',
-        };
-    }
-    if (subjectName.includes('国語')) {
-        return {
-            letter: 'J',
-            bgColor: 'bg-green-500',
-            hoverColor: 'hover:bg-green-600',
-            label: '国語',
-        };
-    }
-    return null;
-}
 
 export async function getMaxCustomIdNumber(prefix: string, client: any = prisma): Promise<number> {
     const prefixDash = prefix + '-';

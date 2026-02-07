@@ -28,7 +28,7 @@ export async function loginAction(prevState: any, formData: FormData) {
     const { createClient } = await import('@/lib/supabase/server');
     const supabase = await createClient();
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
     });
@@ -37,8 +37,8 @@ export async function loginAction(prevState: any, formData: FormData) {
         return { error: 'IDまたはパスワードが間違っています' };
     }
 
-    const { data: { user } } = await supabase.auth.getUser();
-    const role = user?.app_metadata?.role || 'STUDENT';
+    // signInWithPasswordの戻り値からuserを取得（二重呼び出し削減）
+    const role = data.user?.app_metadata?.role || 'STUDENT';
 
     if (role === 'ADMIN') {
         redirect('/admin');

@@ -9,6 +9,7 @@ import { ArrowLeft, PlayCircle, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VideoPlayerDialog } from "@/components/video-player-dialog"; // Client component we need to make
 import { LectureVideoButton } from "@/components/lecture-video-button";
+import { DateDisplay } from "@/components/ui/date-display";
 
 export default async function SessionDetailsPage({ params }: { params: Promise<{ groupId: string }> }) {
     const session = await getSession();
@@ -26,7 +27,6 @@ export default async function SessionDetailsPage({ params }: { params: Promise<{
 
     const firstItem = details[0];
     const subjectName = firstItem.problem.coreProblems[0]?.subject.name || '教科不明';
-    const date = firstItem.answeredAt.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) + ' ' + firstItem.answeredAt.toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo' });
 
     const requiredVideos = details
         .filter(d => (d.evaluation === 'C' || d.evaluation === 'D') && d.problem.videoUrl) // C/D are mapped to "destructive" badge usually, or checking !A/B
@@ -46,7 +46,7 @@ export default async function SessionDetailsPage({ params }: { params: Promise<{
                 </Link>
                 <div>
                     <h1 className="text-2xl font-bold">{subjectName} 採点結果</h1>
-                    <p className="text-muted-foreground text-sm">{date}</p>
+                    <p className="text-muted-foreground text-sm"><DateDisplay date={firstItem.answeredAt} showTime /></p>
                 </div>
             </div>
 

@@ -1,9 +1,4 @@
-import { Redis } from '@upstash/redis';
-
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL!,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-});
+import { redis } from '@/lib/redis';
 
 const SCAN_LOCK_KEY = 'sullivan:grading:scan:lock';
 const SCAN_LOCK_TTL_SECONDS = 60;

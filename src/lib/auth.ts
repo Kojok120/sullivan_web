@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { cache } from 'react';
 
 export type SessionPayload = {
     userId: string;
@@ -14,7 +15,8 @@ export async function logout() {
     await supabase.auth.signOut();
 }
 
-export async function getSession(): Promise<SessionPayload | null> {
+// React cache でメモ化: 同一リクエスト内の複数呼び出しを1回に削減
+export const getSession = cache(async (): Promise<SessionPayload | null> => {
     try {
         const supabase = await createClient();
         const { data: { user } } = await supabase.auth.getUser();
@@ -34,7 +36,7 @@ export async function getSession(): Promise<SessionPayload | null> {
     } catch (error) {
         return null;
     }
-}
+});
 
 export async function requireAdmin() {
     const session = await getSession();

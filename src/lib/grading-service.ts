@@ -705,16 +705,13 @@ type PreparedFile = {
 };
 
 async function prepareFileForGemini(filePath: string): Promise<PreparedFile> {
-    const fd = await fs.promises.open(filePath, 'r');
-    const headerBuffer = Buffer.alloc(4);
-    await fd.read(headerBuffer, 0, 4, 0);
-    await fd.close();
-
-    const isPdfHeader = headerBuffer.toString('hex') === '25504446'; // %PDF
-    const mimeType = isPdfHeader ? 'application/pdf' : (filePath.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
-    console.log(`Detected MIME Type: ${mimeType} (Header: ${headerBuffer.toString('hex')})`);
-
+    // ファイル全体を1回で読み込み（ヘッダ判定と全読込を統合）
     const fileBuffer = await fs.promises.readFile(filePath);
+
+    // ヘッダの最初の4バイトでPDFかどうか判定
+    const isPdfHeader = fileBuffer.slice(0, 4).toString('hex') === '25504446'; // %PDF
+    const mimeType = isPdfHeader ? 'application/pdf' : (filePath.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
+    console.log(`Detected MIME Type: ${mimeType} (Header: ${fileBuffer.slice(0, 4).toString('hex')})`);
 
     return {
         base64Data: fileBuffer.toString('base64'),
@@ -746,10 +743,6 @@ async function getQrDataWithFallback(filePath: string, prepared: PreparedFile): 
     return qrData;
 }
 
-// Deprecated/Wrapper for backward compatibility if needed, else used as the implementation
-async function extractQrDataFromFile(filePath: string, prepared: PreparedFile): Promise<QRData | null> {
-    return getQrDataWithFallback(filePath, prepared);
-}
 
 async function resolveUserFromQr(qrData: QRData) {
     // [NEW] Resolve User (Strict loginId only)

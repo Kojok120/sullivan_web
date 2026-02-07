@@ -6,7 +6,6 @@ import { History } from "lucide-react";
 import { PrintSelector } from "@/components/print/print-selector";
 import { StampOverlay } from "@/components/grading/stamp-overlay";
 import { AchievementOverlay } from "@/components/gamification/achievement-overlay";
-import { LevelUpOverlay } from "@/components/gamification/level-up-overlay";
 import { CoreProblemUnlockOverlay } from "@/components/gamification/core-problem-unlock-overlay";
 
 export default async function Home() {
@@ -20,7 +19,6 @@ export default async function Home() {
             <header className="mb-10">
                 <StampOverlay />
                 <AchievementOverlay />
-                <LevelUpOverlay />
                 <CoreProblemUnlockOverlay />
                 <h1 className="text-3xl font-bold text-foreground tracking-tight mb-2">
                     ホーム

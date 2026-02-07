@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Trophy, Star, Sparkles } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { createClient } from '@/lib/supabase/client';
+import { markLevelAsSeen } from '@/app/actions/level';
 
 // Simple implementation of SSE listening
 export function LevelUpModal() {
@@ -31,7 +32,7 @@ export function LevelUpModal() {
                         table: 'realtime_events',
                         filter: `user_id=eq.${prismaUserId}`,
                     },
-                    (payload) => {
+                    async (payload) => {
                         const record = payload.new as { type?: string; payload?: any } | null;
                         if (!record || record.type !== 'gamification_update') return;
 
@@ -43,6 +44,8 @@ export function LevelUpModal() {
                             });
                             setOpen(true);
                             triggerConfetti();
+                            // 既読管理: DBに記録して二重表示を防止
+                            await markLevelAsSeen(update.levelUp.newLevel);
                         }
                     }
                 )

@@ -7,6 +7,7 @@ import { Printer, Minus, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { getSubjectConfig } from '@/lib/subject-config';
 
 export interface PrintSubject {
     subjectId: string;
@@ -25,10 +26,8 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
     const [sets, setSets] = useState(1);
 
     const getSubjectStyle = (name: string) => {
-        if (name.includes('英語') || name.includes('English')) return { color: 'bg-orange-500', label: 'E', full: 'English' };
-        if (name.includes('数学') || name.includes('Math')) return { color: 'bg-blue-500', label: 'M', full: 'Math' };
-        if (name.includes('国語') || name.includes('Japanese')) return { color: 'bg-green-500', label: 'J', full: 'Japanese' };
-        return { color: 'bg-gray-500', label: '?', full: name };
+        const config = getSubjectConfig(name);
+        return { color: config.bgColor, label: config.letter, full: config.fullName };
     };
 
     const incrementSets = () => setSets(prev => Math.min(prev + 1, 10));
