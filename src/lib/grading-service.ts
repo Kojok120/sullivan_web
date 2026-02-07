@@ -1271,8 +1271,12 @@ export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: strin
             if (currentIndex !== -1 && currentIndex < subjectCps.length - 1) {
                 let nextIndex = currentIndex + 1;
 
+                // アンロック済みCPを追跡するためのSetを構築
+                // （現在のunlockedCpIdsをコピーし、アンロックするたびに追加）
+                const tempUnlockedCpIds = new Set(unlockedCpIds);
+
                 // [MODIFIED] Recursive Unlock Logic
-                // If the next CP has 0 problems, unlock it AND continue to the next one.
+                // 問題数が0、または問題があっても依存不足で解けない場合は、次を続けてアンロックする
                 while (nextIndex < subjectCps.length) {
                     const nextCp = subjectCps[nextIndex];
 
@@ -1296,6 +1300,9 @@ export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: strin
                     });
                     console.log(`Unlocked CoreProblem ${nextCp.name} (recursive).`);
 
+                    // tempUnlockedCpIdsにこのCPを追加
+                    tempUnlockedCpIds.add(nextCp.id);
+
                     // 講義動画情報の確認ログ
                     console.log(`  -> LectureVideos found: ${nextCp.lectureVideos ? 'YES' : 'NO'}`);
 
@@ -1315,16 +1322,16 @@ export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: strin
                         console.error('[Realtime] Failed to emit core_problem_unlocked event:', e);
                     }
 
-                    // Count checks to see if we should stop
-                    // Note: We need to rely on the fetched count.
-                    const pCount = (nextCp as any)._count?.problems ?? 0;
+                    // このCoreProblemで「実際に解ける問題」があるかをチェック
+                    // 問題が解ける条件: その問題に紐づくすべてのCoreProblemがアンロックされていること
+                    const hasSolvable = await hasSolvableProblemsInCp(nextCp.id, tempUnlockedCpIds);
 
-                    if (pCount > 0) {
-                        console.log(`  -> CP ${nextCp.name} has ${pCount} problems. Stopping recursion.`);
-                        // We found a unit with problems, so we stop unlocking further.
+                    if (hasSolvable) {
+                        console.log(`  -> CP ${nextCp.name} has solvable problems. Stopping recursion.`);
+                        // 解ける問題があるのでループ終了
                         break;
                     } else {
-                        console.log(`  -> CP ${nextCp.name} has 0 problems. Continuing to next CP...`);
+                        console.log(`  -> CP ${nextCp.name} has no solvable problems yet. Continuing to next CP...`);
                         nextIndex++;
                     }
                 }
@@ -1334,6 +1341,36 @@ export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: strin
         }
     }
 }
+
+/**
+ * 指定されたCoreProblemに、実際に解ける問題が存在するかを判定する。
+ * 問題が解ける条件: その問題に紐づくすべてのCoreProblemがアンロックされていること
+ * @param coreProblemId 対象のCoreProblem ID
+ * @param unlockedCpIds 現在アンロックされているCoreProblem IDのSet
+ */
+async function hasSolvableProblemsInCp(
+    coreProblemId: string,
+    unlockedCpIds: Set<string>
+): Promise<boolean> {
+    const cp = await prisma.coreProblem.findUnique({
+        where: { id: coreProblemId },
+        include: {
+            problems: {
+                include: {
+                    coreProblems: { select: { id: true } }
+                }
+            }
+        }
+    });
+
+    if (!cp || cp.problems.length === 0) return false;
+
+    // この単元に属する問題のうち、1問でも「全依存が満たされる」ものがあるか
+    return cp.problems.some(problem =>
+        problem.coreProblems.every(dep => unlockedCpIds.has(dep.id))
+    );
+}
+
 
 // 2.5 Check for Stuck Files (Timeout > 3 mins)
 export async function checkStuckFiles() {
