@@ -24,7 +24,7 @@ export function MainNav({ role }: { role?: string }) {
                         <div className="relative h-10 w-40">
                             <Image
                                 src={SullivanLogo}
-                                alt="Sullivan Learning"
+                                alt="Sullivan"
                                 fill
                                 className="object-contain object-left"
                                 priority

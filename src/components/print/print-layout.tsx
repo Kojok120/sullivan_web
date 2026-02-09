@@ -366,7 +366,7 @@ function Header({ studentName, studentLoginId, subjectName, pageNum, totalPages,
 function Footer() {
     return (
         <div className="mt-auto pt-4 text-center text-xs text-gray-400 border-t">
-            Sullivan Learning System
+            Sullivan
         </div>
     );
 }
