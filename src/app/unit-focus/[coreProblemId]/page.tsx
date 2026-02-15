@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 export default async function UnitFocusDetailPage({
     params,
 }: {
-    params: { coreProblemId: string };
+    params: Promise<{ coreProblemId: string }>;
 }) {
     const session = await getSession();
     if (!session) redirect("/login");

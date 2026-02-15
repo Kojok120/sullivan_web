@@ -46,7 +46,6 @@ console.log(
 );
 
 const nextConfig: NextConfig = {
-  output: 'standalone',
   // SECURITY: Add recommended security headers
   headers: async () => [
     {

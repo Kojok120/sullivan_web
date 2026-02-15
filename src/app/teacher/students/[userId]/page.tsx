@@ -20,7 +20,7 @@ export default async function TeacherStudentDetailPage({
     params,
     searchParams,
 }: {
-    params: { userId: string };
+    params: Promise<{ userId: string }>;
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
     const session = await getSession();

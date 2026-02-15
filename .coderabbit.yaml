@@ -1,0 +1,42 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: ja-JP
+
+reviews:
+  profile: assertive
+  high_level_summary: true
+  auto_review:
+    enabled: true
+    drafts: false
+    ignore_title_keywords:
+      - WIP
+      - DO NOT MERGE
+      - DRAFT
+  path_filters:
+    - "!node_modules/**"
+    - "!.next/**"
+    - "!prisma/migrations/**"
+    - "!package-lock.json"
+    - "!tsconfig.tsbuildinfo"
+  path_instructions:
+    - path: "src/**"
+      instructions: |
+        このプロジェクトは Next.js 16 (App Router) + TypeScript + Tailwind CSS v4 の学習管理システムです。
+        以下の観点でレビューしてください:
+        - Server Actions / API Routes の適切な使い分け
+        - Prisma クエリのN+1問題やパフォーマンス
+        - Supabase Auth (SSR) のセキュリティ
+        - React Server Components と Client Components の分離
+        - 適切なエラーハンドリング
+        - TypeScript の型安全性（any の使用を避ける）
+    - path: "prisma/schema.prisma"
+      instructions: |
+        Prismaスキーマの変更時は以下を確認:
+        - インデックスの適切な設定
+        - リレーションの整合性
+        - マイグレーションへの影響
+    - path: "**/*.sh"
+      instructions: |
+        デプロイスクリプトの変更時は、環境変数の漏洩やセキュリティリスクがないか注意深く確認してください。
+
+chat:
+  auto_reply: true

@@ -5,7 +5,7 @@ import { SharedStudentPrintPage } from '@/components/print/shared-student-print-
 export default async function StudentPrintPage({
     searchParams,
 }: {
-    searchParams: { subjectId?: string; coreProblemId?: string; sets?: string };
+    searchParams: Promise<{ subjectId?: string; coreProblemId?: string; sets?: string }>;
 }) {
     const session = await getSession();
     if (!session) redirect('/login');

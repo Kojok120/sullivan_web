@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# 同一ブランチでの重複実行をキャンセル
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  ci:
+    name: Lint / Type Check / Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: チェックアウト
+        uses: actions/checkout@v4
+
+      - name: Node.js セットアップ
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: 依存関係インストール
+        run: npm ci
+
+      - name: Prisma クライアント生成
+        run: npx prisma generate
+
+      - name: ユニットテスト
+        run: npm test
+
+      - name: ESLint
+        run: npx next lint
+
+      - name: TypeScript 型チェック
+        run: npx tsc --noEmit
+
+      - name: Next.js ビルド
+        run: npm run build
+        env:
+          # CIではビルドが通ることのみ検証（ダミー値）
+          NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: "placeholder-anon-key"

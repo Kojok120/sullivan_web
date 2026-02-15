@@ -29,6 +29,9 @@ gcloud run deploy sullivan-grading-worker-production \
   --set-env-vars "UPSTASH_REDIS_REST_TOKEN=$UPSTASH_REDIS_REST_TOKEN" \
   --set-env-vars "GEMINI_API_KEY=$GEMINI_API_KEY" \
   --set-env-vars "GEMINI_MODEL=$GEMINI_MODEL" \
+  --set-env-vars "GEMINI_LIVE_MODEL=${GEMINI_LIVE_MODEL:-gemini-2.5-flash-native-audio-preview-09-2025}" \
+  --set-env-vars "GEMINI_LIVE_API_VERSION=${GEMINI_LIVE_API_VERSION:-v1beta}" \
+  --set-env-vars "GEMINI_LIVE_VOICE=${GEMINI_LIVE_VOICE:-Aoede}" \
   --set-env-vars "DRIVE_FOLDER_ID=$DRIVE_FOLDER_ID" \
   --set-env-vars "QSTASH_CURRENT_SIGNING_KEY=$QSTASH_CURRENT_SIGNING_KEY" \
   --set-env-vars "QSTASH_NEXT_SIGNING_KEY=$QSTASH_NEXT_SIGNING_KEY"

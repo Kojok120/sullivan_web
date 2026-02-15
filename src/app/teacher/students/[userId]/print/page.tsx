@@ -6,8 +6,8 @@ export default async function PrintPage({
     params,
     searchParams,
 }: {
-    params: { userId: string };
-    searchParams: { subjectId?: string; coreProblemId?: string; sets?: string };
+    params: Promise<{ userId: string }>;
+    searchParams: Promise<{ subjectId?: string; coreProblemId?: string; sets?: string }>;
 }) {
     const session = await getSession();
     if (!session || (session.role !== 'TEACHER' && session.role !== 'ADMIN')) redirect('/login');

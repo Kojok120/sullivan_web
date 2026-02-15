@@ -19,10 +19,12 @@ require_env() {
 require_env "NEXT_PUBLIC_SUPABASE_URL"
 require_env "NEXT_PUBLIC_SUPABASE_ANON_KEY"
 require_env "SUPABASE_SERVICE_ROLE_KEY"
+require_env "GEMINI_API_KEY"
 
 cat > .env.build <<EOF
 NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
+NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS=${NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS:-500}
 EOF
 
 RUNTIME_SA_EMAIL="${RUNTIME_SA_EMAIL:-sullivan-runtime@${GOOGLE_CLOUD_PROJECT_ID}.iam.gserviceaccount.com}"
@@ -39,6 +41,7 @@ gcloud run deploy sullivan-app-dev \
   --memory 4Gi \
   --cpu 2 \
   --allow-unauthenticated \
+  --set-env-vars "BIND_HOST=0.0.0.0" \
   --set-env-vars "NODE_ENV=development" \
   --set-env-vars "DATABASE_URL=$DATABASE_URL" \
   --set-env-vars "DIRECT_URL=$DIRECT_URL" \
@@ -49,12 +52,17 @@ gcloud run deploy sullivan-app-dev \
   --set-env-vars "UPSTASH_REDIS_REST_TOKEN=$UPSTASH_REDIS_REST_TOKEN" \
   --set-env-vars "GEMINI_API_KEY=$GEMINI_API_KEY" \
   --set-env-vars "GEMINI_MODEL=$GEMINI_MODEL" \
+  --set-env-vars "GEMINI_LIVE_MODEL=${GEMINI_LIVE_MODEL:-gemini-2.5-flash-native-audio-preview-09-2025}" \
+  --set-env-vars "GEMINI_LIVE_API_VERSION=${GEMINI_LIVE_API_VERSION:-v1beta}" \
+  --set-env-vars "GEMINI_LIVE_VOICE=${GEMINI_LIVE_VOICE:-Aoede}" \
   --set-env-vars "DRIVE_FOLDER_ID=$DRIVE_FOLDER_ID" \
   --set-env-vars "APP_URL=$APP_URL" \
   --set-build-env-vars "NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL" \
   --set-build-env-vars "NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+  --set-build-env-vars "NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS=${NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS:-500}" \
   --set-env-vars "NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL" \
   --set-env-vars "NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+  --set-env-vars "NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS=${NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS:-500}" \
   --set-env-vars "SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY" \
   --update-secrets "INTERNAL_API_SECRET=internal-api-secret:latest" \
   --update-secrets "DRIVE_WEBHOOK_TOKEN=drive-webhook-token:latest" \
