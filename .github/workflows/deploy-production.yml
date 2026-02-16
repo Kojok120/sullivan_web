@@ -50,8 +50,8 @@ jobs:
             --set-env-vars "BIND_HOST=0.0.0.0" \
             --set-build-env-vars "NODE_ENV=production" \
             --set-env-vars "NODE_ENV=production" \
-            --set-env-vars "DATABASE_URL=${{ secrets.DATABASE_URL }}" \
-            --set-env-vars "DIRECT_URL=${{ secrets.DIRECT_URL }}" \
+            --update-secrets "DATABASE_URL=database-url:latest" \
+            --update-secrets "DIRECT_URL=direct-url:latest" \
             --set-env-vars "QSTASH_TOKEN=${{ secrets.QSTASH_TOKEN }}" \
             --set-env-vars "QSTASH_CURRENT_SIGNING_KEY=${{ secrets.QSTASH_CURRENT_SIGNING_KEY }}" \
             --set-env-vars "QSTASH_NEXT_SIGNING_KEY=${{ secrets.QSTASH_NEXT_SIGNING_KEY }}" \
@@ -110,8 +110,8 @@ jobs:
             --cpu 2 \
             --allow-unauthenticated \
             --set-env-vars "NODE_ENV=production" \
-            --set-env-vars "DATABASE_URL=${{ secrets.DATABASE_URL }}" \
-            --set-env-vars "DIRECT_URL=${{ secrets.DIRECT_URL }}" \
+            --update-secrets "DATABASE_URL=database-url:latest" \
+            --update-secrets "DIRECT_URL=direct-url:latest" \
             --set-env-vars "UPSTASH_REDIS_REST_URL=${{ secrets.UPSTASH_REDIS_REST_URL }}" \
             --set-env-vars "UPSTASH_REDIS_REST_TOKEN=${{ secrets.UPSTASH_REDIS_REST_TOKEN }}" \
             --set-env-vars "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" \

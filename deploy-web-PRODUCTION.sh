@@ -44,8 +44,8 @@ gcloud run deploy sullivan-app-production \
   --set-env-vars "BIND_HOST=0.0.0.0" \
   --set-build-env-vars "NODE_ENV=production" \
   --set-env-vars "NODE_ENV=production" \
-  --set-env-vars "DATABASE_URL=$DATABASE_URL" \
-  --set-env-vars "DIRECT_URL=$DIRECT_URL" \
+  --update-secrets "DATABASE_URL=database-url:latest" \
+  --update-secrets "DIRECT_URL=direct-url:latest" \
   --set-env-vars "QSTASH_TOKEN=$QSTASH_TOKEN" \
   --set-env-vars "QSTASH_CURRENT_SIGNING_KEY=$QSTASH_CURRENT_SIGNING_KEY" \
   --set-env-vars "QSTASH_NEXT_SIGNING_KEY=$QSTASH_NEXT_SIGNING_KEY" \

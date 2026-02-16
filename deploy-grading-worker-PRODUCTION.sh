@@ -23,8 +23,8 @@ gcloud run deploy sullivan-grading-worker-production \
   --cpu 2 \
   --allow-unauthenticated \
   --set-env-vars "NODE_ENV=production" \
-  --set-env-vars "DATABASE_URL=$DATABASE_URL" \
-  --set-env-vars "DIRECT_URL=$DIRECT_URL" \
+  --update-secrets "DATABASE_URL=database-url:latest" \
+  --update-secrets "DIRECT_URL=direct-url:latest" \
   --set-env-vars "UPSTASH_REDIS_REST_URL=$UPSTASH_REDIS_REST_URL" \
   --set-env-vars "UPSTASH_REDIS_REST_TOKEN=$UPSTASH_REDIS_REST_TOKEN" \
   --set-env-vars "GEMINI_API_KEY=$GEMINI_API_KEY" \
