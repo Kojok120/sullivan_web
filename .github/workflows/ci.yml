@@ -44,7 +44,7 @@ jobs:
         run: npm test
 
       - name: ESLint
-        run: npm run lint
+        run: npx eslint .
 
       - name: TypeScript 型チェック
         run: npx tsc --noEmit
