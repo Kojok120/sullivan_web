@@ -129,6 +129,9 @@ jobs:
     timeout-minutes: 10
     needs: [deploy-web]
     environment: dev
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DIRECT_URL: ${{ secrets.DIRECT_URL }}
 
     steps:
       - name: チェックアウト
@@ -145,6 +148,3 @@ jobs:
 
       - name: Prisma マイグレーション実行
         run: npx prisma migrate deploy
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          DIRECT_URL: ${{ secrets.DIRECT_URL }}
