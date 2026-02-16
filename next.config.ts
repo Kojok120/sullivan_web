@@ -14,8 +14,7 @@ if (hasBuildEnv) {
     NEXT_PUBLIC_SUPABASE_ANON_KEY: parsedBuildEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY?.length ?? 0,
   };
   console.log(
-    `[build-env] .env.build size=${buildEnvRaw.length} keys=${
-      Object.keys(parsedBuildEnv).length
+    `[build-env] .env.build size=${buildEnvRaw.length} keys=${Object.keys(parsedBuildEnv).length
     }`
   );
   console.log(
@@ -46,6 +45,11 @@ console.log(
 );
 
 const nextConfig: NextConfig = {
+  // CI では別ステップで tsc を実行済みのため、ビルド中の重複チェックをスキップ
+  // これによりビルド時のメモリ使用量と所要時間を大幅に削減できる
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   // SECURITY: Add recommended security headers
   headers: async () => [
     {
