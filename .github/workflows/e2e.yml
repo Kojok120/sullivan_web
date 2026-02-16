@@ -4,7 +4,7 @@ on:
   # 手動実行と特定ラベルのPRで実行
   workflow_dispatch:
   pull_request:
-    branches: [main]
+    branches: [main, dev]
     types: [labeled]
 
 concurrency:
@@ -21,6 +21,10 @@ jobs:
     # 手動実行時または "e2e" ラベルが付いたPRで実行
     if: github.event_name == 'workflow_dispatch' || contains(github.event.label.name, 'e2e')
     timeout-minutes: 20
+    env:
+      # Prisma 生成用のダミー接続情報（DBへの実接続は不要）
+      DATABASE_URL: "postgresql://ci:ci@localhost:5432/ci?schema=public"
+      DIRECT_URL: "postgresql://ci:ci@localhost:5432/ci?schema=public"
 
     steps:
       - name: チェックアウト

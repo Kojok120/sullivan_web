@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
-    branches: [main]
+    branches: [main, dev]
 
 # 同一ブランチでの重複実行をキャンセル
 concurrency:
@@ -19,6 +19,10 @@ jobs:
     name: Lint / Type Check / Build
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      # Prisma 生成用のダミー接続情報（DBへの実接続は不要）
+      DATABASE_URL: "postgresql://ci:ci@localhost:5432/ci?schema=public"
+      DIRECT_URL: "postgresql://ci:ci@localhost:5432/ci?schema=public"
 
     steps:
       - name: チェックアウト
