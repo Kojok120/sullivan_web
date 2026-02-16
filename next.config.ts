@@ -45,8 +45,11 @@ console.log(
 );
 
 const nextConfig: NextConfig = {
-  // CI では別ステップで tsc を実行済みのため、ビルド中の重複チェックをスキップ
+  // CI では別ステップで tsc --noEmit を実行済みのため、ビルド中の重複チェックをスキップ
   // これによりビルド時のメモリ使用量と所要時間を大幅に削減できる
+  // ⚠️ ローカルの npm run build では型エラーが検出されない
+  //    ローカルで型チェックする場合: npm run type-check
+  // 参照: .github/workflows/ci.yml の「TypeScript 型チェック」ステップ
   typescript: {
     ignoreBuildErrors: true,
   },

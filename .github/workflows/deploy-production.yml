@@ -127,7 +127,7 @@ jobs:
     name: DB マイグレーション (PRODUCTION)
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [deploy-web]
+    needs: [deploy-web, deploy-grading-worker]
     environment: production
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
