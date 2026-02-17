@@ -21,8 +21,8 @@ jobs:
     timeout-minutes: 15
     env:
       # Prisma 生成用のダミー接続情報（DBへの実接続は不要）
-      DATABASE_URL: "postgresql://ci:ci@localhost:5432/ci?schema=public"
-      DIRECT_URL: "postgresql://ci:ci@localhost:5432/ci?schema=public"
+      DATABASE_URL: "postgresql://ci@localhost:5432/ci?schema=public"
+      DIRECT_URL: "postgresql://ci@localhost:5432/ci?schema=public"
 
     steps:
       - name: チェックアウト
