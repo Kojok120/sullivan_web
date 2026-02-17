@@ -1,0 +1,27 @@
+name: Restrict Main Merge Source
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, reopened, synchronize, edited]
+
+jobs:
+  restrict-source-branch:
+    name: main へのマージ元を dev に制限
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: PR 元ブランチを検証
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          if [ "$BASE_REF" = "main" ] && [ "$HEAD_REF" != "dev" ]; then
+            echo "main へのマージは dev ブランチからのみ許可されています。"
+            echo "現在のPR元ブランチ: $HEAD_REF"
+            exit 1
+          fi
+
+          echo "検証OK: $HEAD_REF -> $BASE_REF"
