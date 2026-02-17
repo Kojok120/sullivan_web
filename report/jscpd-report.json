@@ -1,0 +1,3797 @@
+{
+  "statistics": {
+    "detectionDate": "2026-02-16T06:23:35.643Z",
+    "formats": {
+      "javascript": {
+        "sources": {
+          "src/app/teacher/students/[userId]/history/[groupId]/page.tsx": {
+            "lines": 3,
+            "tokens": 25,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/teacher/students/[userId]/print/page.tsx": {
+            "lines": 2,
+            "tokens": 20,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/unit-focus/[coreProblemId]/components/unit-focus-detail-client.tsx": {
+            "lines": 126,
+            "tokens": 996,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/teacher/students/[userId]/profile-card.tsx": {
+            "lines": 124,
+            "tokens": 1076,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/teacher/students/[userId]/print-problem-card.tsx": {
+            "lines": 58,
+            "tokens": 516,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/teacher/students/[userId]/page.tsx": {
+            "lines": 143,
+            "tokens": 1276,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/teacher/students/[userId]/guidance-list.tsx": {
+            "lines": 80,
+            "tokens": 759,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/dashboard/history/[groupId]/page.tsx": {
+            "lines": 2,
+            "tokens": 17,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/users/register/register-form.tsx": {
+            "lines": 100,
+            "tokens": 817,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/users/register/page.tsx": {
+            "lines": 1,
+            "tokens": 9,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/problems/components/problem-list.tsx": {
+            "lines": 183,
+            "tokens": 1404,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/problems/components/problem-dialog.tsx": {
+            "lines": 72,
+            "tokens": 572,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/problems/components/problem-bulk-import.tsx": {
+            "lines": 202,
+            "tokens": 1991,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/problems/components/core-problem-selector.tsx": {
+            "lines": 24,
+            "tokens": 304,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/curriculum/components/problem-editor.tsx": {
+            "lines": 1,
+            "tokens": 11,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/curriculum/components/core-problem-list.tsx": {
+            "lines": 474,
+            "tokens": 3929,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/curriculum/components/core-problem-bulk-import.tsx": {
+            "lines": 80,
+            "tokens": 715,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/classrooms/[id]/page.tsx": {
+            "lines": 0,
+            "tokens": 6,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/classrooms/[id]/classroom-detail.tsx": {
+            "lines": 81,
+            "tokens": 635,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/analytics/[userId]/page.tsx": {
+            "lines": 67,
+            "tokens": 618,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/unit-focus/components/unit-focus-list-client.tsx": {
+            "lines": 38,
+            "tokens": 370,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/unit-focus/[coreProblemId]/page.tsx": {
+            "lines": 3,
+            "tokens": 21,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/teacher/components/student-list.tsx": {
+            "lines": 35,
+            "tokens": 406,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/dashboard/print/page.tsx": {
+            "lines": 1,
+            "tokens": 12,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/dashboard/history/page.tsx": {
+            "lines": 72,
+            "tokens": 780,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/dashboard/history/filter.tsx": {
+            "lines": 48,
+            "tokens": 428,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/dashboard/components/session-list.tsx": {
+            "lines": 0,
+            "tokens": 15,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/dashboard/components/session-list-client.tsx": {
+            "lines": 66,
+            "tokens": 529,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/users/user-list.tsx": {
+            "lines": 194,
+            "tokens": 1718,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/users/user-form-dialog.tsx": {
+            "lines": 81,
+            "tokens": 867,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/users/password-reset-dialog.tsx": {
+            "lines": 45,
+            "tokens": 450,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/users/page.tsx": {
+            "lines": 10,
+            "tokens": 66,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/problems/problem-manager.tsx": {
+            "lines": 98,
+            "tokens": 816,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/problems/page.tsx": {
+            "lines": 8,
+            "tokens": 63,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/curriculum/page.tsx": {
+            "lines": 0,
+            "tokens": 3,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/curriculum/curriculum-manager.tsx": {
+            "lines": 46,
+            "tokens": 358,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/classrooms/page.tsx": {
+            "lines": 0,
+            "tokens": 12,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/classrooms/classroom-list.tsx": {
+            "lines": 95,
+            "tokens": 783,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/analytics/page.tsx": {
+            "lines": 2,
+            "tokens": 15,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/(dashboard)/settings/page.tsx": {
+            "lines": 77,
+            "tokens": 655,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 52,
+            "duplicatedTokens": 449,
+            "percentage": 67.53,
+            "percentageTokens": 68.55,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/(auth)/login/page.tsx": {
+            "lines": 38,
+            "tokens": 308,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/voice/phone-tutor-button.tsx": {
+            "lines": 16,
+            "tokens": 113,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/voice/chat-tutor-button.tsx": {
+            "lines": 64,
+            "tokens": 475,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/voice/call-overlay.tsx": {
+            "lines": 34,
+            "tokens": 277,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/textarea.tsx": {
+            "lines": 3,
+            "tokens": 9,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/tabs.tsx": {
+            "lines": 34,
+            "tokens": 211,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/table.tsx": {
+            "lines": 86,
+            "tokens": 467,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/switch.tsx": {
+            "lines": 10,
+            "tokens": 37,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/sonner.tsx": {
+            "lines": 16,
+            "tokens": 130,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/select.tsx": {
+            "lines": 130,
+            "tokens": 640,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/role-badge.tsx": {
+            "lines": 0,
+            "tokens": 17,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/progress.tsx": {
+            "lines": 3,
+            "tokens": 9,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/label.tsx": {
+            "lines": 3,
+            "tokens": 9,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/input.tsx": {
+            "lines": 7,
+            "tokens": 27,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/dropdown-menu.tsx": {
+            "lines": 192,
+            "tokens": 956,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/dialog.tsx": {
+            "lines": 86,
+            "tokens": 460,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/date-display.tsx": {
+            "lines": 18,
+            "tokens": 174,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/checkbox.tsx": {
+            "lines": 3,
+            "tokens": 9,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/card.tsx": {
+            "lines": 69,
+            "tokens": 395,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/button.tsx": {
+            "lines": 0,
+            "tokens": 15,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/badge.tsx": {
+            "lines": 0,
+            "tokens": 13,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/alert.tsx": {
+            "lines": 26,
+            "tokens": 193,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/alert-dialog.tsx": {
+            "lines": 101,
+            "tokens": 498,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/accordion.tsx": {
+            "lines": 40,
+            "tokens": 260,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/print/shared-student-print-page.tsx": {
+            "lines": 4,
+            "tokens": 37,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/print/print-selector.tsx": {
+            "lines": 61,
+            "tokens": 553,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/print/print-problem-item.tsx": {
+            "lines": 4,
+            "tokens": 66,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/print/print-layout.tsx": {
+            "lines": 116,
+            "tokens": 1009,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/history/session-detail.tsx": {
+            "lines": 100,
+            "tokens": 883,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/grading/stamp-overlay.tsx": {
+            "lines": 49,
+            "tokens": 434,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/grading/stamp-card.tsx": {
+            "lines": 54,
+            "tokens": 523,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/gamification/level-up-modal.tsx": {
+            "lines": 19,
+            "tokens": 210,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/gamification/heatmap.tsx": {
+            "lines": 5,
+            "tokens": 84,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/gamification/core-problem-unlock-overlay.tsx": {
+            "lines": 144,
+            "tokens": 1067,
+            "sources": 1,
+            "clones": 2,
+            "duplicatedLines": 71,
+            "duplicatedTokens": 600,
+            "percentage": 49.31,
+            "percentageTokens": 56.23,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/gamification/achievement-overlay.tsx": {
+            "lines": 77,
+            "tokens": 634,
+            "sources": 1,
+            "clones": 2,
+            "duplicatedLines": 71,
+            "duplicatedTokens": 600,
+            "percentage": 92.21,
+            "percentageTokens": 94.64,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/unit-focus/page.tsx": {
+            "lines": 0,
+            "tokens": 3,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/teacher/page.tsx": {
+            "lines": 18,
+            "tokens": 134,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/force-password-change/page.tsx": {
+            "lines": 60,
+            "tokens": 508,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 52,
+            "duplicatedTokens": 449,
+            "percentage": 86.67,
+            "percentageTokens": 88.39,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/dashboard/page.tsx": {
+            "lines": 127,
+            "tokens": 1081,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/dashboard/activity-chart.tsx": {
+            "lines": 27,
+            "tokens": 239,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/page.tsx": {
+            "lines": 4,
+            "tokens": 63,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/admin-shell.tsx": {
+            "lines": 8,
+            "tokens": 59,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/achievements/page.tsx": {
+            "lines": 12,
+            "tokens": 146,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/video-player-dialog.tsx": {
+            "lines": 2,
+            "tokens": 34,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/main-nav.tsx": {
+            "lines": 55,
+            "tokens": 383,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/lecture-video-button.tsx": {
+            "lines": 10,
+            "tokens": 93,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/full-screen-video-player.tsx": {
+            "lines": 48,
+            "tokens": 422,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/admin-nav.tsx": {
+            "lines": 55,
+            "tokens": 448,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/page.tsx": {
+            "lines": 13,
+            "tokens": 94,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/layout.tsx": {
+            "lines": 0,
+            "tokens": 6,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          }
+        },
+        "total": {
+          "lines": 4793,
+          "tokens": 38978,
+          "sources": 90,
+          "clones": 3,
+          "duplicatedLines": 123,
+          "duplicatedTokens": 1049,
+          "percentage": 2.57,
+          "percentageTokens": 2.69,
+          "newDuplicatedLines": 0,
+          "newClones": 0
+        }
+      },
+      "tsx": {
+        "sources": {
+          "src/app/teacher/students/[userId]/history/[groupId]/page.tsx": {
+            "lines": 22,
+            "tokens": 185,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/teacher/students/[userId]/print/page.tsx": {
+            "lines": 23,
+            "tokens": 225,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/unit-focus/[coreProblemId]/components/unit-focus-detail-client.tsx": {
+            "lines": 259,
+            "tokens": 2112,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 17,
+            "duplicatedTokens": 123,
+            "percentage": 6.56,
+            "percentageTokens": 5.82,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/teacher/students/[userId]/profile-card.tsx": {
+            "lines": 248,
+            "tokens": 2227,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 8,
+            "duplicatedTokens": 110,
+            "percentage": 3.23,
+            "percentageTokens": 4.94,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/teacher/students/[userId]/print-problem-card.tsx": {
+            "lines": 145,
+            "tokens": 1314,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/teacher/students/[userId]/page.tsx": {
+            "lines": 216,
+            "tokens": 2098,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/teacher/students/[userId]/guidance-list.tsx": {
+            "lines": 157,
+            "tokens": 1452,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 8,
+            "duplicatedTokens": 110,
+            "percentage": 5.1,
+            "percentageTokens": 7.58,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/dashboard/history/[groupId]/page.tsx": {
+            "lines": 18,
+            "tokens": 166,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/users/register/register-form.tsx": {
+            "lines": 191,
+            "tokens": 1544,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/users/register/page.tsx": {
+            "lines": 31,
+            "tokens": 273,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/problems/components/problem-list.tsx": {
+            "lines": 294,
+            "tokens": 2441,
+            "sources": 1,
+            "clones": 2,
+            "duplicatedLines": 34,
+            "duplicatedTokens": 247,
+            "percentage": 11.56,
+            "percentageTokens": 10.12,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/problems/components/problem-dialog.tsx": {
+            "lines": 170,
+            "tokens": 1487,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/problems/components/problem-bulk-import.tsx": {
+            "lines": 451,
+            "tokens": 4529,
+            "sources": 1,
+            "clones": 3,
+            "duplicatedLines": 53,
+            "duplicatedTokens": 578,
+            "percentage": 11.75,
+            "percentageTokens": 12.76,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/problems/components/core-problem-selector.tsx": {
+            "lines": 112,
+            "tokens": 1137,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/curriculum/components/problem-editor.tsx": {
+            "lines": 98,
+            "tokens": 766,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/curriculum/components/core-problem-list.tsx": {
+            "lines": 611,
+            "tokens": 5136,
+            "sources": 1,
+            "clones": 2,
+            "duplicatedLines": 34,
+            "duplicatedTokens": 247,
+            "percentage": 5.56,
+            "percentageTokens": 4.81,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/curriculum/components/core-problem-bulk-import.tsx": {
+            "lines": 187,
+            "tokens": 1828,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 13,
+            "duplicatedTokens": 128,
+            "percentage": 6.95,
+            "percentageTokens": 7,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/classrooms/[id]/page.tsx": {
+            "lines": 21,
+            "tokens": 178,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/classrooms/[id]/classroom-detail.tsx": {
+            "lines": 203,
+            "tokens": 1644,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/analytics/[userId]/page.tsx": {
+            "lines": 142,
+            "tokens": 1365,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 10,
+            "duplicatedTokens": 116,
+            "percentage": 7.04,
+            "percentageTokens": 8.5,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/unit-focus/components/unit-focus-list-client.tsx": {
+            "lines": 114,
+            "tokens": 985,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/unit-focus/[coreProblemId]/page.tsx": {
+            "lines": 52,
+            "tokens": 425,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/teacher/components/student-list.tsx": {
+            "lines": 89,
+            "tokens": 829,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/dashboard/print/page.tsx": {
+            "lines": 19,
+            "tokens": 163,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/dashboard/history/page.tsx": {
+            "lines": 140,
+            "tokens": 1586,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/dashboard/history/filter.tsx": {
+            "lines": 99,
+            "tokens": 970,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/dashboard/components/session-list.tsx": {
+            "lines": 12,
+            "tokens": 131,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/dashboard/components/session-list-client.tsx": {
+            "lines": 186,
+            "tokens": 1684,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/users/user-list.tsx": {
+            "lines": 379,
+            "tokens": 3401,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/users/user-form-dialog.tsx": {
+            "lines": 218,
+            "tokens": 1873,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/users/password-reset-dialog.tsx": {
+            "lines": 118,
+            "tokens": 1012,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/users/page.tsx": {
+            "lines": 76,
+            "tokens": 679,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/problems/problem-manager.tsx": {
+            "lines": 230,
+            "tokens": 2051,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/problems/page.tsx": {
+            "lines": 66,
+            "tokens": 665,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/curriculum/page.tsx": {
+            "lines": 25,
+            "tokens": 203,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/curriculum/curriculum-manager.tsx": {
+            "lines": 105,
+            "tokens": 873,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/classrooms/page.tsx": {
+            "lines": 26,
+            "tokens": 224,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/classrooms/classroom-list.tsx": {
+            "lines": 188,
+            "tokens": 1536,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/analytics/page.tsx": {
+            "lines": 31,
+            "tokens": 250,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/(dashboard)/settings/page.tsx": {
+            "lines": 113,
+            "tokens": 992,
+            "sources": 1,
+            "clones": 2,
+            "duplicatedLines": 19,
+            "duplicatedTokens": 173,
+            "percentage": 16.81,
+            "percentageTokens": 17.44,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/(auth)/login/page.tsx": {
+            "lines": 68,
+            "tokens": 570,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/voice/phone-tutor-button.tsx": {
+            "lines": 78,
+            "tokens": 504,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/voice/chat-tutor-button.tsx": {
+            "lines": 173,
+            "tokens": 1485,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/voice/call-overlay.tsx": {
+            "lines": 121,
+            "tokens": 1004,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/textarea.tsx": {
+            "lines": 17,
+            "tokens": 97,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/tabs.tsx": {
+            "lines": 54,
+            "tokens": 361,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/table.tsx": {
+            "lines": 115,
+            "tokens": 606,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/switch.tsx": {
+            "lines": 30,
+            "tokens": 144,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/sonner.tsx": {
+            "lines": 39,
+            "tokens": 270,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/select.tsx": {
+            "lines": 186,
+            "tokens": 990,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/role-badge.tsx": {
+            "lines": 29,
+            "tokens": 222,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/progress.tsx": {
+            "lines": 30,
+            "tokens": 174,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/label.tsx": {
+            "lines": 23,
+            "tokens": 116,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/input.tsx": {
+            "lines": 20,
+            "tokens": 112,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/dropdown-menu.tsx": {
+            "lines": 256,
+            "tokens": 1305,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/dialog.tsx": {
+            "lines": 142,
+            "tokens": 805,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/date-display.tsx": {
+            "lines": 29,
+            "tokens": 297,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/checkbox.tsx": {
+            "lines": 31,
+            "tokens": 168,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/card.tsx": {
+            "lines": 91,
+            "tokens": 509,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/button.tsx": {
+            "lines": 59,
+            "tokens": 359,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/badge.tsx": {
+            "lines": 45,
+            "tokens": 278,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/alert.tsx": {
+            "lines": 58,
+            "tokens": 404,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/alert-dialog.tsx": {
+            "lines": 156,
+            "tokens": 812,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ui/accordion.tsx": {
+            "lines": 64,
+            "tokens": 453,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/print/shared-student-print-page.tsx": {
+            "lines": 27,
+            "tokens": 238,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/print/print-selector.tsx": {
+            "lines": 138,
+            "tokens": 1233,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/print/print-problem-item.tsx": {
+            "lines": 20,
+            "tokens": 206,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/print/print-layout.tsx": {
+            "lines": 371,
+            "tokens": 3194,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/history/session-detail.tsx": {
+            "lines": 168,
+            "tokens": 1527,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/grading/stamp-overlay.tsx": {
+            "lines": 127,
+            "tokens": 1206,
+            "sources": 1,
+            "clones": 2,
+            "duplicatedLines": 21,
+            "duplicatedTokens": 264,
+            "percentage": 16.54,
+            "percentageTokens": 21.89,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/grading/stamp-card.tsx": {
+            "lines": 88,
+            "tokens": 820,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/gamification/level-up-modal.tsx": {
+            "lines": 112,
+            "tokens": 1206,
+            "sources": 1,
+            "clones": 3,
+            "duplicatedLines": 37,
+            "duplicatedTokens": 475,
+            "percentage": 33.04,
+            "percentageTokens": 39.39,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/gamification/heatmap.tsx": {
+            "lines": 95,
+            "tokens": 844,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/gamification/core-problem-unlock-overlay.tsx": {
+            "lines": 345,
+            "tokens": 2826,
+            "sources": 1,
+            "clones": 4,
+            "duplicatedLines": 64,
+            "duplicatedTokens": 775,
+            "percentage": 18.55,
+            "percentageTokens": 27.42,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/gamification/achievement-overlay.tsx": {
+            "lines": 166,
+            "tokens": 1490,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 25,
+            "duplicatedTokens": 335,
+            "percentage": 15.06,
+            "percentageTokens": 22.48,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/unit-focus/page.tsx": {
+            "lines": 47,
+            "tokens": 371,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/teacher/page.tsx": {
+            "lines": 63,
+            "tokens": 524,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/force-password-change/page.tsx": {
+            "lines": 107,
+            "tokens": 912,
+            "sources": 1,
+            "clones": 2,
+            "duplicatedLines": 19,
+            "duplicatedTokens": 173,
+            "percentage": 17.76,
+            "percentageTokens": 18.97,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/dashboard/page.tsx": {
+            "lines": 190,
+            "tokens": 1782,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 10,
+            "duplicatedTokens": 116,
+            "percentage": 5.26,
+            "percentageTokens": 6.51,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/dashboard/activity-chart.tsx": {
+            "lines": 46,
+            "tokens": 365,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/page.tsx": {
+            "lines": 88,
+            "tokens": 665,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/layout.tsx": {
+            "lines": 12,
+            "tokens": 71,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/admin-shell.tsx": {
+            "lines": 57,
+            "tokens": 450,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/achievements/page.tsx": {
+            "lines": 71,
+            "tokens": 715,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/video-player-dialog.tsx": {
+            "lines": 106,
+            "tokens": 802,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/main-nav.tsx": {
+            "lines": 87,
+            "tokens": 667,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/lecture-video-button.tsx": {
+            "lines": 50,
+            "tokens": 368,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/grading-notifier.tsx": {
+            "lines": 72,
+            "tokens": 619,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 12,
+            "duplicatedTokens": 156,
+            "percentage": 16.67,
+            "percentageTokens": 25.2,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/full-screen-video-player.tsx": {
+            "lines": 154,
+            "tokens": 1166,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/admin-nav.tsx": {
+            "lines": 121,
+            "tokens": 855,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/page.tsx": {
+            "lines": 48,
+            "tokens": 401,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/layout.tsx": {
+            "lines": 41,
+            "tokens": 287,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          }
+        },
+        "total": {
+          "lines": 10816,
+          "tokens": 90494,
+          "sources": 92,
+          "clones": 14,
+          "duplicatedLines": 192,
+          "duplicatedTokens": 2063,
+          "percentage": 1.78,
+          "percentageTokens": 2.28,
+          "newDuplicatedLines": 0,
+          "newClones": 0
+        }
+      },
+      "typescript": {
+        "sources": {
+          "src/app/api/drive/watch/setup/route.ts": {
+            "lines": 117,
+            "tokens": 1028,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 19,
+            "duplicatedTokens": 222,
+            "percentage": 16.24,
+            "percentageTokens": 21.6,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/api/drive/watch/renew/route.ts": {
+            "lines": 130,
+            "tokens": 1075,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 19,
+            "duplicatedTokens": 222,
+            "percentage": 14.62,
+            "percentageTokens": 20.65,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/teacher/students/[userId]/actions.ts": {
+            "lines": 132,
+            "tokens": 1380,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/api/queue/grading/route.ts": {
+            "lines": 41,
+            "tokens": 419,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/api/grading/webhook/route.ts": {
+            "lines": 92,
+            "tokens": 881,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/api/grading/check/route.ts": {
+            "lines": 39,
+            "tokens": 394,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/users/register/actions.ts": {
+            "lines": 52,
+            "tokens": 510,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/api/tutor-chat/route.ts": {
+            "lines": 260,
+            "tokens": 2313,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/api/lecture-watched/route.ts": {
+            "lines": 46,
+            "tokens": 401,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/api/core-problem-unlocks/route.ts": {
+            "lines": 62,
+            "tokens": 561,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/problems/actions.ts": {
+            "lines": 528,
+            "tokens": 4458,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/curriculum/actions.ts": {
+            "lines": 322,
+            "tokens": 3036,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/classrooms/actions.ts": {
+            "lines": 118,
+            "tokens": 1075,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/(dashboard)/settings/actions.ts": {
+            "lines": 47,
+            "tokens": 412,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/(auth)/login/actions.ts": {
+            "lines": 49,
+            "tokens": 430,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/supabase/server.ts": {
+            "lines": 33,
+            "tokens": 233,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/supabase/middleware.ts": {
+            "lines": 36,
+            "tokens": 303,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/supabase/client.ts": {
+            "lines": 7,
+            "tokens": 51,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/supabase/admin.ts": {
+            "lines": 13,
+            "tokens": 82,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/__tests__/progression.test.ts": {
+            "lines": 73,
+            "tokens": 673,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/__tests__/print-algo.test.ts": {
+            "lines": 41,
+            "tokens": 371,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/force-password-change/actions.ts": {
+            "lines": 26,
+            "tokens": 227,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/admin/actions.ts": {
+            "lines": 234,
+            "tokens": 2112,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/actions/stamp.ts": {
+            "lines": 34,
+            "tokens": 285,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/actions/level.ts": {
+            "lines": 74,
+            "tokens": 583,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/actions/achievement.ts": {
+            "lines": 40,
+            "tokens": 297,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/types/images.d.ts": {
+            "lines": 35,
+            "tokens": 251,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/youtube.ts": {
+            "lines": 51,
+            "tokens": 326,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/utils.ts": {
+            "lines": 13,
+            "tokens": 116,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/user-service.ts": {
+            "lines": 44,
+            "tokens": 357,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/user-registration-service.ts": {
+            "lines": 68,
+            "tokens": 513,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/tsv-parser.ts": {
+            "lines": 139,
+            "tokens": 1165,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/subject-config.ts": {
+            "lines": 80,
+            "tokens": 470,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/stamp-service.ts": {
+            "lines": 92,
+            "tokens": 783,
+            "sources": 1,
+            "clones": 2,
+            "duplicatedLines": 20,
+            "duplicatedTokens": 218,
+            "percentage": 21.74,
+            "percentageTokens": 27.84,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/redis.ts": {
+            "lines": 9,
+            "tokens": 56,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/realtime-events.ts": {
+            "lines": 27,
+            "tokens": 173,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/qr-utils.ts": {
+            "lines": 98,
+            "tokens": 1133,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/progression.ts": {
+            "lines": 133,
+            "tokens": 1009,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/problem-service.ts": {
+            "lines": 364,
+            "tokens": 3471,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/prisma.ts": {
+            "lines": 16,
+            "tokens": 132,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/print-service.ts": {
+            "lines": 88,
+            "tokens": 846,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/print-algo.ts": {
+            "lines": 118,
+            "tokens": 887,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/password-service.ts": {
+            "lines": 64,
+            "tokens": 532,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/grading-lock.ts": {
+            "lines": 45,
+            "tokens": 308,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/grading-job.ts": {
+            "lines": 63,
+            "tokens": 601,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/gemini-socket-proxy.ts": {
+            "lines": 217,
+            "tokens": 2066,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/gamification-service.ts": {
+            "lines": 353,
+            "tokens": 3009,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/drive-webhook-manager.ts": {
+            "lines": 55,
+            "tokens": 483,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/drive-watch-state.ts": {
+            "lines": 40,
+            "tokens": 284,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/drive-client.ts": {
+            "lines": 48,
+            "tokens": 448,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/curriculum-service.ts": {
+            "lines": 103,
+            "tokens": 974,
+            "sources": 1,
+            "clones": 2,
+            "duplicatedLines": 16,
+            "duplicatedTokens": 214,
+            "percentage": 15.53,
+            "percentageTokens": 21.97,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/classroom-service.ts": {
+            "lines": 25,
+            "tokens": 240,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/auth.ts": {
+            "lines": 58,
+            "tokens": 515,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/auth-admin.ts": {
+            "lines": 126,
+            "tokens": 834,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/audio-streamer.ts": {
+            "lines": 331,
+            "tokens": 3198,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/analytics.ts": {
+            "lines": 591,
+            "tokens": 4136,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/hooks/use-gemini-live.ts": {
+            "lines": 196,
+            "tokens": 1679,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/actions.ts": {
+            "lines": 73,
+            "tokens": 666,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/proxy.ts": {
+            "lines": 66,
+            "tokens": 659,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          }
+        },
+        "total": {
+          "lines": 6475,
+          "tokens": 55910,
+          "sources": 59,
+          "clones": 3,
+          "duplicatedLines": 37,
+          "duplicatedTokens": 438,
+          "percentage": 0.57,
+          "percentageTokens": 0.78,
+          "newDuplicatedLines": 0,
+          "newClones": 0
+        }
+      },
+      "css": {
+        "sources": {
+          "src/components/print/print-layout.tsx": {
+            "lines": 43,
+            "tokens": 175,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/app/globals.css": {
+            "lines": 128,
+            "tokens": 1226,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          }
+        },
+        "total": {
+          "lines": 171,
+          "tokens": 1401,
+          "sources": 2,
+          "clones": 0,
+          "duplicatedLines": 0,
+          "duplicatedTokens": 0,
+          "percentage": 0,
+          "percentageTokens": 0,
+          "newDuplicatedLines": 0,
+          "newClones": 0
+        }
+      },
+      "markdown": {
+        "sources": {
+          "src/app/api/AGENTS.md": {
+            "lines": 20,
+            "tokens": 180,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/prompts/phone-tutor.md": {
+            "lines": 20,
+            "tokens": 106,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/prompts/chat-tutor.md": {
+            "lines": 19,
+            "tokens": 102,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/lib/AGENTS.md": {
+            "lines": 56,
+            "tokens": 439,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/AGENTS.md": {
+            "lines": 40,
+            "tokens": 295,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          }
+        },
+        "total": {
+          "lines": 155,
+          "tokens": 1122,
+          "sources": 5,
+          "clones": 0,
+          "duplicatedLines": 0,
+          "duplicatedTokens": 0,
+          "percentage": 0,
+          "percentageTokens": 0,
+          "newDuplicatedLines": 0,
+          "newClones": 0
+        }
+      }
+    },
+    "total": {
+      "lines": 22410,
+      "tokens": 187905,
+      "sources": 248,
+      "clones": 20,
+      "duplicatedLines": 352,
+      "duplicatedTokens": 3550,
+      "percentage": 1.57,
+      "percentageTokens": 1.89,
+      "newDuplicatedLines": 0,
+      "newClones": 0
+    }
+  },
+  "duplicates": [
+    {
+      "format": "typescript",
+      "lines": 20,
+      "fragment": "export async function POST(request: Request) {\n    try {\n        const url = new URL(request.url);\n        const shouldCheck = ['1', 'true'].includes(url.searchParams.get('check') || '');\n\n        const authHeader = request.headers.get('Authorization');\n        if (authHeader !== `Bearer ${process.env.INTERNAL_API_SECRET}`) {\n            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });\n        }\n\n        const appUrl = process.env.APP_URL;\n        if (!appUrl) {\n            return NextResponse.json(\n                { success: false, error: 'APP_URL is not configured' },\n                { status: 500 }\n            );\n        }\n\n        const webhookUrl = `${appUrl}/api/grading/webhook`;\n        const",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/app/api/drive/watch/renew/route.ts",
+        "start": 16,
+        "end": 35,
+        "startLoc": {
+          "line": 16,
+          "column": 1,
+          "position": 100
+        },
+        "endLoc": {
+          "line": 35,
+          "column": 6,
+          "position": 322
+        }
+      },
+      "secondFile": {
+        "name": "src/app/api/drive/watch/setup/route.ts",
+        "start": 13,
+        "end": 32,
+        "startLoc": {
+          "line": 13,
+          "column": 1,
+          "position": 70
+        },
+        "endLoc": {
+          "line": 32,
+          "column": 8,
+          "position": 292
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 9,
+      "fragment": "'use client';\n\nimport { useState } from 'react';\nimport { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';\nimport { Button } from '@/components/ui/button';\nimport { Textarea } from '@/components/ui/textarea';\nimport { Input } from '@/components/ui/input';\nimport { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';\nimport { MessageSquare",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/app/teacher/students/[userId]/guidance-list.tsx",
+        "start": 1,
+        "end": 9,
+        "startLoc": {
+          "line": 1,
+          "column": 1,
+          "position": 0
+        },
+        "endLoc": {
+          "line": 9,
+          "column": 14,
+          "position": 110
+        }
+      },
+      "secondFile": {
+        "name": "src/app/teacher/students/[userId]/profile-card.tsx",
+        "start": 1,
+        "end": 9,
+        "startLoc": {
+          "line": 1,
+          "column": 1,
+          "position": 0
+        },
+        "endLoc": {
+          "line": 9,
+          "column": 5,
+          "position": 110
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 21,
+      "fragment": "if (row.coreProblemNames) {\n                                                    row.coreProblemNames.forEach(name => {\n                                                        const resolved = resolvedCoreProblems.get(name);\n                                                        if (resolved) newIds.add(resolved.id);\n                                                    });\n                                                } else if (row.coreProblemName) {\n                                                    const resolved = resolvedCoreProblems.get(row.coreProblemName);\n                                                    if (resolved) newIds.add(resolved.id);\n                                                }\n\n                                                const oldIds = new Set(old.coreProblems.map((cp: any) => cp.id));\n                                                if (newIds.size !== oldIds.size) isCpChanged = true;\n                                                else {\n                                                    for (const id of newIds) {\n                                                        if (!oldIds.has(id)) {\n                                                            isCpChanged = true;\n                                                            break;\n                                                        }\n                                                    }\n                                                }\n                                            }",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/app/admin/problems/components/problem-bulk-import.tsx",
+        "start": 342,
+        "end": 362,
+        "startLoc": {
+          "line": 342,
+          "column": 49,
+          "position": 3385
+        },
+        "endLoc": {
+          "line": 362,
+          "column": 2,
+          "position": 3610
+        }
+      },
+      "secondFile": {
+        "name": "src/app/admin/problems/components/problem-bulk-import.tsx",
+        "start": 76,
+        "end": 98,
+        "startLoc": {
+          "line": 76,
+          "column": 13,
+          "position": 877
+        },
+        "endLoc": {
+          "line": 98,
+          "column": 7,
+          "position": 1104
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 16,
+      "fragment": "};\n\n    const handleCheckChange = (id: string, checked: boolean) => {\n        setCheckedIds(prev => {\n            const newSet = new Set(prev);\n            if (checked) {\n                newSet.add(id);\n            } else {\n                newSet.delete(id);\n            }\n            return newSet;\n        });\n    };\n\n    const handleSelectAll = () => {\n        if (checkedIds.size === items",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/app/admin/curriculum/components/core-problem-list.tsx",
+        "start": 398,
+        "end": 413,
+        "startLoc": {
+          "line": 398,
+          "column": 5,
+          "position": 3582
+        },
+        "endLoc": {
+          "line": 413,
+          "column": 6,
+          "position": 3711
+        }
+      },
+      "secondFile": {
+        "name": "src/app/admin/problems/components/problem-list.tsx",
+        "start": 79,
+        "end": 94,
+        "startLoc": {
+          "line": 79,
+          "column": 5,
+          "position": 750
+        },
+        "endLoc": {
+          "line": 94,
+          "column": 9,
+          "position": 879
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 20,
+      "fragment": "</AlertDialogDescription>\n                    </AlertDialogHeader>\n                    <AlertDialogFooter>\n                        <AlertDialogCancel disabled={isDeleting}>キャンセル</AlertDialogCancel>\n                        <AlertDialogAction\n                            onClick={handleDeleteConfirm}\n                            className=\"bg-red-500 hover:bg-red-600\"\n                            disabled={isDeleting}\n                        >\n                            削除\n                        </AlertDialogAction>\n                    </AlertDialogFooter>\n                </AlertDialogContent>\n            </AlertDialog>\n\n            {/* Bulk Delete Dialog */}\n            <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>\n                <AlertDialogContent>\n                    <AlertDialogHeader>\n                        <AlertDialogTitle>{checkedIds.size}件のコア問題を削除しますか？",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/app/admin/curriculum/components/core-problem-list.tsx",
+        "start": 574,
+        "end": 593,
+        "startLoc": {
+          "line": 574,
+          "column": 25,
+          "position": 4914
+        },
+        "endLoc": {
+          "line": 593,
+          "column": 15,
+          "position": 5032
+        }
+      },
+      "secondFile": {
+        "name": "src/app/admin/problems/components/problem-list.tsx",
+        "start": 257,
+        "end": 276,
+        "startLoc": {
+          "line": 257,
+          "column": 25,
+          "position": 2219
+        },
+        "endLoc": {
+          "line": 276,
+          "column": 13,
+          "position": 2337
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 14,
+      "fragment": ">\n                    </div>\n                )}\n\n                <DialogFooter>\n                    {step === 'input' ? (\n                        <Button onClick={handleParse} disabled={!rawText.trim()}>\n                            プレビュー\n                        </Button>\n                    ) : (\n                        <>\n                            <Button variant=\"ghost\" onClick={() => setStep('input')}>戻る</Button>\n                            <Button onClick={handleExecute} disabled={isPending}>\n                                {isPending && <Loader2 className=\"mr-2 h-4 w-4 animate-spin",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/app/admin/curriculum/components/core-problem-bulk-import.tsx",
+        "start": 166,
+        "end": 179,
+        "startLoc": {
+          "line": 166,
+          "column": 6,
+          "position": 1649
+        },
+        "endLoc": {
+          "line": 179,
+          "column": 26,
+          "position": 1777
+        }
+      },
+      "secondFile": {
+        "name": "src/app/admin/problems/components/problem-bulk-import.tsx",
+        "start": 410,
+        "end": 423,
+        "startLoc": {
+          "line": 410,
+          "column": 4,
+          "position": 4172
+        },
+        "endLoc": {
+          "line": 423,
+          "column": 26,
+          "position": 4305
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 13,
+      "fragment": "};\n\n        const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;\n\n        const interval: any = setInterval(function () {\n            const timeLeft = animationEnd - Date.now();\n\n            if (timeLeft <= 0) {\n                return clearInterval(interval);\n            }\n\n            const particleCount = 50 * (timeLeft / duration);\n            confetti",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/gamification/level-up-modal.tsx",
+        "start": 67,
+        "end": 79,
+        "startLoc": {
+          "line": 67,
+          "column": 2,
+          "position": 695
+        },
+        "endLoc": {
+          "line": 79,
+          "column": 9,
+          "position": 828
+        }
+      },
+      "secondFile": {
+        "name": "src/components/grading/stamp-overlay.tsx",
+        "start": 47,
+        "end": 59,
+        "startLoc": {
+          "line": 47,
+          "column": 2,
+          "position": 457
+        },
+        "endLoc": {
+          "line": 59,
+          "column": 61,
+          "position": 590
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 18,
+      "fragment": "}\n\n// 講義動画視聴完了を記録\nasync function markLectureAsWatched(coreProblemId: string): Promise<boolean> {\n    try {\n        const response = await fetch('/api/lecture-watched', {\n            method: 'POST',\n            headers: { 'Content-Type': 'application/json' },\n            body: JSON.stringify({ coreProblemId })\n        });\n        return response.ok;\n    } catch {\n        console.error('Failed to mark lecture as watched');\n        return false;\n    }\n}\n\n// YouTubeのURLからビデオIDを抽出",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/gamification/core-problem-unlock-overlay.tsx",
+        "start": 45,
+        "end": 62,
+        "startLoc": {
+          "line": 45,
+          "column": 1,
+          "position": 353
+        },
+        "endLoc": {
+          "line": 62,
+          "column": 25,
+          "position": 476
+        }
+      },
+      "secondFile": {
+        "name": "src/app/unit-focus/[coreProblemId]/components/unit-focus-detail-client.tsx",
+        "start": 23,
+        "end": 40,
+        "startLoc": {
+          "line": 23,
+          "column": 1,
+          "position": 231
+        },
+        "endLoc": {
+          "line": 40,
+          "column": 7,
+          "position": 354
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 10,
+      "fragment": "};\n\n    const triggerConfetti = () => {\n        const duration = 3000;\n        const animationEnd = Date.now() + duration;\n        const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 9999 };\n\n        const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;\n\n        const interval =",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/gamification/core-problem-unlock-overlay.tsx",
+        "start": 152,
+        "end": 161,
+        "startLoc": {
+          "line": 152,
+          "column": 5,
+          "position": 1255
+        },
+        "endLoc": {
+          "line": 161,
+          "column": 2,
+          "position": 1386
+        }
+      },
+      "secondFile": {
+        "name": "src/components/grading/stamp-overlay.tsx",
+        "start": 42,
+        "end": 51,
+        "startLoc": {
+          "line": 42,
+          "column": 5,
+          "position": 379
+        },
+        "endLoc": {
+          "line": 51,
+          "column": 2,
+          "position": 509
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 14,
+      "fragment": "= setInterval(function () {\n            const timeLeft = animationEnd - Date.now();\n\n            if (timeLeft <= 0) {\n                return clearInterval(interval);\n            }\n\n            const particleCount = 50 * (timeLeft / duration);\n            confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });\n            confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });\n        }, 250);\n    };\n\n    const",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/gamification/core-problem-unlock-overlay.tsx",
+        "start": 161,
+        "end": 174,
+        "startLoc": {
+          "line": 161,
+          "column": 2,
+          "position": 1386
+        },
+        "endLoc": {
+          "line": 174,
+          "column": 6,
+          "position": 1572
+        }
+      },
+      "secondFile": {
+        "name": "src/components/gamification/level-up-modal.tsx",
+        "start": 71,
+        "end": 65,
+        "startLoc": {
+          "line": 71,
+          "column": 2,
+          "position": 751
+        },
+        "endLoc": {
+          "line": 65,
+          "column": 7,
+          "position": 702
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 22,
+      "fragment": "={{ opacity: 0 }}\n                    animate={{ opacity: 1 }}\n                    exit={{ opacity: 0 }}\n                    className=\"fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4\"\n                >\n                    <motion.div\n                        initial={{ scale: 0.5, rotate: -10 }}\n                        animate={{ scale: 1, rotate: 0 }}\n                        exit={{ scale: 0.5, rotate: 10, opacity: 0 }}\n                        transition={{ type: \"spring\", stiffness: 260, damping: 20 }}\n                        className=\"w-full max-w-md relative\"\n                    >\n                        {/* Shining background effect */}\n                        <div className=\"absolute inset-0 bg-yellow-400 rounded-full blur-3xl opacity-20 animate-pulse\"></div>\n\n                        <div className=\"bg-gradient-to-br from-yellow-100 to-white text-center p-8 rounded-3xl shadow-2xl relative border-4 border-yellow-400\">\n                            {/* Close button */}\n                            <Button\n                                variant=\"ghost\"\n                                size=\"icon\"\n                                className=\"absolute top-2 right-2 text-yellow-600 hover:bg-yellow-200 rounded-full\"\n                                onClick={handleClose",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/gamification/achievement-overlay.tsx",
+        "start": 79,
+        "end": 100,
+        "startLoc": {
+          "line": 79,
+          "column": 8,
+          "position": 811
+        },
+        "endLoc": {
+          "line": 100,
+          "column": 12,
+          "position": 1007
+        }
+      },
+      "secondFile": {
+        "name": "src/components/gamification/core-problem-unlock-overlay.tsx",
+        "start": 183,
+        "end": 205,
+        "startLoc": {
+          "line": 183,
+          "column": 8,
+          "position": 1665
+        },
+        "endLoc": {
+          "line": 205,
+          "column": 2,
+          "position": 1862
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 51,
+      "fragment": "}\n                            >\n                                <X className=\"h-6 w-6\" />\n                            </Button>\n\n                            <motion.div\n                                initial={{ scale: 0 }}\n                                animate={{ scale: 1 }}\n                                transition={{ delay: 0.2, type: \"spring\" }}\n                                className=\"inline-block p-6 rounded-full bg-yellow-400 shadow-inner mb-6\"\n                            >\n                                <Trophy className=\"h-16 w-16 text-white\" />\n                            </motion.div>\n\n                            <motion.h2\n                                initial={{ y: 20, opacity: 0 }}\n                                animate={{ y: 0, opacity: 1 }}\n                                transition={{ delay: 0.3 }}\n                                className=\"text-3xl font-black text-yellow-600 mb-2\"\n                            >\n                                実績解除！\n                            </motion.h2>\n\n                            <motion.div\n                                initial={{ y: 20, opacity: 0 }}\n                                animate={{ y: 0, opacity: 1 }}\n                                transition={{ delay: 0.4 }}\n                                className=\"mb-6 space-y-2\"\n                            >\n                                <h3 className=\"text-2xl font-bold text-gray-800\">\n                                    {current.achievement.name}\n                                </h3>\n                                <p className=\"text-gray-600 font-medium\">\n                                    {current.achievement.description}\n                                </p>\n                            </motion.div>\n\n                            <motion.div\n                                initial={{ scale: 0 }}\n                                animate={{ scale: 1 }}\n                                transition={{ delay: 0.6, type: \"spring\" }}\n                                className=\"inline-flex items-center gap-2 bg-yellow-500 text-white px-6 py-2 rounded-full font-bold text-lg shadow-lg\"\n                            >\n                                <Star className=\"h-5 w-5 fill-current\" />\n                                +{current.achievement.xpReward} XP\n                            </motion.div>\n\n                            <motion.div\n                                initial={{ opacity: 0, y: 20 }}\n                                animate={{ opacity: 1, y: 0 }}\n                                transition={{ delay: 1.5",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/gamification/achievement-overlay.tsx",
+        "start": 100,
+        "end": 150,
+        "startLoc": {
+          "line": 100,
+          "column": 12,
+          "position": 1008
+        },
+        "endLoc": {
+          "line": 150,
+          "column": 4,
+          "position": 1412
+        }
+      },
+      "secondFile": {
+        "name": "src/components/gamification/core-problem-unlock-overlay.tsx",
+        "start": 192,
+        "end": 251,
+        "startLoc": {
+          "line": 192,
+          "column": 2,
+          "position": 1790
+        },
+        "endLoc": {
+          "line": 251,
+          "column": 4,
+          "position": 2232
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 26,
+      "fragment": ");\n    };\n\n    const triggerConfetti = () => {\n        const duration = 3000;\n        const animationEnd = Date.now() + duration;\n        const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 9999 };\n\n        const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;\n\n        const interval: any = setInterval(function () {\n            const timeLeft = animationEnd - Date.now();\n\n            if (timeLeft <= 0) {\n                return clearInterval(interval);\n            }\n\n            const particleCount = 50 * (timeLeft / duration);\n            confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });\n            confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });\n        }, 250);\n    };\n\n    return (\n        <AnimatePresence>\n            {current",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/gamification/achievement-overlay.tsx",
+        "start": 52,
+        "end": 77,
+        "startLoc": {
+          "line": 52,
+          "column": 5,
+          "position": 465
+        },
+        "endLoc": {
+          "line": 77,
+          "column": 8,
+          "position": 800
+        }
+      },
+      "secondFile": {
+        "name": "src/components/gamification/core-problem-unlock-overlay.tsx",
+        "start": 151,
+        "end": 67,
+        "startLoc": {
+          "line": 151,
+          "column": 5,
+          "position": 1251
+        },
+        "endLoc": {
+          "line": 67,
+          "column": 7,
+          "position": 713
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 53,
+      "fragment": "} className=\"space-y-6\">\n                            <div className=\"space-y-2\">\n                                <Label htmlFor=\"newPassword\">新しいパスワード</Label>\n                                <div className=\"relative\">\n                                    <Input\n                                        id=\"newPassword\"\n                                        name=\"newPassword\"\n                                        type={showNewPassword ? 'text' : 'password'}\n                                        required\n                                        minLength={8}\n                                        autoComplete=\"new-password\"\n                                        className=\"pr-10\"\n                                    />\n                                    <button\n                                        type=\"button\"\n                                        onClick={() => setShowNewPassword((prev) => !prev)}\n                                        aria-label={showNewPassword ? 'パスワードを非表示' : 'パスワードを表示'}\n                                        aria-pressed={showNewPassword}\n                                        className=\"absolute right-3 top-1/2 -translate-y-1/2 rounded-md text-gray-500 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500\"\n                                    >\n                                        {showNewPassword ? <EyeOff className=\"h-4 w-4\" /> : <Eye className=\"h-4 w-4\" />}\n                                    </button>\n                                </div>\n                            </div>\n                            <div className=\"space-y-2\">\n                                <Label htmlFor=\"confirmPassword\">新しいパスワード（確認）</Label>\n                                <div className=\"relative\">\n                                    <Input\n                                        id=\"confirmPassword\"\n                                        name=\"confirmPassword\"\n                                        type={showConfirmPassword ? 'text' : 'password'}\n                                        required\n                                        minLength={8}\n                                        autoComplete=\"new-password\"\n                                        className=\"pr-10\"\n                                    />\n                                    <button\n                                        type=\"button\"\n                                        onClick={() => setShowConfirmPassword((prev) => !prev)}\n                                        aria-label={showConfirmPassword ? 'パスワードを非表示' : 'パスワードを表示'}\n                                        aria-pressed={showConfirmPassword}\n                                        className=\"absolute right-3 top-1/2 -translate-y-1/2 rounded-md text-gray-500 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500\"\n                                    >\n                                        {showConfirmPassword ? <EyeOff className=\"h-4 w-4\" /> : <Eye className=\"h-4 w-4\" />}\n                                    </button>\n                                </div>\n                            </div>\n\n                            {state?.error && (\n                                <p className=\"text-sm text-red-500 font-medium\">{state.error}</p>\n                            )}\n\n                            <Button type=\"submit\" className=\"w-full bg-blue-600 hover:bg-blue-700\" disabled={pending}",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/app/force-password-change/page.tsx",
+        "start": 38,
+        "end": 90,
+        "startLoc": {
+          "line": 38,
+          "column": 7,
+          "position": 343
+        },
+        "endLoc": {
+          "line": 90,
+          "column": 2,
+          "position": 792
+        }
+      },
+      "secondFile": {
+        "name": "src/app/(dashboard)/settings/page.tsx",
+        "start": 44,
+        "end": 106,
+        "startLoc": {
+          "line": 44,
+          "column": 20,
+          "position": 428
+        },
+        "endLoc": {
+          "line": 106,
+          "column": 2,
+          "position": 947
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 10,
+      "fragment": ">\n                                        {showNewPassword ? <EyeOff className=\"h-4 w-4\" /> : <Eye className=\"h-4 w-4\" />}\n                                    </button>\n                                </div>\n                            </div>\n                            <div className=\"space-y-2\">\n                                <Label htmlFor=\"confirmPassword\">新しいパスワード（確認）</Label>\n                                <div className=\"relative\">\n                                    <Input\n                                        ",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/app/force-password-change/page.tsx",
+        "start": 57,
+        "end": 66,
+        "startLoc": {
+          "line": 57,
+          "column": 37,
+          "position": 496
+        },
+        "endLoc": {
+          "line": 66,
+          "column": 41,
+          "position": 584
+        }
+      },
+      "secondFile": {
+        "name": "src/app/(dashboard)/settings/page.tsx",
+        "start": 68,
+        "end": 77,
+        "startLoc": {
+          "line": 68,
+          "column": 33,
+          "position": 622
+        },
+        "endLoc": {
+          "line": 77,
+          "column": 37,
+          "position": 710
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 11,
+      "fragment": ">\n                                        {showConfirmPassword ? <EyeOff className=\"h-4 w-4\" /> : <Eye className=\"h-4 w-4\" />}\n                                    </button>\n                                </div>\n                            </div>\n\n                            {state?.error && (\n                                <p className=\"text-sm text-red-500 font-medium\">{state.error}</p>\n                            )}\n\n                            <",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/app/force-password-change/page.tsx",
+        "start": 80,
+        "end": 90,
+        "startLoc": {
+          "line": 80,
+          "column": 37,
+          "position": 688
+        },
+        "endLoc": {
+          "line": 90,
+          "column": 2,
+          "position": 773
+        }
+      },
+      "secondFile": {
+        "name": "src/app/(dashboard)/settings/page.tsx",
+        "start": 90,
+        "end": 100,
+        "startLoc": {
+          "line": 90,
+          "column": 33,
+          "position": 808
+        },
+        "endLoc": {
+          "line": 100,
+          "column": 2,
+          "position": 893
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 11,
+      "fragment": "\">\n                                {subjectProgress.map((subject) => (\n                                    <div key={subject.subjectId} className=\"space-y-2\">\n                                        <div className=\"flex items-center justify-between text-sm\">\n                                            <div className=\"font-medium\">{subject.subjectName}</div>\n                                            <div className=\"text-muted-foreground\">{subject.progressPercentage}%</div>\n                                        </div>\n                                        <Progress value={subject.progressPercentage} />\n                                    </div>\n                                ))}\n                                {",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/app/dashboard/page.tsx",
+        "start": 169,
+        "end": 179,
+        "startLoc": {
+          "line": 169,
+          "column": 10,
+          "position": 1596
+        },
+        "endLoc": {
+          "line": 179,
+          "column": 2,
+          "position": 1712
+        }
+      },
+      "secondFile": {
+        "name": "src/app/admin/analytics/[userId]/page.tsx",
+        "start": 72,
+        "end": 82,
+        "startLoc": {
+          "line": 72,
+          "column": 45,
+          "position": 742
+        },
+        "endLoc": {
+          "line": 82,
+          "column": 3,
+          "position": 858
+        }
+      }
+    },
+    {
+      "format": "typescript",
+      "lines": 11,
+      "fragment": "| null> {\n    const user = await prisma.user.findUnique({\n        where: { id: userId },\n        select: { metadata: true },\n    });\n\n    if (!user) return null;\n\n    const metadata = (user.metadata as any) || {};\n    const stampCard = normalizeStampCard(metadata);\n    const",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/lib/stamp-service.ts",
+        "start": 40,
+        "end": 50,
+        "startLoc": {
+          "line": 40,
+          "column": 2,
+          "position": 348
+        },
+        "endLoc": {
+          "line": 50,
+          "column": 6,
+          "position": 457
+        }
+      },
+      "secondFile": {
+        "name": "src/lib/stamp-service.ts",
+        "start": 22,
+        "end": 33,
+        "startLoc": {
+          "line": 22,
+          "column": 2,
+          "position": 165
+        },
+        "endLoc": {
+          "line": 33,
+          "column": 7,
+          "position": 275
+        }
+      }
+    },
+    {
+      "format": "typescript",
+      "lines": 9,
+      "fragment": "> {\n    const client = tx || prisma;\n    const subject = await client.subject.findUnique({ where: { id: subjectId } });\n    if (!subject) throw new Error('Subject not found');\n\n    const prefix = getSubjectPrefix(subject.name);\n    const maxNum = await getMaxCustomIdNumber(prefix, client);\n\n    return Array",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/lib/curriculum-service.ts",
+        "start": 92,
+        "end": 100,
+        "startLoc": {
+          "line": 92,
+          "column": 2,
+          "position": 822
+        },
+        "endLoc": {
+          "line": 100,
+          "column": 6,
+          "position": 929
+        }
+      },
+      "secondFile": {
+        "name": "src/lib/curriculum-service.ts",
+        "start": 74,
+        "end": 82,
+        "startLoc": {
+          "line": 74,
+          "column": 7,
+          "position": 658
+        },
+        "endLoc": {
+          "line": 82,
+          "column": 2,
+          "position": 765
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 13,
+      "fragment": ");\n\n    useEffect(() => {\n        const supabase = createClient();\n        let channel: ReturnType<typeof supabase.channel> | null = null;\n\n        const setup = async () => {\n            const { data: { user } } = await supabase.auth.getUser();\n            if (!user) return;\n            const prismaUserId = (user.app_metadata as { prismaUserId?: string } | null)?.prismaUserId || user.id;\n\n            channel = supabase\n                .channel(`realtime-events:grading:",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/grading-notifier.tsx",
+        "start": 9,
+        "end": 21,
+        "startLoc": {
+          "line": 9,
+          "column": 2,
+          "position": 76
+        },
+        "endLoc": {
+          "line": 21,
+          "column": 26,
+          "position": 232
+        }
+      },
+      "secondFile": {
+        "name": "src/components/gamification/level-up-modal.tsx",
+        "start": 14,
+        "end": 26,
+        "startLoc": {
+          "line": 14,
+          "column": 5,
+          "position": 178
+        },
+        "endLoc": {
+          "line": 26,
+          "column": 31,
+          "position": 334
+        }
+      }
+    }
+  ]
+}
