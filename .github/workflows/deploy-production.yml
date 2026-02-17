@@ -18,6 +18,7 @@ jobs:
     name: Deploy Web App (PRODUCTION)
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    needs: [migrate-db]
     environment: production
     permissions:
       contents: read
@@ -80,6 +81,7 @@ jobs:
     name: Deploy Grading Worker (PRODUCTION)
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    needs: [migrate-db]
     environment: production
     permissions:
       contents: read
@@ -127,7 +129,6 @@ jobs:
     name: DB マイグレーション (PRODUCTION)
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [deploy-web, deploy-grading-worker]
     environment: production
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
