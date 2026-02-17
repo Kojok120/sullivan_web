@@ -38,7 +38,7 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
 
       - name: Docker 認証
-        run: gcloud auth configure-docker asia.gcr.io
+        run: gcloud auth configure-docker asia.gcr.io --quiet
 
       - name: Docker ビルド (Web)
         run: |
