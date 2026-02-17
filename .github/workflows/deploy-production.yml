@@ -37,19 +37,33 @@ jobs:
       - name: gcloud CLI セットアップ
         uses: google-github-actions/setup-gcloud@v2
 
+      - name: Docker 認証
+        run: gcloud auth configure-docker asia.gcr.io --quiet
+
+      - name: Docker ビルド (Web)
+        run: |
+          docker build \
+            --build-arg NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }} \
+            --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }} \
+            --build-arg NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS=${{ secrets.NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS }} \
+            -t asia.gcr.io/${{ secrets.GCP_PROJECT_ID }}/sullivan-app-production:${{ github.sha }} \
+            .
+
+      - name: Docker プッシュ (Web)
+        run: docker push asia.gcr.io/${{ secrets.GCP_PROJECT_ID }}/sullivan-app-production:${{ github.sha }}
+
       - name: Cloud Run デプロイ (Web)
         run: |
           gcloud run deploy sullivan-app-production \
             --project "${{ secrets.GCP_PROJECT_ID }}" \
             --service-account "${{ secrets.RUNTIME_SA_EMAIL }}" \
-            --source . \
+            --image asia.gcr.io/${{ secrets.GCP_PROJECT_ID }}/sullivan-app-production:${{ github.sha }} \
             --platform managed \
             --region ${{ env.GCP_REGION }} \
             --memory 4Gi \
             --cpu 2 \
             --allow-unauthenticated \
             --set-env-vars "BIND_HOST=0.0.0.0" \
-            --set-build-env-vars "NODE_ENV=production" \
             --set-env-vars "NODE_ENV=production" \
             --update-secrets "DATABASE_URL=database-url:latest" \
             --update-secrets "DIRECT_URL=direct-url:latest" \
@@ -65,9 +79,6 @@ jobs:
             --set-env-vars "GEMINI_LIVE_VOICE=${{ secrets.GEMINI_LIVE_VOICE }}" \
             --set-env-vars "DRIVE_FOLDER_ID=${{ secrets.DRIVE_FOLDER_ID }}" \
             --set-env-vars "APP_URL=${{ secrets.APP_URL }}" \
-            --set-build-env-vars "NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" \
-            --set-build-env-vars "NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" \
-            --set-build-env-vars "NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS=${{ secrets.NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS }}" \
             --set-env-vars "NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" \
             --set-env-vars "NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" \
             --set-env-vars "NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS=${{ secrets.NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS }}" \
