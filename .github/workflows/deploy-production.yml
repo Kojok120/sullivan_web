@@ -1,0 +1,150 @@
+name: Deploy PRODUCTION
+
+on:
+  push:
+    branches: [main]
+
+# 本番デプロイは同時実行を防ぐ
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "20"
+  GCP_REGION: asia-northeast1
+
+jobs:
+  deploy-web:
+    name: Deploy Web App (PRODUCTION)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: チェックアウト
+        uses: actions/checkout@v4
+
+      - name: GCP 認証 (Workload Identity Federation)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: gcloud CLI セットアップ
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Cloud Run デプロイ (Web)
+        run: |
+          gcloud run deploy sullivan-app-production \
+            --project "${{ secrets.GCP_PROJECT_ID }}" \
+            --service-account "${{ secrets.RUNTIME_SA_EMAIL }}" \
+            --source . \
+            --platform managed \
+            --region ${{ env.GCP_REGION }} \
+            --memory 4Gi \
+            --cpu 2 \
+            --allow-unauthenticated \
+            --set-env-vars "BIND_HOST=0.0.0.0" \
+            --set-build-env-vars "NODE_ENV=production" \
+            --set-env-vars "NODE_ENV=production" \
+            --update-secrets "DATABASE_URL=database-url:latest" \
+            --update-secrets "DIRECT_URL=direct-url:latest" \
+            --set-env-vars "QSTASH_TOKEN=${{ secrets.QSTASH_TOKEN }}" \
+            --set-env-vars "QSTASH_CURRENT_SIGNING_KEY=${{ secrets.QSTASH_CURRENT_SIGNING_KEY }}" \
+            --set-env-vars "QSTASH_NEXT_SIGNING_KEY=${{ secrets.QSTASH_NEXT_SIGNING_KEY }}" \
+            --set-env-vars "UPSTASH_REDIS_REST_URL=${{ secrets.UPSTASH_REDIS_REST_URL }}" \
+            --set-env-vars "UPSTASH_REDIS_REST_TOKEN=${{ secrets.UPSTASH_REDIS_REST_TOKEN }}" \
+            --set-env-vars "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" \
+            --set-env-vars "GEMINI_MODEL=${{ secrets.GEMINI_MODEL }}" \
+            --set-env-vars "GEMINI_LIVE_MODEL=${{ secrets.GEMINI_LIVE_MODEL }}" \
+            --set-env-vars "GEMINI_LIVE_API_VERSION=${{ secrets.GEMINI_LIVE_API_VERSION }}" \
+            --set-env-vars "GEMINI_LIVE_VOICE=${{ secrets.GEMINI_LIVE_VOICE }}" \
+            --set-env-vars "DRIVE_FOLDER_ID=${{ secrets.DRIVE_FOLDER_ID }}" \
+            --set-env-vars "APP_URL=${{ secrets.APP_URL }}" \
+            --set-build-env-vars "NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" \
+            --set-build-env-vars "NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" \
+            --set-build-env-vars "NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS=${{ secrets.NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS }}" \
+            --set-env-vars "NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" \
+            --set-env-vars "NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" \
+            --set-env-vars "NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS=${{ secrets.NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS }}" \
+            --set-env-vars "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            --update-secrets "INTERNAL_API_SECRET=internal-api-secret:latest" \
+            --update-secrets "DRIVE_WEBHOOK_TOKEN=drive-webhook-token:latest" \
+            --set-env-vars "DRIVE_WEBHOOK_CHANNEL_ID=${{ secrets.DRIVE_WEBHOOK_CHANNEL_ID }}" \
+            --set-env-vars "GRADING_WORKER_URL=${{ secrets.GRADING_WORKER_URL }}"
+
+  deploy-grading-worker:
+    name: Deploy Grading Worker (PRODUCTION)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: チェックアウト
+        uses: actions/checkout@v4
+
+      - name: GCP 認証 (Workload Identity Federation)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: gcloud CLI セットアップ
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Cloud Run デプロイ (Grading Worker)
+        run: |
+          gcloud run deploy sullivan-grading-worker-production \
+            --project "${{ secrets.GCP_PROJECT_ID }}" \
+            --service-account "${{ secrets.RUNTIME_SA_EMAIL }}" \
+            --source . \
+            --platform managed \
+            --region ${{ env.GCP_REGION }} \
+            --memory 4Gi \
+            --cpu 2 \
+            --allow-unauthenticated \
+            --set-env-vars "NODE_ENV=production" \
+            --update-secrets "DATABASE_URL=database-url:latest" \
+            --update-secrets "DIRECT_URL=direct-url:latest" \
+            --set-env-vars "UPSTASH_REDIS_REST_URL=${{ secrets.UPSTASH_REDIS_REST_URL }}" \
+            --set-env-vars "UPSTASH_REDIS_REST_TOKEN=${{ secrets.UPSTASH_REDIS_REST_TOKEN }}" \
+            --set-env-vars "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" \
+            --set-env-vars "GEMINI_MODEL=${{ secrets.GEMINI_MODEL }}" \
+            --set-env-vars "GEMINI_LIVE_MODEL=${{ secrets.GEMINI_LIVE_MODEL }}" \
+            --set-env-vars "GEMINI_LIVE_API_VERSION=${{ secrets.GEMINI_LIVE_API_VERSION }}" \
+            --set-env-vars "GEMINI_LIVE_VOICE=${{ secrets.GEMINI_LIVE_VOICE }}" \
+            --set-env-vars "DRIVE_FOLDER_ID=${{ secrets.DRIVE_FOLDER_ID }}" \
+            --set-env-vars "QSTASH_CURRENT_SIGNING_KEY=${{ secrets.QSTASH_CURRENT_SIGNING_KEY }}" \
+            --set-env-vars "QSTASH_NEXT_SIGNING_KEY=${{ secrets.QSTASH_NEXT_SIGNING_KEY }}"
+
+  migrate-db:
+    name: DB マイグレーション (PRODUCTION)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [deploy-web, deploy-grading-worker]
+    environment: production
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DIRECT_URL: ${{ secrets.DIRECT_URL }}
+
+    steps:
+      - name: チェックアウト
+        uses: actions/checkout@v4
+
+      - name: Node.js セットアップ
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: 依存関係インストール
+        run: npm ci
+
+      - name: Prisma マイグレーション実行
+        run: npx prisma migrate deploy
