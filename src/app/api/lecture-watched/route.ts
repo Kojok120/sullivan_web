@@ -10,10 +10,22 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-        const { coreProblemId } = await request.json();
+        const { coreProblemId, watchedDurationSeconds, videoDurationSeconds } = await request.json();
 
         if (!coreProblemId) {
             return NextResponse.json({ error: 'coreProblemId is required' }, { status: 400 });
+        }
+
+        // 視聴時間検証: 動画の60%以上を視聴していないと拒否
+        if (videoDurationSeconds && videoDurationSeconds > 0 && watchedDurationSeconds !== undefined) {
+            const ratio = watchedDurationSeconds / videoDurationSeconds;
+            console.log(`[LectureWatched] User ${session.userId} CP ${coreProblemId}: watched ${watchedDurationSeconds}s / ${videoDurationSeconds}s (${Math.round(ratio * 100)}%)`);
+            if (ratio < 0.6) {
+                return NextResponse.json(
+                    { error: '動画を十分に視聴してください（60%以上の視聴が必要です）' },
+                    { status: 400 }
+                );
+            }
         }
 
         // UserCoreProblemStateを更新（存在しない場合は作成）

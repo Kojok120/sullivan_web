@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { Button } from '@/components/ui/button';
@@ -45,12 +45,12 @@ async function markCoreProblemUnlockAsSeen(eventId: string): Promise<void> {
 }
 
 // 講義動画視聴完了を記録
-async function markLectureAsWatched(coreProblemId: string): Promise<boolean> {
+async function markLectureAsWatched(coreProblemId: string, watchedDurationSeconds?: number, videoDurationSeconds?: number): Promise<boolean> {
     try {
         const response = await fetch('/api/lecture-watched', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ coreProblemId })
+            body: JSON.stringify({ coreProblemId, watchedDurationSeconds, videoDurationSeconds })
         });
         return response.ok;
     } catch {
@@ -58,6 +58,9 @@ async function markLectureAsWatched(coreProblemId: string): Promise<boolean> {
         return false;
     }
 }
+
+// 許可する再生速度
+const ALLOWED_RATES = [1, 1.25, 1.5];
 
 // YouTubeのURLからビデオIDを抽出
 function getYouTubeId(url: string): string | null {
@@ -78,7 +81,14 @@ export function CoreProblemUnlockOverlay() {
     const [showVideo, setShowVideo] = useState(false);
     const [selectedVideoIndex, setSelectedVideoIndex] = useState(0);
     const [videoEnded, setVideoEnded] = useState(false);
+    const [showUnderstoodButton, setShowUnderstoodButton] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [currentRate, setCurrentRate] = useState(1);
+    const playerRef = useRef<any>(null);
+    const watchedTimeRef = useRef(0);
+    const lastTimeRef = useRef(0);
+    const trackingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const videoDurationRef = useRef(0);
 
     useEffect(() => {
         const checkUnlocks = async () => {
@@ -108,8 +118,50 @@ export function CoreProblemUnlockOverlay() {
         }
     }, [queue, current]);
 
+    // 動画終了後に遅延でボタン表示（自動クリック対策）
+    useEffect(() => {
+        if (videoEnded) {
+            const timer = setTimeout(() => setShowUnderstoodButton(true), 2000);
+            return () => clearTimeout(timer);
+        }
+    }, [videoEnded]);
+
+    // クリーンアップ
+    useEffect(() => {
+        return () => {
+            if (trackingIntervalRef.current) {
+                clearInterval(trackingIntervalRef.current);
+            }
+        };
+    }, []);
+
+    // 視聴時間を追跡する
+    const startTracking = useCallback((player: any) => {
+        if (trackingIntervalRef.current) {
+            clearInterval(trackingIntervalRef.current);
+        }
+        trackingIntervalRef.current = setInterval(() => {
+            if (player && typeof player.getCurrentTime === 'function') {
+                try {
+                    const currentTime = player.getCurrentTime();
+                    const diff = currentTime - lastTimeRef.current;
+                    // 通常の再生進行（0〜3秒の範囲）のみカウント
+                    if (diff > 0 && diff < 3) {
+                        watchedTimeRef.current += diff;
+                    }
+                    lastTimeRef.current = currentTime;
+                } catch { }
+            }
+        }, 1000);
+    }, []);
+
     const handleClose = useCallback(async () => {
         if (!current) return;
+
+        // 視聴時間の追跡を停止
+        if (trackingIntervalRef.current) {
+            clearInterval(trackingIntervalRef.current);
+        }
 
         // Mark as seen in background
         await markCoreProblemUnlockAsSeen(current.eventId);
@@ -119,6 +171,10 @@ export function CoreProblemUnlockOverlay() {
         setCurrent(null);
         setShowVideo(false);
         setVideoEnded(false);
+        setShowUnderstoodButton(false);
+        watchedTimeRef.current = 0;
+        lastTimeRef.current = 0;
+        videoDurationRef.current = 0;
     }, [current]);
 
     // 「理解しました」ボタン押下時
@@ -127,7 +183,11 @@ export function CoreProblemUnlockOverlay() {
 
         setIsSubmitting(true);
         try {
-            const success = await markLectureAsWatched(current.coreProblemId);
+            const success = await markLectureAsWatched(
+                current.coreProblemId,
+                Math.round(watchedTimeRef.current),
+                Math.round(videoDurationRef.current)
+            );
             if (success) {
                 await handleClose();
             } else {
@@ -143,12 +203,54 @@ export function CoreProblemUnlockOverlay() {
         setSelectedVideoIndex(index);
         setShowVideo(true);
         setVideoEnded(false);
+        setShowUnderstoodButton(false);
+        watchedTimeRef.current = 0;
+        lastTimeRef.current = 0;
+        videoDurationRef.current = 0;
     };
 
     // 動画終了時のハンドラ
     const handleVideoEnd = (event: YouTubeEvent) => {
         console.log('[CP_UNLOCK] Video ended', event);
+        // 視聴時間の追跡を停止
+        if (trackingIntervalRef.current) {
+            clearInterval(trackingIntervalRef.current);
+        }
         setVideoEnded(true);
+    };
+
+    // 再生速度変更の防止（許可範囲外のみ）
+    const handlePlaybackRateChange = (event: YouTubeEvent) => {
+        const rate = event.target.getPlaybackRate();
+        if (!ALLOWED_RATES.includes(rate)) {
+            event.target.setPlaybackRate(1);
+            setCurrentRate(1);
+        } else {
+            setCurrentRate(rate);
+        }
+    };
+
+    // 手動で速度を変更する
+    const changeSpeed = (rate: number) => {
+        if (playerRef.current) {
+            playerRef.current.setPlaybackRate(rate);
+            setCurrentRate(rate);
+        }
+    };
+
+    // シーク防止: 大幅なジャンプを検知して元に戻す
+    const handleStateChange = (event: YouTubeEvent) => {
+        const player = event.target;
+        if (event.data === 1) { // PLAYING
+            const currentTime = player.getCurrentTime();
+            const diff = currentTime - lastTimeRef.current;
+            // 5秒以上の前方ジャンプはシーク判定
+            if (diff > 5 && lastTimeRef.current > 0 && watchedTimeRef.current > 0) {
+                player.seekTo(lastTimeRef.current, true);
+            } else {
+                lastTimeRef.current = currentTime;
+            }
+        }
     };
 
     const triggerConfetti = () => {
@@ -290,7 +392,7 @@ export function CoreProblemUnlockOverlay() {
                                         {current.coreProblemName} - {selectedVideo?.title}
                                     </h3>
                                     {youtubeId && (
-                                        <div className="aspect-video w-full">
+                                        <div className="aspect-video w-full relative">
                                             <YouTube
                                                 videoId={youtubeId}
                                                 opts={{
@@ -298,16 +400,57 @@ export function CoreProblemUnlockOverlay() {
                                                     height: '100%',
                                                     playerVars: {
                                                         autoplay: 1,
+                                                        rel: 0,           // おすすめ動画を同チャンネルに制限
+                                                        disablekb: 1,      // キーボード操作無効
+                                                        controls: 0,       // コントロールバー（シークバー含む）を非表示
+                                                        fs: 0,             // フルスクリーンボタン無効
+                                                        iv_load_policy: 3, // アノテーション非表示
                                                     },
                                                 }}
                                                 className="w-full h-full"
+                                                onReady={(event: YouTubeEvent) => {
+                                                    playerRef.current = event.target;
+                                                    event.target.setPlaybackRate(1);
+                                                    videoDurationRef.current = event.target.getDuration();
+                                                    lastTimeRef.current = 0;
+                                                    startTracking(event.target);
+                                                }}
                                                 onEnd={handleVideoEnd}
+                                                onPlaybackRateChange={handlePlaybackRateChange}
+                                                onStateChange={handleStateChange}
                                             />
+                                            {/* YouTubeロゴへのクリックをブロックするオーバーレイ */}
+                                            <div className="absolute bottom-0 right-0 w-40 h-12 z-[5]" style={{ pointerEvents: 'auto' }} />
+                                            {/* 動画終了後にレコメンド動画を隠すオーバーレイ */}
+                                            {videoEnded && (
+                                                <div className="absolute inset-0 z-[6] bg-black flex items-center justify-center">
+                                                    <div className="text-white/60 text-sm">動画の再生が完了しました</div>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 
-                                    {/* 動画終了後に「理解しました」ボタンを表示 */}
-                                    {videoEnded ? (
+                                    {/* 速度コントロール */}
+                                    {!videoEnded && youtubeId && (
+                                        <div className="flex items-center gap-1 mt-2">
+                                            <span className="text-xs text-gray-500 mr-1">速度:</span>
+                                            {ALLOWED_RATES.map((rate) => (
+                                                <button
+                                                    key={rate}
+                                                    onClick={() => changeSpeed(rate)}
+                                                    className={`px-2 py-1 rounded text-xs font-medium transition-colors ${currentRate === rate
+                                                            ? 'bg-green-500 text-white'
+                                                            : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                                                        }`}
+                                                >
+                                                    {rate}x
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* 動画終了後に「理解しました」ボタンを表示（2秒遅延） */}
+                                    {showUnderstoodButton ? (
                                         <div className="space-y-2">
                                             <Button
                                                 size="lg"
