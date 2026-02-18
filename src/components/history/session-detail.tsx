@@ -11,6 +11,8 @@ import fs from 'fs';
 import path from 'path';
 import { PhoneTutorButton } from "@/components/voice/phone-tutor-button";
 import { ChatTutorButton } from "@/components/voice/chat-tutor-button";
+import { checkSurveyEligibility } from "@/actions/survey";
+import { SurveyModal } from "@/components/survey/SurveyModal";
 
 type SessionDetailProps = {
     groupId: string;
@@ -35,6 +37,12 @@ export async function SessionDetail({
         await markSessionAsReviewed(groupId, userId);
     }
 
+    // Check for survey eligibility
+    let showSurvey = false;
+    if (!isTeacherView) {
+        showSurvey = await checkSurveyEligibility(userId);
+    }
+
     const promptPath = path.join(process.cwd(), 'src/prompts/phone-tutor.md');
     const systemPrompt = fs.readFileSync(promptPath, 'utf-8');
     const chatPromptPath = path.join(process.cwd(), 'src/prompts/chat-tutor.md');
@@ -53,6 +61,7 @@ export async function SessionDetail({
 
     return (
         <div className="container mx-auto py-8 px-4 max-w-4xl">
+            {showSurvey && <SurveyModal userId={userId} />}
             <div className="mb-6 flex items-center space-x-4">
                 <Link href={backUrl}>
                     <Button variant="ghost" size="icon">
