@@ -7,19 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2 } from 'lucide-react';
-import { Problem } from '@prisma/client';
 import { createStandaloneProblem, updateStandaloneProblem } from '../actions';
 import { toast } from 'sonner';
 import { CoreProblemSelector, SelectedCoreProblem } from './core-problem-selector';
-
-interface ProblemWithRelations extends Problem {
-    masterNumber: number | null;
-    coreProblems: {
-        id: string;
-        name: string;
-        subject: { name: string };
-    }[];
-}
+import type { ProblemWithRelations } from '../types';
 
 interface ProblemDialogProps {
     open: boolean;

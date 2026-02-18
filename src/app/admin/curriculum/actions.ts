@@ -6,6 +6,8 @@ import { Prisma } from '@prisma/client';
 
 import { requireAdmin, getSession } from '@/lib/auth';
 import { bulkCreateProblemsCore, createProblemCore, deleteProblemsWithRelations } from '@/lib/problem-service';
+import { dedupeByCoreProblemName } from '@/lib/core-problem-import';
+import type { LectureVideo } from '@/lib/lecture-videos';
 
 // --- Subjects ---
 export async function getSubjects() {
@@ -23,7 +25,7 @@ export async function getSubjects() {
 
 // --- CoreProblems ---
 // 講義動画の型
-export type LectureVideo = { title: string; url: string };
+export type { LectureVideo };
 
 function toLectureVideosJson(videos?: LectureVideo[]): Prisma.InputJsonValue | undefined {
     if (!videos) return undefined;
@@ -115,10 +117,7 @@ export async function bulkDeleteCoreProblems(ids: string[]) {
 export async function bulkCreateCoreProblems(subjectId: string, items: { name: string; lectureVideos?: LectureVideo[] }[]) {
     await requireAdmin();
     try {
-        // Filter unique names locally first
-        const uniqueItems = items.filter((item, index, self) =>
-            index === self.findIndex(t => t.name === item.name)
-        );
+        const uniqueItems = dedupeByCoreProblemName(items);
 
         // Find existing names in this subject
         const existingProblems = await prisma.coreProblem.findMany({

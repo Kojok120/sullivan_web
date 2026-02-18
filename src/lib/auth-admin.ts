@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { Role } from '@prisma/client';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 export interface CreateSupabaseUserParams {
     email: string;
@@ -9,6 +10,11 @@ export interface CreateSupabaseUserParams {
     name: string;
     prismaUserId: string;
 }
+
+type SupabaseUserLookup = {
+    email?: string;
+    prismaUserId?: string;
+};
 
 export async function createOrUpdateSupabaseUser({
     email,
@@ -42,7 +48,10 @@ export async function createOrUpdateSupabaseUser({
 
     // If user exists, try to update
     if (createError.code === 'email_exists') {
-        const existing = await findSupabaseUserByEmail(email);
+        const existing = await findSupabaseUser({
+            email,
+            prismaUserId,
+        });
 
         if (!existing) {
             console.error('Supabase user not found for email:', email);
@@ -80,24 +89,19 @@ export async function createOrUpdateSupabaseUser({
 }
 
 /**
- * Finds a Supabase user by email with pagination support.
- * Essential for apps with > 50 users (default limit).
+ * Finds a Supabase user by lookup keys with pagination support.
+ * `prismaUserId` is checked first (more stable), then `email`.
  */
-export async function findSupabaseUserByEmail(email: string) {
+export async function findSupabaseUser({ email, prismaUserId }: SupabaseUserLookup): Promise<SupabaseUser | null> {
+    if (!email && !prismaUserId) return null;
+
     const supabaseAdmin = createAdminClient();
-    const normalizedEmail = email.toLowerCase();
+    const normalizedEmail = email?.toLowerCase();
 
     let page = 1;
-    const perPage = 50; // Use default or manageable chunk
-    let hasMore = true;
+    const perPage = 200;
 
-    // TODO: Ideally we should use search if supported, or rely on ID mapping.
-    // Since listUsers doesn't support email filter on server-side JS client easily (unlike generic filtering),
-    // we paginate. 
-    // Optimization: If we have thousands of users, this is still O(N).
-    // A better approach in the future is to store `supabase_id` in Prisma `User` table.
-
-    while (hasMore) {
+    while (true) {
         const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers({
             page,
             perPage,
@@ -107,21 +111,27 @@ export async function findSupabaseUserByEmail(email: string) {
             break;
         }
 
-        const found = users.find(u => (u.email || '').toLowerCase() === normalizedEmail);
+        const found = users.find((u) => {
+            const appMeta = (u.app_metadata ?? {}) as Record<string, unknown>;
+            const matchedByPrismaUserId =
+                prismaUserId !== undefined && appMeta.prismaUserId === prismaUserId;
+            const matchedByEmail =
+                normalizedEmail !== undefined && (u.email || '').toLowerCase() === normalizedEmail;
+            return matchedByPrismaUserId || matchedByEmail;
+        });
         if (found) return found;
 
         if (users.length < perPage) {
-            hasMore = false;
-        } else {
-            page++;
-        }
-
-        // Safety break to prevent infinite loops or timeout on really large DBs without better search
-        if (page > 50) {
-            console.warn('findSupabaseUserByEmail: Exceeded 50 pages search limit. User might not be found.');
             break;
         }
+
+        page++;
     }
 
     return null;
+}
+
+// Backward-compatible wrapper
+export async function findSupabaseUserByEmail(email: string) {
+    return findSupabaseUser({ email });
 }

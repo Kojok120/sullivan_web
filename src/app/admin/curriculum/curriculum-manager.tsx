@@ -31,14 +31,15 @@ export function CurriculumManager({ initialSubjects }: CurriculumManagerProps) {
     // When subject changes, reset core problem selection or select the first one?
     // Let's select null for now to be safe, or maybe the first one for convenience.
     useEffect(() => {
-        if (selectedSubject && selectedSubject.coreProblems.length > 0) {
+        const activeSubject = subjects.find((s) => s.id === selectedSubjectId) || null;
+        if (activeSubject && activeSubject.coreProblems.length > 0) {
             // Optional: Auto-select first core problem?
             // setSelectedCoreProblemId(selectedSubject.coreProblems[0].id);
             setSelectedCoreProblemId(null);
         } else {
             setSelectedCoreProblemId(null);
         }
-    }, [selectedSubjectId]);
+    }, [selectedSubjectId, subjects]);
 
     return (
         <div className="flex flex-col h-[calc(100vh-10rem)] gap-4">

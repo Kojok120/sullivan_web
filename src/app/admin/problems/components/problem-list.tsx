@@ -3,7 +3,6 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Pencil, Trash2, CheckSquare, Square } from 'lucide-react';
-import { Problem } from '@prisma/client';
 import { Badge } from '@/components/ui/badge';
 import { deleteStandaloneProblem, bulkDeleteProblems } from '../actions';
 import { useState, useTransition } from 'react';
@@ -21,15 +20,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { SortIcon } from '@/components/ui/sort-icon';
-
-interface ProblemWithRelations extends Problem {
-    masterNumber: number | null; // Explicitly add specific field if not picked up
-    coreProblems: {
-        id: string;
-        name: string;
-        subject: { name: string };
-    }[];
-}
+import type { ProblemWithRelations } from '../types';
 
 interface ProblemListProps {
     problems: ProblemWithRelations[];

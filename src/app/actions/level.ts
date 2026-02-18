@@ -2,18 +2,12 @@
 
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { toMetadataObject } from '@/lib/metadata-utils';
 
 export type LevelData = {
     currentLevel: number;
     lastSeenLevel: number;
 };
-
-function toMetadataObject(value: unknown): Record<string, unknown> {
-    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-        return { ...(value as Record<string, unknown>) };
-    }
-    return {};
-}
 
 export async function getLevelData(): Promise<LevelData | null> {
     const session = await getSession();

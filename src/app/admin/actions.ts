@@ -33,8 +33,11 @@ export async function resetPassword(userId: string, password: string) {
         // Find Supabase user by email (mapped from loginId)
         const email = `${prismaUser.loginId}@sullivan-internal.local`;
 
-        const { findSupabaseUserByEmail } = await import('@/lib/auth-admin');
-        const supabaseUser = await findSupabaseUserByEmail(email);
+        const { findSupabaseUser } = await import('@/lib/auth-admin');
+        const supabaseUser = await findSupabaseUser({
+            email,
+            prismaUserId: userId,
+        });
 
         if (!supabaseUser) {
             return { success: false, error: 'Supabaseユーザーが見つかりません' };

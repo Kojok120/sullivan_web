@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { toMetadataObject } from '@/lib/metadata-utils';
 
 export type StampData = {
     totalStamps: number;
@@ -10,13 +11,6 @@ type StampCard = {
     totalStamps: number;
     lastSeenStamps: number;
 };
-
-function toMetadataObject(value: unknown): Record<string, unknown> {
-    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-        return { ...(value as Record<string, unknown>) };
-    }
-    return {};
-}
 
 function normalizeStampCard(metadata: Record<string, unknown>): StampCard {
     const rawStampCard = metadata.stampCard;
