@@ -38,6 +38,9 @@ export const getSession = cache(async (): Promise<SessionPayload | null> => {
     }
 });
 
+// Server Components / Server Actions での利用名を統一するためのエイリアス
+export const getCurrentUser = getSession;
+
 export async function requireAdmin() {
     const session = await getSession();
     if (!session || session.role !== 'ADMIN') {
