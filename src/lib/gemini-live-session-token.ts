@@ -17,13 +17,7 @@ const DEFAULT_TOKEN_TTL_SECONDS = 5 * 60;
 const MAX_TOKEN_TTL_SECONDS = 30 * 60;
 
 function resolveTokenSecret() {
-    return (
-        process.env.GEMINI_LIVE_SESSION_SECRET
-        || process.env.INTERNAL_API_SECRET
-        || process.env.SUPABASE_SERVICE_ROLE_KEY
-        || process.env.GEMINI_API_KEY
-        || ''
-    );
+    return process.env.GEMINI_LIVE_SESSION_SECRET || process.env.INTERNAL_API_SECRET || '';
 }
 
 function resolveTokenTtlSeconds() {
@@ -45,9 +39,9 @@ function signPayload(encodedPayload: string, secret: string) {
 }
 
 function timingSafeEquals(a: string, b: string) {
-    const left = Buffer.from(a);
-    const right = Buffer.from(b);
-    if (left.length !== right.length) return false;
+    // 可変長文字列をそのまま比較せず、固定長ダイジェスト同士を比較する
+    const left = crypto.createHash('sha256').update(a).digest();
+    const right = crypto.createHash('sha256').update(b).digest();
     return crypto.timingSafeEqual(left, right);
 }
 
@@ -59,7 +53,7 @@ export function issueGeminiLiveSessionToken(userId: string) {
 
     const secret = resolveTokenSecret();
     if (!secret) {
-        throw new Error('Gemini Live token secret is not configured');
+        throw new Error('GEMINI_LIVE_SESSION_SECRET is not configured');
     }
 
     const now = Math.floor(Date.now() / 1000);

@@ -372,6 +372,7 @@ export function useGeminiLive() {
         } catch (error) {
             console.error('Failed to establish Gemini Live connection:', error);
             setConnectionState('error');
+            throw error;
         }
     }, [ensureAudioStreamer, openSocket]);
 

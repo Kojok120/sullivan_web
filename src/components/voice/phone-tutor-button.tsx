@@ -5,6 +5,7 @@ import { Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useGeminiLive } from '@/hooks/use-gemini-live';
 import { CallOverlay } from '@/components/voice/call-overlay';
+import { toast } from 'sonner';
 
 type PhoneTutorButtonProps = {
     problemContext: {
@@ -42,7 +43,11 @@ ${systemPrompt}
 `;
 
         setIsOverlayOpen(true);
-        void connect(initialContext);
+        void connect(initialContext).catch((error) => {
+            console.error('[PhoneTutorButton] Failed to connect:', error);
+            toast.error('通話の開始に失敗しました');
+            setIsOverlayOpen(false);
+        });
     };
 
     const handleEndCall = () => {

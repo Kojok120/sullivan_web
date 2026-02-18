@@ -7,8 +7,6 @@ import {
 const SECRET_ENV_KEYS = [
     'GEMINI_LIVE_SESSION_SECRET',
     'INTERNAL_API_SECRET',
-    'SUPABASE_SERVICE_ROLE_KEY',
-    'GEMINI_API_KEY',
 ]
 
 function clearSecretEnvs() {
@@ -66,6 +64,17 @@ describe('gemini-live-session-token', () => {
     it('シークレット未設定時は発行に失敗する', () => {
         clearSecretEnvs()
 
-        expect(() => issueGeminiLiveSessionToken('student-4')).toThrowError('Gemini Live token secret is not configured')
+        expect(() => issueGeminiLiveSessionToken('student-4')).toThrowError('GEMINI_LIVE_SESSION_SECRET is not configured')
+    })
+
+    it('INTERNAL_API_SECRETをフォールバックシークレットとして使用できる', () => {
+        vi.stubEnv('GEMINI_LIVE_SESSION_SECRET', '')
+        vi.stubEnv('INTERNAL_API_SECRET', 'fallback-secret')
+
+        const issued = issueGeminiLiveSessionToken('student-5')
+        const verified = verifyGeminiLiveSessionToken(issued.token)
+
+        expect(verified.valid).toBe(true)
+        expect(verified.userId).toBe('student-5')
     })
 })
