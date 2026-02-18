@@ -22,16 +22,8 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
-
-interface Group {
-    id: string;
-    name: string;
-}
-
-interface Classroom {
-    id: string;
-    name: string;
-}
+import { NONE_SELECTION_VALUE, normalizeOptionalSelection } from '@/lib/form-selection';
+import type { ClassroomOption, GroupOption } from '@/lib/types/classroom';
 
 type UserWithGroup = User;
 
@@ -40,8 +32,8 @@ interface UserFormDialogProps {
     onOpenChange: (open: boolean) => void;
     mode: 'create' | 'edit';
     user?: UserWithGroup | null;
-    groups: Group[];
-    classrooms: Classroom[];
+    groups: GroupOption[];
+    classrooms: ClassroomOption[];
     onSuccess: () => void;
 }
 
@@ -53,16 +45,14 @@ type UserFormState = {
     classroomId: string;
 };
 
-const NONE_VALUE = '__none__';
-
 function createInitialFormState(mode: 'create' | 'edit', user?: UserWithGroup | null): UserFormState {
     if (mode === 'edit' && user) {
         return {
             name: user.name || '',
             role: user.role,
             password: '',
-            groupId: user.group || NONE_VALUE,
-            classroomId: user.classroomId || NONE_VALUE,
+            groupId: user.group || NONE_SELECTION_VALUE,
+            classroomId: user.classroomId || NONE_SELECTION_VALUE,
         };
     }
 
@@ -70,8 +60,8 @@ function createInitialFormState(mode: 'create' | 'edit', user?: UserWithGroup | 
         name: '',
         role: 'STUDENT',
         password: '',
-        groupId: NONE_VALUE,
-        classroomId: NONE_VALUE,
+        groupId: NONE_SELECTION_VALUE,
+        classroomId: NONE_SELECTION_VALUE,
     };
 }
 
@@ -89,8 +79,8 @@ function UserFormDialogContent({
     const handleSubmit = async () => {
         startTransition(async () => {
             let result;
-            const normalizedGroup = formData.groupId === NONE_VALUE ? undefined : formData.groupId;
-            const normalizedClassroom = formData.classroomId === NONE_VALUE ? undefined : formData.classroomId;
+            const normalizedGroup = normalizeOptionalSelection(formData.groupId);
+            const normalizedClassroom = normalizeOptionalSelection(formData.classroomId);
 
             if (mode === 'create') {
                 result = await createUser({
@@ -179,7 +169,7 @@ function UserFormDialogContent({
                             <SelectValue placeholder="教室を選択 (任意)" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value={NONE_VALUE}>なし</SelectItem>
+                            <SelectItem value={NONE_SELECTION_VALUE}>なし</SelectItem>
                             {classrooms.map((c) => (
                                 <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                             ))}
@@ -196,7 +186,7 @@ function UserFormDialogContent({
                             <SelectValue placeholder="グループを選択 (任意)" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value={NONE_VALUE}>なし</SelectItem>
+                            <SelectItem value={NONE_SELECTION_VALUE}>なし</SelectItem>
                             {groups.map((group) => (
                                 <SelectItem key={group.id} value={group.id}>{group.name}</SelectItem>
                             ))}

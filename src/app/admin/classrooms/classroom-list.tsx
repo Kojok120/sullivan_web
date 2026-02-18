@@ -19,13 +19,11 @@ import { toast } from 'sonner';
 import { createClassroom, deleteClassroom } from './actions';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import type { ClassroomWithGroups } from '@/lib/types/classroom';
 
-interface Classroom {
-    id: string;
-    name: string;
-    groups: string[];
+type Classroom = ClassroomWithGroups & {
     createdAt: Date;
-}
+};
 
 interface ClassroomListProps {
     initialClassrooms: Classroom[];

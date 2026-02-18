@@ -45,13 +45,9 @@ import { PasswordResetDialog } from './password-reset-dialog';
 import { RoleBadge } from '@/components/ui/role-badge';
 import { DateDisplay } from '@/components/ui/date-display';
 import { SortIcon } from '@/components/ui/sort-icon';
+import type { ClassroomOption, GroupOption } from '@/lib/types/classroom';
 
 type UserWithGroup = User; // Group is now just a string field on User
-
-interface Group {
-    id: string;
-    name: string;
-}
 
 interface UserListProps {
     initialUsers: UserWithGroup[];
@@ -63,8 +59,8 @@ interface UserListProps {
     sortOrder: 'asc' | 'desc';
     roleFilter?: Role;
     groupIdFilter?: string;
-    groups: Group[];
-    classrooms: { id: string; name: string; }[];
+    groups: GroupOption[];
+    classrooms: ClassroomOption[];
 }
 
 export function UserList({
@@ -84,7 +80,6 @@ export function UserList({
     const router = useRouter();
 
     // Dialog states
-    const [isAddOpen, setIsAddOpen] = useState(false);
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
     const [isPasswordResetOpen, setIsPasswordResetOpen] = useState(false);
@@ -336,16 +331,6 @@ export function UserList({
                     </Button>
                 </div>
             )}
-
-            {/* User Form Dialogs using Shared Component */}
-            <UserFormDialog
-                open={isAddOpen}
-                onOpenChange={setIsAddOpen}
-                mode="create"
-                groups={groups}
-                classrooms={classrooms}
-                onSuccess={() => router.refresh()}
-            />
 
             <UserFormDialog
                 open={isEditOpen}

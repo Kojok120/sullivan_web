@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { getSession, isTeacherOrAdmin } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 import { GuidanceType } from '@prisma/client';
+import { normalizeOptionalSelection } from '@/lib/form-selection';
 
 async function ensureTeacherCanAccessStudent(
     teacherId: string,
@@ -55,6 +56,9 @@ export async function updateStudentProfile(userId: string, formData: FormData) {
     const phoneNumber = formData.get('phoneNumber') as string;
     const email = formData.get('email') as string;
 
+    const normalizedClassroomId = normalizeOptionalSelection(classroomId);
+    const normalizedGroup = normalizeOptionalSelection(group);
+
     try {
 
 
@@ -65,9 +69,8 @@ export async function updateStudentProfile(userId: string, formData: FormData) {
                 notes,
                 birthday: birthdayStr ? new Date(birthdayStr) : null,
                 // SECURITY: Only Admins can change classroomId to prevent unauthorized transfers
-                classroomId: (session.role === 'ADMIN' && classroomId && classroomId !== 'unselected') ? classroomId : undefined,
-
-                group: (group && group !== 'unselected') ? group : null,
+                classroomId: session.role === 'ADMIN' ? normalizedClassroomId : undefined,
+                group: normalizedGroup ?? null,
                 school,
                 phoneNumber,
                 email,
