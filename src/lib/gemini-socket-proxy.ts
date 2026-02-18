@@ -1,10 +1,39 @@
 import WebSocket, { RawData } from 'ws';
 
-const DEFAULT_LIVE_MODEL = process.env.GEMINI_LIVE_MODEL || "gemini-2.5-flash-native-audio-preview-09-2025";
-const GEMINI_API_VERSION = process.env.GEMINI_LIVE_API_VERSION || "v1beta";
-const GEMINI_VOICE = process.env.GEMINI_LIVE_VOICE || "Aoede";
-const MAX_PENDING_MESSAGES = 200;
+type SetupGeminiSocketOptions = {
+    userId: string;
+    resumeHandle?: string;
+};
+
+const DEFAULT_LIVE_MODEL = process.env.GEMINI_LIVE_MODEL || 'gemini-live-2.5-flash-preview';
+const GEMINI_API_VERSION = process.env.GEMINI_LIVE_API_VERSION || 'v1beta';
+const GEMINI_VOICE = process.env.GEMINI_LIVE_VOICE || 'Aoede';
+const MAX_PENDING_MESSAGES = 300;
 const RESERVED_CLOSE_CODES = new Set([1004, 1005, 1006, 1015]);
+const CLIENT_HEARTBEAT_MS = 25_000;
+
+function parseNumber(value: string | undefined, fallback: number, min: number, max: number) {
+    const parsed = Number.parseInt(value || '', 10);
+    if (!Number.isFinite(parsed)) return fallback;
+    return Math.min(max, Math.max(min, parsed));
+}
+
+const CONTEXT_WINDOW_TRIGGER_TOKENS = parseNumber(
+    process.env.GEMINI_LIVE_CONTEXT_TRIGGER_TOKENS,
+    28_672,
+    8_192,
+    1_000_000,
+);
+
+const CONTEXT_WINDOW_TARGET_TOKENS = Math.min(
+    CONTEXT_WINDOW_TRIGGER_TOKENS - 1,
+    parseNumber(
+        process.env.GEMINI_LIVE_CONTEXT_TARGET_TOKENS,
+        20_480,
+        4_096,
+        999_999,
+    ),
+);
 
 function rawDataToUtf8(data: RawData): string {
     if (typeof data === 'string') return data;
@@ -18,8 +47,8 @@ function normalizeCloseCode(code?: number): number {
     const validatedCode = code as number;
     if (validatedCode === 1000) return 1000;
     if (
-        (validatedCode >= 1001 && validatedCode <= 1014 && !RESERVED_CLOSE_CODES.has(validatedCode)) ||
-        (validatedCode >= 3000 && validatedCode <= 4999)
+        (validatedCode >= 1001 && validatedCode <= 1014 && !RESERVED_CLOSE_CODES.has(validatedCode))
+        || (validatedCode >= 3000 && validatedCode <= 4999)
     ) {
         return validatedCode;
     }
@@ -53,24 +82,95 @@ function safeClose(ws: WebSocket, code?: number, reason?: string) {
     }
 }
 
-export function setupGeminiSocket(clientWs: WebSocket) {
-    const API_KEY = process.env.GEMINI_API_KEY;
+function parseMessageIfJson(message: string) {
+    try {
+        const parsed = JSON.parse(message) as Record<string, unknown>;
+        return parsed;
+    } catch {
+        return null;
+    }
+}
 
-    if (!API_KEY) {
-        console.error("[GeminiProxy] GEMINI_API_KEY is not set");
-        safeClose(clientWs, 1008, "API Key Missing");
+function buildSetupMessage(options: SetupGeminiSocketOptions) {
+    const sessionResumption: { transparent: boolean; handle?: string } = {
+        transparent: true,
+    };
+
+    if (options.resumeHandle) {
+        sessionResumption.handle = options.resumeHandle;
+    }
+
+    return {
+        setup: {
+            model: `models/${DEFAULT_LIVE_MODEL}`,
+            generationConfig: {
+                responseModalities: ['AUDIO'],
+                speechConfig: {
+                    voiceConfig: {
+                        prebuiltVoiceConfig: { voiceName: GEMINI_VOICE },
+                    },
+                },
+            },
+            realtimeInputConfig: {
+                automaticActivityDetection: {
+                    disabled: false,
+                    startOfSpeechSensitivity: 'START_SENSITIVITY_LOW',
+                    endOfSpeechSensitivity: 'END_SENSITIVITY_LOW',
+                    prefixPaddingMs: 120,
+                    silenceDurationMs: 450,
+                },
+                activityHandling: 'START_OF_ACTIVITY_INTERRUPTS',
+                turnCoverage: 'TURN_INCLUDES_ONLY_ACTIVITY',
+            },
+            inputAudioTranscription: {},
+            outputAudioTranscription: {},
+            sessionResumption,
+            contextWindowCompression: {
+                triggerTokens: String(CONTEXT_WINDOW_TRIGGER_TOKENS),
+                slidingWindow: {
+                    targetTokens: String(CONTEXT_WINDOW_TARGET_TOKENS),
+                },
+            },
+        },
+    };
+}
+
+export function setupGeminiSocket(clientWs: WebSocket, options: SetupGeminiSocketOptions) {
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+        console.error('[GeminiProxy] GEMINI_API_KEY is not set');
+        safeClose(clientWs, 1008, 'API Key Missing');
         return;
     }
 
-    console.log("[GeminiProxy] API Key found, connecting to Gemini...");
-
-    const geminiUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.${GEMINI_API_VERSION}.GenerativeService.BidiGenerateContent?key=${API_KEY}`;
-
+    const geminiUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.${GEMINI_API_VERSION}.GenerativeService.BidiGenerateContent?key=${apiKey}`;
     const geminiWs = new WebSocket(geminiUrl);
+
     let isSetupComplete = false;
+    let clientAlive = true;
     const pendingClientMessages: string[] = [];
-    let audioFrameCount = 0;
-    let lastAudioFrameLogAt = Date.now();
+
+    const heartbeatTimer = setInterval(() => {
+        if (clientWs.readyState !== WebSocket.OPEN) return;
+
+        if (!clientAlive) {
+            console.warn('[GeminiProxy] Client heartbeat timeout');
+            safeClose(clientWs, 1001, 'Client heartbeat timeout');
+            return;
+        }
+
+        clientAlive = false;
+        try {
+            clientWs.ping();
+        } catch (error) {
+            console.error('[GeminiProxy] Failed to ping client:', error);
+        }
+    }, CLIENT_HEARTBEAT_MS);
+
+    const cleanup = () => {
+        clearInterval(heartbeatTimer);
+    };
 
     const queueOrForwardMessage = (message: string) => {
         if (!isSetupComplete) {
@@ -82,7 +182,7 @@ export function setupGeminiSocket(clientWs: WebSocket) {
         }
 
         if (geminiWs.readyState !== WebSocket.OPEN) {
-            console.warn("[GeminiProxy] Gemini WS not open, cannot forward client message");
+            console.warn('[GeminiProxy] Gemini WS not open, cannot forward client message');
             return;
         }
 
@@ -99,60 +199,28 @@ export function setupGeminiSocket(clientWs: WebSocket) {
     };
 
     geminiWs.on('open', () => {
-        console.log(`[GeminiProxy] Connected to Gemini Live API (model=${DEFAULT_LIVE_MODEL}, api=${GEMINI_API_VERSION})`);
-
-        // Initial Setup Message
-        const setupMessage = {
-            setup: {
-                model: `models/${DEFAULT_LIVE_MODEL}`,
-                generationConfig: {
-                    responseModalities: ["AUDIO"],
-                    speechConfig: {
-                        voiceConfig: { prebuiltVoiceConfig: { voiceName: GEMINI_VOICE } }
-                    }
-                }
-            }
-        };
-        console.log('[GeminiProxy] Sending setup message...');
-        geminiWs.send(JSON.stringify(setupMessage));
+        console.log(`[GeminiProxy] Connected to Gemini Live API user=${options.userId} model=${DEFAULT_LIVE_MODEL} api=${GEMINI_API_VERSION}`);
+        geminiWs.send(JSON.stringify(buildSetupMessage(options)));
     });
 
-    // Handle messages from Client -> Gemini
+    clientWs.on('pong', () => {
+        clientAlive = true;
+    });
+
     clientWs.on('message', (data: RawData) => {
         try {
             const message = rawDataToUtf8(data);
             if (!message) return;
 
-            let isAudioFrame = false;
-            try {
-                const parsed = JSON.parse(message);
-                isAudioFrame = Boolean(parsed?.realtimeInput?.audio?.data);
-            } catch {
-                // Ignore parse errors for logging classification.
-            }
-
-            if (isAudioFrame) {
-                audioFrameCount += 1;
-                const now = Date.now();
-                if (now - lastAudioFrameLogAt >= 5000) {
-                    console.log(`[GeminiProxy] Client -> Gemini realtime audio frames: ${audioFrameCount}/5s`);
-                    audioFrameCount = 0;
-                    lastAudioFrameLogAt = now;
-                }
-            } else {
-                console.log(`[GeminiProxy] Client -> Gemini: ${message.substring(0, 100)}...`);
-            }
-
             queueOrForwardMessage(message);
         } catch (err) {
-            console.error("[GeminiProxy] Error forwarding client message:", err);
+            console.error('[GeminiProxy] Error forwarding client message:', err);
         }
     });
 
-    // Handle messages from Gemini -> Client
     geminiWs.on('message', (data: RawData) => {
         if (clientWs.readyState !== WebSocket.OPEN) {
-            console.warn("[GeminiProxy] Client WS not open, cannot forward Gemini message");
+            console.warn('[GeminiProxy] Client WS not open, cannot forward Gemini message');
             return;
         }
 
@@ -160,57 +228,59 @@ export function setupGeminiSocket(clientWs: WebSocket) {
             const message = rawDataToUtf8(data);
             if (!message) return;
 
-            try {
-                const parsed = JSON.parse(message);
-                if (parsed.setupComplete !== undefined) {
-                    isSetupComplete = true;
-                    console.log('[GeminiProxy] setupComplete received');
-                    flushPendingMessages();
-                }
-                if (parsed.goAway) {
-                    console.warn(`[GeminiProxy] goAway from Gemini: ${JSON.stringify(parsed.goAway).slice(0, 300)}`);
-                }
-                if (parsed.error) {
-                    console.error(`[GeminiProxy] error frame from Gemini: ${JSON.stringify(parsed.error).slice(0, 300)}`);
-                }
-            } catch {
-                // Pass through non-JSON payloads as-is.
+            const parsed = parseMessageIfJson(message);
+            if (parsed?.setupComplete !== undefined) {
+                isSetupComplete = true;
+                flushPendingMessages();
+            }
+
+            if (parsed?.error) {
+                console.error(`[GeminiProxy] error frame from Gemini: ${JSON.stringify(parsed.error).slice(0, 500)}`);
+            }
+
+            if (parsed?.goAway) {
+                console.warn(`[GeminiProxy] goAway from Gemini user=${options.userId}: ${JSON.stringify(parsed.goAway).slice(0, 300)}`);
+            }
+
+            if (parsed?.sessionResumptionUpdate) {
+                const update = parsed.sessionResumptionUpdate as { newHandle?: string; resumable?: boolean };
+                console.log(`[GeminiProxy] sessionResumptionUpdate user=${options.userId} resumable=${String(update?.resumable)} handle=${update?.newHandle ? 'present' : 'empty'}`);
             }
 
             clientWs.send(message);
         } catch (err) {
-            console.error("[GeminiProxy] Error forwarding Gemini message:", err);
+            console.error('[GeminiProxy] Error forwarding Gemini message:', err);
         }
     });
 
-    // Error handling
     geminiWs.on('error', (err: Error) => {
-        console.error("[GeminiProxy] Gemini WS Error:", err.message);
+        console.error('[GeminiProxy] Gemini WS Error:', err.message);
         if (clientWs.readyState === WebSocket.OPEN) {
-            safeClose(clientWs, 1011, "Gemini Error");
+            safeClose(clientWs, 1011, 'Gemini Error');
         }
     });
 
     clientWs.on('error', (err: Error) => {
-        console.error("[GeminiProxy] Client WS Error:", err.message);
+        console.error('[GeminiProxy] Client WS Error:', err.message);
         if (geminiWs.readyState === WebSocket.OPEN || geminiWs.readyState === WebSocket.CONNECTING) {
-            safeClose(geminiWs, 1000, "Client Error");
+            safeClose(geminiWs, 1000, 'Client Error');
         }
     });
 
-    // Close handling with RFC-safe close codes
     clientWs.on('close', (code: number, reason: Buffer) => {
+        cleanup();
         const reasonText = reason.toString('utf-8');
-        console.log(`[GeminiProxy] Client WS closed: code=${normalizeCloseCode(code)} reason=${reasonText}`);
+        console.log(`[GeminiProxy] Client WS closed user=${options.userId} code=${normalizeCloseCode(code)} reason=${reasonText}`);
         if (geminiWs.readyState === WebSocket.OPEN || geminiWs.readyState === WebSocket.CONNECTING) {
-            safeClose(geminiWs, 1000, "Client Closed");
+            safeClose(geminiWs, 1000, 'Client Closed');
         }
     });
 
     geminiWs.on('close', (code: number, reason: Buffer) => {
+        cleanup();
         const reasonText = reason.toString('utf-8');
         const safeCode = normalizeCloseCode(code);
-        console.log(`[GeminiProxy] Gemini WS closed: code=${safeCode} reason=${reasonText}`);
+        console.log(`[GeminiProxy] Gemini WS closed user=${options.userId} code=${safeCode} reason=${reasonText}`);
         if (clientWs.readyState === WebSocket.OPEN || clientWs.readyState === WebSocket.CONNECTING) {
             safeClose(clientWs, safeCode, reasonText);
         }

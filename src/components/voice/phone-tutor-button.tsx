@@ -42,7 +42,7 @@ ${systemPrompt}
 `;
 
         setIsOverlayOpen(true);
-        connect(initialContext);
+        void connect(initialContext);
     };
 
     const handleEndCall = () => {

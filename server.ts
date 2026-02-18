@@ -1,10 +1,48 @@
 import { config } from 'dotenv';
 config(); // Load .env file
+import type { IncomingMessage } from 'http';
 import { createServer } from 'http';
+import type { Duplex } from 'stream';
 import { parse } from 'url';
 import next from 'next';
 import { WebSocketServer } from 'ws';
 import { setupGeminiSocket } from './src/lib/gemini-socket-proxy';
+import { verifyGeminiLiveSessionToken } from './src/lib/gemini-live-session-token';
+
+type GeminiSocketContext = {
+    userId: string;
+    resumeHandle?: string;
+};
+
+type GeminiUpgradeRequest = IncomingMessage & {
+    geminiSocketContext?: GeminiSocketContext;
+};
+
+function normalizeResumeHandle(value: unknown) {
+    if (typeof value !== 'string') return undefined;
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    if (trimmed.length > 2048) return undefined;
+    return trimmed;
+}
+
+function rejectUpgrade(socket: Duplex, statusCode: 401 | 400, reason: string) {
+    if (socket.destroyed) return;
+    try {
+        socket.write(
+            `HTTP/1.1 ${statusCode} ${statusCode === 401 ? 'Unauthorized' : 'Bad Request'}\r\n`
+            + 'Connection: close\r\n'
+            + 'Content-Type: text/plain\r\n'
+            + `Content-Length: ${Buffer.byteLength(reason, 'utf8')}\r\n`
+            + '\r\n'
+            + reason,
+        );
+    } catch (error) {
+        console.error('[Server] Failed to write upgrade rejection response:', error);
+    } finally {
+        socket.destroy();
+    }
+}
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = process.env.BIND_HOST || (dev ? '127.0.0.1' : '0.0.0.0');
@@ -38,15 +76,41 @@ app.prepare().then(() => {
 
     wss.on('connection', (ws, req) => {
         console.log('Client connected to WebSocket for Gemini');
-        setupGeminiSocket(ws);
+        const context = (req as GeminiUpgradeRequest).geminiSocketContext;
+        if (!context) {
+            ws.close(1008, 'Unauthorized');
+            return;
+        }
+
+        setupGeminiSocket(ws, {
+            userId: context.userId,
+            resumeHandle: context.resumeHandle,
+        });
     });
 
     server.on('upgrade', (req, socket, head) => {
         const { pathname } = parse(req.url || '', true);
 
         if (pathname === '/ws') {
+            const parsedUrl = parse(req.url || '', true);
+            const tokenRaw = parsedUrl.query.token;
+            const token = typeof tokenRaw === 'string' ? tokenRaw : '';
+
+            const verified = verifyGeminiLiveSessionToken(token);
+            if (!verified.valid || !verified.userId) {
+                console.warn(`[Server] Rejected /ws upgrade. reason=${verified.reason || 'unknown'}`);
+                rejectUpgrade(socket, 401, 'Unauthorized');
+                return;
+            }
+
+            const resumeHandle = normalizeResumeHandle(parsedUrl.query.resumeHandle);
+            (req as GeminiUpgradeRequest).geminiSocketContext = {
+                userId: verified.userId,
+                resumeHandle,
+            };
+
             wss.handleUpgrade(req, socket, head, (ws) => {
-                wss.emit('connection', ws, req);
+                wss.emit('connection', ws, req as GeminiUpgradeRequest);
             });
             return;
         }
