@@ -18,8 +18,6 @@ export function Heatmap({ data }: Props) {
     const dataMap = new Map<string, number>();
     data.forEach(d => dataMap.set(d.date, d.count));
 
-    // Generate grid cells
-    const cells = [];
     let currentResponseDate = new Date(startDate);
 
     // Adjust start date to align with Sunday (optional, for GitHub style layout)

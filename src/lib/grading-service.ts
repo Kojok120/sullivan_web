@@ -1,4 +1,3 @@
-import { google } from 'googleapis';
 import QRCode from 'qrcode';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Client as QStashClient } from '@upstash/qstash';
@@ -226,7 +225,6 @@ export async function processFile(fileId: string, fileName: string) {
         return;
     }
 
-    let destPath = "";
     let jobFinalized = false;
 
     const finalizeFailure = async (message: string) => {
@@ -688,7 +686,7 @@ async function readQRCodeLocally(filePath: string): Promise<QRData | null> {
             }
             console.log("Local QR Read Success (Python OpenCV):", json);
             return json;
-        } catch (e) {
+        } catch {
             console.warn("Python returned non-JSON:", trimmed);
             return null;
         }

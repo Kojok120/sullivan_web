@@ -5,7 +5,6 @@ import { Subject, CoreProblem } from '@prisma/client';
 import { CoreProblemList } from './components/core-problem-list';
 import { CoreProblemBulkImport } from './components/core-problem-bulk-import';
 import { ProblemEditor } from './components/problem-editor';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 // Type definitions including relations

@@ -2,7 +2,6 @@ import { getUsers, getGroups, getClassroomsForAdmin } from '../actions';
 import { UserList } from './user-list';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft } from 'lucide-react';
 
 export default async function UsersPage({
     searchParams,

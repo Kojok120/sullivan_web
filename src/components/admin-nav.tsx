@@ -10,8 +10,6 @@ import {
     LayoutDashboard,
     Users,
     BookOpen,
-    Video,
-    Settings,
     LogOut,
     School,
     PanelLeftClose,

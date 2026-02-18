@@ -17,7 +17,7 @@ import {
 import { Trash2, Plus, School, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { createClassroom, deleteClassroom } from './actions';
-import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 
 interface Classroom {

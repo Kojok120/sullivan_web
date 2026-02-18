@@ -5,7 +5,7 @@ import Image from "next/image";
 import SullivanLogo from "@/assets/Sullivan-Logo.jpg";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { LogOut, BookOpen } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { logoutAction } from "@/app/actions";
 
 export function MainNav({ role }: { role?: string }) {

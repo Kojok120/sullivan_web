@@ -1,4 +1,4 @@
-import { getClassroom, updateClassroomGroups } from '../actions';
+import { getClassroom } from '../actions';
 import { notFound } from 'next/navigation';
 import { ClassroomDetail } from './classroom-detail';
 

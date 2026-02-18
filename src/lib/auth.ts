@@ -33,7 +33,7 @@ export const getSession = cache(async (): Promise<SessionPayload | null> => {
             role: appMeta.role || 'STUDENT',         // removed userMeta.role
             name: appMeta.name || userMeta.name || '',
         };
-    } catch (error) {
+    } catch {
         return null;
     }
 });
@@ -57,4 +57,3 @@ export async function requireTeacherOrAdmin() {
     }
     return session;
 }
-

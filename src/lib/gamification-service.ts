@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { User, Achievement } from '@prisma/client';
+import { Achievement } from '@prisma/client';
 
 export const XP_PER_LOGIN = 50;
 export const XP_PER_ANSWER = 10;
@@ -116,8 +116,7 @@ export async function processGamificationUpdates(
         });
 
         // 4. Check Achievements (Streak & Solve Count & Perfect & Core Unlock)
-        const isPerfect = results.every(r => r.isCorrect);
-        const unlockedAchievements = await checkAchievements(tx, userId, currentStreak, false, isPerfect);
+        const unlockedAchievements = await checkAchievements(tx, userId, currentStreak, false);
 
         // Add Achievement XP
         let achievementXp = 0;
@@ -163,7 +162,7 @@ export async function processVideoWatch(userId: string): Promise<GamificationUpd
         const user = await tx.user.findUniqueOrThrow({ where: { id: userId } });
 
         // Check Video Achievements
-        const unlockedAchievements = await checkAchievements(tx, userId, user.currentStreak, true, false);
+        const unlockedAchievements = await checkAchievements(tx, userId, user.currentStreak, true);
 
         // Add Achievement XP
         let achievementXp = 0;
@@ -199,7 +198,7 @@ export async function processVideoWatch(userId: string): Promise<GamificationUpd
 }
 
 // Helper to check achievements
-async function checkAchievements(tx: any, userId: string, currentStreak: number, isVideoCheck = false, isPerfectSession = false) {
+async function checkAchievements(tx: any, userId: string, currentStreak: number, isVideoCheck = false) {
     const unlockedAchievements: Achievement[] = [];
 
     // Optimize: Get user's unlocked achievement IDs first
