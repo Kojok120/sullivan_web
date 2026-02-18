@@ -19,7 +19,6 @@ const supabase = createClient(supabaseUrl, serviceRoleKey);
 async function migrateRoles() {
     console.log('Starting role migration...');
 
-    let page = 1;
     const { data: { users }, error } = await supabase.auth.admin.listUsers();
 
     if (error || !users) {

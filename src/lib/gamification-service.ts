@@ -68,7 +68,7 @@ export async function processGamificationUpdates(
         // 2. Update Streak & Daily Summary
         let streakUpdated = false;
         let currentStreak = user.currentStreak;
-        let lastStudyDate = user.lastStudyDate ? new Date(user.lastStudyDate) : null;
+        const lastStudyDate = user.lastStudyDate ? new Date(user.lastStudyDate) : null;
         if (lastStudyDate) lastStudyDate.setHours(0, 0, 0, 0);
 
         // a. Daily Summary (Heatmap)

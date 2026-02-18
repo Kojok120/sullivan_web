@@ -18,7 +18,7 @@ export function Heatmap({ data }: Props) {
     const dataMap = new Map<string, number>();
     data.forEach(d => dataMap.set(d.date, d.count));
 
-    let currentResponseDate = new Date(startDate);
+    const currentResponseDate = new Date(startDate);
 
     // Adjust start date to align with Sunday (optional, for GitHub style layout)
     // For simplicity, just horizontal flex or grid wrapped.

@@ -130,11 +130,11 @@ export function CoreProblemUnlockOverlay() {
 
         setIsSubmitting(true);
         try {
-            const success = await markLectureAsWatched(
-                current.coreProblemId,
-                Math.round(watchedTimeRef.current),
-                Math.round(videoDurationRef.current)
-            );
+            const success = await markLectureAsWatched({
+                coreProblemId: current.coreProblemId,
+                watchedDurationSeconds: Math.round(watchedTimeRef.current),
+                videoDurationSeconds: Math.round(videoDurationRef.current),
+            });
             if (success) {
                 await handleClose();
             } else {

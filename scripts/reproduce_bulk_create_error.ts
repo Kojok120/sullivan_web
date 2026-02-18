@@ -20,7 +20,7 @@ async function main() {
     console.log(`Subject: ${subject.name}, Prefix should be E`);
 
     // Logic from actions.ts
-    let prefix = 'E'; // Hardcoded for English
+    const prefix = 'E'; // Hardcoded for English
 
     // Find existing custom IDs
     const allSubjectProblems = await prisma.problem.findMany({

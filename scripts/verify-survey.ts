@@ -82,8 +82,6 @@ async function main() {
             const message = e instanceof Error ? e.message : String(e);
             console.log(`成功: 不正な値は拒否されました - ${message}`);
         }
-        }
-
 
         // クリーンアップ
         // 安全のため、このテストユーザーに関連するデータのみを削除します

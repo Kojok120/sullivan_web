@@ -7,6 +7,7 @@ import {
     SURVEY_INTERVAL_DAYS
 } from '../survey-service'
 import { prisma } from '@/lib/prisma'
+import { SurveyCategory } from '@prisma/client'
 
 // Mock Prisma
 vi.mock('@/lib/prisma', () => ({
@@ -26,7 +27,12 @@ describe('survey-service', () => {
         vi.clearAllMocks()
     })
 
-    const buildCategoryQuestions = (countPerCategory: number) =>
+    const buildCategoryQuestions = (countPerCategory: number): Array<{
+        id: string;
+        category: SurveyCategory;
+        question: string;
+        createdAt: Date;
+    }> =>
         SURVEY_CATEGORIES.flatMap((category) =>
             Array.from({ length: countPerCategory }, (_, i) => ({
                 id: `${category}-${i}`,
@@ -35,6 +41,9 @@ describe('survey-service', () => {
                 createdAt: new Date(),
             }))
         )
+
+    const surveyResponseWithDate = (answeredAt: Date) =>
+        ({ answeredAt } as any)
 
     describe('shouldShowSurvey', () => {
         it('ユーザーが一度も回答していない場合、trueを返す', async () => {
@@ -54,9 +63,7 @@ describe('survey-service', () => {
             const ninetyOneDaysAgo = new Date()
             ninetyOneDaysAgo.setDate(ninetyOneDaysAgo.getDate() - 91)
 
-            vi.mocked(prisma.surveyResponse.findFirst).mockResolvedValue({
-                answeredAt: ninetyOneDaysAgo
-            })
+            vi.mocked(prisma.surveyResponse.findFirst).mockResolvedValue(surveyResponseWithDate(ninetyOneDaysAgo))
 
             const result = await shouldShowSurvey('user1')
 
@@ -67,9 +74,7 @@ describe('survey-service', () => {
             const exactlyNinetyDaysAgo = new Date()
             exactlyNinetyDaysAgo.setDate(exactlyNinetyDaysAgo.getDate() - 90)
 
-            vi.mocked(prisma.surveyResponse.findFirst).mockResolvedValue({
-                answeredAt: exactlyNinetyDaysAgo
-            })
+            vi.mocked(prisma.surveyResponse.findFirst).mockResolvedValue(surveyResponseWithDate(exactlyNinetyDaysAgo))
 
             const result = await shouldShowSurvey('user1')
 
@@ -80,9 +85,7 @@ describe('survey-service', () => {
             const recentDate = new Date()
             recentDate.setDate(recentDate.getDate() - 30) // 30日前
 
-            vi.mocked(prisma.surveyResponse.findFirst).mockResolvedValue({
-                answeredAt: recentDate
-            })
+            vi.mocked(prisma.surveyResponse.findFirst).mockResolvedValue(surveyResponseWithDate(recentDate))
 
             const result = await shouldShowSurvey('user1')
 
@@ -93,9 +96,7 @@ describe('survey-service', () => {
             const yesterday = new Date()
             yesterday.setDate(yesterday.getDate() - 1)
 
-            vi.mocked(prisma.surveyResponse.findFirst).mockResolvedValue({
-                answeredAt: yesterday
-            })
+            vi.mocked(prisma.surveyResponse.findFirst).mockResolvedValue(surveyResponseWithDate(yesterday))
 
             const result = await shouldShowSurvey('user1')
 
@@ -105,9 +106,7 @@ describe('survey-service', () => {
         it('前回の回答が今日の場合、falseを返す', async () => {
             const today = new Date()
 
-            vi.mocked(prisma.surveyResponse.findFirst).mockResolvedValue({
-                answeredAt: today
-            })
+            vi.mocked(prisma.surveyResponse.findFirst).mockResolvedValue(surveyResponseWithDate(today))
 
             const result = await shouldShowSurvey('user1')
 
@@ -168,17 +167,17 @@ describe('survey-service', () => {
             const mockQuestions = [
                 ...Array.from({ length: 2 }, (_, i) => ({
                     id: `GRIT-${i}`,
-                    category: 'GRIT',
+                    category: SurveyCategory.GRIT,
                     question: `GRIT Question ${i + 1}`,
                     createdAt: new Date()
                 })),
                 ...Array.from({ length: 4 }, (_, i) => ({
                     id: `SELF_EFFICACY-${i}`,
-                    category: 'SELF_EFFICACY',
+                    category: SurveyCategory.SELF_EFFICACY,
                     question: `SELF_EFFICACY Question ${i + 1}`,
                     createdAt: new Date()
                 })),
-                ...['SELF_REGULATION', 'GROWTH_MINDSET', 'EMOTIONAL_REGULATION'].flatMap((category) =>
+                ...[SurveyCategory.SELF_REGULATION, SurveyCategory.GROWTH_MINDSET, SurveyCategory.EMOTIONAL_REGULATION].flatMap((category) =>
                     Array.from({ length: 20 }, (_, i) => ({
                         id: `${category}-${i}`,
                         category,
@@ -200,10 +199,10 @@ describe('survey-service', () => {
     describe('submitSurveyResponse', () => {
         it('回答を保存し、カテゴリー別スコアを計算する', async () => {
             const mockQuestions = [
-                { id: 'q1', category: 'GRIT', question: 'Q1', createdAt: new Date() },
-                { id: 'q2', category: 'GRIT', question: 'Q2', createdAt: new Date() },
-                { id: 'q3', category: 'SELF_EFFICACY', question: 'Q3', createdAt: new Date() },
-                { id: 'q4', category: 'SELF_EFFICACY', question: 'Q4', createdAt: new Date() },
+                { id: 'q1', category: SurveyCategory.GRIT, question: 'Q1', createdAt: new Date() },
+                { id: 'q2', category: SurveyCategory.GRIT, question: 'Q2', createdAt: new Date() },
+                { id: 'q3', category: SurveyCategory.SELF_EFFICACY, question: 'Q3', createdAt: new Date() },
+                { id: 'q4', category: SurveyCategory.SELF_EFFICACY, question: 'Q4', createdAt: new Date() },
             ]
 
             vi.mocked(prisma.questionBank.findMany).mockResolvedValue(mockQuestions)
@@ -249,9 +248,9 @@ describe('survey-service', () => {
 
         it('カテゴリー別の平均スコアを正しく計算する', async () => {
             const mockQuestions = [
-                { id: 'q1', category: 'GRIT', question: 'Q1', createdAt: new Date() },
-                { id: 'q2', category: 'GRIT', question: 'Q2', createdAt: new Date() },
-                { id: 'q3', category: 'GRIT', question: 'Q3', createdAt: new Date() },
+                { id: 'q1', category: SurveyCategory.GRIT, question: 'Q1', createdAt: new Date() },
+                { id: 'q2', category: SurveyCategory.GRIT, question: 'Q2', createdAt: new Date() },
+                { id: 'q3', category: SurveyCategory.GRIT, question: 'Q3', createdAt: new Date() },
             ]
 
             vi.mocked(prisma.questionBank.findMany).mockResolvedValue(mockQuestions)
@@ -313,7 +312,7 @@ describe('survey-service', () => {
 
         it('detailsに質問テキストとカテゴリー情報を含む', async () => {
             const mockQuestions = [
-                { id: 'q1', category: 'GRIT', question: 'Grit Question 1', createdAt: new Date() },
+                { id: 'q1', category: SurveyCategory.GRIT, question: 'Grit Question 1', createdAt: new Date() },
             ]
 
             vi.mocked(prisma.questionBank.findMany).mockResolvedValue(mockQuestions)
@@ -335,14 +334,14 @@ describe('survey-service', () => {
             expect(details[0]).toEqual({
                 questionId: 'q1',
                 question: 'Grit Question 1',
-                category: 'GRIT',
+                category: SurveyCategory.GRIT,
                 value: 5
             })
         })
 
         it('存在しない質問IDは無視される', async () => {
             const mockQuestions = [
-                { id: 'q1', category: 'GRIT', question: 'Q1', createdAt: new Date() },
+                { id: 'q1', category: SurveyCategory.GRIT, question: 'Q1', createdAt: new Date() },
             ]
 
             vi.mocked(prisma.questionBank.findMany).mockResolvedValue(mockQuestions)
@@ -370,9 +369,9 @@ describe('survey-service', () => {
 
         it('スコアを小数点第2位まで丸める', async () => {
             const mockQuestions = [
-                { id: 'q1', category: 'GRIT', question: 'Q1', createdAt: new Date() },
-                { id: 'q2', category: 'GRIT', question: 'Q2', createdAt: new Date() },
-                { id: 'q3', category: 'GRIT', question: 'Q3', createdAt: new Date() },
+                { id: 'q1', category: SurveyCategory.GRIT, question: 'Q1', createdAt: new Date() },
+                { id: 'q2', category: SurveyCategory.GRIT, question: 'Q2', createdAt: new Date() },
+                { id: 'q3', category: SurveyCategory.GRIT, question: 'Q3', createdAt: new Date() },
             ]
 
             vi.mocked(prisma.questionBank.findMany).mockResolvedValue(mockQuestions)
@@ -401,7 +400,7 @@ describe('survey-service', () => {
 
         it('answeredAtが現在時刻に近い値で保存される', async () => {
             const mockQuestions = [
-                { id: 'q1', category: 'GRIT', question: 'Q1', createdAt: new Date() },
+                { id: 'q1', category: SurveyCategory.GRIT, question: 'Q1', createdAt: new Date() },
             ]
 
             vi.mocked(prisma.questionBank.findMany).mockResolvedValue(mockQuestions)
