@@ -80,6 +80,7 @@ model User {
   achievements   UserAchievement[]
   dailySummaries DailyLearningSummary[]
   realtimeEvents RealtimeEvent[]
+  surveyResponses SurveyResponse[]
 
 
   // Teacher specific fields
@@ -233,4 +234,20 @@ model GradingJob {
 
   @@index([status, updatedAt])
   @@map("grading_jobs")
+}
+
+model QuestionBank {
+  id        String   @id @default(cuid())
+  category  String   // GRIT, SELF_EFFICACY, SELF_REGULATION, GROWTH_MINDSET, EMOTIONAL_REGULATION
+  question  String
+  createdAt DateTime @default(now())
+}
+
+model SurveyResponse {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  answeredAt DateTime @default(now())
+  details    Json     // Detailed answers
+  scores     Json     // Calculated scores per category
 }
