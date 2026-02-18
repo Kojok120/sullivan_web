@@ -1169,16 +1169,16 @@ export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: strin
                 include: { coreProblems: { select: { id: true } } } // Need dependencies
             },
             subject: {
-                include: {
+                select: {
+                    id: true,
                     coreProblems: {
-                        // [Optimization] lectureVideos is a scalar, so it's included by default.
-                        // We just order them.
-                        include: {
-                            _count: {
-                                select: { problems: true }
-                            }
-                        },
-                        orderBy: { order: 'asc' }
+                        orderBy: { order: 'asc' },
+                        select: {
+                            id: true,
+                            name: true,
+                            order: true,
+                            lectureVideos: true,
+                        }
                     }
                 }
             }
@@ -1186,6 +1186,29 @@ export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: strin
     });
 
     if (cpDetails.length === 0) return;
+
+    // 0. 以降の再帰アンロック判定用に、対象教科のCoreProblem依存関係を一括取得
+    const subjectIds = Array.from(new Set(cpDetails.map(cp => cp.subject.id)));
+    const coreProblemsInSubjects = await prisma.coreProblem.findMany({
+        where: { subjectId: { in: subjectIds } },
+        select: {
+            id: true,
+            problems: {
+                select: {
+                    coreProblems: {
+                        select: { id: true }
+                    }
+                }
+            }
+        }
+    });
+    const solvableDependencyMap = new Map<string, string[][]>();
+    for (const coreProblem of coreProblemsInSubjects) {
+        solvableDependencyMap.set(
+            coreProblem.id,
+            coreProblem.problems.map(problem => problem.coreProblems.map(dep => dep.id))
+        );
+    }
 
     // === OPTIMIZATION: Batch fetch all user states upfront ===
 
@@ -1300,6 +1323,7 @@ export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: strin
 
                     // tempUnlockedCpIdsにこのCPを追加
                     tempUnlockedCpIds.add(nextCp.id);
+                    unlockedCpIds.add(nextCp.id);
 
                     // 講義動画情報の確認ログ
                     console.log(`  -> LectureVideos found: ${nextCp.lectureVideos ? 'YES' : 'NO'}`);
@@ -1322,7 +1346,10 @@ export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: strin
 
                     // このCoreProblemで「実際に解ける問題」があるかをチェック
                     // 問題が解ける条件: その問題に紐づくすべてのCoreProblemがアンロックされていること
-                    const hasSolvable = await hasSolvableProblemsInCp(nextCp.id, tempUnlockedCpIds);
+                    const problemDependencyList = solvableDependencyMap.get(nextCp.id);
+                    const hasSolvable = !!problemDependencyList?.some(depIds =>
+                        depIds.every(depId => tempUnlockedCpIds.has(depId))
+                    );
 
                     if (hasSolvable) {
                         console.log(`  -> CP ${nextCp.name} has solvable problems. Stopping recursion.`);
@@ -1338,35 +1365,6 @@ export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: strin
             }
         }
     }
-}
-
-/**
- * 指定されたCoreProblemに、実際に解ける問題が存在するかを判定する。
- * 問題が解ける条件: その問題に紐づくすべてのCoreProblemがアンロックされていること
- * @param coreProblemId 対象のCoreProblem ID
- * @param unlockedCpIds 現在アンロックされているCoreProblem IDのSet
- */
-async function hasSolvableProblemsInCp(
-    coreProblemId: string,
-    unlockedCpIds: Set<string>
-): Promise<boolean> {
-    const cp = await prisma.coreProblem.findUnique({
-        where: { id: coreProblemId },
-        include: {
-            problems: {
-                include: {
-                    coreProblems: { select: { id: true } }
-                }
-            }
-        }
-    });
-
-    if (!cp || cp.problems.length === 0) return false;
-
-    // この単元に属する問題のうち、1問でも「全依存が満たされる」ものがあるか
-    return cp.problems.some(problem =>
-        problem.coreProblems.every(dep => unlockedCpIds.has(dep.id))
-    );
 }
 
 

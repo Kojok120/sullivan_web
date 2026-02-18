@@ -22,15 +22,13 @@ type FilterCondition =
     | { type: 'subjectId'; value: string }
     | { type: 'coreProblemId'; value: string }
     | { type: 'search'; value: string }
-    | { type: 'excludeIds'; value: string[] }
     | { type: 'video'; value: 'exists' | 'none' };
 
 const SEARCH_SCALAR_FIELDS = ['question', 'answer', 'customId'] as const;
 
 function buildFilterConditions(
     filters: ProblemFilters,
-    search?: string,
-    excludeIds?: string[]
+    search?: string
 ): FilterCondition[] {
     const conditions: FilterCondition[] = [];
 
@@ -49,10 +47,6 @@ function buildFilterConditions(
     if (search) {
         conditions.push({ type: 'search', value: search });
     }
-    if (excludeIds && excludeIds.length > 0) {
-        conditions.push({ type: 'excludeIds', value: excludeIds });
-    }
-
     return conditions;
 }
 
@@ -111,9 +105,6 @@ function conditionsToPrismaWhere(conditions: FilterCondition[]): Prisma.ProblemW
                     },
                 ];
                 break;
-            case 'excludeIds':
-                where.id = { notIn: cond.value };
-                break;
         }
     }
 
@@ -123,104 +114,11 @@ function conditionsToPrismaWhere(conditions: FilterCondition[]): Prisma.ProblemW
 
     return where;
 }
-
-/**
- * 条件をSQL WHERE句に変換
- */
-function conditionsToSql(conditions: FilterCondition[]): Prisma.Sql {
-    const sqlConditions: Prisma.Sql[] = [];
-
-    for (const cond of conditions) {
-        switch (cond.type) {
-            case 'grade':
-                sqlConditions.push(Prisma.sql`p."grade" = ${cond.value}`);
-                break;
-            case 'subjectId':
-                sqlConditions.push(Prisma.sql`
-                    EXISTS (
-                        SELECT 1
-                        FROM "_CoreProblemToProblem" cpp
-                        JOIN "CoreProblem" cp ON cp.id = cpp."A"
-                        WHERE cpp."B" = p.id AND cp."subjectId" = ${cond.value}
-                    )
-                `);
-                break;
-            case 'coreProblemId':
-                sqlConditions.push(Prisma.sql`
-                    EXISTS (
-                        SELECT 1
-                        FROM "_CoreProblemToProblem" cpp
-                        WHERE cpp."B" = p.id AND cpp."A" = ${cond.value}
-                    )
-                `);
-                break;
-            case 'video':
-                if (cond.value === 'exists') {
-                    sqlConditions.push(Prisma.sql`p."videoUrl" IS NOT NULL AND p."videoUrl" != ''`);
-                } else {
-                    sqlConditions.push(Prisma.sql`(p."videoUrl" IS NULL OR p."videoUrl" = '')`);
-                }
-                break;
-            case 'search':
-                const like = `%${cond.value}%`;
-                const scalarConditions = SEARCH_SCALAR_FIELDS.map(
-                    field => Prisma.sql`p.${Prisma.raw(`"${field}"`)} ILIKE ${like}`
-                );
-
-                sqlConditions.push(Prisma.sql`
-                    (
-                        ${Prisma.join(scalarConditions, ' OR ')}
-                        OR EXISTS (
-                            SELECT 1
-                            FROM "_CoreProblemToProblem" cpp
-                            JOIN "CoreProblem" cp ON cp.id = cpp."A"
-                            WHERE cpp."B" = p.id AND cp."name" ILIKE ${like}
-                        )
-                    )
-                `);
-                break;
-            case 'excludeIds':
-                sqlConditions.push(Prisma.sql`p.id NOT IN (${Prisma.join(cond.value)})`);
-                break;
-        }
-    }
-
-    if (sqlConditions.length === 0) {
-        return Prisma.empty;
-    }
-
-    return Prisma.sql`WHERE ${Prisma.join(sqlConditions, ' AND ')}`;
-}
-
 // 後方互換性のためのラッパー関数
 function buildProblemWhere(filters: ProblemFilters, search?: string): Prisma.ProblemWhereInput {
     const conditions = buildFilterConditions(filters, search);
     return conditionsToPrismaWhere(conditions);
 }
-
-function buildExactMatchWhere(filters: ProblemFilters, search: string): Prisma.ProblemWhereInput {
-    const baseConditions = buildFilterConditions(filters);
-    const where = conditionsToPrismaWhere(baseConditions);
-    return {
-        ...where,
-        customId: { equals: search, mode: 'insensitive' }
-    };
-}
-
-function buildProblemWhereSql({
-    search,
-    filters,
-    excludeIds = [],
-}: {
-    search?: string;
-    filters: ProblemFilters;
-    excludeIds?: string[];
-}) {
-    const conditions = buildFilterConditions(filters, search, excludeIds);
-    return conditionsToSql(conditions);
-}
-
-// ... (abbrev)
 
 export async function getProblems(
     page: number = 1,
@@ -232,7 +130,8 @@ export async function getProblems(
 ) {
     await requireAdmin();
     try {
-        const where = buildProblemWhere(filters, search);
+        const normalizedSearch = search.trim();
+        const where = buildProblemWhere(filters, normalizedSearch || undefined);
         const include: Prisma.ProblemInclude = {
             coreProblems: {
                 include: {
@@ -242,68 +141,32 @@ export async function getProblems(
         };
 
         const skip = (page - 1) * limit;
-        const isCustomIdSort = sortBy === 'customId'; // Keep custom logic for customId
-        const orderDirection = sortOrder === 'asc' ? 'ASC' : 'DESC';
+        const orderBy: Prisma.ProblemOrderByWithRelationInput[] =
+            sortBy === 'createdAt'
+                ? [{ createdAt: sortOrder }, { id: 'asc' }]
+                : sortBy === 'masterNumber'
+                    ? [{ masterNumber: { sort: sortOrder, nulls: 'last' } }, { id: 'asc' }]
+                    : sortBy === 'customId'
+                        ? [{ customId: { sort: sortOrder, nulls: 'last' } }, { id: 'asc' }]
+                        : [{ updatedAt: sortOrder }, { id: 'asc' }];
 
-        let orderBy: Prisma.ProblemOrderByWithRelationInput[] = [];
+        const [problems, total] = await Promise.all([
+            prisma.problem.findMany({
+                where,
+                include,
+                orderBy,
+                skip,
+                take: limit,
+            }),
+            prisma.problem.count({ where }),
+        ]);
 
-        if (sortBy === 'createdAt') {
-            orderBy = [{ createdAt: sortOrder }, { id: 'asc' }];
-        } else if (sortBy === 'updatedAt') {
-            orderBy = [{ updatedAt: sortOrder }, { id: 'asc' }];
-        } else if (sortBy === 'masterNumber') {
-            orderBy = [{ masterNumber: { sort: sortOrder, nulls: 'last' } }, { id: 'asc' }];
-        } else {
-            // Fallback or customId handled separately below if not strictly sorted
-            orderBy = [{ updatedAt: sortOrder }, { id: 'asc' }];
-        }
-
-        // ... existing logic for customId sorting ...
-
-        const fetchProblemsByIds = async (ids: string[]) => {
-            // ... existing ...
-            if (ids.length === 0) return [];
-            const problems = await prisma.problem.findMany({
-                where: { id: { in: ids } },
-                include
-            });
-            const problemMap = new Map(problems.map(p => [p.id, p]));
-            // Re-order based on ids input if needed, but existing logic just returned mapped.
-            // Actually, existing logic returns: ids.map(id => problemMap.get(id))
-            return ids.map(id => problemMap.get(id)).filter(Boolean);
-        };
-
-        // (Skipping deep customId sort logic modification, assumming we just use the simple path for masterNumber)
-
-        // ... (inside the main branching)
-
-        if (search) {
-            // ... existing search logic ...
-        } else {
-            if (isCustomIdSort) {
-                // ... existing ...
-            }
-
-            // Standard behavior without search or special customId sort
-            const [problems, total] = await Promise.all([
-                prisma.problem.findMany({
-                    where,
-                    include,
-                    orderBy,
-                    skip,
-                    take: limit,
-                }),
-                prisma.problem.count({ where }),
-            ]);
-            return { success: true, problems, total, page, limit };
-        }
+        return { success: true, problems, total, page, limit };
     } catch (error) {
         console.error('Failed to get problems:', error);
         return { error: '問題の取得に失敗しました' };
     }
 }
-
-// ...
 
 export async function createStandaloneProblem(data: {
     question: string;
@@ -527,4 +390,3 @@ export async function searchProblemsByMasterNumbers(masterNumbers: number[]) {
         return { error: '既存問題の検索に失敗しました' };
     }
 }
-

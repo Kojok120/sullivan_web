@@ -20,6 +20,29 @@ interface BulkImportDialogProps {
     onSuccess: () => void;
 }
 
+type ExistingProblemSnapshot = {
+    question: string;
+    answer: string | null;
+    grade: string | null;
+    videoUrl: string | null;
+    coreProblems: { id: string }[];
+};
+
+type ResolvedCoreProblem = {
+    id: string;
+    name: string;
+    subject: { name: string };
+};
+
+type ParsedExistingProblem = {
+    masterNumber: number | null;
+    question: string;
+    answer: string | null;
+    grade: string | null;
+    videoUrl: string | null;
+    coreProblems: { id: string }[];
+};
+
 interface ParsedProblem {
     masterNumber?: number;
     question: string;
@@ -31,7 +54,85 @@ interface ParsedProblem {
     coreProblemNames?: string[];
     isValid: boolean;
     error?: string;
-    existingProblem?: any;
+    existingProblem?: ExistingProblemSnapshot;
+}
+
+type RowDiffResult = {
+    isQuestionChanged: boolean;
+    isAnswerChanged: boolean;
+    isGradeChanged: boolean;
+    isVideoChanged: boolean;
+    isCpChanged: boolean;
+    hasChanges: boolean;
+};
+
+function collectNewCoreProblemIds(
+    row: Pick<ParsedProblem, 'coreProblemNames' | 'coreProblemName'>,
+    selectedCoreProblems: SelectedCoreProblem[],
+    resolvedCoreProblems: Map<string, ResolvedCoreProblem>
+): Set<string> {
+    const newIds = new Set<string>();
+
+    selectedCoreProblems.forEach((cp) => {
+        newIds.add(cp.id);
+    });
+
+    if (row.coreProblemNames && row.coreProblemNames.length > 0) {
+        row.coreProblemNames.forEach((name) => {
+            const resolved = resolvedCoreProblems.get(name);
+            if (resolved) {
+                newIds.add(resolved.id);
+            }
+        });
+        return newIds;
+    }
+
+    if (row.coreProblemName) {
+        const resolved = resolvedCoreProblems.get(row.coreProblemName);
+        if (resolved) {
+            newIds.add(resolved.id);
+        }
+    }
+
+    return newIds;
+}
+
+function computeRowDiff(
+    row: ParsedProblem,
+    selectedCoreProblems: SelectedCoreProblem[],
+    resolvedCoreProblems: Map<string, ResolvedCoreProblem>
+): RowDiffResult {
+    if (!row.existingProblem) {
+        return {
+            isQuestionChanged: false,
+            isAnswerChanged: false,
+            isGradeChanged: false,
+            isVideoChanged: false,
+            isCpChanged: false,
+            hasChanges: true,
+        };
+    }
+
+    const old = row.existingProblem;
+    const isQuestionChanged = old.question !== row.question;
+    const isAnswerChanged = (old.answer || '') !== (row.answer || '');
+    const isGradeChanged = (old.grade || '') !== (row.grade || '');
+    const isVideoChanged = (old.videoUrl || '') !== (row.videoUrl || '');
+
+    const newIds = collectNewCoreProblemIds(row, selectedCoreProblems, resolvedCoreProblems);
+    const oldIds = new Set(old.coreProblems.map((cp) => cp.id));
+    const isCpChanged =
+        newIds.size !== oldIds.size ||
+        Array.from(newIds).some((id) => !oldIds.has(id));
+
+    return {
+        isQuestionChanged,
+        isAnswerChanged,
+        isGradeChanged,
+        isVideoChanged,
+        isCpChanged,
+        hasChanges: isQuestionChanged || isAnswerChanged || isGradeChanged || isVideoChanged || isCpChanged,
+    };
 }
 
 export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDialogProps) {
@@ -46,56 +147,14 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
     const [coreProblems, setCoreProblems] = useState<SelectedCoreProblem[]>([]);
 
     // Map of CoreProblem name -> CoreProblem data (auto-resolved)
-    const [resolvedCoreProblems, setResolvedCoreProblems] = useState<Map<string, { id: string, name: string, subject: { name: string } }>>(new Map());
+    const [resolvedCoreProblems, setResolvedCoreProblems] = useState<Map<string, ResolvedCoreProblem>>(new Map());
 
     const visibleItems = useMemo(() => {
-        return parsedData.filter(row => {
-            const isUpdate = !!row.existingProblem;
-            // New items are always visible
-            if (!isUpdate) return true;
-
-            const old = row.existingProblem;
-
-            // Diff checks
-            const isQuestionChanged = old.question !== row.question;
-            const isAnswerChanged = (old.answer || '') !== (row.answer || '');
-            const isGradeChanged = (old.grade || '') !== (row.grade || '');
-            // const isVideoChanged = (old.videoUrl || '') !== (row.videoUrl || ''); // Video URL comparison strictly?
-            // Handle null/empty string normalization for videoUrl
-            const oldVideo = old.videoUrl || '';
-            const newVideo = row.videoUrl || '';
-            const isVideoChanged = oldVideo !== newVideo;
-
-            // Core problem diff logic
-            let isCpChanged = false;
-            const newIds = new Set<string>();
-            // Add manual selections
-            coreProblems.forEach(cp => newIds.add(cp.id));
-
-            // Add row specific resolved
-            if (row.coreProblemNames) {
-                row.coreProblemNames.forEach(name => {
-                    const resolved = resolvedCoreProblems.get(name);
-                    if (resolved) newIds.add(resolved.id);
-                });
-            } else if (row.coreProblemName) {
-                const resolved = resolvedCoreProblems.get(row.coreProblemName);
-                if (resolved) newIds.add(resolved.id);
+        return parsedData.filter((row) => {
+            if (!row.existingProblem) {
+                return true;
             }
-
-            const oldIds = new Set(old.coreProblems.map((cp: any) => cp.id));
-
-            if (newIds.size !== oldIds.size) isCpChanged = true;
-            else {
-                for (const id of newIds) {
-                    if (!oldIds.has(id)) {
-                        isCpChanged = true;
-                        break;
-                    }
-                }
-            }
-
-            return isQuestionChanged || isAnswerChanged || isGradeChanged || isVideoChanged || isCpChanged;
+            return computeRowDiff(row, coreProblems, resolvedCoreProblems).hasChanges;
         });
     }, [parsedData, coreProblems, resolvedCoreProblems]);
 
@@ -136,14 +195,14 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
         });
 
         // [N+1 解消] Try to resolve CoreProblem names to IDs with bulk search
-        const newResolvedMap = new Map<string, { id: string, name: string, subject: { name: string } }>();
+        const newResolvedMap = new Map<string, ResolvedCoreProblem>();
         if (coreProblemNames.size > 0) {
             const { coreProblemsMap } = await bulkSearchCoreProblems(Array.from(coreProblemNames));
             if (coreProblemsMap) {
                 for (const name of coreProblemNames) {
                     const resolved = coreProblemsMap[name];
                     if (resolved) {
-                        newResolvedMap.set(name, resolved as any);
+                        newResolvedMap.set(name, resolved as ResolvedCoreProblem);
                     }
                 }
             }
@@ -154,11 +213,23 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
         const masterNumbers = parsed.map(p => p.masterNumber).filter((n): n is number => n !== undefined && n !== null);
         const uniqueMasterNumbers = Array.from(new Set(masterNumbers));
 
-        let existingMap = new Map<number, any>();
+        const existingMap = new Map<number, ExistingProblemSnapshot>();
         if (uniqueMasterNumbers.length > 0) {
             const { problems } = await searchProblemsByMasterNumbers(uniqueMasterNumbers);
             if (problems) {
-                problems.forEach((p: any) => existingMap.set(p.masterNumber!, p));
+                const existingProblems = problems as ParsedExistingProblem[];
+                existingProblems.forEach((problem) => {
+                    if (problem.masterNumber === null) {
+                        return;
+                    }
+                    existingMap.set(problem.masterNumber, {
+                        question: problem.question,
+                        answer: problem.answer,
+                        grade: problem.grade,
+                        videoUrl: problem.videoUrl,
+                        coreProblems: problem.coreProblems,
+                    });
+                });
             }
         }
 
@@ -176,28 +247,10 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
         if (validCount === 0) return;
 
         startTransition(async () => {
-            const problems = validItems.map(p => {
-                // Determine CoreProblem IDs
-                const coreProblemIds: string[] = [];
-
-                // Add manually selected CoreProblems
-                coreProblems.forEach(cp => coreProblemIds.push(cp.id));
-
-                // Add auto-resolved CoreProblems from the row
-                if (p.coreProblemNames && p.coreProblemNames.length > 0) {
-                    p.coreProblemNames.forEach(name => {
-                        const resolved = resolvedCoreProblems.get(name);
-                        if (resolved && !coreProblemIds.includes(resolved.id)) {
-                            coreProblemIds.push(resolved.id);
-                        }
-                    });
-                } else if (p.coreProblemName) {
-                    // Fallback for singular
-                    const resolved = resolvedCoreProblems.get(p.coreProblemName);
-                    if (resolved && !coreProblemIds.includes(resolved.id)) {
-                        coreProblemIds.push(resolved.id);
-                    }
-                }
+            const problems = validItems.map((p) => {
+                const coreProblemIds = Array.from(
+                    collectNewCoreProblemIds(p, coreProblems, resolvedCoreProblems)
+                );
 
                 return {
                     masterNumber: p.masterNumber,
@@ -281,7 +334,7 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
                                     <div className="mb-2">
                                         <span className="text-xs text-muted-foreground">自動検出されたコア問題:</span>
                                         <div className="flex flex-wrap gap-1 mt-1">
-                                            {Array.from(resolvedCoreProblems.entries()).map(([name, cp]) => (
+                                            {Array.from(resolvedCoreProblems.entries()).map(([, cp]) => (
                                                 <Badge key={cp.id} variant="outline" className="text-xs">
                                                     {cp.subject?.name} &gt; {cp.name}
                                                 </Badge>
@@ -317,49 +370,7 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
                                     <TableBody>
                                         {visibleItems.map((row, i) => {
                                             const isUpdate = !!row.existingProblem;
-                                            const old = row.existingProblem;
-
-                                            // Diff checks (Re-calculate for highlighting, or extracted?)
-                                            // Since we already filtered, we know if it's update, it MUST have changes.
-                                            // But we still need to know WHICH fields changed for highlighting.
-
-                                            let isQuestionChanged = false;
-                                            let isAnswerChanged = false;
-                                            let isGradeChanged = false;
-                                            let isVideoChanged = false;
-                                            let isCpChanged = false;
-
-                                            if (isUpdate) {
-                                                isQuestionChanged = old.question !== row.question;
-                                                isAnswerChanged = (old.answer || '') !== (row.answer || '');
-                                                isGradeChanged = (old.grade || '') !== (row.grade || '');
-                                                const oldVideo = old.videoUrl || '';
-                                                const newVideo = row.videoUrl || '';
-                                                isVideoChanged = oldVideo !== newVideo;
-
-                                                const newIds = new Set<string>();
-                                                coreProblems.forEach(cp => newIds.add(cp.id));
-                                                if (row.coreProblemNames) {
-                                                    row.coreProblemNames.forEach(name => {
-                                                        const resolved = resolvedCoreProblems.get(name);
-                                                        if (resolved) newIds.add(resolved.id);
-                                                    });
-                                                } else if (row.coreProblemName) {
-                                                    const resolved = resolvedCoreProblems.get(row.coreProblemName);
-                                                    if (resolved) newIds.add(resolved.id);
-                                                }
-
-                                                const oldIds = new Set(old.coreProblems.map((cp: any) => cp.id));
-                                                if (newIds.size !== oldIds.size) isCpChanged = true;
-                                                else {
-                                                    for (const id of newIds) {
-                                                        if (!oldIds.has(id)) {
-                                                            isCpChanged = true;
-                                                            break;
-                                                        }
-                                                    }
-                                                }
-                                            }
+                                            const diff = computeRowDiff(row, coreProblems, resolvedCoreProblems);
 
                                             return (
                                                 <TableRow key={i} className={!row.isValid ? 'bg-destructive/10' : ''}>
@@ -380,11 +391,11 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
                                                         )}
                                                     </TableCell>
                                                     <TableCell className="font-mono">{row.masterNumber || '-'}</TableCell>
-                                                    <TableCell className={isGradeChanged ? 'bg-blue-50 text-blue-700 font-medium' : ''}>{row.grade}</TableCell>
-                                                    <TableCell className={`max-w-[150px] ${isCpChanged ? 'bg-blue-50' : ''}`}>
+                                                    <TableCell className={diff.isGradeChanged ? 'bg-blue-50 text-blue-700 font-medium' : ''}>{row.grade}</TableCell>
+                                                    <TableCell className={`max-w-[150px] ${diff.isCpChanged ? 'bg-blue-50' : ''}`}>
                                                         {row.coreProblemNames && row.coreProblemNames.length > 0 ? (
                                                             <div className="flex flex-wrap gap-1">
-                                                                {row.coreProblemNames.map(name => {
+                                                                {row.coreProblemNames.map((name) => {
                                                                     const isResolved = resolvedCoreProblems.has(name);
                                                                     return (
                                                                         <span key={name} className={`text-xs px-1 rounded border ${isResolved ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
@@ -398,10 +409,10 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
                                                             row.coreProblemName || '-'
                                                         )}
                                                     </TableCell>
-                                                    <TableCell className={`max-w-[200px] truncate ${isQuestionChanged ? 'bg-blue-50 text-blue-700 font-medium' : ''}`} title={row.question}>{row.question}</TableCell>
-                                                    <TableCell className={`max-w-[100px] truncate ${isAnswerChanged ? 'bg-blue-50 text-blue-700 font-medium' : ''}`} title={row.answer}>{row.answer}</TableCell>
+                                                    <TableCell className={`max-w-[200px] truncate ${diff.isQuestionChanged ? 'bg-blue-50 text-blue-700 font-medium' : ''}`} title={row.question}>{row.question}</TableCell>
+                                                    <TableCell className={`max-w-[100px] truncate ${diff.isAnswerChanged ? 'bg-blue-50 text-blue-700 font-medium' : ''}`} title={row.answer}>{row.answer}</TableCell>
                                                     <TableCell className="max-w-[80px] truncate">{row.acceptedAnswers?.join(', ')}</TableCell>
-                                                    <TableCell className={`max-w-[80px] truncate ${isVideoChanged ? 'bg-blue-50 text-blue-700 font-medium' : ''}`}>{row.videoUrl}</TableCell>
+                                                    <TableCell className={`max-w-[80px] truncate ${diff.isVideoChanged ? 'bg-blue-50 text-blue-700 font-medium' : ''}`}>{row.videoUrl}</TableCell>
                                                 </TableRow>
                                             );
                                         })}

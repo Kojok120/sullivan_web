@@ -5,6 +5,29 @@ import { getSession, isTeacherOrAdmin } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 import { GuidanceType } from '@prisma/client';
 
+async function ensureTeacherCanAccessStudent(
+    teacherId: string,
+    studentId: string,
+    errorMessage: string
+): Promise<string | null> {
+    const [teacher, student] = await Promise.all([
+        prisma.user.findUnique({
+            where: { id: teacherId },
+            select: { classroomId: true }
+        }),
+        prisma.user.findUnique({
+            where: { id: studentId },
+            select: { classroomId: true }
+        })
+    ]);
+
+    if (!teacher?.classroomId || !student?.classroomId || teacher.classroomId !== student.classroomId) {
+        return errorMessage;
+    }
+
+    return null;
+}
+
 export async function updateStudentProfile(userId: string, formData: FormData) {
     const session = await getSession();
     if (!isTeacherOrAdmin(session)) {
@@ -13,17 +36,13 @@ export async function updateStudentProfile(userId: string, formData: FormData) {
 
     // SECURITY: Teachers can only edit students in their assigned classroom (IDOR protection)
     if (session.role === 'TEACHER') {
-        const teacher = await prisma.user.findUnique({
-            where: { id: session.userId },
-            select: { classroomId: true }
-        });
-        const student = await prisma.user.findUnique({
-            where: { id: userId },
-            select: { classroomId: true }
-        });
-
-        if (!teacher?.classroomId || !student?.classroomId || teacher.classroomId !== student.classroomId) {
-            return { error: '担当教室外の生徒は編集できません' };
+        const accessError = await ensureTeacherCanAccessStudent(
+            session.userId,
+            userId,
+            '担当教室外の生徒は編集できません'
+        );
+        if (accessError) {
+            return { error: accessError };
         }
     }
 
@@ -79,10 +98,13 @@ export async function addGuidanceRecord(userId: string, formData: FormData) {
 
     // SECURITY: Verify student is in teacher's classroom
     if (session.role === 'TEACHER') {
-        const teacher = await prisma.user.findUnique({ where: { id: session.userId }, select: { classroomId: true } });
-        const student = await prisma.user.findUnique({ where: { id: userId }, select: { classroomId: true } });
-        if (!teacher?.classroomId || !student?.classroomId || teacher.classroomId !== student.classroomId) {
-            return { error: '担当教室外の生徒です' };
+        const accessError = await ensureTeacherCanAccessStudent(
+            session.userId,
+            userId,
+            '担当教室外の生徒です'
+        );
+        if (accessError) {
+            return { error: accessError };
         }
     }
 
