@@ -4,9 +4,9 @@ import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Trophy, Sparkles } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
 import { markLevelAsSeen } from '@/app/actions/level';
 import { triggerCelebrationConfetti } from '@/lib/confetti';
+import { subscribeToUserRealtimeEvents } from '@/lib/realtime-events-client';
 
 // Simple implementation of SSE listening
 export function LevelUpModal() {
@@ -14,56 +14,35 @@ export function LevelUpModal() {
     const [data, setData] = useState<{ newLevel: number; xpGained: number } | null>(null);
 
     useEffect(() => {
-        const supabase = createClient();
-        let channel: ReturnType<typeof supabase.channel> | null = null;
+        let unsubscribe = () => { };
 
-        const setup = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
-            const prismaUserId = (user.app_metadata as { prismaUserId?: string } | null)?.prismaUserId || user.id;
+        void (async () => {
+            unsubscribe = await subscribeToUserRealtimeEvents({
+                channelName: 'realtime-events:gamification',
+                onInsert: async (record) => {
+                    if (record.type !== 'gamification_update') return;
 
-            channel = supabase
-                .channel(`realtime-events:gamification:${prismaUserId}`)
-                .on(
-                    'postgres_changes',
-                    {
-                        event: 'INSERT',
-                        schema: 'public',
-                        table: 'realtime_events',
-                        filter: `user_id=eq.${prismaUserId}`,
-                    },
-                    async (payload) => {
-                        const record = payload.new as {
-                            type?: string;
-                            payload?: {
-                                levelUp?: { newLevel?: number };
-                                xpGained?: number;
-                            };
-                        } | null;
-                        if (!record || record.type !== 'gamification_update') return;
+                    const update = record.payload as {
+                        levelUp?: { newLevel?: number };
+                        xpGained?: number;
+                    } | undefined;
 
-                        const update = record.payload;
-                        if (update?.levelUp?.newLevel) {
-                            setData({
-                                newLevel: update.levelUp.newLevel,
-                                xpGained: update.xpGained ?? 0,
-                            });
-                            setOpen(true);
-                            triggerCelebrationConfetti({ zIndex: 0 });
-                            // 既読管理: DBに記録して二重表示を防止
-                            await markLevelAsSeen(update.levelUp.newLevel);
-                        }
+                    if (update?.levelUp?.newLevel) {
+                        setData({
+                            newLevel: update.levelUp.newLevel,
+                            xpGained: update.xpGained ?? 0,
+                        });
+                        setOpen(true);
+                        triggerCelebrationConfetti({ zIndex: 0 });
+                        // 既読管理: DBに記録して二重表示を防止
+                        await markLevelAsSeen(update.levelUp.newLevel);
                     }
-                )
-                .subscribe();
-        };
-
-        setup();
+                },
+            });
+        })();
 
         return () => {
-            if (channel) {
-                supabase.removeChannel(channel);
-            }
+            unsubscribe();
         };
     }, []);
 

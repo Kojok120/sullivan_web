@@ -46,7 +46,6 @@ export default async function UnitFocusDetailPage({
         <UnitFocusDetailClient
             coreProblem={coreProblem}
             lectureVideos={lectureVideos}
-            isUnlocked={isUnlocked}
             isLectureWatched={isLectureWatched}
         />
     );

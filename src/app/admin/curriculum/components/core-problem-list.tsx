@@ -22,7 +22,7 @@ import { useState, useEffect } from 'react';
 import { reorderCoreProblems, createCoreProblem, deleteCoreProblem, updateCoreProblem, bulkDeleteCoreProblems } from '../actions';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { GripVertical, Plus, Trash2, Pencil, Check, X, CheckSquare, Square, Video } from 'lucide-react';
+import { GripVertical, Plus, Trash2, Pencil, X, CheckSquare, Square, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -81,13 +81,6 @@ function SortableCoreProblemItem({ coreProblem, isSelected, isChecked, onSelect,
 
     // 講義動画の編集ステート
     const [editVideos, setEditVideos] = useState<{ title: string; url: string }[]>([]);
-
-    useEffect(() => {
-        if (isEditing) {
-            setEditVideos((coreProblem.lectureVideos as { title: string; url: string }[] | null) || []);
-            setEditName(coreProblem.name);
-        }
-    }, [isEditing, coreProblem]);
 
     // 講義動画の配列（表示用）
     const lectureVideos = (coreProblem.lectureVideos as { title: string; url: string }[] | null) || [];
@@ -236,6 +229,8 @@ function SortableCoreProblemItem({ coreProblem, isSelected, isChecked, onSelect,
                                 className="h-7 w-7 text-muted-foreground hover:text-foreground"
                                 onClick={(e) => {
                                     e.stopPropagation();
+                                    setEditName(coreProblem.name);
+                                    setEditVideos((coreProblem.lectureVideos as { title: string; url: string }[] | null) || []);
                                     setIsEditing(true);
                                 }}
                             >
@@ -310,7 +305,7 @@ export function CoreProblemList({ subjectId, coreProblems, selectedId, onSelect 
             try {
                 const res = await reorderCoreProblems(updates);
                 if (res.error) toast.error(res.error);
-            } catch (e) {
+            } catch {
                 toast.error('並び替えに失敗しました');
             }
         }

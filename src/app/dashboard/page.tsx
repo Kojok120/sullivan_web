@@ -3,8 +3,7 @@ import { redirect } from 'next/navigation';
 import { getStudentStats, getSubjectProgress, getDailyActivity, getUnwatchedCount, getUnwatchedLectures } from '@/lib/analytics';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Activity, Trophy, Target, Printer, AlertTriangle, Zap, PlayCircle } from 'lucide-react';
-import { Button } from "@/components/ui/button";
+import { Activity, Target, AlertTriangle, Zap, PlayCircle } from 'lucide-react';
 import { ActivityChart } from './activity-chart';
 import Link from 'next/link';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -12,6 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Heatmap } from '@/components/gamification/heatmap';
 import { Badge } from '@/components/ui/badge';
 import { PrintSelector } from '@/components/print/print-selector';
+import { SubjectProgressList } from '@/components/subject-progress-list';
 
 export default async function DashboardPage() {
     const session = await getSession();
@@ -166,22 +166,7 @@ export default async function DashboardPage() {
                             <CardTitle>教科別進捗</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="space-y-6">
-                                {subjectProgress.map((subject) => (
-                                    <div key={subject.subjectId} className="space-y-2">
-                                        <div className="flex items-center justify-between text-sm">
-                                            <div className="font-medium">{subject.subjectName}</div>
-                                            <div className="text-muted-foreground">{subject.progressPercentage}%</div>
-                                        </div>
-                                        <Progress value={subject.progressPercentage} />
-                                    </div>
-                                ))}
-                                {subjectProgress.length === 0 && (
-                                    <div className="text-sm text-muted-foreground text-center py-4">
-                                        まだ学習データがありません
-                                    </div>
-                                )}
-                            </div>
+                            <SubjectProgressList items={subjectProgress} />
                         </CardContent>
                     </Card>
                 </div>

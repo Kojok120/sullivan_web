@@ -3,7 +3,7 @@ import { Problem } from '@prisma/client';
 import { Button } from '@/components/ui/button';
 import { Printer, ArrowLeft, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, useRef, useLayoutEffect } from 'react';
+import { useState, useRef, useLayoutEffect } from 'react';
 import { PrintProblemItem } from './print-problem-item';
 import QRCode from 'qrcode';
 import { compressProblemIds } from '@/lib/qr-utils';
@@ -37,7 +37,6 @@ export function PrintLayout({ studentName, subjectName, problems, studentLoginId
 
     useLayoutEffect(() => {
         if (!measureRef.current) return;
-        setIsCalculating(true);
 
         const listStyles = window.getComputedStyle(measureRef.current);
         const listMarginTop = parseFloat(listStyles.marginTop || '0') || 0;

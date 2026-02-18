@@ -21,21 +21,35 @@ export function CallOverlay({
     isTalking,
     connectionState,
 }: CallOverlayProps) {
+    if (!isOpen) return null;
+
+    return (
+        <CallOverlayContent
+            onClose={onClose}
+            onToggleMic={onToggleMic}
+            isMicMuted={isMicMuted}
+            isTalking={isTalking}
+            connectionState={connectionState}
+        />
+    );
+}
+
+function CallOverlayContent({
+    onClose,
+    onToggleMic,
+    isMicMuted,
+    isTalking,
+    connectionState,
+}: Omit<CallOverlayProps, 'isOpen'>) {
     const [duration, setDuration] = useState(0);
 
     useEffect(() => {
-        let interval: NodeJS.Timeout;
-        if (isOpen) {
-            interval = setInterval(() => {
-                setDuration(prev => prev + 1);
-            }, 1000);
-        } else {
-            setDuration(0);
-        }
-        return () => clearInterval(interval);
-    }, [isOpen]);
+        const interval = setInterval(() => {
+            setDuration((prev) => prev + 1);
+        }, 1000);
 
-    if (!isOpen) return null;
+        return () => clearInterval(interval);
+    }, []);
 
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);

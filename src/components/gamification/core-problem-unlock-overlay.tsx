@@ -3,11 +3,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Trophy, Star, Play, CheckCircle2 } from 'lucide-react';
+import { Play, CheckCircle2 } from 'lucide-react';
 import YouTube, { YouTubeEvent } from 'react-youtube';
 import { triggerCelebrationConfetti } from '@/lib/confetti';
 import { getYouTubeId } from '@/lib/youtube';
 import { useYouTubePlaybackGuard } from '@/hooks/use-youtube-playback-guard';
+import { CelebrationOverlayShell } from '@/components/gamification/celebration-overlay-shell';
+import { CelebrationIntro } from '@/components/gamification/celebration-intro';
+import { markLectureAsWatched } from '@/lib/api/lecture-watched-client';
 
 // 講義動画の型
 interface LectureVideo {
@@ -43,21 +46,6 @@ async function markCoreProblemUnlockAsSeen(eventId: string): Promise<void> {
         });
     } catch {
         console.error('Failed to mark unlock as seen');
-    }
-}
-
-// 講義動画視聴完了を記録
-async function markLectureAsWatched(coreProblemId: string, watchedDurationSeconds?: number, videoDurationSeconds?: number): Promise<boolean> {
-    try {
-        const response = await fetch('/api/lecture-watched', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ coreProblemId, watchedDurationSeconds, videoDurationSeconds })
-        });
-        return response.ok;
-    } catch {
-        console.error('Failed to mark lecture as watched');
-        return false;
     }
 }
 
@@ -182,71 +170,29 @@ export function CoreProblemUnlockOverlay() {
     return (
         <AnimatePresence>
             {current && (
-                <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
-                >
-                    <motion.div
-                        initial={{ scale: 0.5, rotate: -10 }}
-                        animate={{ scale: 1, rotate: 0 }}
-                        exit={{ scale: 0.5, rotate: 10, opacity: 0 }}
-                        transition={{ type: "spring", stiffness: 260, damping: 20 }}
-                        className="w-full max-w-lg relative"
-                    >
-                        {/* Shining background effect */}
-                        <div className="absolute inset-0 bg-green-400 rounded-full blur-3xl opacity-20 animate-pulse"></div>
-
-                        <div className="bg-gradient-to-br from-green-100 to-white text-center p-8 rounded-3xl shadow-2xl relative border-4 border-green-400">
+                <CelebrationOverlayShell accent="green" maxWidthClassName="max-w-lg">
                             {/* Xボタンは講義動画がない場合のみ表示 */}
                             {/* 講義動画がある場合は動画視聴後に「理解しました」で閉じる */}
 
                             {!showVideo ? (
                                 <>
-                                    <motion.div
-                                        initial={{ scale: 0 }}
-                                        animate={{ scale: 1 }}
-                                        transition={{ delay: 0.2, type: "spring" }}
-                                        className="inline-block p-6 rounded-full bg-green-400 shadow-inner mb-6"
-                                    >
-                                        <Trophy className="h-16 w-16 text-white" />
-                                    </motion.div>
-
-                                    <motion.h2
-                                        initial={{ y: 20, opacity: 0 }}
-                                        animate={{ y: 0, opacity: 1 }}
-                                        transition={{ delay: 0.3 }}
-                                        className="text-3xl font-black text-green-600 mb-2"
-                                    >
-                                        新しい単元をアンロック！
-                                    </motion.h2>
-
-                                    <motion.div
-                                        initial={{ y: 20, opacity: 0 }}
-                                        animate={{ y: 0, opacity: 1 }}
-                                        transition={{ delay: 0.4 }}
-                                        className="mb-6 space-y-2"
-                                    >
-                                        <h3 className="text-2xl font-bold text-gray-800">
-                                            {current.coreProblemName}
-                                        </h3>
-                                        <p className="text-gray-600 font-medium">
-                                            {hasVideos
-                                                ? 'まずは講義動画を視聴してください。'
-                                                : 'おめでとうございます！新しい学習内容が開放されました。'}
-                                        </p>
-                                    </motion.div>
-
-                                    <motion.div
-                                        initial={{ scale: 0 }}
-                                        animate={{ scale: 1 }}
-                                        transition={{ delay: 0.6, type: "spring" }}
-                                        className="inline-flex items-center gap-2 bg-green-500 text-white px-6 py-2 rounded-full font-bold text-lg shadow-lg mb-6"
-                                    >
-                                        <Star className="h-5 w-5 fill-current" />
-                                        レベルアップ！
-                                    </motion.div>
+                                    <CelebrationIntro
+                                        accent="green"
+                                        title="新しい単元をアンロック！"
+                                        description={(
+                                            <>
+                                                <h3 className="text-2xl font-bold text-gray-800">
+                                                    {current.coreProblemName}
+                                                </h3>
+                                                <p className="text-gray-600 font-medium">
+                                                    {hasVideos
+                                                        ? 'まずは講義動画を視聴してください。'
+                                                        : 'おめでとうございます！新しい学習内容が開放されました。'}
+                                                </p>
+                                            </>
+                                        )}
+                                        badgeText="レベルアップ！"
+                                    />
 
                                     <motion.div
                                         initial={{ opacity: 0, y: 20 }}
@@ -377,9 +323,7 @@ export function CoreProblemUnlockOverlay() {
                                     )}
                                 </div>
                             )}
-                        </div>
-                    </motion.div>
-                </motion.div>
+                </CelebrationOverlayShell>
             )}
         </AnimatePresence>
     );
