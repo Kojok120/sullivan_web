@@ -2,7 +2,7 @@
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Pencil, Trash2, CheckSquare, Square, ArrowUpDown } from 'lucide-react';
+import { Pencil, Trash2, CheckSquare, Square } from 'lucide-react';
 import { Problem } from '@prisma/client';
 import { Badge } from '@/components/ui/badge';
 import { deleteStandaloneProblem, bulkDeleteProblems } from '../actions';
@@ -20,6 +20,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { SortIcon } from '@/components/ui/sort-icon';
 
 interface ProblemWithRelations extends Problem {
     masterNumber: number | null; // Explicitly add specific field if not picked up
@@ -98,11 +99,6 @@ export function ProblemList({ problems, onEdit, sortBy, sortOrder, onSort }: Pro
         }
     };
 
-    const SortIcon = ({ column }: { column: string }) => {
-        if (sortBy !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />;
-        return <ArrowUpDown className={`ml-2 h-4 w-4 ${sortOrder === 'asc' ? 'text-primary' : 'text-primary/80'}`} />;
-    };
-
     return (
         <>
             {/* Bulk Actions Header */}
@@ -149,7 +145,8 @@ export function ProblemList({ problems, onEdit, sortBy, sortOrder, onSort }: Pro
                                 onClick={() => onSort('masterNumber')}
                             >
                                 <div className="flex items-center">
-                                    マスタNo <SortIcon column="masterNumber" />
+                                    マスタNo
+                                    <SortIcon active={sortBy === 'masterNumber'} sortOrder={sortOrder} />
                                 </div>
                             </TableHead>
                             <TableHead
@@ -157,7 +154,8 @@ export function ProblemList({ problems, onEdit, sortBy, sortOrder, onSort }: Pro
                                 onClick={() => onSort('customId')}
                             >
                                 <div className="flex items-center">
-                                    ID <SortIcon column="customId" />
+                                    ID
+                                    <SortIcon active={sortBy === 'customId'} sortOrder={sortOrder} />
                                 </div>
                             </TableHead>
                             <TableHead>問題文</TableHead>

@@ -1,0 +1,27 @@
+import { NextResponse } from 'next/server';
+
+export function getShouldCheckFromRequest(request: Request): boolean {
+    const url = new URL(request.url);
+    return ['1', 'true'].includes(url.searchParams.get('check') || '');
+}
+
+export function verifyInternalApiAuthorization(request: Request): NextResponse | null {
+    const authHeader = request.headers.get('Authorization');
+    if (authHeader !== `Bearer ${process.env.INTERNAL_API_SECRET}`) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    return null;
+}
+
+export function getDriveWebhookUrlOrError(): { webhookUrl: string } | { errorResponse: NextResponse } {
+    const appUrl = process.env.APP_URL;
+    if (!appUrl) {
+        return {
+            errorResponse: NextResponse.json(
+                { success: false, error: 'APP_URL is not configured' },
+                { status: 500 }
+            )
+        };
+    }
+    return { webhookUrl: `${appUrl}/api/grading/webhook` };
+}

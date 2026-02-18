@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import confetti from 'canvas-confetti';
 import { getUnseenAchievements, markAchievementsAsSeen } from '@/app/actions/achievement';
 import { Button } from '@/components/ui/button';
 import { Trophy, X, Star } from 'lucide-react';
 import { type Achievement, type UserAchievement } from '@prisma/client';
+import { triggerCelebrationConfetti } from '@/lib/confetti';
 
 type ExtendedUserAchievement = UserAchievement & {
     achievement: Achievement;
@@ -14,7 +14,8 @@ type ExtendedUserAchievement = UserAchievement & {
 
 export function AchievementOverlay() {
     const [queue, setQueue] = useState<ExtendedUserAchievement[]>([]);
-    const [current, setCurrent] = useState<ExtendedUserAchievement | null>(null);
+    const current = queue[0] || null;
+    const currentId = current?.id;
 
     useEffect(() => {
         const checkAchievements = async () => {
@@ -32,14 +33,11 @@ export function AchievementOverlay() {
     }, []);
 
     useEffect(() => {
-        if (!current && queue.length > 0) {
-            const next = queue[0];
-            setCurrent(next);
-            triggerConfetti();
-
+        if (currentId) {
+            triggerCelebrationConfetti();
             // Play sound effect if desired (optional)
         }
-    }, [queue, current]);
+    }, [currentId]);
 
     const handleClose = async () => {
         if (!current) return;
@@ -49,27 +47,6 @@ export function AchievementOverlay() {
 
         // Remove current from queue
         setQueue((prev) => prev.slice(1));
-        setCurrent(null);
-    };
-
-    const triggerConfetti = () => {
-        const duration = 3000;
-        const animationEnd = Date.now() + duration;
-        const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 9999 };
-
-        const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
-
-        const interval: any = setInterval(function () {
-            const timeLeft = animationEnd - Date.now();
-
-            if (timeLeft <= 0) {
-                return clearInterval(interval);
-            }
-
-            const particleCount = 50 * (timeLeft / duration);
-            confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
-            confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
-        }, 250);
     };
 
     return (

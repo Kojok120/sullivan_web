@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import confetti from 'canvas-confetti';
 import { Button } from '@/components/ui/button';
 import { Trophy, Star, Play, CheckCircle2 } from 'lucide-react';
 import YouTube, { YouTubeEvent } from 'react-youtube';
+import { triggerCelebrationConfetti } from '@/lib/confetti';
+import { getYouTubeId } from '@/lib/youtube';
+import { useYouTubePlaybackGuard } from '@/hooks/use-youtube-playback-guard';
 
 // 講義動画の型
 interface LectureVideo {
@@ -59,22 +61,6 @@ async function markLectureAsWatched(coreProblemId: string, watchedDurationSecond
     }
 }
 
-// 許可する再生速度
-const ALLOWED_RATES = [1, 1.25, 1.5];
-
-// YouTubeのURLからビデオIDを抽出
-function getYouTubeId(url: string): string | null {
-    const patterns = [
-        /(?:youtu\.be\/|youtube\.com\/watch\?v=|youtube\.com\/embed\/)([^&\n?#]+)/,
-        /^([a-zA-Z0-9_-]{11})$/
-    ];
-    for (const pattern of patterns) {
-        const match = url.match(pattern);
-        if (match) return match[1];
-    }
-    return null;
-}
-
 export function CoreProblemUnlockOverlay() {
     const [queue, setQueue] = useState<UnlockedCoreProblem[]>([]);
     const [current, setCurrent] = useState<UnlockedCoreProblem | null>(null);
@@ -83,12 +69,18 @@ export function CoreProblemUnlockOverlay() {
     const [videoEnded, setVideoEnded] = useState(false);
     const [showUnderstoodButton, setShowUnderstoodButton] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [currentRate, setCurrentRate] = useState(1);
-    const playerRef = useRef<any>(null);
-    const watchedTimeRef = useRef(0);
-    const lastTimeRef = useRef(0);
-    const trackingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-    const videoDurationRef = useRef(0);
+    const {
+        allowedRates,
+        currentRate,
+        watchedTimeRef,
+        videoDurationRef,
+        stopTracking,
+        resetTracking,
+        registerPlayer,
+        handlePlaybackRateChange,
+        handleStateChange,
+        changeSpeed,
+    } = useYouTubePlaybackGuard();
 
     useEffect(() => {
         const checkUnlocks = async () => {
@@ -114,7 +106,7 @@ export function CoreProblemUnlockOverlay() {
             setShowVideo(false);
             setSelectedVideoIndex(0);
             setVideoEnded(false);
-            triggerConfetti();
+            triggerCelebrationConfetti();
         }
     }, [queue, current]);
 
@@ -126,42 +118,11 @@ export function CoreProblemUnlockOverlay() {
         }
     }, [videoEnded]);
 
-    // クリーンアップ
-    useEffect(() => {
-        return () => {
-            if (trackingIntervalRef.current) {
-                clearInterval(trackingIntervalRef.current);
-            }
-        };
-    }, []);
-
-    // 視聴時間を追跡する
-    const startTracking = useCallback((player: any) => {
-        if (trackingIntervalRef.current) {
-            clearInterval(trackingIntervalRef.current);
-        }
-        trackingIntervalRef.current = setInterval(() => {
-            if (player && typeof player.getCurrentTime === 'function') {
-                try {
-                    const currentTime = player.getCurrentTime();
-                    const diff = currentTime - lastTimeRef.current;
-                    // 通常の再生進行（0〜3秒の範囲）のみカウント
-                    if (diff > 0 && diff < 3) {
-                        watchedTimeRef.current += diff;
-                    }
-                    lastTimeRef.current = currentTime;
-                } catch { }
-            }
-        }, 1000);
-    }, []);
-
     const handleClose = useCallback(async () => {
         if (!current) return;
 
         // 視聴時間の追跡を停止
-        if (trackingIntervalRef.current) {
-            clearInterval(trackingIntervalRef.current);
-        }
+        stopTracking();
 
         // Mark as seen in background
         await markCoreProblemUnlockAsSeen(current.eventId);
@@ -172,10 +133,8 @@ export function CoreProblemUnlockOverlay() {
         setShowVideo(false);
         setVideoEnded(false);
         setShowUnderstoodButton(false);
-        watchedTimeRef.current = 0;
-        lastTimeRef.current = 0;
-        videoDurationRef.current = 0;
-    }, [current]);
+        resetTracking();
+    }, [current, resetTracking, stopTracking]);
 
     // 「理解しました」ボタン押下時
     const handleUnderstood = async () => {
@@ -204,73 +163,15 @@ export function CoreProblemUnlockOverlay() {
         setShowVideo(true);
         setVideoEnded(false);
         setShowUnderstoodButton(false);
-        watchedTimeRef.current = 0;
-        lastTimeRef.current = 0;
-        videoDurationRef.current = 0;
+        resetTracking();
     };
 
     // 動画終了時のハンドラ
     const handleVideoEnd = (event: YouTubeEvent) => {
         console.log('[CP_UNLOCK] Video ended', event);
         // 視聴時間の追跡を停止
-        if (trackingIntervalRef.current) {
-            clearInterval(trackingIntervalRef.current);
-        }
+        stopTracking();
         setVideoEnded(true);
-    };
-
-    // 再生速度変更の防止（許可範囲外のみ）
-    const handlePlaybackRateChange = (event: YouTubeEvent) => {
-        const rate = event.target.getPlaybackRate();
-        if (!ALLOWED_RATES.includes(rate)) {
-            event.target.setPlaybackRate(1);
-            setCurrentRate(1);
-        } else {
-            setCurrentRate(rate);
-        }
-    };
-
-    // 手動で速度を変更する
-    const changeSpeed = (rate: number) => {
-        if (playerRef.current) {
-            playerRef.current.setPlaybackRate(rate);
-            setCurrentRate(rate);
-        }
-    };
-
-    // シーク防止: 大幅なジャンプを検知して元に戻す
-    const handleStateChange = (event: YouTubeEvent) => {
-        const player = event.target;
-        if (event.data === 1) { // PLAYING
-            const currentTime = player.getCurrentTime();
-            const diff = currentTime - lastTimeRef.current;
-            // 5秒以上の前方ジャンプはシーク判定
-            if (diff > 5 && lastTimeRef.current > 0 && watchedTimeRef.current > 0) {
-                player.seekTo(lastTimeRef.current, true);
-            } else {
-                lastTimeRef.current = currentTime;
-            }
-        }
-    };
-
-    const triggerConfetti = () => {
-        const duration = 3000;
-        const animationEnd = Date.now() + duration;
-        const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 9999 };
-
-        const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
-
-        const interval = setInterval(function () {
-            const timeLeft = animationEnd - Date.now();
-
-            if (timeLeft <= 0) {
-                return clearInterval(interval);
-            }
-
-            const particleCount = 50 * (timeLeft / duration);
-            confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
-            confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
-        }, 250);
     };
 
     const videos = current?.lectureVideos || [];
@@ -409,11 +310,7 @@ export function CoreProblemUnlockOverlay() {
                                                 }}
                                                 className="w-full h-full"
                                                 onReady={(event: YouTubeEvent) => {
-                                                    playerRef.current = event.target;
-                                                    event.target.setPlaybackRate(1);
-                                                    videoDurationRef.current = event.target.getDuration();
-                                                    lastTimeRef.current = 0;
-                                                    startTracking(event.target);
+                                                    registerPlayer(event.target, { captureDuration: true });
                                                 }}
                                                 onEnd={handleVideoEnd}
                                                 onPlaybackRateChange={handlePlaybackRateChange}
@@ -434,7 +331,7 @@ export function CoreProblemUnlockOverlay() {
                                     {!videoEnded && youtubeId && (
                                         <div className="flex items-center gap-1 mt-2">
                                             <span className="text-xs text-gray-500 mr-1">速度:</span>
-                                            {ALLOWED_RATES.map((rate) => (
+                                            {allowedRates.map((rate) => (
                                                 <button
                                                     key={rate}
                                                     onClick={() => changeSpeed(rate)}

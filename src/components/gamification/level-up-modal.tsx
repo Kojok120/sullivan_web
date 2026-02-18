@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Trophy, Star, Sparkles } from 'lucide-react';
-import confetti from 'canvas-confetti';
+import { Trophy, Sparkles } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { markLevelAsSeen } from '@/app/actions/level';
+import { triggerCelebrationConfetti } from '@/lib/confetti';
 
 // Simple implementation of SSE listening
 export function LevelUpModal() {
@@ -33,7 +33,13 @@ export function LevelUpModal() {
                         filter: `user_id=eq.${prismaUserId}`,
                     },
                     async (payload) => {
-                        const record = payload.new as { type?: string; payload?: any } | null;
+                        const record = payload.new as {
+                            type?: string;
+                            payload?: {
+                                levelUp?: { newLevel?: number };
+                                xpGained?: number;
+                            };
+                        } | null;
                         if (!record || record.type !== 'gamification_update') return;
 
                         const update = record.payload;
@@ -43,7 +49,7 @@ export function LevelUpModal() {
                                 xpGained: update.xpGained ?? 0,
                             });
                             setOpen(true);
-                            triggerConfetti();
+                            triggerCelebrationConfetti({ zIndex: 0 });
                             // 既読管理: DBに記録して二重表示を防止
                             await markLevelAsSeen(update.levelUp.newLevel);
                         }
@@ -60,26 +66,6 @@ export function LevelUpModal() {
             }
         };
     }, []);
-
-    const triggerConfetti = () => {
-        const duration = 3000;
-        const animationEnd = Date.now() + duration;
-        const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
-
-        const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
-
-        const interval: any = setInterval(function () {
-            const timeLeft = animationEnd - Date.now();
-
-            if (timeLeft <= 0) {
-                return clearInterval(interval);
-            }
-
-            const particleCount = 50 * (timeLeft / duration);
-            confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
-            confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
-        }, 250);
-    };
 
     if (!data) return null;
 
