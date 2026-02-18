@@ -139,7 +139,7 @@ export async function submitSurveyResponse(userId: string, answers: { questionId
 
 // ヘルパー関数
 function pickRandom<T>(arr: T[], count: number): T[] {
-    const shuffled = [...arr].sort(() => 0.5 - Math.random());
+    const shuffled = shuffleArray([...arr]);
     return shuffled.slice(0, count);
 }
 
