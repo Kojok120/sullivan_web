@@ -31,10 +31,12 @@ export async function subscribeToUserRealtimeEvents({
                 table: 'realtime_events',
                 filter: `user_id=eq.${prismaUserId}`,
             },
-            async (payload) => {
+            (payload) => {
                 const record = payload.new as RealtimeEventRecord | null;
                 if (!record) return;
-                await onInsert(record);
+                void Promise.resolve(onInsert(record)).catch((error) => {
+                    console.error('[Realtime] onInsert handler failed:', error);
+                });
             }
         )
         .subscribe();

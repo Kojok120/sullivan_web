@@ -1,5 +1,5 @@
 
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -73,11 +73,22 @@ async function main() {
         });
         console.log("Success!");
     } catch (e: unknown) {
-        const err = e as { code?: unknown; message?: unknown; meta?: unknown };
         console.error("Caught Error:");
-        console.error("Code:", err.code);
-        console.error("Message:", err.message);
-        console.error("Meta:", err.meta);
+        if (e instanceof Prisma.PrismaClientKnownRequestError) {
+            console.error("Code:", e.code);
+            console.error("Message:", e.message);
+            console.error("Meta:", e.meta);
+            return;
+        }
+        if (e instanceof Prisma.PrismaClientUnknownRequestError) {
+            console.error("Message:", e.message);
+            return;
+        }
+        if (e instanceof Error) {
+            console.error("Message:", e.message);
+            return;
+        }
+        console.error("Unknown error:", e);
     }
 }
 

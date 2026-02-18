@@ -162,14 +162,21 @@ export async function createUser(data: { name: string; role: Role; password?: st
     }
 }
 
-export async function updateUser(id: string, data: { name?: string; role?: Role; group?: string; classroomId?: string }) {
+export async function updateUser(
+    id: string,
+    data: { name?: string; role?: Role; group?: string | null; classroomId?: string | null }
+) {
     await requireAdmin();
     try {
         const updateData: Prisma.UserUpdateInput = {};
         if (data.name !== undefined) updateData.name = data.name;
         if (data.role !== undefined) updateData.role = data.role;
         if (data.group !== undefined) updateData.group = data.group;
-        if (data.classroomId !== undefined) updateData.classroom = { connect: { id: data.classroomId } };
+        if (data.classroomId !== undefined) {
+            updateData.classroom = data.classroomId
+                ? { connect: { id: data.classroomId } }
+                : { disconnect: true };
+        }
 
         const user = await prisma.user.update({
             where: { id },

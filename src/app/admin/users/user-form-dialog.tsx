@@ -92,11 +92,13 @@ function UserFormDialogContent({
                 });
             } else {
                 if (!user) return;
+                const nextGroup = formData.groupId === NONE_SELECTION_VALUE ? null : normalizedGroup;
+                const nextClassroomId = formData.classroomId === NONE_SELECTION_VALUE ? null : normalizedClassroom;
                 result = await updateUser(user.id, {
                     name: formData.name,
                     role: formData.role,
-                    group: normalizedGroup,
-                    classroomId: normalizedClassroom,
+                    group: nextGroup,
+                    classroomId: nextClassroomId,
                 });
             }
 

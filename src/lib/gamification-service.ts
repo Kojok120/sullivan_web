@@ -24,6 +24,11 @@ export type GamificationUpdateResult = {
     achievementsUnlocked: Achievement[];
 };
 
+type GamificationContext = {
+    currentGroupId?: string;
+    currentSessionIsPerfect?: boolean;
+};
+
 export function toGamificationPayload(result: GamificationUpdateResult) {
     return {
         userId: result.userId,
@@ -47,7 +52,8 @@ export function toGamificationPayload(result: GamificationUpdateResult) {
  */
 export async function processGamificationUpdates(
     userId: string,
-    results: { isCorrect: boolean }[]
+    results: { isCorrect: boolean }[],
+    context: GamificationContext = {}
 ): Promise<GamificationUpdateResult> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -117,7 +123,7 @@ export async function processGamificationUpdates(
         });
 
         // 4. Check Achievements (Streak & Solve Count & Perfect & Core Unlock)
-        const unlockedAchievements = await checkAchievements(tx, userId, currentStreak, false);
+        const unlockedAchievements = await checkAchievements(tx, userId, currentStreak, false, context);
 
         // Add Achievement XP
         let achievementXp = 0;
@@ -203,7 +209,8 @@ async function checkAchievements(
     tx: Prisma.TransactionClient,
     userId: string,
     currentStreak: number,
-    isVideoCheck = false
+    isVideoCheck = false,
+    context?: GamificationContext
 ) {
     const unlockedAchievements: Achievement[] = [];
 
@@ -292,24 +299,36 @@ async function checkAchievements(
 
         // Perfect Logic
         if (achievement.slug.startsWith('perfect-')) {
-            // First, if this session is NOT perfect and we need perfect, we rely on history.
-            // If this session IS perfect, we count it + history (or just rely on history logic if it includes current)
-            // Since this runs within transaction after saving results, history SHOULD theoretically include current session if it was saved?
-            // processGamificationUpdates calls this AFTER updates (but wait, results are not saved to LearningHistory in that function directly? 
-            // processGamificationUpdates is called from grading-service AFTER recordGradingResults, so DB should be up to date.)
-
             if (totalPerfectCount === -1) {
-                // Count sessions (groups) where all answers were correct (no C or D)
-                const countResult = await tx.$queryRaw<Array<{ count: number | string | bigint }>>`
-                    SELECT COUNT(*) as count FROM (
-                        SELECT lh."groupId"
-                        FROM "LearningHistory" lh
-                        WHERE lh."userId" = ${userId} AND lh."groupId" IS NOT NULL
-                        GROUP BY lh."groupId"
-                        HAVING COUNT(CASE WHEN lh.evaluation IN ('C', 'D') THEN 1 END) = 0
-                    ) as perfect_sessions
-                `;
-                totalPerfectCount = Number(countResult[0]?.count || 0);
+                if (context?.currentGroupId) {
+                    // 現在セッションを除外して集計し、呼び出し元から渡された判定を合算する
+                    const countResult = await tx.$queryRaw<Array<{ count: number | string | bigint }>>`
+                        SELECT COUNT(*) as count FROM (
+                            SELECT lh."groupId"
+                            FROM "LearningHistory" lh
+                            WHERE
+                                lh."userId" = ${userId}
+                                AND lh."groupId" IS NOT NULL
+                                AND lh."groupId" <> ${context.currentGroupId}
+                            GROUP BY lh."groupId"
+                            HAVING COUNT(CASE WHEN lh.evaluation IN ('C', 'D') THEN 1 END) = 0
+                        ) as perfect_sessions
+                    `;
+                    totalPerfectCount = Number(countResult[0]?.count || 0)
+                        + (context.currentSessionIsPerfect ? 1 : 0);
+                } else {
+                    // Count sessions (groups) where all answers were correct (no C or D)
+                    const countResult = await tx.$queryRaw<Array<{ count: number | string | bigint }>>`
+                        SELECT COUNT(*) as count FROM (
+                            SELECT lh."groupId"
+                            FROM "LearningHistory" lh
+                            WHERE lh."userId" = ${userId} AND lh."groupId" IS NOT NULL
+                            GROUP BY lh."groupId"
+                            HAVING COUNT(CASE WHEN lh.evaluation IN ('C', 'D') THEN 1 END) = 0
+                        ) as perfect_sessions
+                    `;
+                    totalPerfectCount = Number(countResult[0]?.count || 0);
+                }
             }
 
             const target = parseInt(achievement.slug.replace('perfect-', ''));

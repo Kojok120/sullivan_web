@@ -294,11 +294,14 @@ export async function processFile(fileId: string, fileName: string) {
 
         // Update DB
         if (results && results.length > 0) {
-            await recordGradingResults(results);
+            const gradingSummary = await recordGradingResults(results);
 
             // [GAMIFICATION] Process XP, Streaks, Achievements
             try {
-                const gamificationResult = await processGamificationUpdates(results[0].studentId, results);
+                const gamificationResult = await processGamificationUpdates(results[0].studentId, results, {
+                    currentGroupId: gradingSummary?.groupId,
+                    currentSessionIsPerfect: gradingSummary?.sessionIsPerfect,
+                });
                 const payload = toGamificationPayload(gamificationResult);
                 await emitRealtimeEvent({
                     userId: gamificationResult.userId,
@@ -1015,19 +1018,25 @@ function parseJSON(text: string): unknown {
 
 // 5. Save Result (Unified)
 // Unified Grading Logic (Batch)
-export async function recordGradingResults(results: GradingResult[]) {
-    if (results.length === 0) return;
+type GradingBatchSummary = {
+    groupId: string;
+    sessionIsPerfect: boolean;
+};
+
+export async function recordGradingResults(results: GradingResult[]): Promise<GradingBatchSummary | null> {
+    if (results.length === 0) return null;
 
     const userId = results[0].studentId; // Assumes all results are for same student
     const problemIds = results.map(r => r.problemId);
+    const sessionIsPerfect = results.every((result) => result.isCorrect);
 
     // Generate Group ID for this batch
     const groupId = crypto.randomUUID();
 
     // WRAP EVERYTHING IN A SINGLE TRANSACTION
-    await prisma.$transaction(async (tx) => {
+    const involvedCpIds = await prisma.$transaction(async (tx) => {
         // 1. Record History (Batch)
-        // Note: createMany is not supported in interactive transactions for SQLite/some adapters if using executeRaw, 
+        // Note: createMany is not supported in interactive transactions for SQLite/some adapters if using executeRaw,
         // but typically supported in modern Prisma client (tx.learningHistory.createMany).
         await tx.learningHistory.createMany({
             data: results.map(r => ({
@@ -1102,7 +1111,7 @@ export async function recordGradingResults(results: GradingResult[]) {
         const problemMap = new Map(problems.map(p => [p.id, p]));
 
         const cpDeltas = new Map<string, number>();
-        const involvedCpIds = new Set<string>();
+        const involvedCpIdsInTransaction = new Set<string>();
 
         for (const r of results) {
             const problem = problemMap.get(r.problemId);
@@ -1113,7 +1122,7 @@ export async function recordGradingResults(results: GradingResult[]) {
                 for (const cp of problem.coreProblems) {
                     const current = cpDeltas.get(cp.id) || 0;
                     cpDeltas.set(cp.id, current - 5);
-                    involvedCpIds.add(cp.id);
+                    involvedCpIdsInTransaction.add(cp.id);
                 }
             } else {
                 // Incorrect: +5 for BAD CoreProblems
@@ -1122,7 +1131,7 @@ export async function recordGradingResults(results: GradingResult[]) {
                         if (problem.coreProblems.some(cp => cp.id === cpId)) {
                             const current = cpDeltas.get(cpId) || 0;
                             cpDeltas.set(cpId, current + 5);
-                            involvedCpIds.add(cpId);
+                            involvedCpIdsInTransaction.add(cpId);
                         }
                     }
                 }
@@ -1144,34 +1153,35 @@ export async function recordGradingResults(results: GradingResult[]) {
             )
         );
 
-        // Pass involved CpIds out or call check function? 
+        // Pass involved CpIds out or call check function?
         // We can't easily call checkProgressAndUnlock inside here if it uses `prisma` global.
         // We should move the check LOGIC to use `tx` or call it AFTER transaction.
-        // But if check fails (crash), transaction is committed. That's actually OK. 
+        // But if check fails (crash), transaction is committed. That's actually OK.
         // Unlock failure is less critical than Data Consistency.
         // However, we need to export the involved IPs to run the check AFTER.
         // But interactive transaction returns result.
-        return involvedCpIds;
-    })
-        .then(async (involvedCpIds) => {
-            // 4. Batch Unlock Check (Outside Transaction)
-            await checkProgressAndUnlock(userId, Array.from(involvedCpIds));
+        return involvedCpIdsInTransaction;
+    });
 
-            // 5. Emit Event for SSE
-            try {
-                await emitRealtimeEvent({
-                    userId,
-                    type: 'grading_completed',
-                    payload: {
-                        groupId,
-                        timestamp: new Date().toISOString(),
-                    },
-                });
-            } catch (e) {
-                console.error('[Realtime] Failed to emit grading_completed event:', e);
-            }
-            console.log(`Emitted GRADING_COMPLETED event for user ${userId}, group ${groupId}`);
+    // 4. Batch Unlock Check (Outside Transaction)
+    await checkProgressAndUnlock(userId, Array.from(involvedCpIds));
+
+    // 5. Emit Event for SSE
+    try {
+        await emitRealtimeEvent({
+            userId,
+            type: 'grading_completed',
+            payload: {
+                groupId,
+                timestamp: new Date().toISOString(),
+            },
         });
+    } catch (e) {
+        console.error('[Realtime] Failed to emit grading_completed event:', e);
+    }
+    console.log(`Emitted GRADING_COMPLETED event for user ${userId}, group ${groupId}`);
+
+    return { groupId, sessionIsPerfect };
 }
 
 export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: string[]) {
