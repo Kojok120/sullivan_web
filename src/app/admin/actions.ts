@@ -199,40 +199,37 @@ export async function deleteUser(id: string) {
     }
 }
 
-// Wrapper for admin/users page that needs { success, classrooms: [{id, name}] } format
-// Uses consolidated getClassrooms from admin/classrooms/actions.ts
-export async function getClassroomsForAdmin() {
+export async function getUserManagementMeta() {
     await requireAdmin();
     try {
-        const { getClassrooms } = await import('@/app/admin/classrooms/actions');
-        const classrooms = await getClassrooms();
-        return {
-            success: true,
-            classrooms: classrooms.map(c => ({ id: c.id, name: c.name }))
-        };
-    } catch (error) {
-        console.error('Failed to fetch classrooms:', error);
-        return { error: '教室の取得に失敗しました' };
-    }
-}
-
-export async function getGroups() {
-    await requireAdmin();
-    try {
-        // Fetch all classrooms to get their groups
         const classrooms = await prisma.classroom.findMany({
-            select: { groups: true }
+            select: { id: true, name: true, groups: true },
+            orderBy: { name: 'asc' },
         });
 
-        // Flatten and unique
-        const allGroups = Array.from(new Set(classrooms.flatMap(c => c.groups)));
+        const allGroupsSet = new Set<string>();
+        classrooms.forEach((classroom) => {
+            classroom.groups.forEach((groupName) => {
+                allGroupsSet.add(groupName);
+            });
+        });
 
-        // Return as objects to match expected interface
-        const groups = allGroups.map(g => ({ id: g, name: g })).sort((a, b) => a.name.localeCompare(b.name));
+        const groups = Array.from(allGroupsSet)
+            .sort((a, b) => a.localeCompare(b))
+            .map((name) => ({ id: name, name }));
 
-        return { success: true, groups };
+        const classroomOptions = classrooms.map((classroom) => ({
+            id: classroom.id,
+            name: classroom.name,
+        }));
+
+        return {
+            success: true,
+            groups,
+            classrooms: classroomOptions,
+        };
     } catch (error) {
-        console.error('Failed to fetch groups:', error);
-        return { error: 'グループの取得に失敗しました' };
+        console.error('Failed to fetch user management metadata:', error);
+        return { error: 'ユーザー管理メタデータの取得に失敗しました' };
     }
 }

@@ -1129,18 +1129,20 @@ export async function recordGradingResults(results: GradingResult[]) {
             }
         }
 
-        for (const [cpId, delta] of cpDeltas.entries()) {
-            await tx.userCoreProblemState.upsert({
-                where: { userId_coreProblemId: { userId, coreProblemId: cpId } },
-                create: {
-                    userId,
-                    coreProblemId: cpId,
-                    priority: delta,
-                    isUnlocked: true // Assume unlocked if graded
-                },
-                update: { priority: { increment: delta } }
-            });
-        }
+        await Promise.all(
+            Array.from(cpDeltas.entries()).map(([cpId, delta]) =>
+                tx.userCoreProblemState.upsert({
+                    where: { userId_coreProblemId: { userId, coreProblemId: cpId } },
+                    create: {
+                        userId,
+                        coreProblemId: cpId,
+                        priority: delta,
+                        isUnlocked: true // Assume unlocked if graded
+                    },
+                    update: { priority: { increment: delta } }
+                })
+            )
+        );
 
         // Pass involved CpIds out or call check function? 
         // We can't easily call checkProgressAndUnlock inside here if it uses `prisma` global.

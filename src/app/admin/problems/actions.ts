@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { requireAdmin } from '@/lib/auth';
 import { Prisma } from '@prisma/client';
-import { bulkCreateProblemsCore, bulkUpsertProblemsCore, createProblemCore, deleteProblemsWithRelations } from '@/lib/problem-service';
+import { bulkUpsertProblemsCore, createProblemCore, deleteProblemsWithRelations } from '@/lib/problem-service';
 
 type ProblemFilters = {
     grade?: string;
@@ -238,32 +238,6 @@ export async function updateStandaloneProblem(id: string, data: {
     }
 }
 
-// ...
-
-export async function bulkCreateStandaloneProblems(problems: {
-    question: string;
-    answer?: string;
-    acceptedAnswers?: string[];
-    grade?: string;
-    masterNumber?: number;
-    videoUrl?: string;
-    coreProblemIds: string[];
-}[]) {
-    await requireAdmin();
-    try {
-        const { count, warnings } = await bulkCreateProblemsCore(
-            problems,
-            { batchSize: 50, assignOrder: false }
-        );
-
-        revalidatePath('/admin/problems');
-        return { success: true, count, warnings };
-    } catch (error) {
-        console.error('Failed to bulk create problems:', error);
-        return { error: '一括登録に失敗しました' };
-    }
-}
-
 export async function deleteStandaloneProblem(id: string) {
     await requireAdmin();
     try {
@@ -303,36 +277,66 @@ export async function bulkSearchCoreProblems(names: string[]) {
             return { success: true, coreProblemsMap: {} };
         }
 
-        const coreProblems = await prisma.coreProblem.findMany({
+        const include = { subject: true } satisfies Prisma.CoreProblemInclude;
+        const ordering: Prisma.CoreProblemOrderByWithRelationInput[] = [
+            { subject: { order: 'asc' } },
+            { order: 'asc' }
+        ];
+
+        const exactCandidates = await prisma.coreProblem.findMany({
             where: {
                 OR: uniqueNames.map(name => ({
-                    name: { contains: name, mode: 'insensitive' }
+                    name: { equals: name, mode: 'insensitive' }
                 }))
             },
-            include: { subject: true },
-            orderBy: [
-                { subject: { order: 'asc' } },
-                { order: 'asc' }
-            ]
+            include,
+            orderBy: ordering,
         });
 
-        const normalizedCoreProblems = coreProblems.map(cp => ({
-            coreProblem: cp,
-            nameLower: cp.name.toLowerCase()
-        }));
-        const exactMatchMap = new Map(
-            normalizedCoreProblems.map(item => [item.nameLower, item.coreProblem])
+        const exactMatchMap = new Map<string, (typeof exactCandidates)[number]>();
+        exactCandidates.forEach((coreProblem) => {
+            const key = coreProblem.name.toLowerCase();
+            if (!exactMatchMap.has(key)) {
+                exactMatchMap.set(key, coreProblem);
+            }
+        });
+
+        const unresolvedNames = uniqueNames.filter(
+            (name) => !exactMatchMap.has(name.toLowerCase())
         );
 
+        const partialMatchMap = new Map<string, (typeof exactCandidates)[number]>();
+        if (unresolvedNames.length > 0) {
+            const partialCandidates = await prisma.coreProblem.findMany({
+                where: {
+                    OR: unresolvedNames.map(name => ({
+                        name: { contains: name, mode: 'insensitive' }
+                    }))
+                },
+                include,
+                orderBy: ordering,
+            });
+
+            const unresolvedNameSet = new Set(unresolvedNames.map((name) => name.toLowerCase()));
+            for (const candidate of partialCandidates) {
+                if (unresolvedNameSet.size === 0) {
+                    break;
+                }
+                const candidateLower = candidate.name.toLowerCase();
+                for (const unresolvedName of Array.from(unresolvedNameSet)) {
+                    if (candidateLower.includes(unresolvedName)) {
+                        partialMatchMap.set(unresolvedName, candidate);
+                        unresolvedNameSet.delete(unresolvedName);
+                    }
+                }
+            }
+        }
+
         // 名前→CoreProblemのマップを返す（完全一致優先）
-        const resultMap: Record<string, typeof coreProblems[0] | null> = {};
+        const resultMap: Record<string, (typeof exactCandidates)[number] | null> = {};
         for (const name of uniqueNames) {
             const normalized = name.toLowerCase();
-            const exactMatch = exactMatchMap.get(normalized);
-            const partialMatch = normalizedCoreProblems.find(item =>
-                item.nameLower.includes(normalized)
-            )?.coreProblem;
-            resultMap[name] = exactMatch || partialMatch || null;
+            resultMap[name] = exactMatchMap.get(normalized) || partialMatchMap.get(normalized) || null;
         }
 
         return { success: true, coreProblemsMap: resultMap };

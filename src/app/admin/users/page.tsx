@@ -1,4 +1,4 @@
-import { getUsers, getGroups, getClassroomsForAdmin } from '../actions';
+import { getUsers, getUserManagementMeta } from '../actions';
 import { UserList } from './user-list';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -26,20 +26,20 @@ export default async function UsersPage({
     // Validate role
     const roleEnum = (Object.values(Role) as Role[]).find((value) => value === role);
 
-    const [usersData, groupsData, classroomsData] = await Promise.all([
+    const [usersData, metadataResult] = await Promise.all([
         getUsers(currentPage, limit, query, currentSortBy, currentSortOrder, roleEnum, groupId),
-        getGroups(),
-        getClassroomsForAdmin(),
+        getUserManagementMeta(),
     ]);
 
     const { users, total, error } = usersData;
-    const groups = groupsData.groups || [];
-    const classrooms = classroomsData.classrooms || [];
+    const groups = metadataResult.success ? metadataResult.groups : [];
+    const classrooms = metadataResult.success ? metadataResult.classrooms : [];
+    const metadataError = metadataResult.success ? undefined : metadataResult.error;
 
-    if (error || !users) {
+    if (error || !users || metadataError) {
         return (
             <div className="p-8 text-center text-red-600">
-                エラーが発生しました: {error}
+                エラーが発生しました: {error || metadataError}
             </div>
         );
     }

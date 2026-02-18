@@ -130,8 +130,3 @@ export async function findSupabaseUser({ email, prismaUserId }: SupabaseUserLook
 
     return null;
 }
-
-// Backward-compatible wrapper
-export async function findSupabaseUserByEmail(email: string) {
-    return findSupabaseUser({ email });
-}

@@ -49,11 +49,3 @@ export async function requireAdmin() {
 export function isTeacherOrAdmin(session: SessionPayload | null): session is SessionPayload {
     return !!session && (session.role === 'TEACHER' || session.role === 'ADMIN');
 }
-
-export async function requireTeacherOrAdmin() {
-    const session = await getSession();
-    if (!isTeacherOrAdmin(session)) {
-        throw new Error('Unauthorized');
-    }
-    return session;
-}

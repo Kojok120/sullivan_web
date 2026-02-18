@@ -246,10 +246,16 @@ export async function bulkCreateProblemsCore(
     }
 
     const customIdsBySubject = new Map<string, string[]>();
-    for (const [subjectId, count] of subjectCounts) {
-        const ids = await getNextCustomIds(subjectId, count, client);
+    const subjectEntries = Array.from(subjectCounts.entries());
+    const generatedCustomIds = await Promise.all(
+        subjectEntries.map(async ([subjectId, count]) => ({
+            subjectId,
+            ids: await getNextCustomIds(subjectId, count, client),
+        }))
+    );
+    generatedCustomIds.forEach(({ subjectId, ids }) => {
         customIdsBySubject.set(subjectId, ids);
-    }
+    });
 
     const subjectIndexes = new Map<string, number>();
     const batchSize = options.batchSize || problemsWithSubject.length;
