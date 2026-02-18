@@ -26,6 +26,16 @@ describe('survey-service', () => {
         vi.clearAllMocks()
     })
 
+    const buildCategoryQuestions = (countPerCategory: number) =>
+        SURVEY_CATEGORIES.flatMap((category) =>
+            Array.from({ length: countPerCategory }, (_, i) => ({
+                id: `${category}-${i}`,
+                category,
+                question: `Question ${i + 1} for ${category}`,
+                createdAt: new Date(),
+            }))
+        )
+
     describe('shouldShowSurvey', () => {
         it('ユーザーが一度も回答していない場合、trueを返す', async () => {
             vi.mocked(prisma.surveyResponse.findFirst).mockResolvedValue(null)
@@ -108,14 +118,7 @@ describe('survey-service', () => {
     describe('getSurveyQuestions', () => {
         it('各カテゴリーから4問ずつ、合計20問を返す', async () => {
             // 各カテゴリー20問ずつ、合計100問を用意
-            const mockQuestions = SURVEY_CATEGORIES.flatMap((category) =>
-                Array.from({ length: 20 }, (_, i) => ({
-                    id: `${category}-${i}`,
-                    category,
-                    question: `Question ${i + 1} for ${category}`,
-                    createdAt: new Date()
-                }))
-            )
+            const mockQuestions = buildCategoryQuestions(20)
 
             vi.mocked(prisma.questionBank.findMany).mockResolvedValue(mockQuestions)
 
@@ -126,14 +129,7 @@ describe('survey-service', () => {
         })
 
         it('5つのカテゴリーすべてが含まれる', async () => {
-            const mockQuestions = SURVEY_CATEGORIES.flatMap((category) =>
-                Array.from({ length: 20 }, (_, i) => ({
-                    id: `${category}-${i}`,
-                    category,
-                    question: `Question ${i + 1} for ${category}`,
-                    createdAt: new Date()
-                }))
-            )
+            const mockQuestions = buildCategoryQuestions(20)
 
             vi.mocked(prisma.questionBank.findMany).mockResolvedValue(mockQuestions)
 
@@ -147,14 +143,7 @@ describe('survey-service', () => {
         })
 
         it('各カテゴリーから4問ずつ選択される', async () => {
-            const mockQuestions = SURVEY_CATEGORIES.flatMap((category) =>
-                Array.from({ length: 20 }, (_, i) => ({
-                    id: `${category}-${i}`,
-                    category,
-                    question: `Question ${i + 1} for ${category}`,
-                    createdAt: new Date()
-                }))
-            )
+            const mockQuestions = buildCategoryQuestions(20)
 
             vi.mocked(prisma.questionBank.findMany).mockResolvedValue(mockQuestions)
 
