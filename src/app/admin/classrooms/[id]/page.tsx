@@ -1,4 +1,4 @@
-import { getClassroom, updateClassroomGroups } from '../actions';
+import { getClassroom } from '../actions';
 import { notFound } from 'next/navigation';
 import { ClassroomDetail } from './classroom-detail';
 
@@ -16,7 +16,7 @@ export default async function ClassroomDetailPage({
 
     return (
         <div className="container mx-auto py-10 space-y-8">
-            <ClassroomDetail classroom={classroom as any} />
+            <ClassroomDetail classroom={classroom} />
         </div>
     );
 }

@@ -9,6 +9,7 @@ import Link from "next/link";
 import { FullScreenVideoPlayer } from "@/components/full-screen-video-player";
 import { CoreProblem, Subject } from "@prisma/client";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { markLectureAsWatched } from '@/lib/api/lecture-watched-client';
 
 interface VideoData {
     title: string;
@@ -18,26 +19,10 @@ interface VideoData {
 interface UnitFocusDetailClientProps {
     coreProblem: CoreProblem & { subject: Subject };
     lectureVideos: VideoData[];
-    isUnlocked: boolean;
     isLectureWatched: boolean;
 }
 
-// 講義動画視聴完了を記録
-async function markLectureAsWatched(coreProblemId: string): Promise<boolean> {
-    try {
-        const response = await fetch('/api/lecture-watched', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ coreProblemId })
-        });
-        return response.ok;
-    } catch {
-        console.error('Failed to mark lecture as watched');
-        return false;
-    }
-}
-
-export function UnitFocusDetailClient({ coreProblem, lectureVideos, isUnlocked, isLectureWatched }: UnitFocusDetailClientProps) {
+export function UnitFocusDetailClient({ coreProblem, lectureVideos, isLectureWatched }: UnitFocusDetailClientProps) {
     const router = useRouter();
     const [isVideoOpen, setIsVideoOpen] = useState(false);
     const [startIndex, setStartIndex] = useState(0);
@@ -54,7 +39,7 @@ export function UnitFocusDetailClient({ coreProblem, lectureVideos, isUnlocked, 
         // 最後の動画を視聴したら視聴完了を記録
         if (newCount >= totalVideos && !isWatched) {
             setIsSubmitting(true);
-            const success = await markLectureAsWatched(coreProblem.id);
+            const success = await markLectureAsWatched({ coreProblemId: coreProblem.id });
             if (success) {
                 setIsWatched(true);
                 router.refresh(); // ページを更新して最新データを取得

@@ -2,6 +2,7 @@ import { UnitFocusDetailClient } from "./components/unit-focus-detail-client";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
+import { normalizeLectureVideos } from "@/lib/lecture-videos";
 
 export default async function UnitFocusDetailPage({
     params,
@@ -40,13 +41,12 @@ export default async function UnitFocusDetailPage({
         // Just show message
     }
 
-    const lectureVideos = ((coreProblem as any).lectureVideos as { title: string; url: string }[] | null) || [];
+    const lectureVideos = normalizeLectureVideos(coreProblem.lectureVideos);
 
     return (
         <UnitFocusDetailClient
             coreProblem={coreProblem}
             lectureVideos={lectureVideos}
-            isUnlocked={isUnlocked}
             isLectureWatched={isLectureWatched}
         />
     );

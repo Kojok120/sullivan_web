@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { User, Role } from '@prisma/client';
-import { createUser, updateUser, deleteUser } from '../actions';
+import { deleteUser } from '../actions';
 import { Button } from '@/components/ui/button';
 import {
     Table,
@@ -38,19 +38,16 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { MoreHorizontal, Plus, Pencil, Trash2, Loader2, ArrowUpDown, Filter, KeyRound } from 'lucide-react';
+import { MoreHorizontal, Pencil, Trash2, Loader2, Filter, KeyRound } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { UserFormDialog } from './user-form-dialog';
 import { PasswordResetDialog } from './password-reset-dialog';
 import { RoleBadge } from '@/components/ui/role-badge';
 import { DateDisplay } from '@/components/ui/date-display';
+import { SortIcon } from '@/components/ui/sort-icon';
+import type { ClassroomOption, GroupOption } from '@/lib/types/classroom';
 
 type UserWithGroup = User; // Group is now just a string field on User
-
-interface Group {
-    id: string;
-    name: string;
-}
 
 interface UserListProps {
     initialUsers: UserWithGroup[];
@@ -62,8 +59,8 @@ interface UserListProps {
     sortOrder: 'asc' | 'desc';
     roleFilter?: Role;
     groupIdFilter?: string;
-    groups: Group[];
-    classrooms: { id: string; name: string; }[];
+    groups: GroupOption[];
+    classrooms: ClassroomOption[];
 }
 
 export function UserList({
@@ -83,7 +80,6 @@ export function UserList({
     const router = useRouter();
 
     // Dialog states
-    const [isAddOpen, setIsAddOpen] = useState(false);
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
     const [isPasswordResetOpen, setIsPasswordResetOpen] = useState(false);
@@ -172,11 +168,6 @@ export function UserList({
     const end = Math.min(currentPage * limit, total);
     const totalPages = Math.ceil(total / limit);
 
-    const SortIcon = ({ column }: { column: string }) => {
-        if (sortBy !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />;
-        return <ArrowUpDown className={`ml-2 h-4 w-4 ${sortOrder === 'asc' ? 'text-primary' : 'text-primary/80'}`} />;
-    };
-
     return (
         <div>
             <div className="flex flex-col space-y-4 mb-6">
@@ -243,19 +234,34 @@ export function UserList({
                     <TableHeader>
                         <TableRow>
                             <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('loginId')}>
-                                <div className="flex items-center">ログインID <SortIcon column="loginId" /></div>
+                                <div className="flex items-center">
+                                    ログインID
+                                    <SortIcon active={sortBy === 'loginId'} sortOrder={sortOrder} />
+                                </div>
                             </TableHead>
                             <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('name')}>
-                                <div className="flex items-center">名前 <SortIcon column="name" /></div>
+                                <div className="flex items-center">
+                                    名前
+                                    <SortIcon active={sortBy === 'name'} sortOrder={sortOrder} />
+                                </div>
                             </TableHead>
                             <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('role')}>
-                                <div className="flex items-center">役割 <SortIcon column="role" /></div>
+                                <div className="flex items-center">
+                                    役割
+                                    <SortIcon active={sortBy === 'role'} sortOrder={sortOrder} />
+                                </div>
                             </TableHead>
                             <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('group')}>
-                                <div className="flex items-center">グループ <SortIcon column="group" /></div>
+                                <div className="flex items-center">
+                                    グループ
+                                    <SortIcon active={sortBy === 'group'} sortOrder={sortOrder} />
+                                </div>
                             </TableHead>
                             <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('createdAt')}>
-                                <div className="flex items-center">作成日 <SortIcon column="createdAt" /></div>
+                                <div className="flex items-center">
+                                    作成日
+                                    <SortIcon active={sortBy === 'createdAt'} sortOrder={sortOrder} />
+                                </div>
                             </TableHead>
                             <TableHead className="text-right">操作</TableHead>
                         </TableRow>
@@ -325,16 +331,6 @@ export function UserList({
                     </Button>
                 </div>
             )}
-
-            {/* User Form Dialogs using Shared Component */}
-            <UserFormDialog
-                open={isAddOpen}
-                onOpenChange={setIsAddOpen}
-                mode="create"
-                groups={groups}
-                classrooms={classrooms}
-                onSuccess={() => router.refresh()}
-            />
 
             <UserFormDialog
                 open={isEditOpen}

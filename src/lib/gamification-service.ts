@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
-import { User, Achievement } from '@prisma/client';
+import { Achievement } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 
 export const XP_PER_LOGIN = 50;
 export const XP_PER_ANSWER = 10;
@@ -21,6 +22,11 @@ export type GamificationUpdateResult = {
     } | null;
     streakUpdated?: boolean;
     achievementsUnlocked: Achievement[];
+};
+
+type GamificationContext = {
+    currentGroupId?: string;
+    currentSessionIsPerfect?: boolean;
 };
 
 export function toGamificationPayload(result: GamificationUpdateResult) {
@@ -46,7 +52,8 @@ export function toGamificationPayload(result: GamificationUpdateResult) {
  */
 export async function processGamificationUpdates(
     userId: string,
-    results: { isCorrect: boolean }[]
+    results: { isCorrect: boolean }[],
+    context: GamificationContext = {}
 ): Promise<GamificationUpdateResult> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -68,7 +75,7 @@ export async function processGamificationUpdates(
         // 2. Update Streak & Daily Summary
         let streakUpdated = false;
         let currentStreak = user.currentStreak;
-        let lastStudyDate = user.lastStudyDate ? new Date(user.lastStudyDate) : null;
+        const lastStudyDate = user.lastStudyDate ? new Date(user.lastStudyDate) : null;
         if (lastStudyDate) lastStudyDate.setHours(0, 0, 0, 0);
 
         // a. Daily Summary (Heatmap)
@@ -116,8 +123,7 @@ export async function processGamificationUpdates(
         });
 
         // 4. Check Achievements (Streak & Solve Count & Perfect & Core Unlock)
-        const isPerfect = results.every(r => r.isCorrect);
-        const unlockedAchievements = await checkAchievements(tx, userId, currentStreak, false, isPerfect);
+        const unlockedAchievements = await checkAchievements(tx, userId, currentStreak, false, context);
 
         // Add Achievement XP
         let achievementXp = 0;
@@ -163,7 +169,7 @@ export async function processVideoWatch(userId: string): Promise<GamificationUpd
         const user = await tx.user.findUniqueOrThrow({ where: { id: userId } });
 
         // Check Video Achievements
-        const unlockedAchievements = await checkAchievements(tx, userId, user.currentStreak, true, false);
+        const unlockedAchievements = await checkAchievements(tx, userId, user.currentStreak, true);
 
         // Add Achievement XP
         let achievementXp = 0;
@@ -199,7 +205,13 @@ export async function processVideoWatch(userId: string): Promise<GamificationUpd
 }
 
 // Helper to check achievements
-async function checkAchievements(tx: any, userId: string, currentStreak: number, isVideoCheck = false, isPerfectSession = false) {
+async function checkAchievements(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    currentStreak: number,
+    isVideoCheck = false,
+    context?: GamificationContext
+) {
     const unlockedAchievements: Achievement[] = [];
 
     // Optimize: Get user's unlocked achievement IDs first
@@ -207,10 +219,10 @@ async function checkAchievements(tx: any, userId: string, currentStreak: number,
         where: { userId },
         select: { achievementId: true }
     });
-    const unlockedIds = new Set(userUnlocked.map((ua: any) => ua.achievementId));
+    const unlockedIds = new Set(userUnlocked.map((ua) => ua.achievementId));
 
     const allAchievements = await tx.achievement.findMany();
-    const pendingAchievements = allAchievements.filter((a: any) => !unlockedIds.has(a.id));
+    const pendingAchievements = allAchievements.filter((a) => !unlockedIds.has(a.id));
 
     // Cache some aggregates
     let totalSolvedCount = -1;
@@ -260,7 +272,7 @@ async function checkAchievements(tx: any, userId: string, currentStreak: number,
                 // Count sessions where (Mistakes > 0 AND UnwatchedMistakes == 0) OR (Mistakes == 0)
                 // Effectively: Sessions where UnwatchedMistakes == 0
                 // Note: We need to filter by groupId is not null to ensure it's a valid session.
-                const countResult = await tx.$queryRaw`
+                const countResult = await tx.$queryRaw<Array<{ count: number | string | bigint }>>`
                     SELECT COUNT(*) as count FROM (
                         SELECT lh."groupId"
                         FROM "LearningHistory" lh
@@ -279,8 +291,7 @@ async function checkAchievements(tx: any, userId: string, currentStreak: number,
                             END) = 0
                     ) as completed_sessions
                 `;
-                // Type assertion for raw query result
-                totalReviewCount = Number((countResult as any)[0]?.count || 0);
+                totalReviewCount = Number(countResult[0]?.count || 0);
             }
             const target = parseInt(achievement.slug.replace('review-', ''));
             if (!isNaN(target) && totalReviewCount >= target) isUnlocked = true;
@@ -288,24 +299,36 @@ async function checkAchievements(tx: any, userId: string, currentStreak: number,
 
         // Perfect Logic
         if (achievement.slug.startsWith('perfect-')) {
-            // First, if this session is NOT perfect and we need perfect, we rely on history.
-            // If this session IS perfect, we count it + history (or just rely on history logic if it includes current)
-            // Since this runs within transaction after saving results, history SHOULD theoretically include current session if it was saved?
-            // processGamificationUpdates calls this AFTER updates (but wait, results are not saved to LearningHistory in that function directly? 
-            // processGamificationUpdates is called from grading-service AFTER recordGradingResults, so DB should be up to date.)
-
             if (totalPerfectCount === -1) {
-                // Count sessions (groups) where all answers were correct (no C or D)
-                const countResult = await tx.$queryRaw`
-                    SELECT COUNT(*) as count FROM (
-                        SELECT lh."groupId"
-                        FROM "LearningHistory" lh
-                        WHERE lh."userId" = ${userId} AND lh."groupId" IS NOT NULL
-                        GROUP BY lh."groupId"
-                        HAVING COUNT(CASE WHEN lh.evaluation IN ('C', 'D') THEN 1 END) = 0
-                    ) as perfect_sessions
-                `;
-                totalPerfectCount = Number((countResult as any)[0]?.count || 0);
+                if (context?.currentGroupId) {
+                    // 現在セッションを除外して集計し、呼び出し元から渡された判定を合算する
+                    const countResult = await tx.$queryRaw<Array<{ count: number | string | bigint }>>`
+                        SELECT COUNT(*) as count FROM (
+                            SELECT lh."groupId"
+                            FROM "LearningHistory" lh
+                            WHERE
+                                lh."userId" = ${userId}
+                                AND lh."groupId" IS NOT NULL
+                                AND lh."groupId" <> ${context.currentGroupId}
+                            GROUP BY lh."groupId"
+                            HAVING COUNT(CASE WHEN lh.evaluation IN ('C', 'D') THEN 1 END) = 0
+                        ) as perfect_sessions
+                    `;
+                    totalPerfectCount = Number(countResult[0]?.count || 0)
+                        + (context.currentSessionIsPerfect ? 1 : 0);
+                } else {
+                    // Count sessions (groups) where all answers were correct (no C or D)
+                    const countResult = await tx.$queryRaw<Array<{ count: number | string | bigint }>>`
+                        SELECT COUNT(*) as count FROM (
+                            SELECT lh."groupId"
+                            FROM "LearningHistory" lh
+                            WHERE lh."userId" = ${userId} AND lh."groupId" IS NOT NULL
+                            GROUP BY lh."groupId"
+                            HAVING COUNT(CASE WHEN lh.evaluation IN ('C', 'D') THEN 1 END) = 0
+                        ) as perfect_sessions
+                    `;
+                    totalPerfectCount = Number(countResult[0]?.count || 0);
+                }
             }
 
             const target = parseInt(achievement.slug.replace('perfect-', ''));
@@ -333,7 +356,7 @@ async function checkAchievements(tx: any, userId: string, currentStreak: number,
                     const unlockedCount = await tx.userCoreProblemState.count({
                         where: {
                             userId,
-                            coreProblemId: { in: subject.coreProblems.map((cp: any) => cp.id) },
+                            coreProblemId: { in: subject.coreProblems.map((cp) => cp.id) },
                             isUnlocked: true
                         }
                     });

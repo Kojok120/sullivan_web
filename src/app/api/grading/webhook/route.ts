@@ -15,7 +15,6 @@ export async function POST(request: Request) {
         const headers = request.headers;
         const channelId = headers.get('x-goog-channel-id');
         const channelToken = headers.get('x-goog-channel-token');
-        const resourceId = headers.get('x-goog-resource-id');
         const resourceState = headers.get('x-goog-resource-state');
 
         // SECURITY: Verify webhook channel ID matches the active watch stored in Redis

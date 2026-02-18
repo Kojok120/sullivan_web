@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { checkSurveyEligibility, fetchSurveyQuestions, submitSurvey } from '../survey'
 import * as surveyService from '@/lib/survey-service'
 import { revalidatePath } from 'next/cache'
+import { SurveyCategory } from '@prisma/client'
 
 // Mock the survey service
 vi.mock('@/lib/survey-service', () => ({
@@ -17,7 +18,7 @@ vi.mock('next/cache', () => ({
 
 describe('survey actions', () => {
     beforeEach(() => {
-        vi.clearAllMocks()
+        vi.resetAllMocks()
     })
 
     describe('checkSurveyEligibility', () => {
@@ -63,8 +64,8 @@ describe('survey actions', () => {
     describe('fetchSurveyQuestions', () => {
         it('getSurveyQuestionsの結果を返す', async () => {
             const mockQuestions = [
-                { id: 'q1', category: 'GRIT', question: 'Question 1' },
-                { id: 'q2', category: 'SELF_EFFICACY', question: 'Question 2' },
+                { id: 'q1', category: SurveyCategory.GRIT, question: 'Question 1' },
+                { id: 'q2', category: SurveyCategory.SELF_EFFICACY, question: 'Question 2' },
             ]
 
             vi.mocked(surveyService.getSurveyQuestions).mockResolvedValue(mockQuestions)
@@ -86,7 +87,7 @@ describe('survey actions', () => {
         it('20問の質問を返す', async () => {
             const mockQuestions = Array.from({ length: 20 }, (_, i) => ({
                 id: `q${i}`,
-                category: 'GRIT',
+                category: SurveyCategory.GRIT,
                 question: `Question ${i + 1}`
             }))
 

@@ -6,7 +6,7 @@
     "dev": "ts-node --compiler-options '{\"module\":\"commonjs\"}' server.ts",
     "build": "next build --webpack",
     "start": "NODE_ENV=production ts-node --compiler-options '{\"module\":\"commonjs\"}' server.ts",
-    "lint": "next lint",
+    "lint": "eslint \"src/**/*.{ts,tsx}\" \"scripts/**/*.{ts,tsx}\"",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

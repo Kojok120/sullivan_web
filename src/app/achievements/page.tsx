@@ -3,7 +3,7 @@ import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Trophy, Lock, CheckCircle } from 'lucide-react';
+import { Trophy, CheckCircle } from 'lucide-react';
 
 export default async function AchievementsPage() {
     const session = await getSession();

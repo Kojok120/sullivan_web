@@ -10,7 +10,7 @@ const loginSchema = z.object({
     password: z.string().min(1, 'パスワードを入力してください'),
 });
 
-export async function loginAction(prevState: any, formData: FormData) {
+export async function loginAction(_prevState: unknown, formData: FormData) {
     const rawData = {
         loginId: formData.get('loginId') as string,
         password: formData.get('password') as string,
@@ -48,4 +48,3 @@ export async function loginAction(prevState: any, formData: FormData) {
         redirect('/');
     }
 }
-

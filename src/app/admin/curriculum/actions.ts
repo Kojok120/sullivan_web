@@ -2,9 +2,11 @@
 
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
+import { Prisma } from '@prisma/client';
 
 import { requireAdmin, getSession } from '@/lib/auth';
-import { bulkCreateProblemsCore, createProblemCore, deleteProblemsWithRelations } from '@/lib/problem-service';
+import { dedupeByCoreProblemName } from '@/lib/core-problem-import';
+import type { LectureVideo } from '@/lib/lecture-videos';
 
 // --- Subjects ---
 export async function getSubjects() {
@@ -13,7 +15,7 @@ export async function getSubjects() {
         const { fetchSubjects } = await import('@/lib/curriculum-service');
         // Updated fetchSubjects should handle includeCoreProblems correctly without Units
         const subjects = await fetchSubjects({ includeCoreProblems: true });
-        return { success: true, subjects: subjects as any };
+        return { success: true, subjects };
     } catch (error) {
         console.error('Failed to fetch subjects:', error);
         return { error: '科目の取得に失敗しました' };
@@ -22,7 +24,12 @@ export async function getSubjects() {
 
 // --- CoreProblems ---
 // 講義動画の型
-export type LectureVideo = { title: string; url: string };
+export type { LectureVideo };
+
+function toLectureVideosJson(videos?: LectureVideo[]): Prisma.InputJsonValue | undefined {
+    if (!videos) return undefined;
+    return videos as unknown as Prisma.InputJsonValue;
+}
 
 export async function getCoreProblemsForSubject(subjectId: string) {
     const session = await getSession();
@@ -51,7 +58,7 @@ export async function createCoreProblem(data: { name: string; subjectId: string;
                 name: data.name,
                 subjectId: data.subjectId,
                 order: data.order,
-                lectureVideos: (data.lectureVideos ?? undefined) as any,
+                lectureVideos: toLectureVideosJson(data.lectureVideos),
             },
         });
         revalidatePath('/admin/curriculum');
@@ -109,10 +116,7 @@ export async function bulkDeleteCoreProblems(ids: string[]) {
 export async function bulkCreateCoreProblems(subjectId: string, items: { name: string; lectureVideos?: LectureVideo[] }[]) {
     await requireAdmin();
     try {
-        // Filter unique names locally first
-        const uniqueItems = items.filter((item, index, self) =>
-            index === self.findIndex(t => t.name === item.name)
-        );
+        const uniqueItems = dedupeByCoreProblemName(items);
 
         // Find existing names in this subject
         const existingProblems = await prisma.coreProblem.findMany({
@@ -142,7 +146,7 @@ export async function bulkCreateCoreProblems(subjectId: string, items: { name: s
                 prisma.coreProblem.create({
                     data: {
                         name: item.name,
-                        lectureVideos: (item.lectureVideos ?? undefined) as any,
+                        lectureVideos: toLectureVideosJson(item.lectureVideos),
                         subjectId,
                         order: order++
                     }
@@ -200,124 +204,5 @@ export async function getProblemsByCoreProblem(coreProblemId: string) {
     } catch (error) {
         console.error('Failed to fetch problems:', error);
         return { error: '問題の取得に失敗しました' };
-    }
-}
-
-export async function createProblem(data: {
-    question: string;
-    answer?: string;
-    coreProblemId: string; // Primary CoreProblem to link
-    order: number;
-
-    videoUrl?: string;
-    acceptedAnswers?: string[];
-    grade?: string;
-}) {
-    await requireAdmin();
-    try {
-        const problem = await createProblemCore({
-            question: data.question,
-            answer: data.answer,
-            coreProblemIds: [data.coreProblemId],
-            order: data.order,
-            videoUrl: data.videoUrl,
-            acceptedAnswers: data.acceptedAnswers,
-            grade: data.grade,
-        });
-        revalidatePath('/admin/curriculum');
-        return { success: true, problem };
-    } catch (error) {
-        console.error('Failed to create problem:', error);
-        return { error: '問題の作成に失敗しました' };
-    }
-}
-
-export async function updateProblem(id: string, data: {
-    question?: string;
-    answer?: string;
-    order?: number;
-    videoUrl?: string;
-    acceptedAnswers?: string[];
-    grade?: string;
-}) {
-    await requireAdmin();
-    try {
-        const problem = await prisma.problem.update({
-            where: { id },
-            data: {
-                question: data.question,
-                answer: data.answer,
-                order: data.order,
-                videoUrl: data.videoUrl,
-                acceptedAnswers: data.acceptedAnswers,
-                grade: data.grade,
-            },
-        });
-        revalidatePath('/admin/curriculum');
-        return { success: true, problem };
-    } catch (error) {
-        console.error('Failed to update problem:', error);
-        return { error: '問題の更新に失敗しました' };
-    }
-}
-
-export async function deleteProblem(id: string) {
-    await requireAdmin();
-    try {
-        await deleteProblemsWithRelations([id]);
-        revalidatePath('/admin/curriculum');
-        return { success: true };
-    } catch (error) {
-        console.error('Failed to delete problem:', error);
-        return { error: '問題の削除に失敗しました' };
-    }
-}
-
-export async function reorderProblems(items: { id: string, order: number }[]) {
-    await requireAdmin();
-    try {
-        await prisma.$transaction(
-            items.map((item) =>
-                prisma.problem.update({
-                    where: { id: item.id },
-                    data: { order: item.order },
-                })
-            )
-        );
-        revalidatePath('/admin/curriculum');
-        return { success: true };
-    } catch (error) {
-        console.error('Failed to reorder problems:', error);
-        return { error: '問題の並び替えに失敗しました' };
-    }
-}
-
-export async function bulkCreateProblems(subjectId: string, problems: {
-    question: string;
-    answer?: string;
-    videoUrl?: string;
-    grade?: string;
-    acceptedAnswers?: string[];
-    coreProblemIds: string[];
-}[]) {
-    await requireAdmin();
-    try {
-        const subject = await prisma.subject.findUnique({
-            where: { id: subjectId },
-            select: { id: true }
-        });
-
-        if (!subject) throw new Error('Subject not found');
-
-        const { count, warnings } = await bulkCreateProblemsCore(
-            problems.map(p => ({ ...p, subjectId })),
-            { subjectId, assignOrder: true }
-        );
-
-        revalidatePath('/admin/curriculum');
-        return { success: true, count, warnings };
-    } catch (error) {
-        console.error('Failed to bulk create problems:', error);
-        return { error: '一括登録に失敗しました' };
     }
 }

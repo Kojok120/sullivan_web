@@ -10,16 +10,7 @@ import { Plus } from 'lucide-react';
 import { ProblemList } from './components/problem-list';
 import { ProblemDialog } from './components/problem-dialog';
 import { BulkImportDialog } from './components/problem-bulk-import';
-import { Problem } from '@prisma/client';
-
-interface ProblemWithRelations extends Problem {
-    masterNumber: number | null; // Match ProblemList expectation
-    coreProblems: {
-        id: string;
-        name: string;
-        subject: { name: string };
-    }[];
-}
+import type { ProblemWithRelations } from './types';
 
 interface ProblemManagerProps {
     initialProblems: ProblemWithRelations[];

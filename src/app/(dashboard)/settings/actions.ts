@@ -6,6 +6,7 @@ import {
     updateUserPassword,
     verifyCurrentPassword
 } from '@/lib/password-service';
+import { getSession } from '@/lib/auth';
 import { z } from 'zod';
 
 // 設定ページ用スキーマ（現在のパスワード必須）
@@ -16,34 +17,48 @@ const settingsPasswordSchema = z.object({
     path: ['confirmPassword'],
 });
 
-export async function updatePassword(prevState: any, formData: FormData) {
-    const rawData = {
-        currentPassword: formData.get('currentPassword') as string,
-        newPassword: formData.get('newPassword') as string,
-        confirmPassword: formData.get('confirmPassword') as string,
-    };
+export async function updatePassword(_prevState: unknown, formData: FormData) {
+    try {
+        const session = await getSession();
+        if (!session) {
+            return { error: 'ログインが必要です' };
+        }
 
-    const result = settingsPasswordSchema.safeParse(rawData);
+        const allowedRoles = new Set(['STUDENT', 'TEACHER', 'PARENT', 'ADMIN']);
+        if (!allowedRoles.has(session.role)) {
+            return { error: '権限がありません' };
+        }
 
-    if (!result.success) {
-        return { error: result.error.errors[0].message };
+        const rawData = {
+            currentPassword: formData.get('currentPassword') as string,
+            newPassword: formData.get('newPassword') as string,
+            confirmPassword: formData.get('confirmPassword') as string,
+        };
+
+        const result = settingsPasswordSchema.safeParse(rawData);
+
+        if (!result.success) {
+            return { error: result.error.errors[0].message };
+        }
+
+        const { currentPassword, newPassword } = result.data;
+
+        // 現在のパスワードを検証
+        const verifyResult = await verifyCurrentPassword(currentPassword);
+        if (!verifyResult.success) {
+            return { error: verifyResult.error };
+        }
+
+        // 新しいパスワードで更新
+        const updateResult = await updateUserPassword(newPassword);
+        if (!updateResult.success) {
+            return { error: updateResult.error };
+        }
+
+        revalidatePath('/settings');
+        return { success: true };
+    } catch (error) {
+        console.error('Failed to update password in settings action:', error);
+        return { error: 'パスワード更新に失敗しました' };
     }
-
-    const { currentPassword, newPassword } = result.data;
-
-    // 現在のパスワードを検証
-    const verifyResult = await verifyCurrentPassword(currentPassword);
-    if (!verifyResult.success) {
-        return { error: verifyResult.error };
-    }
-
-    // 新しいパスワードで更新
-    const updateResult = await updateUserPassword(newPassword);
-    if (!updateResult.success) {
-        return { error: updateResult.error };
-    }
-
-    revalidatePath('/settings');
-    return { success: true };
 }
-

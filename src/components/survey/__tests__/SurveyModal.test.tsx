@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { SurveyModal } from '../SurveyModal'
 import * as surveyActions from '@/actions/survey'
 import { useRouter } from 'next/navigation'
+import { SurveyCategory } from '@prisma/client'
 
 // Mock Next.js router
 vi.mock('next/navigation', () => ({
@@ -27,10 +27,38 @@ describe('SurveyModal', () => {
     }
 
     const mockQuestions = [
-        { id: 'q1', category: 'GRIT', question: '難しい問題にぶつかっても、あきらめずに解き続けようとする。' },
-        { id: 'q2', category: 'GRIT', question: '一度決めた目標は、最後までやり遂げる自信がある。' },
-        { id: 'q3', category: 'SELF_EFFICACY', question: '勉強すれば、必ず成績は上がると信じている。' },
+        { id: 'q1', category: SurveyCategory.GRIT, question: '難しい問題にぶつかっても、あきらめずに解き続けようとする。' },
+        { id: 'q2', category: SurveyCategory.GRIT, question: '一度決めた目標は、最後までやり遂げる自信がある。' },
+        { id: 'q3', category: SurveyCategory.SELF_EFFICACY, question: '勉強すれば、必ず成績は上がると信じている。' },
     ]
+
+    async function renderLoadedSurveyModal(props?: { onComplete?: () => void }) {
+        render(<SurveyModal userId="user1" {...props} />)
+        await waitFor(() => {
+            expect(screen.getByText(mockQuestions[0].question)).toBeInTheDocument()
+        })
+        return {
+            allRadios: screen.getAllByRole('radio'),
+            submitButton: screen.getByRole('button', { name: /回答を送信して結果を見る/ }),
+        }
+    }
+
+    async function answerAndSubmit(options?: {
+        onComplete?: () => void;
+        radioIndexes?: [number, number, number];
+    }) {
+        const { allRadios, submitButton } = await renderLoadedSurveyModal({
+            onComplete: options?.onComplete,
+        })
+
+        const [first, second, third] = options?.radioIndexes ?? [0, 5, 10]
+        fireEvent.click(allRadios[first])
+        fireEvent.click(allRadios[second])
+        fireEvent.click(allRadios[third])
+        fireEvent.click(submitButton)
+
+        return { submitButton }
+    }
 
     beforeEach(() => {
         vi.clearAllMocks()
@@ -106,7 +134,6 @@ describe('SurveyModal', () => {
     describe('質問への回答', () => {
         it('ラジオボタンを選択できる', async () => {
             vi.mocked(surveyActions.fetchSurveyQuestions).mockResolvedValue(mockQuestions)
-            const user = userEvent.setup()
 
             render(<SurveyModal userId="user1" />)
 
@@ -117,14 +144,13 @@ describe('SurveyModal', () => {
             const firstQuestionRadios = screen.getAllByRole('radio', { name: /^[1-5]$/ })
             const firstRadio = firstQuestionRadios[2] // 3を選択
 
-            await user.click(firstRadio)
+            fireEvent.click(firstRadio)
 
             expect(firstRadio).toBeChecked()
         })
 
         it('複数の質問に回答できる', async () => {
             vi.mocked(surveyActions.fetchSurveyQuestions).mockResolvedValue(mockQuestions)
-            const user = userEvent.setup()
 
             render(<SurveyModal userId="user1" />)
 
@@ -135,9 +161,9 @@ describe('SurveyModal', () => {
             const allRadios = screen.getAllByRole('radio')
 
             // 各質問の3番目の選択肢を選択
-            await user.click(allRadios[2]) // q1: value 3
-            await user.click(allRadios[7]) // q2: value 3
-            await user.click(allRadios[12]) // q3: value 3
+            fireEvent.click(allRadios[2]) // q1: value 3
+            fireEvent.click(allRadios[7]) // q2: value 3
+            fireEvent.click(allRadios[12]) // q3: value 3
 
             expect(allRadios[2]).toBeChecked()
             expect(allRadios[7]).toBeChecked()
@@ -146,7 +172,6 @@ describe('SurveyModal', () => {
 
         it('同じ質問内で選択を変更できる', async () => {
             vi.mocked(surveyActions.fetchSurveyQuestions).mockResolvedValue(mockQuestions)
-            const user = userEvent.setup()
 
             render(<SurveyModal userId="user1" />)
 
@@ -157,11 +182,11 @@ describe('SurveyModal', () => {
             const allRadios = screen.getAllByRole('radio')
 
             // 最初に3を選択
-            await user.click(allRadios[2])
+            fireEvent.click(allRadios[2])
             expect(allRadios[2]).toBeChecked()
 
             // 5に変更
-            await user.click(allRadios[4])
+            fireEvent.click(allRadios[4])
             expect(allRadios[4]).toBeChecked()
             expect(allRadios[2]).not.toBeChecked()
         })
@@ -181,7 +206,6 @@ describe('SurveyModal', () => {
 
         it('すべての質問に回答すると送信ボタンが有効になる', async () => {
             vi.mocked(surveyActions.fetchSurveyQuestions).mockResolvedValue(mockQuestions)
-            const user = userEvent.setup()
 
             render(<SurveyModal userId="user1" />)
 
@@ -192,9 +216,9 @@ describe('SurveyModal', () => {
             const allRadios = screen.getAllByRole('radio')
 
             // すべての質問に回答
-            await user.click(allRadios[0]) // q1
-            await user.click(allRadios[5]) // q2
-            await user.click(allRadios[10]) // q3
+            fireEvent.click(allRadios[0]) // q1
+            fireEvent.click(allRadios[5]) // q2
+            fireEvent.click(allRadios[10]) // q3
 
             await waitFor(() => {
                 const submitButton = screen.getByRole('button', { name: /回答を送信して結果を見る/ })
@@ -204,7 +228,6 @@ describe('SurveyModal', () => {
 
         it('一部の質問にのみ回答した場合、送信ボタンは無効のまま', async () => {
             vi.mocked(surveyActions.fetchSurveyQuestions).mockResolvedValue(mockQuestions)
-            const user = userEvent.setup()
 
             render(<SurveyModal userId="user1" />)
 
@@ -215,8 +238,8 @@ describe('SurveyModal', () => {
             const allRadios = screen.getAllByRole('radio')
 
             // 2問だけ回答
-            await user.click(allRadios[0])
-            await user.click(allRadios[5])
+            fireEvent.click(allRadios[0])
+            fireEvent.click(allRadios[5])
 
             const submitButton = screen.getByRole('button', { name: /回答を送信して結果を見る/ })
             expect(submitButton).toBeDisabled()
@@ -237,22 +260,8 @@ describe('SurveyModal', () => {
         it('すべての質問に回答して送信すると、submitSurveyが呼ばれる', async () => {
             vi.mocked(surveyActions.fetchSurveyQuestions).mockResolvedValue(mockQuestions)
             vi.mocked(surveyActions.submitSurvey).mockResolvedValue(undefined)
-            const user = userEvent.setup()
 
-            render(<SurveyModal userId="user1" />)
-
-            await waitFor(() => {
-                expect(screen.getByText(mockQuestions[0].question)).toBeInTheDocument()
-            })
-
-            const allRadios = screen.getAllByRole('radio')
-
-            await user.click(allRadios[4]) // q1: value 5
-            await user.click(allRadios[8]) // q2: value 4
-            await user.click(allRadios[12]) // q3: value 3
-
-            const submitButton = screen.getByRole('button', { name: /回答を送信して結果を見る/ })
-            await user.click(submitButton)
+            await answerAndSubmit({ radioIndexes: [4, 8, 12] })
 
             await waitFor(() => {
                 expect(surveyActions.submitSurvey).toHaveBeenCalledWith('user1', [
@@ -268,21 +277,8 @@ describe('SurveyModal', () => {
             vi.mocked(surveyActions.submitSurvey).mockImplementation(
                 () => new Promise(resolve => setTimeout(resolve, 100))
             )
-            const user = userEvent.setup()
 
-            render(<SurveyModal userId="user1" />)
-
-            await waitFor(() => {
-                expect(screen.getByText(mockQuestions[0].question)).toBeInTheDocument()
-            })
-
-            const allRadios = screen.getAllByRole('radio')
-            await user.click(allRadios[0])
-            await user.click(allRadios[5])
-            await user.click(allRadios[10])
-
-            const submitButton = screen.getByRole('button', { name: /回答を送信して結果を見る/ })
-            await user.click(submitButton)
+            const { submitButton } = await answerAndSubmit()
 
             expect(screen.getByText('送信中...')).toBeInTheDocument()
             expect(submitButton).toBeDisabled()
@@ -291,21 +287,8 @@ describe('SurveyModal', () => {
         it('送信完了後、router.refreshが呼ばれる', async () => {
             vi.mocked(surveyActions.fetchSurveyQuestions).mockResolvedValue(mockQuestions)
             vi.mocked(surveyActions.submitSurvey).mockResolvedValue(undefined)
-            const user = userEvent.setup()
 
-            render(<SurveyModal userId="user1" />)
-
-            await waitFor(() => {
-                expect(screen.getByText(mockQuestions[0].question)).toBeInTheDocument()
-            })
-
-            const allRadios = screen.getAllByRole('radio')
-            await user.click(allRadios[0])
-            await user.click(allRadios[5])
-            await user.click(allRadios[10])
-
-            const submitButton = screen.getByRole('button', { name: /回答を送信して結果を見る/ })
-            await user.click(submitButton)
+            await answerAndSubmit()
 
             await waitFor(() => {
                 expect(mockRouter.refresh).toHaveBeenCalled()
@@ -316,21 +299,8 @@ describe('SurveyModal', () => {
             vi.mocked(surveyActions.fetchSurveyQuestions).mockResolvedValue(mockQuestions)
             vi.mocked(surveyActions.submitSurvey).mockResolvedValue(undefined)
             const onComplete = vi.fn()
-            const user = userEvent.setup()
 
-            render(<SurveyModal userId="user1" onComplete={onComplete} />)
-
-            await waitFor(() => {
-                expect(screen.getByText(mockQuestions[0].question)).toBeInTheDocument()
-            })
-
-            const allRadios = screen.getAllByRole('radio')
-            await user.click(allRadios[0])
-            await user.click(allRadios[5])
-            await user.click(allRadios[10])
-
-            const submitButton = screen.getByRole('button', { name: /回答を送信して結果を見る/ })
-            await user.click(submitButton)
+            await answerAndSubmit({ onComplete })
 
             await waitFor(() => {
                 expect(onComplete).toHaveBeenCalled()
@@ -341,21 +311,8 @@ describe('SurveyModal', () => {
             vi.mocked(surveyActions.fetchSurveyQuestions).mockResolvedValue(mockQuestions)
             vi.mocked(surveyActions.submitSurvey).mockRejectedValue(new Error('Network error'))
             const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => { })
-            const user = userEvent.setup()
 
-            render(<SurveyModal userId="user1" />)
-
-            await waitFor(() => {
-                expect(screen.getByText(mockQuestions[0].question)).toBeInTheDocument()
-            })
-
-            const allRadios = screen.getAllByRole('radio')
-            await user.click(allRadios[0])
-            await user.click(allRadios[5])
-            await user.click(allRadios[10])
-
-            const submitButton = screen.getByRole('button', { name: /回答を送信して結果を見る/ })
-            await user.click(submitButton)
+            await answerAndSubmit()
 
             await waitFor(() => {
                 expect(alertSpy).toHaveBeenCalledWith('送信に失敗しました。もう一度お試しください。')
@@ -368,21 +325,8 @@ describe('SurveyModal', () => {
             vi.mocked(surveyActions.fetchSurveyQuestions).mockResolvedValue(mockQuestions)
             vi.mocked(surveyActions.submitSurvey).mockRejectedValue(new Error('Network error'))
             const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => { })
-            const user = userEvent.setup()
 
-            render(<SurveyModal userId="user1" />)
-
-            await waitFor(() => {
-                expect(screen.getByText(mockQuestions[0].question)).toBeInTheDocument()
-            })
-
-            const allRadios = screen.getAllByRole('radio')
-            await user.click(allRadios[0])
-            await user.click(allRadios[5])
-            await user.click(allRadios[10])
-
-            const submitButton = screen.getByRole('button', { name: /回答を送信して結果を見る/ })
-            await user.click(submitButton)
+            const { submitButton } = await answerAndSubmit()
 
             await waitFor(() => {
                 expect(submitButton).not.toBeDisabled()

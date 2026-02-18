@@ -9,6 +9,7 @@ import { Loader2, Check, Video } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { bulkCreateCoreProblems, type LectureVideo } from '../actions';
 import { toast } from 'sonner';
+import { dedupeByCoreProblemName, normalizeCoreProblemName } from '@/lib/core-problem-import';
 
 interface CoreProblemBulkImportProps {
     subjectId: string;
@@ -35,7 +36,7 @@ export function CoreProblemBulkImport({ subjectId }: CoreProblemBulkImportProps)
         // TSV形式をパース: 名前[TAB]タイトル1[TAB]URL1[TAB]タイトル2[TAB]URL2...
         const items: ParsedItem[] = lines.map(line => {
             const parts = line.split('\t');
-            const name = parts[0]?.trim() || '';
+            const name = normalizeCoreProblemName(parts[0] || '');
 
             // タイトルとURLのペアをパース
             const lectureVideos: LectureVideo[] = [];
@@ -55,9 +56,7 @@ export function CoreProblemBulkImport({ subjectId }: CoreProblemBulkImportProps)
         });
 
         // 重複を除去（名前ベース）
-        const uniqueItems = items.filter((item, index, self) =>
-            index === self.findIndex(t => t.name === item.name)
-        );
+        const uniqueItems = dedupeByCoreProblemName(items);
 
         setParsedData(uniqueItems.filter(i => i.isValid));
         setStep('preview');

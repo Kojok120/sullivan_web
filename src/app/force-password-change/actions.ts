@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation';
 import { passwordUpdateSchema, updateUserPassword } from '@/lib/password-service';
 
-export async function forceUpdatePassword(prevState: any, formData: FormData) {
+export async function forceUpdatePassword(_prevState: unknown, formData: FormData) {
     const rawData = {
         newPassword: formData.get('newPassword') as string,
         confirmPassword: formData.get('confirmPassword') as string,
@@ -25,4 +25,3 @@ export async function forceUpdatePassword(prevState: any, formData: FormData) {
 
     redirect('/');
 }
-

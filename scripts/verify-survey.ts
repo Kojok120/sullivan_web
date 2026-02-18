@@ -69,8 +69,9 @@ async function main() {
         try {
             await submitSurveyResponse(testUser.id, []);
             console.error('エラー: 空の回答は拒否されるべきです。');
-        } catch (e: any) {
-            console.log(`成功: 空の回答は拒否されました - ${e.message}`);
+        } catch (e: unknown) {
+            const message = e instanceof Error ? e.message : String(e);
+            console.log(`成功: 空の回答は拒否されました - ${message}`);
         }
 
         // 不正なデータの検証 (範囲外の値)
@@ -82,8 +83,6 @@ async function main() {
             const message = e instanceof Error ? e.message : String(e);
             console.log(`成功: 不正な値は拒否されました - ${message}`);
         }
-        }
-
 
         // クリーンアップ
         // 安全のため、このテストユーザーに関連するデータのみを削除します

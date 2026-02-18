@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { QuestionBank, SurveyCategory, SurveyResponse } from '@prisma/client';
+import { QuestionBank, SurveyCategory } from '@prisma/client';
 
 export const SURVEY_CATEGORIES: SurveyCategory[] = [
     SurveyCategory.GRIT,

@@ -4,6 +4,69 @@ import { SessionDetail } from '../session-detail'
 import * as analytics from '@/lib/analytics'
 import * as surveyActions from '@/actions/survey'
 import fs from 'fs'
+import type { MouseEventHandler, ReactNode } from 'react'
+
+type LinkProps = {
+    children?: ReactNode
+    href: string
+}
+
+type CardProps = {
+    children?: ReactNode
+    className?: string
+}
+
+type BadgeProps = {
+    children?: ReactNode
+    variant?: string
+}
+
+type ButtonProps = {
+    children?: ReactNode
+    onClick?: MouseEventHandler<HTMLButtonElement>
+}
+
+type VideoPlayerDialogProps = {
+    videoUrl?: string | null
+    isWatched?: boolean
+}
+
+type LectureVideoButtonProps = {
+    videos?: { title: string; url: string }[]
+    coreProblemName?: string
+}
+
+type DateDisplayProps = {
+    date: Date
+}
+
+type SurveyModalProps = {
+    userId: string
+}
+
+type SessionDetailMock = {
+    id: string
+    evaluation: 'A' | 'B' | 'C' | 'D'
+    userAnswer: string
+    feedback: string
+    answeredAt: Date
+    isVideoWatched: boolean
+    problem: {
+        question: string
+        answer: string | null
+        customId: string | null
+        videoUrl: string | null
+        coreProblems: {
+            name: string
+            subject: {
+                name: string
+            }
+            lectureVideos: { title: string; url: string }[]
+        }[]
+    }
+}
+
+type SessionDetailsResult = Awaited<ReturnType<typeof analytics.getSessionDetails>>
 
 // Mock external dependencies
 vi.mock('@/lib/analytics', () => ({
@@ -22,26 +85,26 @@ vi.mock('fs', () => ({
 }))
 
 vi.mock('next/link', () => ({
-    default: ({ children, href }: any) => <a href={href}>{children}</a>,
+    default: ({ children, href }: LinkProps) => <a href={href}>{children}</a>,
 }))
 
 vi.mock('@/components/ui/card', () => ({
-    Card: ({ children, className }: any) => <div className={className}>{children}</div>,
-    CardContent: ({ children }: any) => <div>{children}</div>,
-    CardHeader: ({ children }: any) => <div>{children}</div>,
-    CardTitle: ({ children }: any) => <h3>{children}</h3>,
+    Card: ({ children, className }: CardProps) => <div className={className}>{children}</div>,
+    CardContent: ({ children }: CardProps) => <div>{children}</div>,
+    CardHeader: ({ children }: CardProps) => <div>{children}</div>,
+    CardTitle: ({ children }: CardProps) => <h3>{children}</h3>,
 }))
 
 vi.mock('@/components/ui/badge', () => ({
-    Badge: ({ children, variant }: any) => <span data-variant={variant}>{children}</span>,
+    Badge: ({ children, variant }: BadgeProps) => <span data-variant={variant}>{children}</span>,
 }))
 
 vi.mock('@/components/ui/button', () => ({
-    Button: ({ children, onClick }: any) => <button onClick={onClick}>{children}</button>,
+    Button: ({ children, onClick }: ButtonProps) => <button onClick={onClick}>{children}</button>,
 }))
 
 vi.mock('@/components/video-player-dialog', () => ({
-    VideoPlayerDialog: ({ videoUrl, isWatched }: any) => (
+    VideoPlayerDialog: ({ videoUrl, isWatched }: VideoPlayerDialogProps) => (
         <div data-testid="video-player" data-url={videoUrl} data-watched={isWatched}>
             Video Player
         </div>
@@ -49,7 +112,7 @@ vi.mock('@/components/video-player-dialog', () => ({
 }))
 
 vi.mock('@/components/lecture-video-button', () => ({
-    LectureVideoButton: ({ videos, coreProblemName }: any) => (
+    LectureVideoButton: ({ videos = [], coreProblemName }: LectureVideoButtonProps) => (
         <div data-testid="lecture-video" data-count={videos.length}>
             Lecture: {coreProblemName}
         </div>
@@ -57,7 +120,7 @@ vi.mock('@/components/lecture-video-button', () => ({
 }))
 
 vi.mock('@/components/ui/date-display', () => ({
-    DateDisplay: ({ date }: any) => <span>{date.toISOString()}</span>,
+    DateDisplay: ({ date }: DateDisplayProps) => <span>{date.toISOString()}</span>,
 }))
 
 vi.mock('@/components/voice/phone-tutor-button', () => ({
@@ -69,7 +132,7 @@ vi.mock('@/components/voice/chat-tutor-button', () => ({
 }))
 
 vi.mock('@/components/survey/SurveyModal', () => ({
-    SurveyModal: ({ userId }: any) => <div data-testid="survey-modal" data-user-id={userId}>Survey Modal</div>,
+    SurveyModal: ({ userId }: SurveyModalProps) => <div data-testid="survey-modal" data-user-id={userId}>Survey Modal</div>,
 }))
 
 describe('SessionDetail', () => {
@@ -80,7 +143,7 @@ describe('SessionDetail', () => {
         vi.mocked(fs.readFileSync).mockReturnValue(mockSystemPrompt)
     })
 
-    const createMockSessionDetail = (overrides = {}) => ({
+    const createMockSessionDetail = (overrides: Partial<SessionDetailMock> = {}): SessionDetailMock => ({
         id: 'history1',
         evaluation: 'A',
         userAnswer: 'ユーザーの回答',
@@ -107,9 +170,21 @@ describe('SessionDetail', () => {
         ...overrides,
     })
 
+    const mockSessionDetails = (details: SessionDetailMock[] | null) => {
+        if (details === null) {
+            vi.mocked(analytics.getSessionDetails).mockImplementation(
+                async () => null as unknown as SessionDetailsResult
+            )
+            return
+        }
+        vi.mocked(analytics.getSessionDetails).mockResolvedValue(
+            details as unknown as SessionDetailsResult
+        )
+    }
+
     describe('基本表示', () => {
         it('履歴がない場合、メッセージを表示する', async () => {
-            vi.mocked(analytics.getSessionDetails).mockResolvedValue([])
+            mockSessionDetails([])
 
             const { container } = render(
                 await SessionDetail({ groupId: 'group1', userId: 'user1' })
@@ -119,7 +194,7 @@ describe('SessionDetail', () => {
         })
 
         it('履歴がnullの場合、メッセージを表示する', async () => {
-            vi.mocked(analytics.getSessionDetails).mockResolvedValue(null as any)
+            mockSessionDetails(null)
 
             const { container } = render(
                 await SessionDetail({ groupId: 'group1', userId: 'user1' })
@@ -130,7 +205,7 @@ describe('SessionDetail', () => {
 
         it('教科名とタイトルを表示する', async () => {
             const mockDetails = [createMockSessionDetail()]
-            vi.mocked(analytics.getSessionDetails).mockResolvedValue(mockDetails as any)
+            mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
             const { container } = render(
@@ -146,7 +221,7 @@ describe('SessionDetail', () => {
                 createMockSessionDetail({ id: 'h1', problem: { ...createMockSessionDetail().problem, question: '問題1' } }),
                 createMockSessionDetail({ id: 'h2', problem: { ...createMockSessionDetail().problem, question: '問題2' } }),
             ]
-            vi.mocked(analytics.getSessionDetails).mockResolvedValue(mockDetails as any)
+            mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
             const { container } = render(
@@ -161,7 +236,7 @@ describe('SessionDetail', () => {
     describe('評価バッジ', () => {
         it('正答（A評価）の場合、defaultバリアントを使用する', async () => {
             const mockDetails = [createMockSessionDetail({ evaluation: 'A' })]
-            vi.mocked(analytics.getSessionDetails).mockResolvedValue(mockDetails as any)
+            mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
             const { container } = render(
@@ -175,7 +250,7 @@ describe('SessionDetail', () => {
 
         it('正答（B評価）の場合、defaultバリアントを使用する', async () => {
             const mockDetails = [createMockSessionDetail({ evaluation: 'B' })]
-            vi.mocked(analytics.getSessionDetails).mockResolvedValue(mockDetails as any)
+            mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
             const { container } = render(
@@ -189,7 +264,7 @@ describe('SessionDetail', () => {
 
         it('誤答（C評価）の場合、destructiveバリアントを使用する', async () => {
             const mockDetails = [createMockSessionDetail({ evaluation: 'C' })]
-            vi.mocked(analytics.getSessionDetails).mockResolvedValue(mockDetails as any)
+            mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
             const { container } = render(
@@ -203,7 +278,7 @@ describe('SessionDetail', () => {
 
         it('誤答（D評価）の場合、destructiveバリアントを使用する', async () => {
             const mockDetails = [createMockSessionDetail({ evaluation: 'D' })]
-            vi.mocked(analytics.getSessionDetails).mockResolvedValue(mockDetails as any)
+            mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
             const { container } = render(
@@ -219,7 +294,7 @@ describe('SessionDetail', () => {
     describe('問題表示', () => {
         it('問題文を表示する', async () => {
             const mockDetails = [createMockSessionDetail()]
-            vi.mocked(analytics.getSessionDetails).mockResolvedValue(mockDetails as any)
+            mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
             const { container } = render(
@@ -231,7 +306,7 @@ describe('SessionDetail', () => {
 
         it('ユーザーの解答を表示する', async () => {
             const mockDetails = [createMockSessionDetail({ userAnswer: 'ユーザーの解答テスト' })]
-            vi.mocked(analytics.getSessionDetails).mockResolvedValue(mockDetails as any)
+            mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
             const { container } = render(
@@ -243,7 +318,7 @@ describe('SessionDetail', () => {
 
         it('正答を表示する', async () => {
             const mockDetails = [createMockSessionDetail()]
-            vi.mocked(analytics.getSessionDetails).mockResolvedValue(mockDetails as any)
+            mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
             const { container } = render(
@@ -255,7 +330,7 @@ describe('SessionDetail', () => {
 
         it('フィードバックを表示する', async () => {
             const mockDetails = [createMockSessionDetail({ feedback: 'フィードバックテスト内容' })]
-            vi.mocked(analytics.getSessionDetails).mockResolvedValue(mockDetails as any)
+            mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
             const { container } = render(
@@ -267,7 +342,7 @@ describe('SessionDetail', () => {
 
         it('customIdがある場合、それを表示する', async () => {
             const mockDetails = [createMockSessionDetail()]
-            vi.mocked(analytics.getSessionDetails).mockResolvedValue(mockDetails as any)
+            mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
             const { container } = render(
@@ -281,7 +356,7 @@ describe('SessionDetail', () => {
     describe('動画機能', () => {
         it('復習動画がある場合、VideoPlayerDialogを表示する', async () => {
             const mockDetails = [createMockSessionDetail()]
-            vi.mocked(analytics.getSessionDetails).mockResolvedValue(mockDetails as any)
+            mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
             render(await SessionDetail({ groupId: 'group1', userId: 'user1' }))
@@ -293,7 +368,7 @@ describe('SessionDetail', () => {
 
         it('講義動画がある場合、LectureVideoButtonを表示する', async () => {
             const mockDetails = [createMockSessionDetail()]
-            vi.mocked(analytics.getSessionDetails).mockResolvedValue(mockDetails as any)
+            mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
             render(await SessionDetail({ groupId: 'group1', userId: 'user1' }))
@@ -310,7 +385,7 @@ describe('SessionDetail', () => {
                     videoUrl: null,
                 }
             })]
-            vi.mocked(analytics.getSessionDetails).mockResolvedValue(mockDetails as any)
+            mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
             render(await SessionDetail({ groupId: 'group1', userId: 'user1' }))
@@ -323,7 +398,7 @@ describe('SessionDetail', () => {
     describe('レビュー済みマーク', () => {
         it('生徒ビューの場合、markSessionAsReviewedを呼ぶ', async () => {
             const mockDetails = [createMockSessionDetail()]
-            vi.mocked(analytics.getSessionDetails).mockResolvedValue(mockDetails as any)
+            mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
             await SessionDetail({ groupId: 'group1', userId: 'user1', isTeacherView: false })
@@ -333,7 +408,7 @@ describe('SessionDetail', () => {
 
         it('教師ビューの場合、markSessionAsReviewedを呼ばない', async () => {
             const mockDetails = [createMockSessionDetail()]
-            vi.mocked(analytics.getSessionDetails).mockResolvedValue(mockDetails as any)
+            mockSessionDetails(mockDetails)
 
             await SessionDetail({ groupId: 'group1', userId: 'user1', isTeacherView: true })
 
@@ -344,7 +419,7 @@ describe('SessionDetail', () => {
     describe('アンケート機能', () => {
         it('生徒ビューで対象の場合、SurveyModalを表示する', async () => {
             const mockDetails = [createMockSessionDetail()]
-            vi.mocked(analytics.getSessionDetails).mockResolvedValue(mockDetails as any)
+            mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(true)
 
             render(await SessionDetail({ groupId: 'group1', userId: 'user1', isTeacherView: false }))
@@ -356,7 +431,7 @@ describe('SessionDetail', () => {
 
         it('生徒ビューで対象外の場合、SurveyModalを表示しない', async () => {
             const mockDetails = [createMockSessionDetail()]
-            vi.mocked(analytics.getSessionDetails).mockResolvedValue(mockDetails as any)
+            mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
             render(await SessionDetail({ groupId: 'group1', userId: 'user1', isTeacherView: false }))
@@ -367,7 +442,7 @@ describe('SessionDetail', () => {
 
         it('教師ビューの場合、SurveyModalを表示しない', async () => {
             const mockDetails = [createMockSessionDetail()]
-            vi.mocked(analytics.getSessionDetails).mockResolvedValue(mockDetails as any)
+            mockSessionDetails(mockDetails)
 
             render(await SessionDetail({ groupId: 'group1', userId: 'user1', isTeacherView: true }))
 
@@ -377,7 +452,7 @@ describe('SessionDetail', () => {
 
         it('教師ビューの場合、checkSurveyEligibilityを呼ばない', async () => {
             const mockDetails = [createMockSessionDetail()]
-            vi.mocked(analytics.getSessionDetails).mockResolvedValue(mockDetails as any)
+            mockSessionDetails(mockDetails)
 
             await SessionDetail({ groupId: 'group1', userId: 'user1', isTeacherView: true })
 
@@ -388,7 +463,7 @@ describe('SessionDetail', () => {
     describe('バックリンク', () => {
         it('デフォルトの戻り先は"/"である', async () => {
             const mockDetails = [createMockSessionDetail()]
-            vi.mocked(analytics.getSessionDetails).mockResolvedValue(mockDetails as any)
+            mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
             const { container } = render(
@@ -401,7 +476,7 @@ describe('SessionDetail', () => {
 
         it('カスタムの戻り先を指定できる', async () => {
             const mockDetails = [createMockSessionDetail()]
-            vi.mocked(analytics.getSessionDetails).mockResolvedValue(mockDetails as any)
+            mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
             const { container } = render(
@@ -416,7 +491,7 @@ describe('SessionDetail', () => {
     describe('音声チューター機能', () => {
         it('PhoneTutorButtonとChatTutorButtonを表示する', async () => {
             const mockDetails = [createMockSessionDetail()]
-            vi.mocked(analytics.getSessionDetails).mockResolvedValue(mockDetails as any)
+            mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
             const { container } = render(
@@ -431,7 +506,7 @@ describe('SessionDetail', () => {
     describe('プロンプトファイルの読み込み', () => {
         it('phone-tutor.mdとchat-tutor.mdを読み込む', async () => {
             const mockDetails = [createMockSessionDetail()]
-            vi.mocked(analytics.getSessionDetails).mockResolvedValue(mockDetails as any)
+            mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
             await SessionDetail({ groupId: 'group1', userId: 'user1' })
@@ -455,7 +530,7 @@ describe('SessionDetail', () => {
                     coreProblems: [],
                 }
             })]
-            vi.mocked(analytics.getSessionDetails).mockResolvedValue(mockDetails as any)
+            mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
             const { container } = render(

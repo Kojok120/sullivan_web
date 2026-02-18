@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { MessageSquare, Plus, Trash2, Calendar } from 'lucide-react';
 import { addGuidanceRecord, deleteGuidanceRecord } from './actions';
 import { toast } from 'sonner';
-import { GuidanceRecord, GuidanceType } from '@prisma/client';
+import { GuidanceRecord } from '@prisma/client';
 import { DateDisplay } from '@/components/ui/date-display';
 
 interface GuidanceListProps {
