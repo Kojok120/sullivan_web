@@ -85,10 +85,11 @@ export function verifyGeminiLiveSessionToken(token: string): VerifiedGeminiLiveT
         return { valid: false, reason: 'missing_token' };
     }
 
-    const [encodedPayload, signature] = token.split('.');
-    if (!encodedPayload || !signature) {
+    const parts = token.split('.');
+    if (parts.length !== 2 || !parts[0] || !parts[1]) {
         return { valid: false, reason: 'invalid_format' };
     }
+    const [encodedPayload, signature] = parts;
 
     const expectedSignature = signPayload(encodedPayload, secret);
     if (!timingSafeEquals(signature, expectedSignature)) {

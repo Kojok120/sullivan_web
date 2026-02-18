@@ -61,6 +61,15 @@ describe('gemini-live-session-token', () => {
         expect(verified.reason).toBe('invalid_signature')
     })
 
+    it('セグメントが3つ以上のトークンを拒否する', () => {
+        const issued = issueGeminiLiveSessionToken('student-3')
+        const invalidToken = `${issued.token}.extra`
+        const verified = verifyGeminiLiveSessionToken(invalidToken)
+
+        expect(verified.valid).toBe(false)
+        expect(verified.reason).toBe('invalid_format')
+    })
+
     it('シークレット未設定時は発行に失敗する', () => {
         clearSecretEnvs()
 

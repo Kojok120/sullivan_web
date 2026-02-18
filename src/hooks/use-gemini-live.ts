@@ -173,6 +173,18 @@ export function useGeminiLive() {
         setConnectionState('connecting');
 
         const token = await fetchLiveSessionToken();
+        if (manualDisconnectRef.current) {
+            setConnectionState('disconnected');
+            return;
+        }
+
+        if (
+            wsRef.current?.readyState === WebSocket.OPEN
+            || wsRef.current?.readyState === WebSocket.CONNECTING
+        ) {
+            return;
+        }
+
         const params = new URLSearchParams({ token });
         const resumeHandle = resumeHandleRef.current;
         if (resumeHandle) {

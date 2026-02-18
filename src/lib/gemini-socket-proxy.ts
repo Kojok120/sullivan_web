@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import WebSocket, { RawData } from 'ws';
 
 type SetupGeminiSocketOptions = {
@@ -97,6 +98,10 @@ function parseMessageIfJson(message: string) {
     }
 }
 
+function anonymizeUserId(userId: string) {
+    return crypto.createHash('sha256').update(userId).digest('hex').slice(0, 12);
+}
+
 function buildReconnectDelayMs(attempt: number) {
     const exponent = Math.max(0, attempt - 1);
     const base = GEMINI_RECONNECT_BASE_DELAY_MS * (2 ** exponent);
@@ -158,6 +163,7 @@ export function setupGeminiSocket(clientWs: WebSocket, options: SetupGeminiSocke
     }
 
     const geminiUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.${GEMINI_API_VERSION}.GenerativeService.BidiGenerateContent?key=${apiKey}`;
+    const userLogId = anonymizeUserId(options.userId);
 
     let geminiWs: WebSocket | null = null;
     let isSetupComplete = false;
@@ -238,7 +244,7 @@ export function setupGeminiSocket(clientWs: WebSocket, options: SetupGeminiSocke
             if (geminiWs !== ws || isShuttingDown) return;
 
             console.log(
-                `[GeminiProxy] Connected to Gemini Live API user=${options.userId} model=${DEFAULT_LIVE_MODEL} api=${GEMINI_API_VERSION}`,
+                `[GeminiProxy] Connected to Gemini Live API user=${userLogId} model=${DEFAULT_LIVE_MODEL} api=${GEMINI_API_VERSION}`,
             );
             ws.send(JSON.stringify(buildSetupMessage(options, latestResumeHandle)));
         });
@@ -262,7 +268,7 @@ export function setupGeminiSocket(clientWs: WebSocket, options: SetupGeminiSocke
                 }
 
                 if (parsed?.goAway) {
-                    console.warn(`[GeminiProxy] goAway from Gemini user=${options.userId}: ${JSON.stringify(parsed.goAway).slice(0, 300)}`);
+                    console.warn(`[GeminiProxy] goAway from Gemini user=${userLogId}: ${JSON.stringify(parsed.goAway).slice(0, 300)}`);
                 }
 
                 if (parsed?.sessionResumptionUpdate) {
@@ -272,7 +278,7 @@ export function setupGeminiSocket(clientWs: WebSocket, options: SetupGeminiSocke
                     }
 
                     console.log(
-                        `[GeminiProxy] sessionResumptionUpdate user=${options.userId} resumable=${String(update?.resumable)} handle=${update?.newHandle ? 'present' : 'empty'}`,
+                        `[GeminiProxy] sessionResumptionUpdate user=${userLogId} resumable=${String(update?.resumable)} handle=${update?.newHandle ? 'present' : 'empty'}`,
                     );
                 }
 
@@ -299,7 +305,7 @@ export function setupGeminiSocket(clientWs: WebSocket, options: SetupGeminiSocke
 
             const reasonText = reason.toString('utf-8');
             const safeCode = normalizeCloseCode(code);
-            console.log(`[GeminiProxy] Gemini WS closed user=${options.userId} code=${safeCode} reason=${reasonText}`);
+            console.log(`[GeminiProxy] Gemini WS closed user=${userLogId} code=${safeCode} reason=${reasonText}`);
 
             if (isShuttingDown) {
                 return;
@@ -317,7 +323,7 @@ export function setupGeminiSocket(clientWs: WebSocket, options: SetupGeminiSocke
             reconnectAttempt += 1;
             const delayMs = buildReconnectDelayMs(reconnectAttempt);
             console.warn(
-                `[GeminiProxy] Reconnecting to Gemini (${reconnectAttempt}/${MAX_GEMINI_RECONNECT_ATTEMPTS}) in ${delayMs}ms user=${options.userId}`,
+                `[GeminiProxy] Reconnecting to Gemini (${reconnectAttempt}/${MAX_GEMINI_RECONNECT_ATTEMPTS}) in ${delayMs}ms user=${userLogId}`,
             );
 
             clearReconnectTimer();
@@ -353,7 +359,7 @@ export function setupGeminiSocket(clientWs: WebSocket, options: SetupGeminiSocke
 
     clientWs.on('close', (code: number, reason: Buffer) => {
         const reasonText = reason.toString('utf-8');
-        console.log(`[GeminiProxy] Client WS closed user=${options.userId} code=${normalizeCloseCode(code)} reason=${reasonText}`);
+        console.log(`[GeminiProxy] Client WS closed user=${userLogId} code=${normalizeCloseCode(code)} reason=${reasonText}`);
 
         isShuttingDown = true;
         cleanup();
