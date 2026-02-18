@@ -32,6 +32,8 @@ export class AudioStreamer {
     private audioQueue: Float32Array[] = [];
     private isProcessingQueue: boolean = false;
     private scheduledTime: number = 0;
+    private activeSources: Set<AudioBufferSourceNode> = new Set();
+    private queueGeneration: number = 0;
     private inputRemainder: Float32Array = new Float32Array(0);
     private pendingInputPcm: number[] = [];
     private lastVoiceAtMs: number = 0;
@@ -309,7 +311,12 @@ export class AudioStreamer {
 
     async processQueue() {
         this.isProcessingQueue = true;
+        const currentGeneration = this.queueGeneration;
         while (this.audioQueue.length > 0) {
+            if (currentGeneration !== this.queueGeneration) {
+                break;
+            }
+
             const data = this.audioQueue.shift();
             if (data && this.audioContext) {
                 const buffer = this.audioContext.createBuffer(1, data.length, GEMINI_OUTPUT_SAMPLE_RATE);
@@ -318,6 +325,11 @@ export class AudioStreamer {
                 const source = this.audioContext.createBufferSource();
                 source.buffer = buffer;
                 source.connect(this.audioContext.destination);
+                this.activeSources.add(source);
+                source.onended = () => {
+                    source.disconnect();
+                    this.activeSources.delete(source);
+                };
 
                 // Simple scheduling to avoid gaps or overlaps
                 const currentTime = this.audioContext.currentTime;
@@ -332,8 +344,32 @@ export class AudioStreamer {
         this.isProcessingQueue = false;
     }
 
+    clearPlaybackQueue() {
+        this.queueGeneration += 1;
+        this.audioQueue = [];
+
+        for (const source of this.activeSources) {
+            try {
+                source.stop();
+            } catch {
+                // stop済みsourceは例外を投げることがあるため握りつぶす
+            }
+            source.disconnect();
+        }
+        this.activeSources.clear();
+
+        if (this.audioContext) {
+            this.scheduledTime = this.audioContext.currentTime;
+        } else {
+            this.scheduledTime = 0;
+        }
+
+        this.isProcessingQueue = false;
+    }
+
     async close() {
         this.stopRecording();
+        this.clearPlaybackQueue();
         if (this.audioContext) {
             await this.audioContext.close();
             this.audioContext = null;

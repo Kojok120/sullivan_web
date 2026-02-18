@@ -1,6 +1,5 @@
 import QRCode from 'qrcode';
-import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
-import type { GenerativeModel, ResponseSchema } from '@google/generative-ai';
+import { GoogleGenAI, Type } from '@google/genai';
 import { Client as QStashClient } from '@upstash/qstash';
 import { prisma } from '@/lib/prisma';
 import type { Prisma, User } from '@prisma/client';
@@ -33,11 +32,11 @@ const DRIVE_FOLDER_ID = process.env.DRIVE_FOLDER_ID || ''; // Folder to watch
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 
 // Lazy Initialization
-let genAI: GoogleGenerativeAI | null = null;
+let genAI: GoogleGenAI | null = null;
 function getGenAI() {
     if (!genAI) {
         if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not set");
-        genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+        genAI = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
     }
     return genAI;
 }
@@ -752,8 +751,7 @@ async function getQrDataWithFallback(filePath: string, prepared: PreparedFile): 
     if (!hasStudentId || !hasProblems) {
         console.log("Local QR read failed/skipped or incomplete. Attempting to scan QR with Gemini...");
         const modelName = process.env.GEMINI_MODEL || "gemini-2.5-pro";
-        const model = getGenAI().getGenerativeModel({ model: modelName });
-        qrData = await scanQRWithGemini(model, prepared.base64Data, prepared.mimeType);
+        qrData = await scanQRWithGemini(modelName, prepared.base64Data, prepared.mimeType);
     }
 
     return qrData;
@@ -834,42 +832,32 @@ async function gradeWithGemini(
     }));
 
     // 3. Define responseSchema for structured output
-    const gradingResponseSchema: ResponseSchema = {
-        type: SchemaType.ARRAY,
+    const gradingResponseSchema = {
+        type: Type.ARRAY,
         items: {
-            type: SchemaType.OBJECT,
+            type: Type.OBJECT,
             properties: {
                 problemIndex: {
-                    type: SchemaType.INTEGER,
+                    type: Type.INTEGER,
                     description: "問題のインデックス（0始まり、問題リストの順序に対応）"
                 },
                 studentAnswer: {
-                    type: SchemaType.STRING,
+                    type: Type.STRING,
                     description: "生徒の解答をそのまま転記"
                 },
                 evaluation: {
-                    type: SchemaType.STRING,
-                    format: "enum",
+                    type: Type.STRING,
                     enum: ["A", "B", "C", "D"],
                     description: "A=完璧, B=ほぼ正解, C=部分的に正解, D=不正解"
                 },
                 feedback: {
-                    type: SchemaType.STRING,
+                    type: Type.STRING,
                     description: "日本語でのフィードバック"
                 }
             },
             required: ["problemIndex", "studentAnswer", "evaluation", "feedback"]
         }
     };
-
-    // 4. Create model with structured output configuration
-    const model = getGenAI().getGenerativeModel({
-        model: modelName,
-        generationConfig: {
-            responseMimeType: "application/json",
-            responseSchema: gradingResponseSchema
-        }
-    });
 
     // 5. Build enhanced prompt
     // 5. Build enhanced prompt
@@ -891,17 +879,24 @@ async function gradeWithGemini(
             }
 
             console.log(`Calling Gemini generateContent for grading (attempt ${attempt})...`);
-            const result = await model.generateContent([
-                gradingPrompt,
-                {
-                    inlineData: {
-                        data: prepared.base64Data,
-                        mimeType: prepared.mimeType
+            const result = await getGenAI().models.generateContent({
+                model: modelName,
+                contents: [
+                    { text: gradingPrompt },
+                    {
+                        inlineData: {
+                            data: prepared.base64Data,
+                            mimeType: prepared.mimeType
+                        }
                     }
+                ],
+                config: {
+                    responseMimeType: "application/json",
+                    responseSchema: gradingResponseSchema
                 }
-            ]);
+            });
 
-            const text = result.response.text();
+            const text = result.text || '';
             console.log(`Gemini Grading Response (attempt ${attempt}):`, text);
 
             const resultsJson = parseJSON(text);
@@ -930,21 +925,24 @@ async function gradeWithGemini(
 }
 
 // Helper: Scan QR with Gemini
-async function scanQRWithGemini(model: GenerativeModel, base64Data: string, mimeType: string): Promise<QRData | null> {
+async function scanQRWithGemini(modelName: string, base64Data: string, mimeType: string): Promise<QRData | null> {
     try {
         const prompt = loadPrompt('qr-scan-prompt.md');
         // ...
 
-        const result = await model.generateContent([
-            prompt,
-            {
-                inlineData: {
-                    data: base64Data,
-                    mimeType: mimeType
+        const result = await getGenAI().models.generateContent({
+            model: modelName,
+            contents: [
+                { text: prompt },
+                {
+                    inlineData: {
+                        data: base64Data,
+                        mimeType: mimeType
+                    }
                 }
-            }
-        ]);
-        const text = result.response.text();
+            ]
+        });
+        const text = result.text || '';
         console.log("Gemini QR Scan Response:", text);
         const parsed = parseJSON(text);
         return normalizeQrData(parsed);
