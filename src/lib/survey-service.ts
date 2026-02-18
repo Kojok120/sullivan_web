@@ -1,27 +1,25 @@
 import { prisma } from '@/lib/prisma';
-import { QuestionBank, SurveyResponse } from '@prisma/client';
-
-export type SurveyCategory = 'GRIT' | 'SELF_EFFICACY' | 'SELF_REGULATION' | 'GROWTH_MINDSET' | 'EMOTIONAL_REGULATION';
+import { QuestionBank, SurveyCategory, SurveyResponse } from '@prisma/client';
 
 export const SURVEY_CATEGORIES: SurveyCategory[] = [
-    'GRIT',
-    'SELF_EFFICACY',
-    'SELF_REGULATION',
-    'GROWTH_MINDSET',
-    'EMOTIONAL_REGULATION'
+    SurveyCategory.GRIT,
+    SurveyCategory.SELF_EFFICACY,
+    SurveyCategory.SELF_REGULATION,
+    SurveyCategory.GROWTH_MINDSET,
+    SurveyCategory.EMOTIONAL_REGULATION
 ];
 
-export const SURVEY_INTERVAL_DAYS = 90; // 3 months
+export const SURVEY_INTERVAL_DAYS = 90; // 3ヶ月
 
 export type SurveyQuestion = {
     id: string;
-    category: string;
+    category: SurveyCategory;
     question: string;
 };
 
 /**
- * Checks if the user should be shown the survey.
- * Returns true if the user has never answered or if 90 days have passed since the last answer.
+ * ユーザーがアンケート対象かどうかをチェックします。
+ * 未回答、または前回の回答から90日以上経過している場合に true を返します。
  */
 export async function shouldShowSurvey(userId: string): Promise<boolean> {
     const lastResponse = await prisma.surveyResponse.findFirst({
@@ -42,19 +40,16 @@ export async function shouldShowSurvey(userId: string): Promise<boolean> {
 }
 
 /**
- * Retrieves 20 random questions from the QuestionBank (4 from each of the 5 categories).
- * The returned array is shuffled.
+ * QuestionBankからランダムに20問（5カテゴリ×4問）を取得します。
+ * 結果はシャッフルされて返されます。
  */
 export async function getSurveyQuestions(): Promise<SurveyQuestion[]> {
     const questions: SurveyQuestion[] = [];
 
-    // Ideally we would use raw SQL for random selection, but for simplicity and portability in Prisma:
-    // We fetch all IDs first (or a reasonable subset) and then pick random ones in JS.
-    // Given the question bank is small (100 questions), fetching all is fine.
-
+    // 全ての質問IDを取得してから JS側でランダム抽出（質問数が少ないため全件取得で問題なし）
     const allQuestions = await prisma.questionBank.findMany();
 
-    // Group by category
+    // カテゴリごとにグループ化
     const byCategory: Record<string, QuestionBank[]> = {};
     for (const q of allQuestions) {
         if (!byCategory[q.category]) {
@@ -63,30 +58,48 @@ export async function getSurveyQuestions(): Promise<SurveyQuestion[]> {
         byCategory[q.category].push(q);
     }
 
-    // Pick 4 from each category
+    // 各カテゴリから4問ずつ抽出
     for (const category of SURVEY_CATEGORIES) {
         const candidates = byCategory[category] || [];
         const picked = pickRandom(candidates, 4);
         questions.push(...picked);
     }
 
-    // Shuffle final list
+    // 最終リストをシャッフル
     return shuffleArray(questions);
 }
 
 /**
- * Saves a survey response and calculates scores.
+ * アンケート回答を保存し、スコアを計算します。
  */
 export async function submitSurveyResponse(userId: string, answers: { questionId: string; value: number }[]) {
-    // 1. Fetch related questions to get categories
-    const questionIds = answers.map(a => a.questionId);
+    // バリデーション
+    if (!answers || answers.length === 0) {
+        throw new Error('回答データが空です。');
+    }
+
+    // 重複チェック
+    const questionIdsInput = answers.map(a => a.questionId);
+    const uniqueQuestionIds = new Set(questionIdsInput);
+    if (uniqueQuestionIds.size !== questionIdsInput.length) {
+        throw new Error('重複した質問IDが含まれています。');
+    }
+
+    // 値の範囲チェック
+    for (const ans of answers) {
+        if (!Number.isInteger(ans.value) || ans.value < 1 || ans.value > 5) {
+            throw new Error(`不正な回答値が含まれています: questionId=${ans.questionId}, value=${ans.value}`);
+        }
+    }
+
+    // 1. 関連する質問を取得してカテゴリを確認
     const questions = await prisma.questionBank.findMany({
-        where: { id: { in: questionIds } }
+        where: { id: { in: questionIdsInput } }
     });
 
     const questionMap = new Map(questions.map(q => [q.id, q]));
 
-    // 2. Calculate scores
+    // 2. スコア計算
     const categoryScores: Record<string, { sum: number; count: number }> = {};
     const detailedAnswers = [];
 
@@ -113,7 +126,7 @@ export async function submitSurveyResponse(userId: string, answers: { questionId
         finalScores[cat] = parseFloat((categoryScores[cat].sum / categoryScores[cat].count).toFixed(2));
     }
 
-    // 3. Save to DB
+    // 3. DB保存
     return await prisma.surveyResponse.create({
         data: {
             userId,
@@ -124,7 +137,7 @@ export async function submitSurveyResponse(userId: string, answers: { questionId
     });
 }
 
-// Helper functions
+// ヘルパー関数
 function pickRandom<T>(arr: T[], count: number): T[] {
     const shuffled = [...arr].sort(() => 0.5 - Math.random());
     return shuffled.slice(0, count);

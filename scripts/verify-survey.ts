@@ -1,78 +1,103 @@
-import { prisma } from '@/lib/prisma';
-import { getSurveyQuestions, shouldShowSurvey, submitSurveyResponse } from '@/lib/survey-service';
+import { PrismaClient, SurveyCategory } from '@prisma/client';
+import { getSurveyQuestions, shouldShowSurvey, submitSurveyResponse } from '../src/lib/survey-service';
+import 'dotenv/config';
+
+const prisma = new PrismaClient();
 
 async function main() {
-    console.log('--- Starting Survey Logic Verification ---');
+    console.log('--- アンケート機能の検証を開始します ---');
 
-    // 1. Verify Questions Seeding
+    // 1. 質問データのシード検証
     const questions = await prisma.questionBank.findMany();
-    console.log(`Total questions in bank: ${questions.length}`);
+    console.log(`質問バンクの総数: ${questions.length}`);
     if (questions.length !== 100) {
-        console.error('ERROR: Expected 100 questions.');
+        console.error('エラー: 100問あるべきです。');
     } else {
-        console.log('PASS: Question bank seeded correctly.');
+        console.log('成功: 質問バンクは正しくシードされています。');
     }
 
-    // 2. Test getSurveyQuestions
+    // 2. getSurveyQuestions のテスト
     const surveyQuestions = await getSurveyQuestions();
-    console.log(`Retrieved survey questions: ${surveyQuestions.length}`);
+    console.log(`取得された質問数: ${surveyQuestions.length}`);
     if (surveyQuestions.length !== 20) {
-        console.error('ERROR: Expected 20 questions.');
+        console.error('エラー: 20問取得されるべきです。');
     } else {
-        console.log('PASS: Retrieved 20 questions.');
+        console.log('成功: 20問取得されました。');
     }
 
-    // Check randomness/categories (basic check)
+    // カテゴリの網羅性チェック
     const categories = new Set(surveyQuestions.map(q => q.category));
-    console.log(`Categories found: ${Array.from(categories).join(', ')}`);
-    if (categories.size !== 5) {
-        console.warn('WARN: Not all 5 categories represented (might happen by chance but unlikely with 4 each logic).');
+    console.log(`含まれるカテゴリ: ${Array.from(categories).join(', ')}`);
+    // SurveyCategory Enumの値をすべて含むか確認
+    const allCategories = Object.values(SurveyCategory);
+    if (categories.size !== allCategories.length) {
+        console.warn('警告: 全5カテゴリが含まれていません（偶然の偏りの可能性がありますが、ロジックを確認してください）。');
     }
 
-    // 3. Test User Flow
-    // Create a dummy user for testing or use an existing one
-    // Let's create a temp user to be safe
+    // 3. ユーザーフローのテスト
+    // テスト用ユーザーを作成
     const testUser = await prisma.user.create({
         data: {
             loginId: `test_survey_${Date.now()}`,
             role: 'STUDENT'
         }
     });
-    console.log(`Created test user: ${testUser.id}`);
+    console.log(`テストユーザーを作成しました: ${testUser.id}`);
 
     try {
-        // Check eligibility (should be true)
+        // 対象可否チェック (trueのはず)
         const eligibleBefore = await shouldShowSurvey(testUser.id);
-        console.log(`Eligible before submission: ${eligibleBefore}`);
-        if (!eligibleBefore) console.error('ERROR: User should be eligible.');
+        console.log(`回答前の対象可否: ${eligibleBefore}`);
+        if (!eligibleBefore) console.error('エラー: ユーザーは対象であるべきです。');
 
-        // Submit response
+        // 回答送信
         const answers = surveyQuestions.map(q => ({
             questionId: q.id,
             value: Math.floor(Math.random() * 5) + 1
         }));
 
         await submitSurveyResponse(testUser.id, answers);
-        console.log('Submitted survey response.');
+        console.log('アンケート回答を送信しました。');
 
-        // Check eligibility again (should be false)
+        // 再度対象可否チェック (falseのはず)
         const eligibleAfter = await shouldShowSurvey(testUser.id);
-        console.log(`Eligible after submission: ${eligibleAfter}`);
-        if (eligibleAfter) console.error('ERROR: User should NOT be eligible immediately after submission.');
-        else console.log('PASS: Eligibility logic works.');
+        console.log(`回答後の対象可否: ${eligibleAfter}`);
+        if (eligibleAfter) console.error('エラー: 回答直後は対象外であるべきです。');
+        else console.log('成功: 対象可否ロジックは正常です。');
 
-        // Clean up
+        // 不正なデータの検証 (空配列)
+        try {
+            await submitSurveyResponse(testUser.id, []);
+            console.error('エラー: 空の回答は拒否されるべきです。');
+        } catch (e: any) {
+            console.log(`成功: 空の回答は拒否されました - ${e.message}`);
+        }
+
+        // 不正なデータの検証 (範囲外の値)
+        try {
+            const invalidAnswers = [{ questionId: surveyQuestions[0].id, value: 6 }];
+            await submitSurveyResponse(testUser.id, invalidAnswers);
+            console.error('エラー: 不正な値(6)は拒否されるべきです。');
+        } catch (e: any) {
+            console.log(`成功: 不正な値は拒否されました - ${e.message}`);
+        }
+
+
+        // クリーンアップ
+        // 安全のため、このテストユーザーに関連するデータのみを削除します
         await prisma.surveyResponse.deleteMany({ where: { userId: testUser.id } });
         await prisma.user.delete({ where: { id: testUser.id } });
-        console.log('Cleaned up test user.');
+        console.log('テストユーザーと関連データを削除しました。');
 
     } catch (e) {
-        console.error('Test failed:', e);
-        // Try cleanup
+        console.error('テスト中にエラーが発生しました:', e);
+        // エラー時のクリーンアップ試行
         await prisma.user.delete({ where: { id: testUser.id } }).catch(() => { });
+    } finally {
+        await prisma.$disconnect();
     }
 
-    console.log('--- Verification Finished ---');
+    console.log('--- 検証終了 ---');
 }
 
 main();
