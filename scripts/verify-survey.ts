@@ -78,8 +78,10 @@ async function main() {
             const invalidAnswers = [{ questionId: surveyQuestions[0].id, value: 6 }];
             await submitSurveyResponse(testUser.id, invalidAnswers);
             console.error('エラー: 不正な値(6)は拒否されるべきです。');
-        } catch (e: any) {
-            console.log(`成功: 不正な値は拒否されました - ${e.message}`);
+        } catch (e: unknown) {
+            const message = e instanceof Error ? e.message : String(e);
+            console.log(`成功: 不正な値は拒否されました - ${message}`);
+        }
         }
 
 
