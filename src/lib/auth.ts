@@ -33,7 +33,7 @@ export const getSession = cache(async (): Promise<SessionPayload | null> => {
             role: appMeta.role || 'STUDENT',         // removed userMeta.role
             name: appMeta.name || userMeta.name || '',
         };
-    } catch (error) {
+    } catch {
         return null;
     }
 });
@@ -49,12 +49,3 @@ export async function requireAdmin() {
 export function isTeacherOrAdmin(session: SessionPayload | null): session is SessionPayload {
     return !!session && (session.role === 'TEACHER' || session.role === 'ADMIN');
 }
-
-export async function requireTeacherOrAdmin() {
-    const session = await getSession();
-    if (!isTeacherOrAdmin(session)) {
-        throw new Error('Unauthorized');
-    }
-    return session;
-}
-

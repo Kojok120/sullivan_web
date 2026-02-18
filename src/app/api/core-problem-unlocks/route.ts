@@ -21,10 +21,18 @@ export async function GET() {
         });
 
         // イベント情報を整形して返す
-        const unlocks = events.map(event => ({
-            eventId: event.id,
-            ...(event.payload as any || {})
-        }));
+        const unlocks = events.map((event) => {
+            const payload = event.payload;
+            const payloadObject =
+                payload && typeof payload === 'object' && !Array.isArray(payload)
+                    ? (payload as Record<string, unknown>)
+                    : {};
+
+            return {
+                eventId: event.id,
+                ...payloadObject
+            };
+        });
 
         return NextResponse.json(unlocks);
     } catch (error) {

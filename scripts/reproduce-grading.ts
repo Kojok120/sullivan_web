@@ -3,7 +3,6 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { prisma } from '../src/lib/prisma';
 import { expandProblemIds, QRData } from '../src/lib/qr-utils';
 import fs from 'fs';
-import path from 'path';
 
 // MOCK: Copy the functionality of gradeWithGemini partially for debugging
 async function reproduceGrading(imagePath: string) {
@@ -52,7 +51,9 @@ async function reproduceGrading(imagePath: string) {
 
     // Resolve Student ID if needed (S0001 -> UUID)
     const student = await prisma.user.findFirst({ where: { loginId: 'S0001' } });
-    const studentId = student ? student.id : "unknown-student-id";
+    if (!student) {
+        console.warn("Student S0001 not found. Continuing with QR data only.");
+    }
 
     const problemIds = expandProblemIds(qrData);
     console.log(`\nFetching problems: ${problemIds.join(', ')}`);

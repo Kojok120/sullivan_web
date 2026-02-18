@@ -42,7 +42,7 @@ export function SessionListClient({ initialSessions, userId, basePath }: Session
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [userId]);
 
     const handleFilterChange = (checked: boolean) => {
         setShowUnreviewedOnly(checked);

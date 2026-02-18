@@ -10,12 +10,8 @@ import { User, Calendar, MapPin, School, Phone, Mail, Users } from 'lucide-react
 import { updateStudentProfile } from './actions';
 import { toast } from 'sonner';
 import { DateDisplay } from '@/components/ui/date-display';
-
-interface Classroom {
-    id: string;
-    name: string;
-    groups: string[];
-}
+import { NONE_SELECTION_VALUE } from '@/lib/form-selection';
+import type { ClassroomWithGroups } from '@/lib/types/classroom';
 
 interface ProfileCardProps {
     userId: string;
@@ -27,7 +23,7 @@ interface ProfileCardProps {
     initialSchool: string | null;
     initialPhoneNumber: string | null;
     initialEmail: string | null;
-    classrooms: Classroom[];
+    classrooms: ClassroomWithGroups[];
 }
 
 export function ProfileCard({
@@ -45,7 +41,7 @@ export function ProfileCard({
     const [isEditing, setIsEditing] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
-    const [selectedClassroomId, setSelectedClassroomId] = useState<string>(initialClassroomId || 'unselected');
+    const [selectedClassroomId, setSelectedClassroomId] = useState<string>(initialClassroomId || NONE_SELECTION_VALUE);
 
     async function handleSubmit(formData: FormData) {
         setIsSaving(true);
@@ -92,14 +88,14 @@ export function ProfileCard({
                                 <label className="text-sm font-medium">教室</label>
                                 <Select
                                     name="classroomId"
-                                    defaultValue={initialClassroomId || ''}
+                                    defaultValue={initialClassroomId || NONE_SELECTION_VALUE}
                                     onValueChange={(value) => setSelectedClassroomId(value)}
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder="教室を選択" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="unselected">未設定</SelectItem>
+                                        <SelectItem value={NONE_SELECTION_VALUE}>未設定</SelectItem>
                                         {classrooms.map((c) => (
                                             <SelectItem key={c.id} value={c.id}>
                                                 {c.name}
@@ -110,12 +106,16 @@ export function ProfileCard({
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">グループ</label>
-                                <Select name="groupId" defaultValue={initialGroupId || ''} disabled={availableGroups.length === 0}>
+                                <Select
+                                    name="groupId"
+                                    defaultValue={initialGroupId || NONE_SELECTION_VALUE}
+                                    disabled={availableGroups.length === 0}
+                                >
                                     <SelectTrigger>
                                         <SelectValue placeholder="グループを選択" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="unselected">未設定</SelectItem>
+                                        <SelectItem value={NONE_SELECTION_VALUE}>未設定</SelectItem>
                                         {availableGroups.map((g) => (
                                             <SelectItem key={g} value={g}>
                                                 {g}

@@ -80,6 +80,7 @@ model User {
   achievements   UserAchievement[]
   dailySummaries DailyLearningSummary[]
   realtimeEvents RealtimeEvent[]
+  surveyResponses SurveyResponse[]
 
 
   // Teacher specific fields
@@ -233,4 +234,30 @@ model GradingJob {
 
   @@index([status, updatedAt])
   @@map("grading_jobs")
+}
+
+enum SurveyCategory {
+  GRIT
+  SELF_EFFICACY
+  SELF_REGULATION
+  GROWTH_MINDSET
+  EMOTIONAL_REGULATION
+}
+
+model QuestionBank {
+  id        String         @id @default(cuid())
+  category  SurveyCategory
+  question  String
+  createdAt DateTime       @default(now())
+}
+
+model SurveyResponse {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  answeredAt DateTime @default(now())
+  details    Json     // 詳細な回答データ
+  scores     Json     // カテゴリごとのスコア
+
+  @@index([userId, answeredAt(sort: Desc)])
 }

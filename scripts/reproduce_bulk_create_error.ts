@@ -1,5 +1,5 @@
 
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -20,7 +20,7 @@ async function main() {
     console.log(`Subject: ${subject.name}, Prefix should be E`);
 
     // Logic from actions.ts
-    let prefix = 'E'; // Hardcoded for English
+    const prefix = 'E'; // Hardcoded for English
 
     // Find existing custom IDs
     const allSubjectProblems = await prisma.problem.findMany({
@@ -72,11 +72,23 @@ async function main() {
             }
         });
         console.log("Success!");
-    } catch (e: any) {
+    } catch (e: unknown) {
         console.error("Caught Error:");
-        console.error("Code:", e.code);
-        console.error("Message:", e.message);
-        console.error("Meta:", e.meta);
+        if (e instanceof Prisma.PrismaClientKnownRequestError) {
+            console.error("Code:", e.code);
+            console.error("Message:", e.message);
+            console.error("Meta:", e.meta);
+            return;
+        }
+        if (e instanceof Prisma.PrismaClientUnknownRequestError) {
+            console.error("Message:", e.message);
+            return;
+        }
+        if (e instanceof Error) {
+            console.error("Message:", e.message);
+            return;
+        }
+        console.error("Unknown error:", e);
     }
 }
 

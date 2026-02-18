@@ -2,8 +2,9 @@
 import { Problem } from '@prisma/client';
 import { Button } from '@/components/ui/button';
 import { Printer, ArrowLeft, Loader2 } from 'lucide-react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, useRef, useLayoutEffect } from 'react';
+import { useState, useRef, useLayoutEffect } from 'react';
 import { PrintProblemItem } from './print-problem-item';
 import QRCode from 'qrcode';
 import { compressProblemIds } from '@/lib/qr-utils';
@@ -37,7 +38,6 @@ export function PrintLayout({ studentName, subjectName, problems, studentLoginId
 
     useLayoutEffect(() => {
         if (!measureRef.current) return;
-        setIsCalculating(true);
 
         const listStyles = window.getComputedStyle(measureRef.current);
         const listMarginTop = parseFloat(listStyles.marginTop || '0') || 0;
@@ -276,7 +276,14 @@ export function PrintLayout({ studentName, subjectName, problems, studentLoginId
 
                                     {qrCode && (
                                         <div className="absolute top-[10mm] right-[10mm] w-25 h-25">
-                                            <img src={qrCode} alt="QR" className="w-full h-full" />
+                                            <Image
+                                                src={qrCode}
+                                                alt="QR"
+                                                width={100}
+                                                height={100}
+                                                className="w-full h-full"
+                                                unoptimized
+                                            />
                                         </div>
                                     )}
 

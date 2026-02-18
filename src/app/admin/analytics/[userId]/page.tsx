@@ -2,10 +2,10 @@ import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { getStudentDashboardData } from '@/lib/analytics';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import { ActivityChart } from '@/app/dashboard/activity-chart';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { SubjectProgressList } from '@/components/subject-progress-list';
 
 interface PageProps {
     params: Promise<{
@@ -69,17 +69,11 @@ export default async function StudentAnalyticsPage({ params }: PageProps) {
                         <CardTitle>教科別進捗</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="space-y-6 max-h-[350px] overflow-y-auto pr-2">
-                            {subjectProgress.map((subject) => (
-                                <div key={subject.subjectId} className="space-y-2">
-                                    <div className="flex items-center justify-between text-sm">
-                                        <div className="font-medium">{subject.subjectName}</div>
-                                        <div className="text-muted-foreground">{subject.progressPercentage}%</div>
-                                    </div>
-                                    <Progress value={subject.progressPercentage} />
-                                </div>
-                            ))}
-                        </div>
+                        <SubjectProgressList
+                            items={subjectProgress}
+                            wrapperClassName="space-y-6 max-h-[350px] overflow-y-auto pr-2"
+                            emptyMessage="学習データがありません"
+                        />
                     </CardContent>
                 </Card>
             </div>

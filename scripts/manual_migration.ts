@@ -14,9 +14,6 @@ async function main() {
         console.log("Migration command sent successfully.");
 
         // 2. Verify
-        const user = await prisma.user.findFirst({
-            select: { id: true }
-        });
         // We can't select 'metadata' via prisma client here if the client is old, 
         // but the previous 'prisma generate' should have updated the client types.
         // Let's try raw query verification

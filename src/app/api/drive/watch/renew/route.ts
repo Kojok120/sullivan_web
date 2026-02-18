@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { watchDriveFolder, stopWatching } from '@/lib/drive-webhook-manager';
 import { saveWatchState, getWatchState, clearWatchState } from '@/lib/drive-watch-state';
 import { secureDriveCheck } from '@/lib/grading-service';
+import { getDriveWebhookUrlOrError, getShouldCheckFromRequest, verifyInternalApiAuthorization } from '@/lib/drive-watch-api';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,23 +16,17 @@ const RENEW_THRESHOLD_MS = 6 * 60 * 60 * 1000;
  */
 export async function POST(request: Request) {
     try {
-        const url = new URL(request.url);
-        const shouldCheck = ['1', 'true'].includes(url.searchParams.get('check') || '');
-
-        const authHeader = request.headers.get('Authorization');
-        if (authHeader !== `Bearer ${process.env.INTERNAL_API_SECRET}`) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        const shouldCheck = getShouldCheckFromRequest(request);
+        const unauthorizedResponse = verifyInternalApiAuthorization(request);
+        if (unauthorizedResponse) {
+            return unauthorizedResponse;
         }
 
-        const appUrl = process.env.APP_URL;
-        if (!appUrl) {
-            return NextResponse.json(
-                { success: false, error: 'APP_URL is not configured' },
-                { status: 500 }
-            );
+        const webhookResult = getDriveWebhookUrlOrError();
+        if ('errorResponse' in webhookResult) {
+            return webhookResult.errorResponse;
         }
-
-        const webhookUrl = `${appUrl}/api/grading/webhook`;
+        const { webhookUrl } = webhookResult;
         const currentState = await getWatchState();
 
         // Check if renewal is needed
@@ -129,6 +124,5 @@ export async function DELETE() {
         );
     }
 }
-
 
 

@@ -353,15 +353,7 @@ export type LearningSession = {
 
 // Group history by groupId
 export async function getLearningSessions(userId: string, limit = 10, offset = 0, onlyUnreviewed = false): Promise<LearningSession[]> {
-    // We can't easily group by groupId and join relations in Prisma (it requires raw SQL or post-processing).
-    // Let's use Raw SQL for performance grouping.
-    //
-    // [FIX] Problem has many-to-many with CoreProblem, so JOIN would multiply rows.
-    // Using subquery to get Subject name without row multiplication.
-    // Using COUNT(DISTINCT lh.id) to avoid duplicate counting.
-
-    // CTEを使用して各グループの最初のproblemIdを1回だけ取得
-    // その後SubjectとCoreProblemをJOINで取得（相関サブクエリを排除）
+    // セッション単位の集計とラベル解決を分離して、JOINによる行増幅を防ぐ
     const sessions = await prisma.$queryRaw<Array<{
         groupId: string;
         date: Date;
@@ -372,39 +364,56 @@ export async function getLearningSessions(userId: string, limit = 10, offset = 0
         unreadCount: bigint;
         unwatchedMistakeCount: bigint;
     }>>`
-        WITH GroupFirstProblem AS (
-            SELECT DISTINCT ON ("groupId") 
-                "groupId", 
-                "problemId"
-            FROM "LearningHistory"
+        WITH session_agg AS (
+            SELECT
+                lh."groupId",
+                MAX(lh."answeredAt") as "date",
+                COUNT(*) as "total",
+                COUNT(CASE WHEN lh.evaluation IN ('A', 'B') THEN 1 END) as "correct",
+                COUNT(CASE WHEN lh."isStudentReviewed" = false THEN 1 END) as "unreadCount",
+                COUNT(CASE
+                    WHEN lh.evaluation IN ('C', 'D')
+                    AND lh."isVideoWatched" = false
+                    AND p."videoUrl" IS NOT NULL
+                    AND p."videoUrl" != ''
+                    THEN 1
+                END) as "unwatchedMistakeCount",
+                MIN(lh.id) as "firstHistoryId"
+            FROM "LearningHistory" lh
+            JOIN "Problem" p ON lh."problemId" = p.id
             WHERE "userId" = ${userId} AND "groupId" IS NOT NULL
-            ORDER BY "groupId", id ASC
+            GROUP BY lh."groupId"
+        ),
+        session_label AS (
+            SELECT
+                sa."groupId",
+                s.name as "subjectName",
+                cp.name as "coreProblemName"
+            FROM session_agg sa
+            JOIN "LearningHistory" first_lh ON first_lh.id = sa."firstHistoryId"
+            LEFT JOIN LATERAL (
+                SELECT cp2.id, cp2.name, cp2."subjectId"
+                FROM "_CoreProblemToProblem" cpp
+                JOIN "CoreProblem" cp2 ON cp2.id = cpp."A"
+                WHERE cpp."B" = first_lh."problemId"
+                ORDER BY cp2."order" ASC, cp2.id ASC
+                LIMIT 1
+            ) cp ON true
+            LEFT JOIN "Subject" s ON s.id = cp."subjectId"
         )
-        SELECT 
-            lh."groupId",
-            MAX(lh."answeredAt") as "date",
-            s.name as "subjectName",
-            cp.name as "coreProblemName",
-            COUNT(DISTINCT lh.id) as "total",
-            COUNT(DISTINCT CASE WHEN lh.evaluation IN ('A', 'B') THEN lh.id END) as "correct",
-            COUNT(CASE WHEN lh."isStudentReviewed" = false THEN 1 END) as "unreadCount",
-            COUNT(DISTINCT CASE 
-                WHEN lh.evaluation IN ('C', 'D') 
-                AND lh."isVideoWatched" = false 
-                AND p."videoUrl" IS NOT NULL 
-                AND p."videoUrl" != ''
-                THEN lh.id 
-            END) as "unwatchedMistakeCount"
-        FROM "LearningHistory" lh
-        JOIN "Problem" p ON lh."problemId" = p.id
-        LEFT JOIN GroupFirstProblem gfp ON lh."groupId" = gfp."groupId"
-        LEFT JOIN "_CoreProblemToProblem" cpp ON gfp."problemId" = cpp."B"
-        LEFT JOIN "CoreProblem" cp ON cpp."A" = cp.id
-        LEFT JOIN "Subject" s ON cp."subjectId" = s.id
-        WHERE lh."userId" = ${userId} AND lh."groupId" IS NOT NULL
-        GROUP BY lh."groupId", s.name, cp.name
-        ${onlyUnreviewed ? Prisma.sql`HAVING COUNT(DISTINCT CASE WHEN lh.evaluation IN ('C', 'D') AND lh."isVideoWatched" = false AND p."videoUrl" IS NOT NULL AND p."videoUrl" != '' THEN lh.id END) > 0` : Prisma.empty}
-        ORDER BY "date" DESC, lh."groupId" DESC
+        SELECT
+            sa."groupId",
+            sa."date",
+            sl."subjectName",
+            sl."coreProblemName",
+            sa."total",
+            sa."correct",
+            sa."unreadCount",
+            sa."unwatchedMistakeCount"
+        FROM session_agg sa
+        LEFT JOIN session_label sl ON sl."groupId" = sa."groupId"
+        ${onlyUnreviewed ? Prisma.sql`WHERE sa."unwatchedMistakeCount" > 0` : Prisma.empty}
+        ORDER BY sa."date" DESC, sa."groupId" DESC
         LIMIT ${limit}
         OFFSET ${offset}
     `;
@@ -440,7 +449,7 @@ export async function getSessionDetails(groupId: string, userId?: string) {
     if (!groupId) return [];
 
     // SECURITY: If userId is provided, ensure we only fetch data for that user
-    const whereClause: any = { groupId };
+    const whereClause: Prisma.LearningHistoryWhereInput = { groupId };
     if (userId) {
         whereClause.userId = userId;
     }

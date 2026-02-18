@@ -1,8 +1,9 @@
-import { google } from 'googleapis';
 import QRCode from 'qrcode';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
+import type { GenerativeModel, ResponseSchema } from '@google/generative-ai';
 import { Client as QStashClient } from '@upstash/qstash';
 import { prisma } from '@/lib/prisma';
+import type { Prisma, User } from '@prisma/client';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -52,7 +53,7 @@ function getDrive() {
  * Loads a prompt from a markdown file in the instructions directory.
  * Replaces {{key}} placeholders with values from the variables object.
  */
-function loadPrompt(filename: string, variables: Record<string, any> = {}): string {
+function loadPrompt(filename: string, variables: Record<string, unknown> = {}): string {
     const filePath = path.join(process.cwd(), 'instructions', filename);
     let content = fs.readFileSync(filePath, 'utf-8');
     for (const [key, value] of Object.entries(variables)) {
@@ -163,7 +164,7 @@ type AnalyzedFile = {
     prepared: PreparedFile;
     qrData: QRData | null;
     studentId: string | null;
-    user: any | null; // Prisma User
+    user: User | null;
     cleanup: () => Promise<void>;
 };
 
@@ -191,12 +192,12 @@ async function downloadAndAnalyzeFile(fileId: string, fileName: string): Promise
             { responseType: 'stream' }
         );
 
-        await new Promise((resolve, reject) => {
+        await new Promise<void>((resolve, reject) => {
             res.data
-                .on('error', (err: any) => reject(err))
+                .on('error', (err: unknown) => reject(err))
                 .pipe(dest)
-                .on('error', (err: any) => reject(err))
-                .on('finish', () => resolve(true));
+                .on('error', (err: unknown) => reject(err))
+                .on('finish', () => resolve());
         });
 
         const stats = await fs.promises.stat(destPath);
@@ -226,7 +227,6 @@ export async function processFile(fileId: string, fileName: string) {
         return;
     }
 
-    let destPath = "";
     let jobFinalized = false;
 
     const finalizeFailure = async (message: string) => {
@@ -294,11 +294,14 @@ export async function processFile(fileId: string, fileName: string) {
 
         // Update DB
         if (results && results.length > 0) {
-            await recordGradingResults(results);
+            const gradingSummary = await recordGradingResults(results);
 
             // [GAMIFICATION] Process XP, Streaks, Achievements
             try {
-                const gamificationResult = await processGamificationUpdates(results[0].studentId, results);
+                const gamificationResult = await processGamificationUpdates(results[0].studentId, results, {
+                    currentGroupId: gradingSummary?.groupId,
+                    currentSessionIsPerfect: gradingSummary?.sessionIsPerfect,
+                });
                 const payload = toGamificationPayload(gamificationResult);
                 await emitRealtimeEvent({
                     userId: gamificationResult.userId,
@@ -373,7 +376,7 @@ async function archiveProcessedFile(fileId: string, studentId: string, problemId
             where: { id: studentId },
             include: { classroom: true }
         });
-        const classroomName = (user as any)?.classroom?.name || '未所属';
+        const classroomName = user?.classroom?.name || '未所属';
         const studentName = user?.name || user?.loginId || '不明な生徒';
 
         // 2. Get Subject Name via Problem
@@ -567,7 +570,7 @@ type ProblemForGrading = {
  * This ensures that the response matches the expected structure and all indices are valid.
  */
 function validateGradingResponse(
-    resultsJson: any[],
+    resultsJson: unknown,
     problems: ProblemForGrading[],
     userId: string
 ): GradingValidationResult {
@@ -588,8 +591,12 @@ function validateGradingResponse(
     // 3. Validate each result and check for duplicates
     const seenIndices = new Set<number>();
 
-    for (const r of resultsJson) {
-        const idx = r.problemIndex;
+    for (const [rawIndex, rawResult] of resultsJson.entries()) {
+        if (!isRecord(rawResult)) {
+            errors.push(`Result at position ${rawIndex} is not an object`);
+            continue;
+        }
+        const idx = rawResult.problemIndex;
 
         // Index range check
         if (typeof idx !== 'number' || idx < 0 || idx >= expectedCount) {
@@ -605,20 +612,25 @@ function validateGradingResponse(
         seenIndices.add(idx);
 
         // Evaluation value check
-        if (!['A', 'B', 'C', 'D'].includes(r.evaluation)) {
-            errors.push(`Invalid evaluation for index ${idx}: ${r.evaluation}`);
+        const evaluation = rawResult.evaluation;
+        if (evaluation !== 'A' && evaluation !== 'B' && evaluation !== 'C' && evaluation !== 'D') {
+            errors.push(`Invalid evaluation for index ${idx}: ${String(evaluation)}`);
             continue;
         }
 
         // Convert index to actual problem ID
         const problem = problems[idx];
+        const studentAnswer =
+            typeof rawResult.studentAnswer === 'string' ? rawResult.studentAnswer : "(空欄)";
+        const feedback =
+            typeof rawResult.feedback === 'string' ? rawResult.feedback : "";
         validatedResults.push({
             studentId: userId,
             problemId: problem.id,  // Convert index to actual problemId
-            userAnswer: r.studentAnswer || "(空欄)",
-            evaluation: r.evaluation,
-            isCorrect: r.evaluation === 'A' || r.evaluation === 'B',
-            feedback: r.feedback || "",
+            userAnswer: studentAnswer,
+            evaluation,
+            isCorrect: evaluation === 'A' || evaluation === 'B',
+            feedback,
             badCoreProblemIds: []  // Not used in new schema for simplicity
         });
     }
@@ -632,6 +644,10 @@ function validateGradingResponse(
 
     const isValid = errors.length === 0 && validatedResults.length === expectedCount;
     return { isValid, errors, validatedResults };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null;
 }
 
 // Local QR Reader using Python OpenCV via child_process
@@ -688,7 +704,7 @@ async function readQRCodeLocally(filePath: string): Promise<QRData | null> {
             }
             console.log("Local QR Read Success (Python OpenCV):", json);
             return json;
-        } catch (e) {
+        } catch {
             console.warn("Python returned non-JSON:", trimmed);
             return null;
         }
@@ -818,26 +834,27 @@ async function gradeWithGemini(
     }));
 
     // 3. Define responseSchema for structured output
-    const gradingResponseSchema = {
-        type: "array" as const,
+    const gradingResponseSchema: ResponseSchema = {
+        type: SchemaType.ARRAY,
         items: {
-            type: "object" as const,
+            type: SchemaType.OBJECT,
             properties: {
                 problemIndex: {
-                    type: "integer" as const,
+                    type: SchemaType.INTEGER,
                     description: "問題のインデックス（0始まり、問題リストの順序に対応）"
                 },
                 studentAnswer: {
-                    type: "string" as const,
+                    type: SchemaType.STRING,
                     description: "生徒の解答をそのまま転記"
                 },
                 evaluation: {
-                    type: "string" as const,
+                    type: SchemaType.STRING,
+                    format: "enum",
                     enum: ["A", "B", "C", "D"],
                     description: "A=完璧, B=ほぼ正解, C=部分的に正解, D=不正解"
                 },
                 feedback: {
-                    type: "string" as const,
+                    type: SchemaType.STRING,
                     description: "日本語でのフィードバック"
                 }
             },
@@ -851,7 +868,7 @@ async function gradeWithGemini(
         generationConfig: {
             responseMimeType: "application/json",
             responseSchema: gradingResponseSchema
-        } as any  // Type assertion needed for responseSchema
+        }
     });
 
     // 5. Build enhanced prompt
@@ -913,7 +930,7 @@ async function gradeWithGemini(
 }
 
 // Helper: Scan QR with Gemini
-async function scanQRWithGemini(model: any, base64Data: string, mimeType: string): Promise<QRData | null> {
+async function scanQRWithGemini(model: GenerativeModel, base64Data: string, mimeType: string): Promise<QRData | null> {
     try {
         const prompt = loadPrompt('qr-scan-prompt.md');
         // ...
@@ -938,8 +955,8 @@ async function scanQRWithGemini(model: any, base64Data: string, mimeType: string
     }
 }
 
-function normalizeQrData(raw: any): QRData | null {
-    if (!raw || typeof raw !== 'object') return null;
+function normalizeQrData(raw: unknown): QRData | null {
+    if (!isRecord(raw)) return null;
 
     const normalized: QRData = {};
 
@@ -953,7 +970,7 @@ function normalizeQrData(raw: any): QRData | null {
 
     if (raw.p !== undefined && raw.p !== null) {
         if (Array.isArray(raw.p)) {
-            const list = raw.p.map((id: any) => String(id).trim()).filter(Boolean);
+            const list = raw.p.map((id) => String(id).trim()).filter(Boolean);
             if (list.length > 0) {
                 normalized.p = list.join(',');
             }
@@ -965,7 +982,7 @@ function normalizeQrData(raw: any): QRData | null {
                     const parsed = JSON.parse(trimmed);
                     if (Array.isArray(parsed)) {
                         parsedArray = true;
-                        const list = parsed.map((id: any) => String(id).trim()).filter(Boolean);
+                        const list = parsed.map((id) => String(id).trim()).filter(Boolean);
                         if (list.length > 0) {
                             normalized.p = list.join(',');
                         }
@@ -984,7 +1001,7 @@ function normalizeQrData(raw: any): QRData | null {
     return normalized;
 }
 
-function parseJSON(text: string): any {
+function parseJSON(text: string): unknown {
     try {
         // Clean markdown code blocks
         let clean = text.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -1001,19 +1018,25 @@ function parseJSON(text: string): any {
 
 // 5. Save Result (Unified)
 // Unified Grading Logic (Batch)
-export async function recordGradingResults(results: GradingResult[]) {
-    if (results.length === 0) return;
+type GradingBatchSummary = {
+    groupId: string;
+    sessionIsPerfect: boolean;
+};
+
+export async function recordGradingResults(results: GradingResult[]): Promise<GradingBatchSummary | null> {
+    if (results.length === 0) return null;
 
     const userId = results[0].studentId; // Assumes all results are for same student
     const problemIds = results.map(r => r.problemId);
+    const sessionIsPerfect = results.every((result) => result.isCorrect);
 
     // Generate Group ID for this batch
     const groupId = crypto.randomUUID();
 
     // WRAP EVERYTHING IN A SINGLE TRANSACTION
-    await prisma.$transaction(async (tx) => {
+    const involvedCpIds = await prisma.$transaction(async (tx) => {
         // 1. Record History (Batch)
-        // Note: createMany is not supported in interactive transactions for SQLite/some adapters if using executeRaw, 
+        // Note: createMany is not supported in interactive transactions for SQLite/some adapters if using executeRaw,
         // but typically supported in modern Prisma client (tx.learningHistory.createMany).
         await tx.learningHistory.createMany({
             data: results.map(r => ({
@@ -1035,8 +1058,8 @@ export async function recordGradingResults(results: GradingResult[]) {
         });
         const stateMap = new Map(currentStates.map(s => [s.problemId, s]));
 
-        const newStates: any[] = [];
-        const updatePromises: any[] = [];
+        const newStates: Prisma.UserProblemStateCreateManyInput[] = [];
+        const updatePromises: Prisma.PrismaPromise<unknown>[] = [];
 
         for (const r of results) {
             const currentState = stateMap.get(r.problemId);
@@ -1088,7 +1111,7 @@ export async function recordGradingResults(results: GradingResult[]) {
         const problemMap = new Map(problems.map(p => [p.id, p]));
 
         const cpDeltas = new Map<string, number>();
-        const involvedCpIds = new Set<string>();
+        const involvedCpIdsInTransaction = new Set<string>();
 
         for (const r of results) {
             const problem = problemMap.get(r.problemId);
@@ -1099,7 +1122,7 @@ export async function recordGradingResults(results: GradingResult[]) {
                 for (const cp of problem.coreProblems) {
                     const current = cpDeltas.get(cp.id) || 0;
                     cpDeltas.set(cp.id, current - 5);
-                    involvedCpIds.add(cp.id);
+                    involvedCpIdsInTransaction.add(cp.id);
                 }
             } else {
                 // Incorrect: +5 for BAD CoreProblems
@@ -1108,54 +1131,57 @@ export async function recordGradingResults(results: GradingResult[]) {
                         if (problem.coreProblems.some(cp => cp.id === cpId)) {
                             const current = cpDeltas.get(cpId) || 0;
                             cpDeltas.set(cpId, current + 5);
-                            involvedCpIds.add(cpId);
+                            involvedCpIdsInTransaction.add(cpId);
                         }
                     }
                 }
             }
         }
 
-        for (const [cpId, delta] of cpDeltas.entries()) {
-            await tx.userCoreProblemState.upsert({
-                where: { userId_coreProblemId: { userId, coreProblemId: cpId } },
-                create: {
-                    userId,
-                    coreProblemId: cpId,
-                    priority: delta,
-                    isUnlocked: true // Assume unlocked if graded
-                },
-                update: { priority: { increment: delta } }
-            });
-        }
+        await Promise.all(
+            Array.from(cpDeltas.entries()).map(([cpId, delta]) =>
+                tx.userCoreProblemState.upsert({
+                    where: { userId_coreProblemId: { userId, coreProblemId: cpId } },
+                    create: {
+                        userId,
+                        coreProblemId: cpId,
+                        priority: delta,
+                        isUnlocked: true // Assume unlocked if graded
+                    },
+                    update: { priority: { increment: delta } }
+                })
+            )
+        );
 
-        // Pass involved CpIds out or call check function? 
+        // Pass involved CpIds out or call check function?
         // We can't easily call checkProgressAndUnlock inside here if it uses `prisma` global.
         // We should move the check LOGIC to use `tx` or call it AFTER transaction.
-        // But if check fails (crash), transaction is committed. That's actually OK. 
+        // But if check fails (crash), transaction is committed. That's actually OK.
         // Unlock failure is less critical than Data Consistency.
         // However, we need to export the involved IPs to run the check AFTER.
         // But interactive transaction returns result.
-        return involvedCpIds;
-    })
-        .then(async (involvedCpIds) => {
-            // 4. Batch Unlock Check (Outside Transaction)
-            await checkProgressAndUnlock(userId, Array.from(involvedCpIds));
+        return involvedCpIdsInTransaction;
+    });
 
-            // 5. Emit Event for SSE
-            try {
-                await emitRealtimeEvent({
-                    userId,
-                    type: 'grading_completed',
-                    payload: {
-                        groupId,
-                        timestamp: new Date().toISOString(),
-                    },
-                });
-            } catch (e) {
-                console.error('[Realtime] Failed to emit grading_completed event:', e);
-            }
-            console.log(`Emitted GRADING_COMPLETED event for user ${userId}, group ${groupId}`);
+    // 4. Batch Unlock Check (Outside Transaction)
+    await checkProgressAndUnlock(userId, Array.from(involvedCpIds));
+
+    // 5. Emit Event for SSE
+    try {
+        await emitRealtimeEvent({
+            userId,
+            type: 'grading_completed',
+            payload: {
+                groupId,
+                timestamp: new Date().toISOString(),
+            },
         });
+    } catch (e) {
+        console.error('[Realtime] Failed to emit grading_completed event:', e);
+    }
+    console.log(`Emitted GRADING_COMPLETED event for user ${userId}, group ${groupId}`);
+
+    return { groupId, sessionIsPerfect };
 }
 
 export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: string[]) {
@@ -1169,16 +1195,16 @@ export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: strin
                 include: { coreProblems: { select: { id: true } } } // Need dependencies
             },
             subject: {
-                include: {
+                select: {
+                    id: true,
                     coreProblems: {
-                        // [Optimization] lectureVideos is a scalar, so it's included by default.
-                        // We just order them.
-                        include: {
-                            _count: {
-                                select: { problems: true }
-                            }
-                        },
-                        orderBy: { order: 'asc' }
+                        orderBy: { order: 'asc' },
+                        select: {
+                            id: true,
+                            name: true,
+                            order: true,
+                            lectureVideos: true,
+                        }
                     }
                 }
             }
@@ -1186,6 +1212,29 @@ export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: strin
     });
 
     if (cpDetails.length === 0) return;
+
+    // 0. 以降の再帰アンロック判定用に、対象教科のCoreProblem依存関係を一括取得
+    const subjectIds = Array.from(new Set(cpDetails.map(cp => cp.subject.id)));
+    const coreProblemsInSubjects = await prisma.coreProblem.findMany({
+        where: { subjectId: { in: subjectIds } },
+        select: {
+            id: true,
+            problems: {
+                select: {
+                    coreProblems: {
+                        select: { id: true }
+                    }
+                }
+            }
+        }
+    });
+    const solvableDependencyMap = new Map<string, string[][]>();
+    for (const coreProblem of coreProblemsInSubjects) {
+        solvableDependencyMap.set(
+            coreProblem.id,
+            coreProblem.problems.map(problem => problem.coreProblems.map(dep => dep.id))
+        );
+    }
 
     // === OPTIMIZATION: Batch fetch all user states upfront ===
 
@@ -1300,6 +1349,7 @@ export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: strin
 
                     // tempUnlockedCpIdsにこのCPを追加
                     tempUnlockedCpIds.add(nextCp.id);
+                    unlockedCpIds.add(nextCp.id);
 
                     // 講義動画情報の確認ログ
                     console.log(`  -> LectureVideos found: ${nextCp.lectureVideos ? 'YES' : 'NO'}`);
@@ -1322,7 +1372,10 @@ export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: strin
 
                     // このCoreProblemで「実際に解ける問題」があるかをチェック
                     // 問題が解ける条件: その問題に紐づくすべてのCoreProblemがアンロックされていること
-                    const hasSolvable = await hasSolvableProblemsInCp(nextCp.id, tempUnlockedCpIds);
+                    const problemDependencyList = solvableDependencyMap.get(nextCp.id);
+                    const hasSolvable = !!problemDependencyList?.some(depIds =>
+                        depIds.every(depId => tempUnlockedCpIds.has(depId))
+                    );
 
                     if (hasSolvable) {
                         console.log(`  -> CP ${nextCp.name} has solvable problems. Stopping recursion.`);
@@ -1338,35 +1391,6 @@ export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: strin
             }
         }
     }
-}
-
-/**
- * 指定されたCoreProblemに、実際に解ける問題が存在するかを判定する。
- * 問題が解ける条件: その問題に紐づくすべてのCoreProblemがアンロックされていること
- * @param coreProblemId 対象のCoreProblem ID
- * @param unlockedCpIds 現在アンロックされているCoreProblem IDのSet
- */
-async function hasSolvableProblemsInCp(
-    coreProblemId: string,
-    unlockedCpIds: Set<string>
-): Promise<boolean> {
-    const cp = await prisma.coreProblem.findUnique({
-        where: { id: coreProblemId },
-        include: {
-            problems: {
-                include: {
-                    coreProblems: { select: { id: true } }
-                }
-            }
-        }
-    });
-
-    if (!cp || cp.problems.length === 0) return false;
-
-    // この単元に属する問題のうち、1問でも「全依存が満たされる」ものがあるか
-    return cp.problems.some(problem =>
-        problem.coreProblems.every(dep => unlockedCpIds.has(dep.id))
-    );
 }
 
 

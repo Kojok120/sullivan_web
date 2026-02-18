@@ -2,7 +2,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
-import { Role } from '@prisma/client';
+import { Prisma, Role } from '@prisma/client';
 import { requireAdmin } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -33,8 +33,11 @@ export async function resetPassword(userId: string, password: string) {
         // Find Supabase user by email (mapped from loginId)
         const email = `${prismaUser.loginId}@sullivan-internal.local`;
 
-        const { findSupabaseUserByEmail } = await import('@/lib/auth-admin');
-        const supabaseUser = await findSupabaseUserByEmail(email);
+        const { findSupabaseUser } = await import('@/lib/auth-admin');
+        const supabaseUser = await findSupabaseUser({
+            email,
+            prismaUserId: userId,
+        });
 
         if (!supabaseUser) {
             return { success: false, error: 'Supabaseユーザーが見つかりません' };
@@ -71,7 +74,7 @@ export async function getUsers(
 ) {
     await requireAdmin();
     try {
-        const where: any = {};
+        const where: Prisma.UserWhereInput = {};
 
         if (query) {
             where.OR = [
@@ -90,12 +93,16 @@ export async function getUsers(
 
         const skip = (page - 1) * limit;
 
-        const orderBy: any = {};
-        if (sortBy === 'group') {
-            orderBy.group = sortOrder;
-        } else {
-            orderBy[sortBy] = sortOrder;
-        }
+        const orderBy: Prisma.UserOrderByWithRelationInput =
+            sortBy === 'group'
+                ? { group: sortOrder }
+                : sortBy === 'name'
+                    ? { name: sortOrder }
+                    : sortBy === 'loginId'
+                        ? { loginId: sortOrder }
+                        : sortBy === 'role'
+                            ? { role: sortOrder }
+                            : { createdAt: sortOrder };
 
         const [users, total] = await Promise.all([
             prisma.user.findMany({
@@ -155,18 +162,21 @@ export async function createUser(data: { name: string; role: Role; password?: st
     }
 }
 
-export async function updateUser(id: string, data: { name?: string; role?: Role; group?: string; classroomId?: string }) {
+export async function updateUser(
+    id: string,
+    data: { name?: string; role?: Role; group?: string | null; classroomId?: string | null }
+) {
     await requireAdmin();
     try {
-        const updateData: any = {
-            name: data.name,
-            role: data.role,
-            group: data.group,
-            classroomId: data.classroomId
-        };
-
-        // Remove undefined fields
-        Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
+        const updateData: Prisma.UserUpdateInput = {};
+        if (data.name !== undefined) updateData.name = data.name;
+        if (data.role !== undefined) updateData.role = data.role;
+        if (data.group !== undefined) updateData.group = data.group;
+        if (data.classroomId !== undefined) {
+            updateData.classroom = data.classroomId
+                ? { connect: { id: data.classroomId } }
+                : { disconnect: true };
+        }
 
         const user = await prisma.user.update({
             where: { id },
@@ -196,40 +206,37 @@ export async function deleteUser(id: string) {
     }
 }
 
-// Wrapper for admin/users page that needs { success, classrooms: [{id, name}] } format
-// Uses consolidated getClassrooms from admin/classrooms/actions.ts
-export async function getClassroomsForAdmin() {
+export async function getUserManagementMeta() {
     await requireAdmin();
     try {
-        const { getClassrooms } = await import('@/app/admin/classrooms/actions');
-        const classrooms = await getClassrooms();
-        return {
-            success: true,
-            classrooms: classrooms.map(c => ({ id: c.id, name: c.name }))
-        };
-    } catch (error) {
-        console.error('Failed to fetch classrooms:', error);
-        return { error: '教室の取得に失敗しました' };
-    }
-}
-
-export async function getGroups() {
-    await requireAdmin();
-    try {
-        // Fetch all classrooms to get their groups
         const classrooms = await prisma.classroom.findMany({
-            select: { groups: true }
+            select: { id: true, name: true, groups: true },
+            orderBy: { name: 'asc' },
         });
 
-        // Flatten and unique
-        const allGroups = Array.from(new Set(classrooms.flatMap(c => c.groups)));
+        const allGroupsSet = new Set<string>();
+        classrooms.forEach((classroom) => {
+            classroom.groups.forEach((groupName) => {
+                allGroupsSet.add(groupName);
+            });
+        });
 
-        // Return as objects to match expected interface
-        const groups = allGroups.map(g => ({ id: g, name: g })).sort((a, b) => a.name.localeCompare(b.name));
+        const groups = Array.from(allGroupsSet)
+            .sort((a, b) => a.localeCompare(b))
+            .map((name) => ({ id: name, name }));
 
-        return { success: true, groups };
+        const classroomOptions = classrooms.map((classroom) => ({
+            id: classroom.id,
+            name: classroom.name,
+        }));
+
+        return {
+            success: true,
+            groups,
+            classrooms: classroomOptions,
+        };
     } catch (error) {
-        console.error('Failed to fetch groups:', error);
-        return { error: 'グループの取得に失敗しました' };
+        console.error('Failed to fetch user management metadata:', error);
+        return { error: 'ユーザー管理メタデータの取得に失敗しました' };
     }
 }

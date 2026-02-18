@@ -43,7 +43,7 @@ export default async function TeacherStudentDetailPage({
         );
     }
 
-    const { student, stats, subjectProgress, dailyActivity, weaknesses, recentHistory, subjects } = dashboardData;
+    const { student, stats, subjectProgress, dailyActivity, weaknesses, subjects } = dashboardData;
     const classrooms = await prisma.classroom.findMany({ orderBy: { createdAt: 'asc' } });
 
 

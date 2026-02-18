@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Trash2, Plus, Users, ArrowLeft, Save } from 'lucide-react';
 import { toast } from 'sonner';
@@ -19,23 +18,9 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { RoleBadge } from '@/components/ui/role-badge';
+import type { ClassroomWithUsers } from '@/lib/types/classroom';
 
-interface User {
-    id: string;
-    loginId: string;
-    name: string | null;
-    role: string;
-    group: string | null;
-}
-
-interface Classroom {
-    id: string;
-    name: string;
-    groups: string[];
-    users: User[];
-}
-
-export function ClassroomDetail({ classroom }: { classroom: Classroom }) {
+export function ClassroomDetail({ classroom }: { classroom: ClassroomWithUsers }) {
     const router = useRouter();
     const [groups, setGroups] = useState<string[]>(classroom.groups || []);
     const [newGroup, setNewGroup] = useState('');

@@ -63,10 +63,12 @@ export function StampCard({ totalStamps, newStamps }: StampCardProps) {
 }
 
 function StampMark({ isNew, index }: { isNew: boolean, index: number }) {
+    const rotate = ((index * 7) % 21) - 10;
+
     return (
         <motion.div
-            initial={isNew ? { scale: 2, opacity: 0, rotate: -30 } : { scale: 1, opacity: 1, rotate: Math.random() * 20 - 10 }}
-            animate={isNew ? { scale: 1, opacity: 1, rotate: Math.random() * 20 - 10 } : {}}
+            initial={isNew ? { scale: 2, opacity: 0, rotate: -30 } : { scale: 1, opacity: 1, rotate }}
+            animate={isNew ? { scale: 1, opacity: 1, rotate } : {}}
             transition={isNew ? {
                 type: "spring",
                 stiffness: 300,

@@ -2,13 +2,13 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { UnitFocusListClient } from "./components/unit-focus-list-client";
+import { normalizeLectureVideos } from "@/lib/lecture-videos";
 
 export default async function UnitFocusPage() {
     const session = await getSession();
     if (!session) redirect("/login");
 
     // Fetch Subjects with CoreProblems and User States
-    // Fixing type error by ensuring lectureVideos matches expected type (it confuses Json with any often)
     const subjectsRaw = await prisma.subject.findMany({
         orderBy: { order: 'asc' },
         include: {
@@ -27,7 +27,7 @@ export default async function UnitFocusPage() {
         ...s,
         coreProblems: s.coreProblems.map(cp => ({
             ...cp,
-            lectureVideos: (cp as any).lectureVideos as any
+            lectureVideos: normalizeLectureVideos(cp.lectureVideos)
         }))
     }));
 

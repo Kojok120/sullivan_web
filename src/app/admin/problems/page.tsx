@@ -1,4 +1,3 @@
-import { Suspense } from 'react';
 import { getProblems } from './actions';
 import { ProblemManager } from './problem-manager';
 import { getSubjects } from '../curriculum/actions';
@@ -51,17 +50,15 @@ export default async function ProblemsPage({
     return (
         <div className="container mx-auto py-8">
             <h1 className="text-2xl font-bold mb-6">問題管理</h1>
-            <Suspense fallback={<div>Loading...</div>}>
-                <ProblemManager
-                    initialProblems={problems as any}
-                    totalCount={total || 0}
-                    currentPage={page}
-                    initialQuery={query}
-                    sortBy={sortBy}
-                    sortOrder={sortOrder}
-                    subjects={subjects}
-                />
-            </Suspense>
+            <ProblemManager
+                initialProblems={problems}
+                totalCount={total || 0}
+                currentPage={page}
+                initialQuery={query}
+                sortBy={sortBy}
+                sortOrder={sortOrder}
+                subjects={subjects}
+            />
         </div>
     );
 }

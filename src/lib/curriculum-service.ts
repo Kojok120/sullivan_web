@@ -5,6 +5,8 @@ import { getSubjectPrefix } from '@/lib/subject-config';
 export { getSubjectPrefix, getSubjectConfig } from '@/lib/subject-config';
 export type { SubjectConfig } from '@/lib/subject-config';
 
+type CurriculumServiceClient = Pick<typeof prisma, 'subject' | 'problem' | '$queryRaw'>;
+
 export async function fetchSubjects(options?: { includeCoreProblems?: boolean }) {
     const includeCoreProblems = options?.includeCoreProblems ?? false;
 
@@ -28,7 +30,10 @@ export async function fetchSubjects(options?: { includeCoreProblems?: boolean })
 }
 
 
-export async function getMaxCustomIdNumber(prefix: string, client: any = prisma): Promise<number> {
+export async function getMaxCustomIdNumber(
+    prefix: string,
+    client: CurriculumServiceClient = prisma
+): Promise<number> {
     const prefixDash = prefix + '-';
     // Postgres specific syntax to find max number safely-ish
     // We assume the format is strictly {prefix}-{number}
@@ -36,7 +41,7 @@ export async function getMaxCustomIdNumber(prefix: string, client: any = prisma)
 
     try {
         const lengthPlusOne = prefixDash.length + 1;
-        const result = await client.$queryRaw`
+        const result = await client.$queryRaw<Array<{ max_num: number | string | bigint | null }>>`
             SELECT MAX(CAST(SUBSTRING("customId", ${lengthPlusOne}::integer) AS INTEGER)) as max_num
             FROM "Problem"
             WHERE "customId" LIKE ${prefixDash + '%'}
@@ -71,7 +76,7 @@ export async function getMaxCustomIdNumber(prefix: string, client: any = prisma)
     return 0;
 }
 
-export async function getNextCustomId(subjectId: string, tx?: any): Promise<string> {
+export async function getNextCustomId(subjectId: string, tx?: CurriculumServiceClient): Promise<string> {
     const client = tx || prisma;
     const subject = await client.subject.findUnique({ where: { id: subjectId } });
     if (!subject) throw new Error('Subject not found');
@@ -88,7 +93,7 @@ export async function getNextCustomId(subjectId: string, tx?: any): Promise<stri
 export async function getNextCustomIds(
     subjectId: string,
     count: number,
-    tx?: any
+    tx?: CurriculumServiceClient
 ): Promise<string[]> {
     const client = tx || prisma;
     const subject = await client.subject.findUnique({ where: { id: subjectId } });

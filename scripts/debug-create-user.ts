@@ -1,8 +1,5 @@
 import { createUser } from '../src/lib/user-service';
 import { prisma } from '../src/lib/prisma';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as dotenv from 'dotenv';
 
 // Force load .env.production into process.env BEFORE other imports if possible, 
 // but imports are cached. 

@@ -16,10 +16,36 @@ if (!supabaseUrl || !serviceRoleKey) {
 
 const supabase = createClient(supabaseUrl, serviceRoleKey);
 
+type SupportedRole = 'STUDENT' | 'TEACHER' | 'PARENT' | 'ADMIN';
+type MigratableMetadata = {
+    role?: SupportedRole;
+    prismaUserId?: string;
+    name?: string;
+};
+
+const SUPPORTED_ROLES = new Set<SupportedRole>(['STUDENT', 'TEACHER', 'PARENT', 'ADMIN']);
+
+function toRecord(value: unknown): Record<string, unknown> {
+    if (typeof value === 'object' && value !== null) {
+        return value as Record<string, unknown>;
+    }
+    return {};
+}
+
+function toNonEmptyString(value: unknown): string | undefined {
+    return typeof value === 'string' && value.trim().length > 0 ? value : undefined;
+}
+
+function toSupportedRole(value: unknown): SupportedRole | undefined {
+    if (typeof value !== 'string') {
+        return undefined;
+    }
+    return SUPPORTED_ROLES.has(value as SupportedRole) ? (value as SupportedRole) : undefined;
+}
+
 async function migrateRoles() {
     console.log('Starting role migration...');
 
-    let page = 1;
     const { data: { users }, error } = await supabase.auth.admin.listUsers();
 
     if (error || !users) {
@@ -30,26 +56,33 @@ async function migrateRoles() {
     console.log(`Found ${users.length} users.`);
 
     for (const user of users) {
-        const userMeta = user.user_metadata || {};
-        const appMeta = user.app_metadata || {};
+        const userMeta = toRecord(user.user_metadata);
+        const appMeta = toRecord(user.app_metadata);
 
         // Check if migration is needed
         // We want to move 'role', 'prismaUserId', 'name' from user_metadata to app_metadata if missing or different
-        const updates: any = {};
+        const updates: Partial<MigratableMetadata> = {};
+
+        const userRole = toSupportedRole(userMeta.role);
+        const appRole = toSupportedRole(appMeta.role);
+        const userPrismaUserId = toNonEmptyString(userMeta.prismaUserId);
+        const appPrismaUserId = toNonEmptyString(appMeta.prismaUserId);
+        const userName = toNonEmptyString(userMeta.name);
+        const appName = toNonEmptyString(appMeta.name);
 
         // Role
-        if (userMeta.role && appMeta.role !== userMeta.role) {
-            updates.role = userMeta.role;
+        if (userRole && appRole !== userRole) {
+            updates.role = userRole;
         }
 
         // Prisma ID
-        if (userMeta.prismaUserId && appMeta.prismaUserId !== userMeta.prismaUserId) {
-            updates.prismaUserId = userMeta.prismaUserId;
+        if (userPrismaUserId && appPrismaUserId !== userPrismaUserId) {
+            updates.prismaUserId = userPrismaUserId;
         }
 
         // Name (Optional, but good to have in secure meta too)
-        if (userMeta.name && appMeta.name !== userMeta.name) {
-            updates.name = userMeta.name;
+        if (userName && appName !== userName) {
+            updates.name = userName;
         }
 
         if (Object.keys(updates).length > 0) {

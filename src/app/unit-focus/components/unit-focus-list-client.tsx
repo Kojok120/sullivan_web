@@ -1,17 +1,17 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Lock, Unlock, PlayCircle, BookOpen } from "lucide-react";
 import { getSubjectConfig } from "@/lib/subject-config";
+import type { LectureVideo } from "@/lib/lecture-videos";
 
 interface CoreProblemData {
     id: string;
     name: string;
-    lectureVideos: any; // Using any to avoid type issues with Json value
+    lectureVideos: LectureVideo[];
     userStates: { isUnlocked: boolean }[];
 }
 
@@ -84,7 +84,7 @@ export function UnitFocusListClient({ subjects }: UnitFocusListClientProps) {
                                             </CardHeader>
                                             <CardContent>
                                                 <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                                    {(coreProblem.lectureVideos as any[] | null)?.length ? (
+                                                    {coreProblem.lectureVideos.length > 0 ? (
                                                         <div className="flex items-center gap-1 text-blue-600">
                                                             <PlayCircle className="w-4 h-4" />
                                                             <span>動画あり</span>

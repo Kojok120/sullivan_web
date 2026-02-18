@@ -4,6 +4,30 @@ import { prisma } from '@/lib/prisma';
 import { getSession, isTeacherOrAdmin } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 import { GuidanceType } from '@prisma/client';
+import { normalizeOptionalSelection } from '@/lib/form-selection';
+
+async function ensureTeacherCanAccessStudent(
+    teacherId: string,
+    studentId: string,
+    errorMessage: string
+): Promise<string | null> {
+    const [teacher, student] = await Promise.all([
+        prisma.user.findUnique({
+            where: { id: teacherId },
+            select: { classroomId: true }
+        }),
+        prisma.user.findUnique({
+            where: { id: studentId },
+            select: { classroomId: true }
+        })
+    ]);
+
+    if (!teacher?.classroomId || !student?.classroomId || teacher.classroomId !== student.classroomId) {
+        return errorMessage;
+    }
+
+    return null;
+}
 
 export async function updateStudentProfile(userId: string, formData: FormData) {
     const session = await getSession();
@@ -13,17 +37,13 @@ export async function updateStudentProfile(userId: string, formData: FormData) {
 
     // SECURITY: Teachers can only edit students in their assigned classroom (IDOR protection)
     if (session.role === 'TEACHER') {
-        const teacher = await prisma.user.findUnique({
-            where: { id: session.userId },
-            select: { classroomId: true }
-        });
-        const student = await prisma.user.findUnique({
-            where: { id: userId },
-            select: { classroomId: true }
-        });
-
-        if (!teacher?.classroomId || !student?.classroomId || teacher.classroomId !== student.classroomId) {
-            return { error: '担当教室外の生徒は編集できません' };
+        const accessError = await ensureTeacherCanAccessStudent(
+            session.userId,
+            userId,
+            '担当教室外の生徒は編集できません'
+        );
+        if (accessError) {
+            return { error: accessError };
         }
     }
 
@@ -36,6 +56,9 @@ export async function updateStudentProfile(userId: string, formData: FormData) {
     const phoneNumber = formData.get('phoneNumber') as string;
     const email = formData.get('email') as string;
 
+    const normalizedClassroomId = normalizeOptionalSelection(classroomId);
+    const normalizedGroup = normalizeOptionalSelection(group);
+
     try {
 
 
@@ -46,9 +69,8 @@ export async function updateStudentProfile(userId: string, formData: FormData) {
                 notes,
                 birthday: birthdayStr ? new Date(birthdayStr) : null,
                 // SECURITY: Only Admins can change classroomId to prevent unauthorized transfers
-                classroomId: (session.role === 'ADMIN' && classroomId && classroomId !== 'unselected') ? classroomId : undefined,
-
-                group: (group && group !== 'unselected') ? group : null,
+                classroomId: session.role === 'ADMIN' ? normalizedClassroomId : undefined,
+                group: normalizedGroup ?? null,
                 school,
                 phoneNumber,
                 email,
@@ -79,10 +101,13 @@ export async function addGuidanceRecord(userId: string, formData: FormData) {
 
     // SECURITY: Verify student is in teacher's classroom
     if (session.role === 'TEACHER') {
-        const teacher = await prisma.user.findUnique({ where: { id: session.userId }, select: { classroomId: true } });
-        const student = await prisma.user.findUnique({ where: { id: userId }, select: { classroomId: true } });
-        if (!teacher?.classroomId || !student?.classroomId || teacher.classroomId !== student.classroomId) {
-            return { error: '担当教室外の生徒です' };
+        const accessError = await ensureTeacherCanAccessStudent(
+            session.userId,
+            userId,
+            '担当教室外の生徒です'
+        );
+        if (accessError) {
+            return { error: accessError };
         }
     }
 

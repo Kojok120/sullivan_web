@@ -5,21 +5,11 @@ import { signupAction } from './actions';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
-
-interface Group {
-    id: string;
-    name: string;
-}
-
-interface Classroom {
-    id: string;
-    name: string;
-    groups: string[]; // Group names/IDs associated with this classroom
-}
+import type { ClassroomWithGroups, GroupOption } from '@/lib/types/classroom';
 
 interface RegisterFormProps {
-    classrooms: Classroom[];
-    allGroups: Group[]; // All available groups in the system if needed, or derived from classrooms
+    classrooms: ClassroomWithGroups[];
+    allGroups: GroupOption[]; // All available groups in the system if needed, or derived from classrooms
 }
 
 export function RegisterForm({ classrooms, allGroups }: RegisterFormProps) {

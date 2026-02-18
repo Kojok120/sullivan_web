@@ -18,6 +18,10 @@ function resolveSilenceHoldMs() {
 
 const SILENCE_HOLD_MS = resolveSilenceHoldMs();
 
+type WindowWithWebkitAudioContext = Window & {
+    webkitAudioContext?: typeof AudioContext;
+};
+
 export class AudioStreamer {
     public audioContext: AudioContext | null = null;
     public isRecording: boolean = false;
@@ -39,7 +43,13 @@ export class AudioStreamer {
     }
 
     async initialize() {
-        this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
+        const audioContextClass =
+            window.AudioContext || (window as WindowWithWebkitAudioContext).webkitAudioContext;
+        if (!audioContextClass) {
+            throw new Error("AudioContext is not supported in this environment");
+        }
+
+        this.audioContext = new audioContextClass({
             sampleRate: GEMINI_OUTPUT_SAMPLE_RATE,
         });
 
