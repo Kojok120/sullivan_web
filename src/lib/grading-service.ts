@@ -1,7 +1,9 @@
 import QRCode from 'qrcode';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
+import type { GenerativeModel, ResponseSchema } from '@google/generative-ai';
 import { Client as QStashClient } from '@upstash/qstash';
 import { prisma } from '@/lib/prisma';
+import type { Prisma, User } from '@prisma/client';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -51,7 +53,7 @@ function getDrive() {
  * Loads a prompt from a markdown file in the instructions directory.
  * Replaces {{key}} placeholders with values from the variables object.
  */
-function loadPrompt(filename: string, variables: Record<string, any> = {}): string {
+function loadPrompt(filename: string, variables: Record<string, unknown> = {}): string {
     const filePath = path.join(process.cwd(), 'instructions', filename);
     let content = fs.readFileSync(filePath, 'utf-8');
     for (const [key, value] of Object.entries(variables)) {
@@ -162,7 +164,7 @@ type AnalyzedFile = {
     prepared: PreparedFile;
     qrData: QRData | null;
     studentId: string | null;
-    user: any | null; // Prisma User
+    user: User | null;
     cleanup: () => Promise<void>;
 };
 
@@ -190,12 +192,12 @@ async function downloadAndAnalyzeFile(fileId: string, fileName: string): Promise
             { responseType: 'stream' }
         );
 
-        await new Promise((resolve, reject) => {
+        await new Promise<void>((resolve, reject) => {
             res.data
-                .on('error', (err: any) => reject(err))
+                .on('error', (err: unknown) => reject(err))
                 .pipe(dest)
-                .on('error', (err: any) => reject(err))
-                .on('finish', () => resolve(true));
+                .on('error', (err: unknown) => reject(err))
+                .on('finish', () => resolve());
         });
 
         const stats = await fs.promises.stat(destPath);
@@ -371,7 +373,7 @@ async function archiveProcessedFile(fileId: string, studentId: string, problemId
             where: { id: studentId },
             include: { classroom: true }
         });
-        const classroomName = (user as any)?.classroom?.name || '未所属';
+        const classroomName = user?.classroom?.name || '未所属';
         const studentName = user?.name || user?.loginId || '不明な生徒';
 
         // 2. Get Subject Name via Problem
@@ -565,7 +567,7 @@ type ProblemForGrading = {
  * This ensures that the response matches the expected structure and all indices are valid.
  */
 function validateGradingResponse(
-    resultsJson: any[],
+    resultsJson: unknown,
     problems: ProblemForGrading[],
     userId: string
 ): GradingValidationResult {
@@ -586,8 +588,12 @@ function validateGradingResponse(
     // 3. Validate each result and check for duplicates
     const seenIndices = new Set<number>();
 
-    for (const r of resultsJson) {
-        const idx = r.problemIndex;
+    for (const [rawIndex, rawResult] of resultsJson.entries()) {
+        if (!isRecord(rawResult)) {
+            errors.push(`Result at position ${rawIndex} is not an object`);
+            continue;
+        }
+        const idx = rawResult.problemIndex;
 
         // Index range check
         if (typeof idx !== 'number' || idx < 0 || idx >= expectedCount) {
@@ -603,20 +609,25 @@ function validateGradingResponse(
         seenIndices.add(idx);
 
         // Evaluation value check
-        if (!['A', 'B', 'C', 'D'].includes(r.evaluation)) {
-            errors.push(`Invalid evaluation for index ${idx}: ${r.evaluation}`);
+        const evaluation = rawResult.evaluation;
+        if (evaluation !== 'A' && evaluation !== 'B' && evaluation !== 'C' && evaluation !== 'D') {
+            errors.push(`Invalid evaluation for index ${idx}: ${String(evaluation)}`);
             continue;
         }
 
         // Convert index to actual problem ID
         const problem = problems[idx];
+        const studentAnswer =
+            typeof rawResult.studentAnswer === 'string' ? rawResult.studentAnswer : "(空欄)";
+        const feedback =
+            typeof rawResult.feedback === 'string' ? rawResult.feedback : "";
         validatedResults.push({
             studentId: userId,
             problemId: problem.id,  // Convert index to actual problemId
-            userAnswer: r.studentAnswer || "(空欄)",
-            evaluation: r.evaluation,
-            isCorrect: r.evaluation === 'A' || r.evaluation === 'B',
-            feedback: r.feedback || "",
+            userAnswer: studentAnswer,
+            evaluation,
+            isCorrect: evaluation === 'A' || evaluation === 'B',
+            feedback,
             badCoreProblemIds: []  // Not used in new schema for simplicity
         });
     }
@@ -630,6 +641,10 @@ function validateGradingResponse(
 
     const isValid = errors.length === 0 && validatedResults.length === expectedCount;
     return { isValid, errors, validatedResults };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null;
 }
 
 // Local QR Reader using Python OpenCV via child_process
@@ -816,26 +831,27 @@ async function gradeWithGemini(
     }));
 
     // 3. Define responseSchema for structured output
-    const gradingResponseSchema = {
-        type: "array" as const,
+    const gradingResponseSchema: ResponseSchema = {
+        type: SchemaType.ARRAY,
         items: {
-            type: "object" as const,
+            type: SchemaType.OBJECT,
             properties: {
                 problemIndex: {
-                    type: "integer" as const,
+                    type: SchemaType.INTEGER,
                     description: "問題のインデックス（0始まり、問題リストの順序に対応）"
                 },
                 studentAnswer: {
-                    type: "string" as const,
+                    type: SchemaType.STRING,
                     description: "生徒の解答をそのまま転記"
                 },
                 evaluation: {
-                    type: "string" as const,
+                    type: SchemaType.STRING,
+                    format: "enum",
                     enum: ["A", "B", "C", "D"],
                     description: "A=完璧, B=ほぼ正解, C=部分的に正解, D=不正解"
                 },
                 feedback: {
-                    type: "string" as const,
+                    type: SchemaType.STRING,
                     description: "日本語でのフィードバック"
                 }
             },
@@ -849,7 +865,7 @@ async function gradeWithGemini(
         generationConfig: {
             responseMimeType: "application/json",
             responseSchema: gradingResponseSchema
-        } as any  // Type assertion needed for responseSchema
+        }
     });
 
     // 5. Build enhanced prompt
@@ -911,7 +927,7 @@ async function gradeWithGemini(
 }
 
 // Helper: Scan QR with Gemini
-async function scanQRWithGemini(model: any, base64Data: string, mimeType: string): Promise<QRData | null> {
+async function scanQRWithGemini(model: GenerativeModel, base64Data: string, mimeType: string): Promise<QRData | null> {
     try {
         const prompt = loadPrompt('qr-scan-prompt.md');
         // ...
@@ -936,8 +952,8 @@ async function scanQRWithGemini(model: any, base64Data: string, mimeType: string
     }
 }
 
-function normalizeQrData(raw: any): QRData | null {
-    if (!raw || typeof raw !== 'object') return null;
+function normalizeQrData(raw: unknown): QRData | null {
+    if (!isRecord(raw)) return null;
 
     const normalized: QRData = {};
 
@@ -951,7 +967,7 @@ function normalizeQrData(raw: any): QRData | null {
 
     if (raw.p !== undefined && raw.p !== null) {
         if (Array.isArray(raw.p)) {
-            const list = raw.p.map((id: any) => String(id).trim()).filter(Boolean);
+            const list = raw.p.map((id) => String(id).trim()).filter(Boolean);
             if (list.length > 0) {
                 normalized.p = list.join(',');
             }
@@ -963,7 +979,7 @@ function normalizeQrData(raw: any): QRData | null {
                     const parsed = JSON.parse(trimmed);
                     if (Array.isArray(parsed)) {
                         parsedArray = true;
-                        const list = parsed.map((id: any) => String(id).trim()).filter(Boolean);
+                        const list = parsed.map((id) => String(id).trim()).filter(Boolean);
                         if (list.length > 0) {
                             normalized.p = list.join(',');
                         }
@@ -982,7 +998,7 @@ function normalizeQrData(raw: any): QRData | null {
     return normalized;
 }
 
-function parseJSON(text: string): any {
+function parseJSON(text: string): unknown {
     try {
         // Clean markdown code blocks
         let clean = text.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -1033,8 +1049,8 @@ export async function recordGradingResults(results: GradingResult[]) {
         });
         const stateMap = new Map(currentStates.map(s => [s.problemId, s]));
 
-        const newStates: any[] = [];
-        const updatePromises: any[] = [];
+        const newStates: Prisma.UserProblemStateCreateManyInput[] = [];
+        const updatePromises: Prisma.PrismaPromise<unknown>[] = [];
 
         for (const r of results) {
             const currentState = stateMap.get(r.problemId);

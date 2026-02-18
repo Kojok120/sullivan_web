@@ -5,6 +5,24 @@
 
 import { prisma } from '@/lib/prisma';
 import { getNextCustomId, getNextCustomIds } from '@/lib/curriculum-service';
+import type { Prisma } from '@prisma/client';
+
+type ProblemServiceClient = Pick<
+    typeof prisma,
+    'coreProblem' | 'problem' | 'learningHistory' | 'userProblemState'
+>;
+
+type ProblemServiceClientWithTransaction = ProblemServiceClient & Partial<Pick<typeof prisma, '$transaction'>>;
+
+async function runBatchTransaction(
+    client: ProblemServiceClientWithTransaction,
+    operations: Prisma.PrismaPromise<unknown>[]
+): Promise<unknown[]> {
+    if (typeof client.$transaction === 'function') {
+        return client.$transaction(operations);
+    }
+    return Promise.all(operations);
+}
 
 export interface CreateProblemData {
     question: string;
@@ -30,7 +48,7 @@ export type BulkCreateOptions = {
  */
 async function resolveSubjectId(
     data: { subjectId?: string; coreProblemIds: string[] },
-    tx: any = prisma
+    tx: ProblemServiceClient = prisma
 ): Promise<string | undefined> {
     if (data.subjectId) {
         return data.subjectId;
@@ -54,7 +72,7 @@ async function resolveSubjectId(
  */
 export async function createProblemCore(
     data: CreateProblemData,
-    tx: any = prisma
+    tx: ProblemServiceClient = prisma
 ) {
     // customId生成
     let customId: string | undefined;
@@ -99,27 +117,29 @@ export async function createProblemCore(
  */
 export async function deleteProblemsWithRelations(
     ids: string[],
-    tx: any = prisma
+    tx: ProblemServiceClientWithTransaction = prisma
 ): Promise<number> {
     if (ids.length === 0) return 0;
 
     if (ids.length === 1) {
         const id = ids[0];
-        await tx.$transaction([
+        const singleDeleteOperations = [
             tx.learningHistory.deleteMany({ where: { problemId: id } }),
             tx.userProblemState.deleteMany({ where: { problemId: id } }),
             tx.problem.delete({ where: { id } }),
-        ]);
+        ];
+        await runBatchTransaction(tx, singleDeleteOperations);
         return 1;
     }
 
-    const [, , deleteResult] = await tx.$transaction([
+    const [, , deleteResult] = await runBatchTransaction(tx, [
         tx.learningHistory.deleteMany({ where: { problemId: { in: ids } } }),
         tx.userProblemState.deleteMany({ where: { problemId: { in: ids } } }),
         tx.problem.deleteMany({ where: { id: { in: ids } } }),
     ]);
 
-    return deleteResult.count ?? ids.length;
+    const deleteBatchPayload = deleteResult as { count?: number };
+    return deleteBatchPayload.count ?? ids.length;
 }
 
 /**
@@ -129,7 +149,7 @@ export async function deleteProblemsWithRelations(
  */
 export async function checkDuplicateQuestions(
     questions: string[],
-    tx: any = prisma
+    tx: ProblemServiceClient = prisma
 ): Promise<Set<string>> {
     const existingProblems = await tx.problem.findMany({
         where: { question: { in: questions } },
@@ -145,7 +165,7 @@ export async function checkDuplicateQuestions(
  */
 export async function fetchCoreProblemMap(
     coreProblemIds: string[],
-    tx: any = prisma
+    tx: ProblemServiceClient = prisma
 ): Promise<Map<string, { id: string; subjectId: string; subject: { name: string } }>> {
     if (coreProblemIds.length === 0) {
         return new Map();
@@ -156,7 +176,7 @@ export async function fetchCoreProblemMap(
         include: { subject: true }
     });
 
-    return new Map(coreProblems.map((cp: any) => [cp.id, cp]));
+    return new Map(coreProblems.map((cp) => [cp.id, cp]));
 }
 
 /**
@@ -165,7 +185,7 @@ export async function fetchCoreProblemMap(
 export async function bulkCreateProblemsCore(
     problems: CreateProblemData[],
     options: BulkCreateOptions = {},
-    client: any = prisma
+    client: ProblemServiceClientWithTransaction = prisma
 ): Promise<{ count: number; warnings: string[] }> {
     const warnings: string[] = [];
 
@@ -272,7 +292,7 @@ export async function bulkCreateProblemsCore(
                 });
             });
 
-            await client.$transaction(createOperations);
+            await runBatchTransaction(client, createOperations);
             createdCount += batch.length;
         } catch (error) {
             warnings.push(`バッチ処理エラー (${i + 1}〜${Math.min(i + batchSize, totalProblems)}件目): ${error}`);
@@ -291,7 +311,7 @@ export async function bulkCreateProblemsCore(
 export async function bulkUpsertProblemsCore(
     problems: CreateProblemData[],
     options: BulkCreateOptions = {},
-    client: any = prisma
+    client: ProblemServiceClientWithTransaction = prisma
 ): Promise<{ createdCount: number; updatedCount: number; warnings: string[] }> {
     const warnings: string[] = [];
     if (problems.length === 0) return { createdCount: 0, updatedCount: 0, warnings };
@@ -308,7 +328,11 @@ export async function bulkUpsertProblemsCore(
             where: { masterNumber: { in: inputMasterNumbers } },
             select: { id: true, masterNumber: true }
         });
-        existing.forEach((p: any) => existingProblemsMap.set(p.masterNumber!, p.id));
+        existing.forEach((p) => {
+            if (typeof p.masterNumber === 'number') {
+                existingProblemsMap.set(p.masterNumber, p.id);
+            }
+        });
     }
 
     const toCreate: CreateProblemData[] = [];
@@ -353,7 +377,7 @@ export async function bulkUpsertProblemsCore(
                     });
                 });
 
-                await client.$transaction(updateOperations);
+                await runBatchTransaction(client, updateOperations);
                 updatedCount += batch.length;
             } catch (error) {
                 warnings.push(`更新バッチ処理エラー (${i + 1}〜${Math.min(i + batchSize, toUpdate.length)}件目): ${error}`);

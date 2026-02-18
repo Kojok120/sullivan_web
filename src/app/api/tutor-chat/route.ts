@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import type { EnhancedGenerateContentResponse, GenerateContentResponse } from '@google/generative-ai';
 import { getSession } from '@/lib/auth';
 
 type ChatMessage = {
@@ -79,10 +80,10 @@ function normalizeTutorReply(text: string) {
     return reply;
 }
 
-function extractModelText(response: any): string {
+function extractModelText(response: EnhancedGenerateContentResponse): string {
     let reply = '';
     try {
-        reply = typeof response?.text === 'function' ? response.text().trim() : '';
+        reply = response.text().trim();
     } catch {
         reply = '';
     }
@@ -94,14 +95,14 @@ function extractModelText(response: any): string {
     if (!Array.isArray(parts)) return '';
 
     return parts
-        .map((part: any) => (typeof part?.text === 'string' ? part.text : ''))
+        .map((part) => (typeof part.text === 'string' ? part.text : ''))
         .join('\n')
         .trim();
 }
 
-function getFinishReason(response: any): string {
+function getFinishReason(response: GenerateContentResponse): string {
     const reason = response?.candidates?.[0]?.finishReason;
-    return typeof reason === 'string' ? reason : '';
+    return typeof reason === 'string' ? reason : reason ? String(reason) : '';
 }
 
 function isUnnaturalReply(text: string) {
@@ -245,7 +246,7 @@ ${translationMode ? '生徒の質問は語句・短文の訳なので、最初�
         if (!reply) {
             console.warn('[TutorChat] Empty text response from Gemini', {
                 model: CHAT_MODEL,
-                promptFeedback: (response as any)?.promptFeedback,
+                promptFeedback: response.promptFeedback,
                 finishReason: getFinishReason(response),
             });
             return NextResponse.json({

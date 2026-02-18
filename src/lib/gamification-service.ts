@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { Achievement } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 
 export const XP_PER_LOGIN = 50;
 export const XP_PER_ANSWER = 10;
@@ -198,7 +199,12 @@ export async function processVideoWatch(userId: string): Promise<GamificationUpd
 }
 
 // Helper to check achievements
-async function checkAchievements(tx: any, userId: string, currentStreak: number, isVideoCheck = false) {
+async function checkAchievements(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    currentStreak: number,
+    isVideoCheck = false
+) {
     const unlockedAchievements: Achievement[] = [];
 
     // Optimize: Get user's unlocked achievement IDs first
@@ -206,10 +212,10 @@ async function checkAchievements(tx: any, userId: string, currentStreak: number,
         where: { userId },
         select: { achievementId: true }
     });
-    const unlockedIds = new Set(userUnlocked.map((ua: any) => ua.achievementId));
+    const unlockedIds = new Set(userUnlocked.map((ua) => ua.achievementId));
 
     const allAchievements = await tx.achievement.findMany();
-    const pendingAchievements = allAchievements.filter((a: any) => !unlockedIds.has(a.id));
+    const pendingAchievements = allAchievements.filter((a) => !unlockedIds.has(a.id));
 
     // Cache some aggregates
     let totalSolvedCount = -1;
@@ -259,7 +265,7 @@ async function checkAchievements(tx: any, userId: string, currentStreak: number,
                 // Count sessions where (Mistakes > 0 AND UnwatchedMistakes == 0) OR (Mistakes == 0)
                 // Effectively: Sessions where UnwatchedMistakes == 0
                 // Note: We need to filter by groupId is not null to ensure it's a valid session.
-                const countResult = await tx.$queryRaw`
+                const countResult = await tx.$queryRaw<Array<{ count: number | string | bigint }>>`
                     SELECT COUNT(*) as count FROM (
                         SELECT lh."groupId"
                         FROM "LearningHistory" lh
@@ -278,8 +284,7 @@ async function checkAchievements(tx: any, userId: string, currentStreak: number,
                             END) = 0
                     ) as completed_sessions
                 `;
-                // Type assertion for raw query result
-                totalReviewCount = Number((countResult as any)[0]?.count || 0);
+                totalReviewCount = Number(countResult[0]?.count || 0);
             }
             const target = parseInt(achievement.slug.replace('review-', ''));
             if (!isNaN(target) && totalReviewCount >= target) isUnlocked = true;
@@ -295,7 +300,7 @@ async function checkAchievements(tx: any, userId: string, currentStreak: number,
 
             if (totalPerfectCount === -1) {
                 // Count sessions (groups) where all answers were correct (no C or D)
-                const countResult = await tx.$queryRaw`
+                const countResult = await tx.$queryRaw<Array<{ count: number | string | bigint }>>`
                     SELECT COUNT(*) as count FROM (
                         SELECT lh."groupId"
                         FROM "LearningHistory" lh
@@ -304,7 +309,7 @@ async function checkAchievements(tx: any, userId: string, currentStreak: number,
                         HAVING COUNT(CASE WHEN lh.evaluation IN ('C', 'D') THEN 1 END) = 0
                     ) as perfect_sessions
                 `;
-                totalPerfectCount = Number((countResult as any)[0]?.count || 0);
+                totalPerfectCount = Number(countResult[0]?.count || 0);
             }
 
             const target = parseInt(achievement.slug.replace('perfect-', ''));
@@ -332,7 +337,7 @@ async function checkAchievements(tx: any, userId: string, currentStreak: number,
                     const unlockedCount = await tx.userCoreProblemState.count({
                         where: {
                             userId,
-                            coreProblemId: { in: subject.coreProblems.map((cp: any) => cp.id) },
+                            coreProblemId: { in: subject.coreProblems.map((cp) => cp.id) },
                             isUnlocked: true
                         }
                     });
