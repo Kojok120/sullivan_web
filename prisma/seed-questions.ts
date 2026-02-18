@@ -114,6 +114,11 @@ const questions = [
     { category: 'EMOTIONAL_REGULATION', question: 'どんな状況でも、希望を持って取り組むことができる。' }
 ];
 
+/**
+ * Seeds the questionBank table with the predefined questions.
+ *
+ * For each entry in the module-level `questions` array, inserts a record if no existing record has the same `question` text. Logs start and finish messages to the console.
+ */
 async function main() {
     console.log('Start seeding questions...');
 

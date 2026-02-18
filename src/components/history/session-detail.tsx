@@ -21,6 +21,19 @@ type SessionDetailProps = {
     backUrl?: string; // 戻るボタンのリンク先
 };
 
+/**
+ * Render the session grading view for a given group and user, showing each question's
+ * answer, correct solution, AI feedback, and video/lecture actions; may display a survey modal.
+ *
+ * Performs an observable side effect: when not in teacher view, marks the session as reviewed
+ * and conditionally shows a survey modal if the user is eligible.
+ *
+ * @param groupId - Identifier for the group whose session details are displayed
+ * @param userId - Identifier for the user whose session details are displayed
+ * @param isTeacherView - When true, suppresses side effects and teacher-specific UI adjustments
+ * @param backUrl - URL to navigate back to from the header (defaults to "/")
+ * @returns The JSX element containing the session detail UI for the specified group and user
+ */
 export async function SessionDetail({
     groupId,
     userId,

@@ -15,6 +15,13 @@ interface SurveyModalProps {
     onComplete?: () => void;
 }
 
+/**
+ * Renders a survey modal that fetches questions on mount, collects a 1–5 response for each question, and submits the answers.
+ *
+ * @param userId - ID of the user whose survey responses will be submitted
+ * @param onComplete - Optional callback invoked after a successful submission
+ * @returns The modal element when questions are available; `null` while loading or if no questions were fetched
+ */
 export function SurveyModal({ userId, onComplete }: SurveyModalProps) {
     const [questions, setQuestions] = useState<Question[]>([]);
     const [answers, setAnswers] = useState<Record<string, number>>({});

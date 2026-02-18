@@ -1,6 +1,11 @@
 import { prisma } from '@/lib/prisma';
 import { getSurveyQuestions, shouldShowSurvey, submitSurveyResponse } from '@/lib/survey-service';
 
+/**
+ * Performs an end-to-end verification of the survey flow and seed data.
+ *
+ * Runs checks against the question bank seed (expects 100 questions), retrieves survey questions (expects 20), verifies category diversity, creates a temporary test user to validate eligibility before and after submitting a generated set of answers, submits those answers, and cleans up the temporary user and their responses. Logs pass/error/warn messages for each step and attempts cleanup on failures.
+ */
 async function main() {
     console.log('--- Starting Survey Logic Verification ---');
 

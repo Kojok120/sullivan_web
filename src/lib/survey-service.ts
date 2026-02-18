@@ -20,8 +20,10 @@ export type SurveyQuestion = {
 };
 
 /**
- * Checks if the user should be shown the survey.
- * Returns true if the user has never answered or if 90 days have passed since the last answer.
+ * Determine whether a user should be shown the survey.
+ *
+ * @param userId - The ID of the user to check
+ * @returns `true` if the user has never submitted a survey response or if their most recent response was answered at least 90 days ago, `false` otherwise
  */
 export async function shouldShowSurvey(userId: string): Promise<boolean> {
     const lastResponse = await prisma.surveyResponse.findFirst({
@@ -42,8 +44,9 @@ export async function shouldShowSurvey(userId: string): Promise<boolean> {
 }
 
 /**
- * Retrieves 20 random questions from the QuestionBank (4 from each of the 5 categories).
- * The returned array is shuffled.
+ * Selects 20 survey questions by choosing 4 random questions from each survey category and returning them shuffled.
+ *
+ * @returns An array of 20 `SurveyQuestion` objects (4 per category) in randomized order
  */
 export async function getSurveyQuestions(): Promise<SurveyQuestion[]> {
     const questions: SurveyQuestion[] = [];
@@ -75,7 +78,16 @@ export async function getSurveyQuestions(): Promise<SurveyQuestion[]> {
 }
 
 /**
- * Saves a survey response and calculates scores.
+ * Persist a user's survey response and compute per-category average scores.
+ *
+ * Builds detailed answer entries from the provided answers and their corresponding questions,
+ * ignores answers whose question cannot be found, computes the average score for each category
+ * (rounded to two decimal places), and creates a SurveyResponse record with `details`, `scores`,
+ * `userId`, and `answeredAt`.
+ *
+ * @param userId - Identifier of the user submitting the survey
+ * @param answers - Array of answer objects with `questionId` and numeric `value`; entries whose `questionId` is not found in the question bank are skipped
+ * @returns The created SurveyResponse record containing the saved details, computed scores, `userId`, and `answeredAt`
  */
 export async function submitSurveyResponse(userId: string, answers: { questionId: string; value: number }[]) {
     // 1. Fetch related questions to get categories
@@ -124,12 +136,24 @@ export async function submitSurveyResponse(userId: string, answers: { questionId
     });
 }
 
-// Helper functions
+/**
+ * Selects up to `count` random elements from an input array.
+ *
+ * @param arr - Source array to pick elements from
+ * @param count - Maximum number of elements to return
+ * @returns A new array containing up to `count` elements chosen at random from `arr`; the original array is not modified
+ */
 function pickRandom<T>(arr: T[], count: number): T[] {
     const shuffled = [...arr].sort(() => 0.5 - Math.random());
     return shuffled.slice(0, count);
 }
 
+/**
+ * Randomly shuffles the elements of an array in place.
+ *
+ * @param array - The array to shuffle; the input is mutated and the same reference is returned
+ * @returns The shuffled array (same reference as `array`)
+ */
 function shuffleArray<T>(array: T[]): T[] {
     for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
