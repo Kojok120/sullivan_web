@@ -19,32 +19,28 @@ export async function getPrintData(
     const PROBLEMS_PER_SET = 10;
     const totalCount = sets * PROBLEMS_PER_SET;
 
-    const promises: Promise<any>[] = [
-        prisma.user.findUnique({
-            where: { id: userId },
-            select: { name: true, loginId: true }
-        }),
-        prisma.subject.findUnique({
-            where: { id: subjectId },
+    const studentPromise = prisma.user.findUnique({
+        where: { id: userId },
+        select: { name: true, loginId: true }
+    });
+    const subjectPromise = prisma.subject.findUnique({
+        where: { id: subjectId },
+        select: { name: true }
+    });
+    const problemsPromise = selectProblemsForPrint(userId, subjectId, coreProblemId, totalCount);
+    const coreProblemPromise = coreProblemId
+        ? prisma.coreProblem.findUnique({
+            where: { id: coreProblemId },
             select: { name: true }
-        }),
-        selectProblemsForPrint(userId, subjectId, coreProblemId, totalCount)
-    ];
+        })
+        : Promise.resolve(null);
 
-    if (coreProblemId) {
-        promises.push(
-            prisma.coreProblem.findUnique({
-                where: { id: coreProblemId },
-                select: { name: true }
-            })
-        );
-    }
-
-    const results = await Promise.all(promises);
-    const student = results[0];
-    const subject = results[1];
-    const problems = results[2] as Problem[];
-    const coreProblem = coreProblemId ? results[3] : null;
+    const [student, subject, problems, coreProblem] = await Promise.all([
+        studentPromise,
+        subjectPromise,
+        problemsPromise,
+        coreProblemPromise
+    ]);
 
     if (!student || !subject) {
         return null;

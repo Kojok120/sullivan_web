@@ -34,7 +34,11 @@ async function migrateRoles() {
 
         // Check if migration is needed
         // We want to move 'role', 'prismaUserId', 'name' from user_metadata to app_metadata if missing or different
-        const updates: any = {};
+        const updates: {
+            role?: unknown;
+            prismaUserId?: unknown;
+            name?: unknown;
+        } = {};
 
         // Role
         if (userMeta.role && appMeta.role !== userMeta.role) {

@@ -4,6 +4,33 @@ import { AudioStreamer } from '@/lib/audio-streamer';
 type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error';
 const CONNECTION_SETUP_TIMEOUT_MS = 10000;
 
+type GeminiLiveMessage = {
+    setupComplete?: unknown;
+    goAway?: unknown;
+    serverContent?: {
+        modelTurn?: {
+            parts?: Array<{
+                inlineData?: {
+                    mimeType?: string;
+                    data?: string;
+                };
+            }>;
+        };
+    };
+};
+
+function parseGeminiLiveMessage(text: string): GeminiLiveMessage | null {
+    try {
+        const parsed = JSON.parse(text);
+        if (typeof parsed === 'object' && parsed !== null) {
+            return parsed as GeminiLiveMessage;
+        }
+        return null;
+    } catch {
+        return null;
+    }
+}
+
 export function useGeminiLive() {
     const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
     const [isTalking, setIsTalking] = useState(false);
@@ -109,12 +136,8 @@ export function useGeminiLive() {
                     ? event.data
                     : await (new Response(event.data)).text();
 
-                let data: any = null;
-                try {
-                    data = JSON.parse(text);
-                } catch {
-                    return;
-                }
+                const data = parseGeminiLiveMessage(text);
+                if (!data) return;
 
                 if (data.setupComplete !== undefined && !isSetupComplete) {
                     isSetupComplete = true;
@@ -134,7 +157,10 @@ export function useGeminiLive() {
 
                 if (data.serverContent?.modelTurn?.parts) {
                     for (const part of data.serverContent.modelTurn.parts) {
-                        if (part.inlineData?.mimeType?.startsWith('audio/pcm')) {
+                        if (
+                            part.inlineData?.mimeType?.startsWith('audio/pcm')
+                            && typeof part.inlineData.data === 'string'
+                        ) {
                             audioStreamerRef.current?.playAudioChunk(part.inlineData.data);
                             setIsTalking(true);
                             setTimeout(() => setIsTalking(false), 2000);

@@ -21,9 +21,8 @@ export default async function ClassroomsPage({
                 </div>
             </div>
 
-            <ClassroomList initialClassrooms={classrooms as any} searchQuery={query} />
+            <ClassroomList initialClassrooms={classrooms} searchQuery={query} />
         </div>
     );
 }
-
 

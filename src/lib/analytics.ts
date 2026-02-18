@@ -440,7 +440,7 @@ export async function getSessionDetails(groupId: string, userId?: string) {
     if (!groupId) return [];
 
     // SECURITY: If userId is provided, ensure we only fetch data for that user
-    const whereClause: any = { groupId };
+    const whereClause: Prisma.LearningHistoryWhereInput = { groupId };
     if (userId) {
         whereClause.userId = userId;
     }

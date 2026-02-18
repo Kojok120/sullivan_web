@@ -72,11 +72,12 @@ async function main() {
             }
         });
         console.log("Success!");
-    } catch (e: any) {
+    } catch (e: unknown) {
+        const err = e as { code?: unknown; message?: unknown; meta?: unknown };
         console.error("Caught Error:");
-        console.error("Code:", e.code);
-        console.error("Message:", e.message);
-        console.error("Meta:", e.meta);
+        console.error("Code:", err.code);
+        console.error("Message:", err.message);
+        console.error("Meta:", err.meta);
     }
 }
 

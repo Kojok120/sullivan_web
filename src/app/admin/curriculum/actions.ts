@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
+import { Prisma } from '@prisma/client';
 
 import { requireAdmin, getSession } from '@/lib/auth';
 import { bulkCreateProblemsCore, createProblemCore, deleteProblemsWithRelations } from '@/lib/problem-service';
@@ -13,7 +14,7 @@ export async function getSubjects() {
         const { fetchSubjects } = await import('@/lib/curriculum-service');
         // Updated fetchSubjects should handle includeCoreProblems correctly without Units
         const subjects = await fetchSubjects({ includeCoreProblems: true });
-        return { success: true, subjects: subjects as any };
+        return { success: true, subjects };
     } catch (error) {
         console.error('Failed to fetch subjects:', error);
         return { error: '科目の取得に失敗しました' };
@@ -23,6 +24,11 @@ export async function getSubjects() {
 // --- CoreProblems ---
 // 講義動画の型
 export type LectureVideo = { title: string; url: string };
+
+function toLectureVideosJson(videos?: LectureVideo[]): Prisma.InputJsonValue | undefined {
+    if (!videos) return undefined;
+    return videos as unknown as Prisma.InputJsonValue;
+}
 
 export async function getCoreProblemsForSubject(subjectId: string) {
     const session = await getSession();
@@ -51,7 +57,7 @@ export async function createCoreProblem(data: { name: string; subjectId: string;
                 name: data.name,
                 subjectId: data.subjectId,
                 order: data.order,
-                lectureVideos: (data.lectureVideos ?? undefined) as any,
+                lectureVideos: toLectureVideosJson(data.lectureVideos),
             },
         });
         revalidatePath('/admin/curriculum');
@@ -142,7 +148,7 @@ export async function bulkCreateCoreProblems(subjectId: string, items: { name: s
                 prisma.coreProblem.create({
                     data: {
                         name: item.name,
-                        lectureVideos: (item.lectureVideos ?? undefined) as any,
+                        lectureVideos: toLectureVideosJson(item.lectureVideos),
                         subjectId,
                         order: order++
                     }

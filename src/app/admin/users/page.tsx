@@ -2,6 +2,7 @@ import { getUsers, getGroups, getClassroomsForAdmin } from '../actions';
 import { UserList } from './user-list';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { Role } from '@prisma/client';
 
 export default async function UsersPage({
     searchParams,
@@ -23,7 +24,7 @@ export default async function UsersPage({
     const currentSortOrder = sortOrder || 'desc';
 
     // Validate role
-    const roleEnum = role && ['STUDENT', 'TEACHER', 'PARENT', 'ADMIN'].includes(role) ? role as any : undefined;
+    const roleEnum = (Object.values(Role) as Role[]).find((value) => value === role);
 
     const [usersData, groupsData, classroomsData] = await Promise.all([
         getUsers(currentPage, limit, query, currentSortBy, currentSortOrder, roleEnum, groupId),

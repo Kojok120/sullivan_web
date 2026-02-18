@@ -11,11 +11,21 @@ type StampCard = {
     lastSeenStamps: number;
 };
 
-function normalizeStampCard(metadata: any): StampCard {
-    const stampCard = metadata?.stampCard || {};
+function toMetadataObject(value: unknown): Record<string, unknown> {
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+        return { ...(value as Record<string, unknown>) };
+    }
+    return {};
+}
+
+function normalizeStampCard(metadata: Record<string, unknown>): StampCard {
+    const rawStampCard = metadata.stampCard;
+    const stampCard = typeof rawStampCard === 'object' && rawStampCard !== null && !Array.isArray(rawStampCard)
+        ? (rawStampCard as Record<string, unknown>)
+        : {};
     return {
-        totalStamps: stampCard.totalStamps || 0,
-        lastSeenStamps: stampCard.lastSeenStamps || 0,
+        totalStamps: typeof stampCard.totalStamps === 'number' ? stampCard.totalStamps : 0,
+        lastSeenStamps: typeof stampCard.lastSeenStamps === 'number' ? stampCard.lastSeenStamps : 0,
     };
 }
 
@@ -27,7 +37,7 @@ export async function getStampDataForUser(userId: string): Promise<StampData | n
 
     if (!user) return null;
 
-    const metadata = (user.metadata as any) || {};
+    const metadata = toMetadataObject(user.metadata);
     const stampCard = normalizeStampCard(metadata);
 
     return {
@@ -45,7 +55,7 @@ export async function incrementStampCount(userId: string, amount: number = 1): P
 
     if (!user) return null;
 
-    const metadata = (user.metadata as any) || {};
+    const metadata = toMetadataObject(user.metadata);
     const stampCard = normalizeStampCard(metadata);
     const newTotal = stampCard.totalStamps + amount;
 
@@ -73,7 +83,7 @@ export async function markStampsAsSeenForUser(userId: string, newSeenCount: numb
 
     if (!user) return;
 
-    const metadata = (user.metadata as any) || {};
+    const metadata = toMetadataObject(user.metadata);
     const stampCard = normalizeStampCard(metadata);
 
     if (newSeenCount > stampCard.lastSeenStamps) {

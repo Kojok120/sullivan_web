@@ -38,7 +38,12 @@ async function main() {
 
         console.log(`Found user ${user.id} (${email}). Updating app_metadata...`);
 
-        const updates: any = {
+        const updates: {
+            role: 'ADMIN';
+            name: string;
+            prismaUserId: string;
+            loginId?: string;
+        } = {
             role: 'ADMIN',
             name: user.user_metadata?.name || 'Admin User',
             prismaUserId: user.id

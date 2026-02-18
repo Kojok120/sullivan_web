@@ -2,7 +2,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
-import { Role } from '@prisma/client';
+import { Prisma, Role } from '@prisma/client';
 import { requireAdmin } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -71,7 +71,7 @@ export async function getUsers(
 ) {
     await requireAdmin();
     try {
-        const where: any = {};
+        const where: Prisma.UserWhereInput = {};
 
         if (query) {
             where.OR = [
@@ -90,12 +90,16 @@ export async function getUsers(
 
         const skip = (page - 1) * limit;
 
-        const orderBy: any = {};
-        if (sortBy === 'group') {
-            orderBy.group = sortOrder;
-        } else {
-            orderBy[sortBy] = sortOrder;
-        }
+        const orderBy: Prisma.UserOrderByWithRelationInput =
+            sortBy === 'group'
+                ? { group: sortOrder }
+                : sortBy === 'name'
+                    ? { name: sortOrder }
+                    : sortBy === 'loginId'
+                        ? { loginId: sortOrder }
+                        : sortBy === 'role'
+                            ? { role: sortOrder }
+                            : { createdAt: sortOrder };
 
         const [users, total] = await Promise.all([
             prisma.user.findMany({
@@ -158,15 +162,11 @@ export async function createUser(data: { name: string; role: Role; password?: st
 export async function updateUser(id: string, data: { name?: string; role?: Role; group?: string; classroomId?: string }) {
     await requireAdmin();
     try {
-        const updateData: any = {
-            name: data.name,
-            role: data.role,
-            group: data.group,
-            classroomId: data.classroomId
-        };
-
-        // Remove undefined fields
-        Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
+        const updateData: Prisma.UserUpdateInput = {};
+        if (data.name !== undefined) updateData.name = data.name;
+        if (data.role !== undefined) updateData.role = data.role;
+        if (data.group !== undefined) updateData.group = data.group;
+        if (data.classroomId !== undefined) updateData.classroom = { connect: { id: data.classroomId } };
 
         const user = await prisma.user.update({
             where: { id },

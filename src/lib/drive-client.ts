@@ -1,12 +1,12 @@
-import { google } from 'googleapis';
+import { google, drive_v3 } from 'googleapis';
 import fs from 'fs';
 import path from 'path';
 
 const SERVICE_ACCOUNT_PATH = path.join(process.cwd(), 'service-account.json');
 
-let driveClient: any | null = null;
+let driveClient: drive_v3.Drive | null = null;
 
-export function getDriveClient() {
+export function getDriveClient(): drive_v3.Drive {
     if (driveClient) return driveClient;
 
     // 1. Try GOOGLE_APPLICATION_CREDENTIALS (Standard Env Var)

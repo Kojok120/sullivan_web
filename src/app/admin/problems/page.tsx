@@ -53,7 +53,7 @@ export default async function ProblemsPage({
             <h1 className="text-2xl font-bold mb-6">問題管理</h1>
             <Suspense fallback={<div>Loading...</div>}>
                 <ProblemManager
-                    initialProblems={problems as any}
+                    initialProblems={problems}
                     totalCount={total || 0}
                     currentPage={page}
                     initialQuery={query}

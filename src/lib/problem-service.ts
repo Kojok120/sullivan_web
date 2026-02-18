@@ -9,7 +9,7 @@ import type { Prisma } from '@prisma/client';
 
 type ProblemServiceClient = Pick<
     typeof prisma,
-    'coreProblem' | 'problem' | 'learningHistory' | 'userProblemState'
+    'coreProblem' | 'problem' | 'learningHistory' | 'userProblemState' | 'subject' | '$queryRaw'
 >;
 
 type ProblemServiceClientWithTransaction = ProblemServiceClient & Partial<Pick<typeof prisma, '$transaction'>>;

@@ -8,6 +8,13 @@ export type LevelData = {
     lastSeenLevel: number;
 };
 
+function toMetadataObject(value: unknown): Record<string, unknown> {
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+        return { ...(value as Record<string, unknown>) };
+    }
+    return {};
+}
+
 export async function getLevelData(): Promise<LevelData | null> {
     const session = await getSession();
     if (!session) return null;
@@ -19,8 +26,10 @@ export async function getLevelData(): Promise<LevelData | null> {
 
     if (!user) return null;
 
-    const metadata = (user.metadata as any) || {};
-    let lastSeenLevel = metadata.lastSeenLevel;
+    const metadata = toMetadataObject(user.metadata);
+    let lastSeenLevel = typeof metadata.lastSeenLevel === 'number'
+        ? metadata.lastSeenLevel
+        : undefined;
 
     // Lazy Initialization:
     // If lastSeenLevel is missing, it means this feature is new for the user.
@@ -58,10 +67,13 @@ export async function markLevelAsSeen(level: number): Promise<void> {
 
     if (!user) return;
 
-    const metadata = (user.metadata as any) || {};
+    const metadata = toMetadataObject(user.metadata);
+    const currentLastSeenLevel = typeof metadata.lastSeenLevel === 'number'
+        ? metadata.lastSeenLevel
+        : 0;
 
     // Only update if the new validated level is higher than what we have stored
-    if (!metadata.lastSeenLevel || level > metadata.lastSeenLevel) {
+    if (level > currentLastSeenLevel) {
         await prisma.user.update({
             where: { id: session.userId },
             data: {

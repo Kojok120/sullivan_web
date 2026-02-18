@@ -12,7 +12,7 @@ const signupSchema = z.object({
     classroomId: z.string().optional(),
 });
 
-export async function signupAction(prevState: any, formData: FormData) {
+export async function signupAction(_prevState: unknown, formData: FormData) {
     const rawData = {
         name: formData.get('name') as string,
         password: formData.get('password') as string,

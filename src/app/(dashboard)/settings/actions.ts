@@ -16,7 +16,7 @@ const settingsPasswordSchema = z.object({
     path: ['confirmPassword'],
 });
 
-export async function updatePassword(prevState: any, formData: FormData) {
+export async function updatePassword(_prevState: unknown, formData: FormData) {
     const rawData = {
         currentPassword: formData.get('currentPassword') as string,
         newPassword: formData.get('newPassword') as string,
@@ -46,4 +46,3 @@ export async function updatePassword(prevState: any, formData: FormData) {
     revalidatePath('/settings');
     return { success: true };
 }
-

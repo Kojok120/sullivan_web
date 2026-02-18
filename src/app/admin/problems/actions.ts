@@ -132,13 +132,13 @@ export async function getProblems(
     try {
         const normalizedSearch = search.trim();
         const where = buildProblemWhere(filters, normalizedSearch || undefined);
-        const include: Prisma.ProblemInclude = {
+        const include = {
             coreProblems: {
                 include: {
                     subject: true
                 }
             }
-        };
+        } satisfies Prisma.ProblemInclude;
 
         const skip = (page - 1) * limit;
         const orderBy: Prisma.ProblemOrderByWithRelationInput[] =

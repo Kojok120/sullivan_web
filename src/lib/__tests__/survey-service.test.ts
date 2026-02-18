@@ -42,8 +42,16 @@ describe('survey-service', () => {
             }))
         )
 
-    const surveyResponseWithDate = (answeredAt: Date) =>
-        ({ answeredAt } as any)
+    type SurveyResponseFindFirstResult = Awaited<ReturnType<typeof prisma.surveyResponse.findFirst>>
+    type SurveyAnswerDetail = {
+        questionId: string
+        question: string
+        category: SurveyCategory
+        value: number
+    }
+
+    const surveyResponseWithDate = (answeredAt: Date): SurveyResponseFindFirstResult =>
+        ({ answeredAt } as unknown as SurveyResponseFindFirstResult)
 
     describe('shouldShowSurvey', () => {
         it('ユーザーが一度も回答していない場合、trueを返す', async () => {
@@ -329,7 +337,7 @@ describe('survey-service', () => {
             await submitSurveyResponse('user1', answers)
 
             const createCall = vi.mocked(prisma.surveyResponse.create).mock.calls[0][0]
-            const details = createCall.data.details as Array<any>
+            const details = createCall.data.details as SurveyAnswerDetail[]
 
             expect(details[0]).toEqual({
                 questionId: 'q1',
@@ -361,7 +369,7 @@ describe('survey-service', () => {
             await submitSurveyResponse('user1', answers)
 
             const createCall = vi.mocked(prisma.surveyResponse.create).mock.calls[0][0]
-            const details = createCall.data.details as Array<any>
+            const details = createCall.data.details as SurveyAnswerDetail[]
 
             expect(details).toHaveLength(1)
             expect(details[0].questionId).toBe('q1')
