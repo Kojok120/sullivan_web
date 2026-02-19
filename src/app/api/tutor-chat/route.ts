@@ -38,12 +38,12 @@ const MAX_TRANSCRIPT_CHARS = 8000;
 const MAX_HISTORY_MESSAGES = 12;
 const MAX_API_RETRIES = 2;
 const RETRY_BASE_DELAY_MS = 500;
-const BAD_ENDING_REGEX = /(残りの|まず|次に|では|そして|たとえば|例えば)[。！？!?]?$/;
 const DANGLING_END_REGEX = /[、,:：;；]$/;
 const INCOMPLETE_PHRASE_END_REGEX = /(まず|次に|そして|たとえば|例えば|つまり|なので|だから)$/;
 const ACK_ONLY_REGEX = /^(なるほど|ありがとう|ありがとうございます|わかった|わかりました|了解|はい|うん|ok|OK|助かった|助かります)[。!！?？\s]*$/;
 const TRANSLATION_HINT_REGEX = /(英語|英文|英訳|訳して|翻訳|英語で|translate|in english)/i;
 const TRANSIENT_ERROR_CODES = new Set([408, 429, 500, 502, 503, 504]);
+const EMPTY_LIKE_REPLY_REGEX = /^(null|undefined|\{\}|\[\]|[。！？!?…,.、\s]+)$/i;
 
 const CHAT_PROMPT_PATH = path.join(process.cwd(), 'src/prompts/chat-tutor.md');
 const DEFAULT_SYSTEM_PROMPT = [
@@ -162,11 +162,9 @@ function normalizeTutorReply(text: string) {
 
 function isUnnaturalReply(text: string) {
     const reply = text.trim();
+    // フォールバックは必要最小限に限定し、モデル返信をできるだけ採用する。
     if (!reply) return true;
-    if (reply.length < 6) return true;
-    if (BAD_ENDING_REGEX.test(reply)) return true;
-    if (/[「『][^」』]*$/.test(reply)) return true;
-    if (!/[。！？!?]$/.test(reply)) return true;
+    if (EMPTY_LIKE_REPLY_REGEX.test(reply)) return true;
     return false;
 }
 
@@ -181,8 +179,13 @@ function parseReplyFromJsonText(text: string) {
     const normalized = text.trim();
     if (!normalized) return '';
 
+    const withoutFence = normalized
+        .replace(/^```(?:json)?\s*/i, '')
+        .replace(/\s*```$/, '')
+        .trim();
+
     try {
-        const parsed = JSON.parse(normalized) as TutorReplySchema;
+        const parsed = JSON.parse(withoutFence) as TutorReplySchema;
         if (typeof parsed.reply === 'string') {
             return parsed.reply.trim();
         }
@@ -344,6 +347,10 @@ async function generateTutorReply({
                 throw new Error('Reply payload is empty');
             } catch (error) {
                 lastError = error;
+                console.warn(
+                    `[TutorChat] model=${model} attempt=${attempt + 1}/${MAX_API_RETRIES + 1} failed`,
+                    error,
+                );
 
                 if (!isRetryableError(error) || attempt >= MAX_API_RETRIES) {
                     break;
@@ -394,6 +401,7 @@ export async function POST(request: NextRequest) {
         }
 
         if (ACK_ONLY_REGEX.test(latestUserMessage)) {
+            console.info('[TutorChat] Reply shortcut used: ACK_ONLY');
             return NextResponse.json({
                 reply: 'いいですね。次はどこを確認しましょうか？短く聞いてくれれば、すぐ一緒に考えます。',
             });
@@ -421,6 +429,9 @@ export async function POST(request: NextRequest) {
         }
 
         if (isUnnaturalReply(reply)) {
+            console.warn(
+                `[TutorChat] Fallback due empty-like reply. len=${reply.trim().length}`,
+            );
             reply = buildFallbackReply(latestUserMessage, translationMode);
         }
 
