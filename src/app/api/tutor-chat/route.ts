@@ -194,6 +194,19 @@ function parseReplyFromJsonText(text: string) {
     return '';
 }
 
+function extractResponseText(response: GenerateContentResponse) {
+    const direct = response.text?.trim();
+    if (direct) return direct;
+
+    const parts = response.candidates?.[0]?.content?.parts;
+    if (!parts || parts.length === 0) return '';
+
+    return parts
+        .map((part) => (typeof part.text === 'string' ? part.text : ''))
+        .join('')
+        .trim();
+}
+
 function parseStatusCode(error: unknown): number | null {
     if (!error || typeof error !== 'object') return null;
 
@@ -321,7 +334,7 @@ async function generateTutorReply({
         for (let attempt = 0; attempt <= MAX_API_RETRIES; attempt += 1) {
             try {
                 const response = await callGeminiWithTimeout(ai, model, prompt);
-                const candidateText = response.text?.trim() || '';
+                const candidateText = extractResponseText(response);
                 const parsedReply = parseReplyFromJsonText(candidateText);
 
                 if (parsedReply) {
@@ -399,7 +412,13 @@ export async function POST(request: NextRequest) {
         });
 
         const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
-        let reply = await generateTutorReply({ ai, prompt });
+        let reply = '';
+        try {
+            reply = await generateTutorReply({ ai, prompt });
+        } catch (error) {
+            console.error('[TutorChat] Generation failed. Returning fallback reply.', error);
+            reply = buildFallbackReply(latestUserMessage, translationMode);
+        }
 
         if (isUnnaturalReply(reply)) {
             reply = buildFallbackReply(latestUserMessage, translationMode);
