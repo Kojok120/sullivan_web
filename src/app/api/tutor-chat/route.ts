@@ -29,6 +29,11 @@ type TutorReplySchema = {
     reply?: unknown;
 };
 
+type GeminiChatContent = {
+    role: 'user' | 'model';
+    parts: Array<{ text: string }>;
+};
+
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const CHAT_MODEL = process.env.GEMINI_CHAT_MODEL || 'gemini-2.5-flash';
 const CHAT_FALLBACK_MODEL = process.env.GEMINI_CHAT_FALLBACK_MODEL || 'gemini-2.5-flash-lite';
@@ -144,6 +149,13 @@ function formatTranscript(messages: ChatMessage[]) {
         .join('\n');
 }
 
+function toGeminiContents(messages: ChatMessage[]): GeminiChatContent[] {
+    return messages.map((message) => ({
+        role: message.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: message.content }],
+    }));
+}
+
 function normalizeTutorReply(text: string) {
     let reply = text.trim();
     if (!reply) return reply;
@@ -254,7 +266,8 @@ async function wait(ms: number) {
 async function callGeminiWithTimeout(
     ai: GoogleGenAI,
     model: string,
-    prompt: string,
+    contents: GeminiChatContent[],
+    systemInstruction: string,
 ): Promise<GenerateContentResponse> {
     const abortController = new AbortController();
     const timeoutId = setTimeout(() => abortController.abort(), CHAT_TIMEOUT_MS);
@@ -262,10 +275,10 @@ async function callGeminiWithTimeout(
     try {
         return await ai.models.generateContent({
             model,
-            contents: prompt,
+            contents,
             config: {
                 abortSignal: abortController.signal,
-                systemInstruction: CHAT_SYSTEM_PROMPT,
+                systemInstruction,
                 temperature: 0.3,
                 topP: 0.9,
                 maxOutputTokens: 512,
@@ -279,24 +292,22 @@ async function callGeminiWithTimeout(
     }
 }
 
-function buildTutorPrompt({
+function buildTutorSystemInstruction({
     question,
     answer,
     userAnswer,
     explanation,
-    transcript,
-    latestUserMessage,
     translationMode,
 }: {
     question: string;
     answer: string;
     userAnswer: string;
     explanation: string;
-    transcript: string;
-    latestUserMessage: string;
     translationMode: boolean;
 }) {
     return [
+        CHAT_SYSTEM_PROMPT,
+        '',
         '以下の情報を使って、生徒への次の返答を作成してください。',
         '',
         '【生徒が現在解いている問題】',
@@ -304,12 +315,6 @@ function buildTutorPrompt({
         `正解: ${answer}`,
         `生徒の回答: ${userAnswer}`,
         `解説: ${explanation}`,
-        '',
-        '【ここまでの会話】',
-        transcript || '（会話なし）',
-        '',
-        '【今回対応する生徒の最新発話】',
-        latestUserMessage,
         '',
         '【出力ルール】',
         '- 必ずJSONのみを返す（例: {"reply":"..."}）',
@@ -325,10 +330,12 @@ function buildTutorPrompt({
 
 async function generateTutorReply({
     ai,
-    prompt,
+    contents,
+    systemInstruction,
 }: {
     ai: GoogleGenAI;
-    prompt: string;
+    contents: GeminiChatContent[];
+    systemInstruction: string;
 }) {
     const models = Array.from(new Set([CHAT_MODEL, CHAT_FALLBACK_MODEL].filter(Boolean)));
     let lastError: unknown = null;
@@ -336,7 +343,7 @@ async function generateTutorReply({
     for (const model of models) {
         for (let attempt = 0; attempt <= MAX_API_RETRIES; attempt += 1) {
             try {
-                const response = await callGeminiWithTimeout(ai, model, prompt);
+                const response = await callGeminiWithTimeout(ai, model, contents, systemInstruction);
                 const candidateText = extractResponseText(response);
                 const parsedReply = parseReplyFromJsonText(candidateText);
 
@@ -408,21 +415,23 @@ export async function POST(request: NextRequest) {
         }
 
         const translationMode = TRANSLATION_HINT_REGEX.test(latestUserMessage);
-        const transcript = formatTranscript(messages);
-        const prompt = buildTutorPrompt({
+        const systemInstruction = buildTutorSystemInstruction({
             question,
             answer,
             userAnswer,
             explanation,
-            transcript,
-            latestUserMessage,
             translationMode,
         });
+        const contents = toGeminiContents(messages);
+        const transcript = formatTranscript(messages);
+        console.info(
+            `[TutorChat] turns=${contents.length} transcriptChars=${transcript.length} latestChars=${latestUserMessage.length}`,
+        );
 
         const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
         let reply = '';
         try {
-            reply = await generateTutorReply({ ai, prompt });
+            reply = await generateTutorReply({ ai, contents, systemInstruction });
         } catch (error) {
             console.error('[TutorChat] Generation failed. Returning fallback reply.', error);
             reply = buildFallbackReply(latestUserMessage, translationMode);
