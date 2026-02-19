@@ -109,10 +109,21 @@ function buildReconnectDelayMs(attempt: number) {
     return Math.min(8_000, base + jitter);
 }
 
-function buildSetupMessage(options: SetupGeminiSocketOptions, resumeHandle?: string) {
-    const sessionResumption: { transparent: boolean; handle?: string } = {
-        transparent: true,
-    };
+function shouldRetryGeminiClose(code: number, reasonText: string) {
+    // 1007 はペイロード不正。再接続しても同一 setup を再送するだけなので即時失敗扱いにする。
+    if (code === 1007) return false;
+
+    const reason = reasonText.toLowerCase();
+    if (reason.includes('invalid json payload') || reason.includes('cannot find field')) {
+        return false;
+    }
+
+    return true;
+}
+
+function buildSetupMessage(resumeHandle?: string) {
+    // Gemini API の sessionResumption では handle のみ指定可能。
+    const sessionResumption: { handle?: string } = {};
 
     if (resumeHandle) {
         sessionResumption.handle = resumeHandle;
@@ -246,7 +257,7 @@ export function setupGeminiSocket(clientWs: WebSocket, options: SetupGeminiSocke
             console.log(
                 `[GeminiProxy] Connected to Gemini Live API user=${userLogId} model=${DEFAULT_LIVE_MODEL} api=${GEMINI_API_VERSION}`,
             );
-            ws.send(JSON.stringify(buildSetupMessage(options, latestResumeHandle)));
+            ws.send(JSON.stringify(buildSetupMessage(latestResumeHandle)));
         });
 
         ws.on('message', (data: RawData) => {
@@ -312,6 +323,16 @@ export function setupGeminiSocket(clientWs: WebSocket, options: SetupGeminiSocke
             }
 
             isSetupComplete = false;
+
+            if (!shouldRetryGeminiClose(safeCode, reasonText)) {
+                console.error(
+                    `[GeminiProxy] Non-retryable Gemini close user=${userLogId} code=${safeCode} reason=${reasonText}`,
+                );
+                if (clientWs.readyState === WebSocket.OPEN || clientWs.readyState === WebSocket.CONNECTING) {
+                    safeClose(clientWs, 1011, 'Gemini setup rejected');
+                }
+                return;
+            }
 
             if (reconnectAttempt >= MAX_GEMINI_RECONNECT_ATTEMPTS) {
                 if (clientWs.readyState === WebSocket.OPEN || clientWs.readyState === WebSocket.CONNECTING) {

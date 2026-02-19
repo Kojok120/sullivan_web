@@ -29,6 +29,11 @@ type TutorReplySchema = {
     reply?: unknown;
 };
 
+type GeminiChatContent = {
+    role: 'user' | 'model';
+    parts: Array<{ text: string }>;
+};
+
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const CHAT_MODEL = process.env.GEMINI_CHAT_MODEL || 'gemini-2.5-flash';
 const CHAT_FALLBACK_MODEL = process.env.GEMINI_CHAT_FALLBACK_MODEL || 'gemini-2.5-flash-lite';
@@ -38,12 +43,12 @@ const MAX_TRANSCRIPT_CHARS = 8000;
 const MAX_HISTORY_MESSAGES = 12;
 const MAX_API_RETRIES = 2;
 const RETRY_BASE_DELAY_MS = 500;
-const BAD_ENDING_REGEX = /(残りの|まず|次に|では|そして|たとえば|例えば)[。！？!?]?$/;
 const DANGLING_END_REGEX = /[、,:：;；]$/;
 const INCOMPLETE_PHRASE_END_REGEX = /(まず|次に|そして|たとえば|例えば|つまり|なので|だから)$/;
 const ACK_ONLY_REGEX = /^(なるほど|ありがとう|ありがとうございます|わかった|わかりました|了解|はい|うん|ok|OK|助かった|助かります)[。!！?？\s]*$/;
 const TRANSLATION_HINT_REGEX = /(英語|英文|英訳|訳して|翻訳|英語で|translate|in english)/i;
 const TRANSIENT_ERROR_CODES = new Set([408, 429, 500, 502, 503, 504]);
+const EMPTY_LIKE_REPLY_REGEX = /^(null|undefined|\{\}|\[\]|[。！？!?…,.、\s]+)$/i;
 
 const CHAT_PROMPT_PATH = path.join(process.cwd(), 'src/prompts/chat-tutor.md');
 const DEFAULT_SYSTEM_PROMPT = [
@@ -144,6 +149,13 @@ function formatTranscript(messages: ChatMessage[]) {
         .join('\n');
 }
 
+function toGeminiContents(messages: ChatMessage[]): GeminiChatContent[] {
+    return messages.map((message) => ({
+        role: message.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: message.content }],
+    }));
+}
+
 function normalizeTutorReply(text: string) {
     let reply = text.trim();
     if (!reply) return reply;
@@ -162,11 +174,9 @@ function normalizeTutorReply(text: string) {
 
 function isUnnaturalReply(text: string) {
     const reply = text.trim();
+    // フォールバックは必要最小限に限定し、モデル返信をできるだけ採用する。
     if (!reply) return true;
-    if (reply.length < 6) return true;
-    if (BAD_ENDING_REGEX.test(reply)) return true;
-    if (/[「『][^」』]*$/.test(reply)) return true;
-    if (!/[。！？!?]$/.test(reply)) return true;
+    if (EMPTY_LIKE_REPLY_REGEX.test(reply)) return true;
     return false;
 }
 
@@ -181,8 +191,13 @@ function parseReplyFromJsonText(text: string) {
     const normalized = text.trim();
     if (!normalized) return '';
 
+    const withoutFence = normalized
+        .replace(/^```(?:json)?\s*/i, '')
+        .replace(/\s*```$/, '')
+        .trim();
+
     try {
-        const parsed = JSON.parse(normalized) as TutorReplySchema;
+        const parsed = JSON.parse(withoutFence) as TutorReplySchema;
         if (typeof parsed.reply === 'string') {
             return parsed.reply.trim();
         }
@@ -192,6 +207,19 @@ function parseReplyFromJsonText(text: string) {
     }
 
     return '';
+}
+
+function extractResponseText(response: GenerateContentResponse) {
+    const direct = response.text?.trim();
+    if (direct) return direct;
+
+    const parts = response.candidates?.[0]?.content?.parts;
+    if (!parts || parts.length === 0) return '';
+
+    return parts
+        .map((part) => (typeof part.text === 'string' ? part.text : ''))
+        .join('')
+        .trim();
 }
 
 function parseStatusCode(error: unknown): number | null {
@@ -238,7 +266,8 @@ async function wait(ms: number) {
 async function callGeminiWithTimeout(
     ai: GoogleGenAI,
     model: string,
-    prompt: string,
+    contents: GeminiChatContent[],
+    systemInstruction: string,
 ): Promise<GenerateContentResponse> {
     const abortController = new AbortController();
     const timeoutId = setTimeout(() => abortController.abort(), CHAT_TIMEOUT_MS);
@@ -246,10 +275,10 @@ async function callGeminiWithTimeout(
     try {
         return await ai.models.generateContent({
             model,
-            contents: prompt,
+            contents,
             config: {
                 abortSignal: abortController.signal,
-                systemInstruction: CHAT_SYSTEM_PROMPT,
+                systemInstruction,
                 temperature: 0.3,
                 topP: 0.9,
                 maxOutputTokens: 512,
@@ -263,24 +292,22 @@ async function callGeminiWithTimeout(
     }
 }
 
-function buildTutorPrompt({
+function buildTutorSystemInstruction({
     question,
     answer,
     userAnswer,
     explanation,
-    transcript,
-    latestUserMessage,
     translationMode,
 }: {
     question: string;
     answer: string;
     userAnswer: string;
     explanation: string;
-    transcript: string;
-    latestUserMessage: string;
     translationMode: boolean;
 }) {
     return [
+        CHAT_SYSTEM_PROMPT,
+        '',
         '以下の情報を使って、生徒への次の返答を作成してください。',
         '',
         '【生徒が現在解いている問題】',
@@ -288,12 +315,6 @@ function buildTutorPrompt({
         `正解: ${answer}`,
         `生徒の回答: ${userAnswer}`,
         `解説: ${explanation}`,
-        '',
-        '【ここまでの会話】',
-        transcript || '（会話なし）',
-        '',
-        '【今回対応する生徒の最新発話】',
-        latestUserMessage,
         '',
         '【出力ルール】',
         '- 必ずJSONのみを返す（例: {"reply":"..."}）',
@@ -309,10 +330,12 @@ function buildTutorPrompt({
 
 async function generateTutorReply({
     ai,
-    prompt,
+    contents,
+    systemInstruction,
 }: {
     ai: GoogleGenAI;
-    prompt: string;
+    contents: GeminiChatContent[];
+    systemInstruction: string;
 }) {
     const models = Array.from(new Set([CHAT_MODEL, CHAT_FALLBACK_MODEL].filter(Boolean)));
     let lastError: unknown = null;
@@ -320,8 +343,8 @@ async function generateTutorReply({
     for (const model of models) {
         for (let attempt = 0; attempt <= MAX_API_RETRIES; attempt += 1) {
             try {
-                const response = await callGeminiWithTimeout(ai, model, prompt);
-                const candidateText = response.text?.trim() || '';
+                const response = await callGeminiWithTimeout(ai, model, contents, systemInstruction);
+                const candidateText = extractResponseText(response);
                 const parsedReply = parseReplyFromJsonText(candidateText);
 
                 if (parsedReply) {
@@ -331,6 +354,10 @@ async function generateTutorReply({
                 throw new Error('Reply payload is empty');
             } catch (error) {
                 lastError = error;
+                console.warn(
+                    `[TutorChat] model=${model} attempt=${attempt + 1}/${MAX_API_RETRIES + 1} failed`,
+                    error,
+                );
 
                 if (!isRetryableError(error) || attempt >= MAX_API_RETRIES) {
                     break;
@@ -381,27 +408,39 @@ export async function POST(request: NextRequest) {
         }
 
         if (ACK_ONLY_REGEX.test(latestUserMessage)) {
+            console.info('[TutorChat] Reply shortcut used: ACK_ONLY');
             return NextResponse.json({
                 reply: 'いいですね。次はどこを確認しましょうか？短く聞いてくれれば、すぐ一緒に考えます。',
             });
         }
 
         const translationMode = TRANSLATION_HINT_REGEX.test(latestUserMessage);
-        const transcript = formatTranscript(messages);
-        const prompt = buildTutorPrompt({
+        const systemInstruction = buildTutorSystemInstruction({
             question,
             answer,
             userAnswer,
             explanation,
-            transcript,
-            latestUserMessage,
             translationMode,
         });
+        const contents = toGeminiContents(messages);
+        const transcript = formatTranscript(messages);
+        console.info(
+            `[TutorChat] turns=${contents.length} transcriptChars=${transcript.length} latestChars=${latestUserMessage.length}`,
+        );
 
         const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
-        let reply = await generateTutorReply({ ai, prompt });
+        let reply = '';
+        try {
+            reply = await generateTutorReply({ ai, contents, systemInstruction });
+        } catch (error) {
+            console.error('[TutorChat] Generation failed. Returning fallback reply.', error);
+            reply = buildFallbackReply(latestUserMessage, translationMode);
+        }
 
         if (isUnnaturalReply(reply)) {
+            console.warn(
+                `[TutorChat] Fallback due empty-like reply. len=${reply.trim().length}`,
+            );
             reply = buildFallbackReply(latestUserMessage, translationMode);
         }
 
