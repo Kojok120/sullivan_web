@@ -139,6 +139,8 @@ export function useGeminiLive() {
         if (!audioStreamer) return;
 
         if (muted) {
+            // ミュート時は VAD 任せにせず turn 終端を明示して取りこぼしを防ぐ。
+            audioStreamer.forceAudioStreamEnd();
             audioStreamer.stopRecording();
             return;
         }
@@ -286,6 +288,10 @@ export function useGeminiLive() {
 
                 if (data.serverContent?.turnComplete) {
                     scheduleTalkingOff(500);
+                }
+
+                if (data.serverContent?.waitingForInput) {
+                    setIsTalking(false);
                 }
 
                 if (data.goAway) {

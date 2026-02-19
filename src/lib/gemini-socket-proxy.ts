@@ -144,7 +144,7 @@ function buildSetupMessage(resumeHandle?: string) {
                 automaticActivityDetection: {
                     disabled: false,
                     startOfSpeechSensitivity: 'START_SENSITIVITY_LOW',
-                    endOfSpeechSensitivity: 'END_SENSITIVITY_LOW',
+                    endOfSpeechSensitivity: 'END_SENSITIVITY_HIGH',
                     prefixPaddingMs: 120,
                     silenceDurationMs: 450,
                 },
@@ -293,6 +293,13 @@ export function setupGeminiSocket(clientWs: WebSocket, options: SetupGeminiSocke
                     );
                 }
 
+                const serverContent = parsed?.serverContent as Record<string, unknown> | undefined;
+                if (serverContent?.turnComplete === true) {
+                    console.log(`[GeminiProxy] turnComplete user=${userLogId}`);
+                } else if (serverContent?.waitingForInput === true) {
+                    console.log(`[GeminiProxy] waitingForInput user=${userLogId}`);
+                }
+
                 if (clientWs.readyState === WebSocket.OPEN) {
                     clientWs.send(message);
                     return;
@@ -363,6 +370,12 @@ export function setupGeminiSocket(clientWs: WebSocket, options: SetupGeminiSocke
         try {
             const message = rawDataToUtf8(data);
             if (!message) return;
+
+            const parsed = parseMessageIfJson(message);
+            const realtimeInput = parsed?.realtimeInput as Record<string, unknown> | undefined;
+            if (realtimeInput?.audioStreamEnd === true) {
+                console.log(`[GeminiProxy] client audioStreamEnd user=${userLogId}`);
+            }
             queueOrForwardMessage(message);
         } catch (err) {
             console.error('[GeminiProxy] Error forwarding client message:', err);
