@@ -46,6 +46,8 @@ jobs:
             --build-arg NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }} \
             --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }} \
             --build-arg NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS=${{ secrets.NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS }} \
+            --build-arg QSTASH_CURRENT_SIGNING_KEY=${{ secrets.QSTASH_CURRENT_SIGNING_KEY }} \
+            --build-arg QSTASH_NEXT_SIGNING_KEY=${{ secrets.QSTASH_NEXT_SIGNING_KEY }} \
             -t asia.gcr.io/${{ secrets.GCP_PROJECT_ID }}/sullivan-app-production:${{ github.sha }} \
             .
 
