@@ -27,17 +27,5 @@ async function handler(req: NextRequest) {
     }
 }
 
-// QStash署名検証を有効化（ビルド時にはenv varsがないため条件付き）
-// QSTASH_CURRENT_SIGNING_KEY と QSTASH_NEXT_SIGNING_KEY が必要
-const hasQStashKeys = process.env.QSTASH_CURRENT_SIGNING_KEY && process.env.QSTASH_NEXT_SIGNING_KEY;
-
-export const POST = hasQStashKeys
-    ? verifySignatureAppRouter(handler)
-    : async (req: NextRequest) => {
-        // Fallback protection (Fail-Closed)
-        const authHeader = req.headers.get('Authorization');
-        if (!process.env.INTERNAL_API_SECRET || authHeader !== `Bearer ${process.env.INTERNAL_API_SECRET}`) {
-            return NextResponse.json({ error: 'Unauthorized (QStash keys missing & no Secret)' }, { status: 401 });
-        }
-        return handler(req);
-    };
+export const dynamic = 'force-dynamic';
+export const POST = verifySignatureAppRouter(handler);

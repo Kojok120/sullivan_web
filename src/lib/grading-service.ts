@@ -11,7 +11,7 @@ import { emitRealtimeEvent } from '@/lib/realtime-events';
 import { incrementStampCount } from '@/lib/stamp-service';
 import { processGamificationUpdates, toGamificationPayload } from '@/lib/gamification-service';
 import { acquireGradingFileLock, releaseGradingFileLock } from '@/lib/grading-lock';
-import { claimGradingJob, markGradingJobCompleted, markGradingJobFailed } from '@/lib/grading-job';
+import { claimGradingJob, markGradingJobCompleted, markGradingJobFailed, publishGradingJob } from '@/lib/grading-job';
 
 // Priority adjustment logic (inlined from removed priority-algo.ts)
 type Evaluation = "A" | "B" | "C" | "D";
@@ -142,7 +142,7 @@ export async function checkDriveForNewFiles() {
         await Promise.all(
             filesToProcess.map((file: { id?: string | null; name?: string | null }) => {
                 console.log(`Queuing grading job for file: ${file.name} (${file.id})`);
-                return triggerGradingJob(file.id!, file.name!);
+                return publishGradingJob(file.id!, file.name!);
             })
         );
 
@@ -456,39 +456,7 @@ async function archiveProcessedFile(fileId: string, studentId: string, problemId
     }
 }
 
-// QStash Integration
-async function triggerGradingJob(fileId: string, fileName: string) {
-    const token = process.env.QSTASH_TOKEN;
-    if (!token) {
-        console.warn('QSTASH_TOKEN not set, falling back to synchronous processing');
-        await processFile(fileId, fileName);
-        return;
-    }
-
-    const client = new QStashClient({ token });
-    const appUrl = process.env.GRADING_WORKER_URL || process.env.APP_URL;
-
-    if (!appUrl) {
-        console.warn('GRADING_WORKER_URL/APP_URL not set, cannot use QStash. Processing synchronously.');
-        await processFile(fileId, fileName);
-        return;
-    }
-
-    const baseUrl = appUrl.replace(/\/+$/, '');
-
-    try {
-        await client.publishJSON({
-            url: `${baseUrl}/api/queue/grading`,
-            body: { fileId, fileName },
-            retries: 3,
-        });
-        console.log(`Published grading job to QStash for ${fileName}`);
-    } catch (error) {
-        console.error('Failed to publish to QStash:', error);
-        // Fallback to sync
-        await processFile(fileId, fileName);
-    }
-}
+// Removed triggerGradingJob; QStash publishing is now centralized in publishGradingJob
 
 // Helper to find or create a folder
 const folderCache = new Map<string, string>(); // Cache folder IDs key="${name}:${parentId}"
