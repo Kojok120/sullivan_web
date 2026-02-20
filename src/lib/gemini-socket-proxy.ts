@@ -240,10 +240,23 @@ export function setupGeminiSocket(clientWs: WebSocket, options: SetupGeminiSocke
         geminiWs.send(message);
     };
 
+    const disposeStaleGeminiSocket = (socket: WebSocket) => {
+        // 再接続時に古いソケットのリスナー/接続を明示的に破棄して混線を避ける。
+        socket.removeAllListeners();
+        if (socket.readyState !== WebSocket.CLOSED) {
+            socket.terminate();
+        }
+    };
+
     const openGeminiConnection = () => {
         if (isShuttingDown) return;
         if (geminiWs && (geminiWs.readyState === WebSocket.OPEN || geminiWs.readyState === WebSocket.CONNECTING)) {
             return;
+        }
+
+        if (geminiWs) {
+            disposeStaleGeminiSocket(geminiWs);
+            geminiWs = null;
         }
 
         isSetupComplete = false;

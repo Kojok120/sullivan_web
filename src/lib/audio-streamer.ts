@@ -350,36 +350,43 @@ export class AudioStreamer {
     async processQueue() {
         this.isProcessingQueue = true;
         const currentGeneration = this.queueGeneration;
-        while (this.audioQueue.length > 0) {
-            if (currentGeneration !== this.queueGeneration) {
-                break;
-            }
-
-            const data = this.audioQueue.shift();
-            if (data && this.audioContext) {
-                const buffer = this.audioContext.createBuffer(1, data.length, GEMINI_OUTPUT_SAMPLE_RATE);
-                buffer.getChannelData(0).set(data);
-
-                const source = this.audioContext.createBufferSource();
-                source.buffer = buffer;
-                source.connect(this.audioContext.destination);
-                this.activeSources.add(source);
-                source.onended = () => {
-                    source.disconnect();
-                    this.activeSources.delete(source);
-                };
-
-                // Simple scheduling to avoid gaps or overlaps
-                const currentTime = this.audioContext.currentTime;
-                if (this.scheduledTime < currentTime) {
-                    this.scheduledTime = currentTime;
+        try {
+            while (this.audioQueue.length > 0) {
+                if (currentGeneration !== this.queueGeneration) {
+                    break;
                 }
 
-                source.start(this.scheduledTime);
-                this.scheduledTime += buffer.duration;
+                const data = this.audioQueue.shift();
+                if (currentGeneration !== this.queueGeneration) {
+                    break;
+                }
+
+                if (data && this.audioContext) {
+                    const buffer = this.audioContext.createBuffer(1, data.length, GEMINI_OUTPUT_SAMPLE_RATE);
+                    buffer.getChannelData(0).set(data);
+
+                    const source = this.audioContext.createBufferSource();
+                    source.buffer = buffer;
+                    source.connect(this.audioContext.destination);
+                    this.activeSources.add(source);
+                    source.onended = () => {
+                        source.disconnect();
+                        this.activeSources.delete(source);
+                    };
+
+                    // Simple scheduling to avoid gaps or overlaps
+                    const currentTime = this.audioContext.currentTime;
+                    if (this.scheduledTime < currentTime) {
+                        this.scheduledTime = currentTime;
+                    }
+
+                    source.start(this.scheduledTime);
+                    this.scheduledTime += buffer.duration;
+                }
             }
+        } finally {
+            this.isProcessingQueue = false;
         }
-        this.isProcessingQueue = false;
     }
 
     clearPlaybackQueue() {
