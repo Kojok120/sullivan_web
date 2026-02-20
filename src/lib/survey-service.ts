@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { QuestionBank, SurveyCategory } from '@prisma/client';
+import { Prisma, QuestionBank, SurveyCategory } from '@prisma/client';
 
 export const SURVEY_CATEGORIES: SurveyCategory[] = [
     SurveyCategory.GRIT,
@@ -17,16 +17,35 @@ export type SurveyQuestion = {
     question: string;
 };
 
+function isMissingSurveyTableError(error: unknown): boolean {
+    return error instanceof Prisma.PrismaClientKnownRequestError
+        && error.code === 'P2021'
+        && typeof error.meta?.table === 'string'
+        && (
+            error.meta.table.includes('SurveyResponse')
+            || error.meta.table.includes('QuestionBank')
+        );
+}
+
 /**
  * ユーザーがアンケート対象かどうかをチェックします。
  * 未回答、または前回の回答から90日以上経過している場合に true を返します。
  */
 export async function shouldShowSurvey(userId: string): Promise<boolean> {
-    const lastResponse = await prisma.surveyResponse.findFirst({
-        where: { userId },
-        orderBy: { answeredAt: 'desc' },
-        select: { answeredAt: true }
-    });
+    let lastResponse: { answeredAt: Date } | null = null;
+    try {
+        lastResponse = await prisma.surveyResponse.findFirst({
+            where: { userId },
+            orderBy: { answeredAt: 'desc' },
+            select: { answeredAt: true }
+        });
+    } catch (error) {
+        if (isMissingSurveyTableError(error)) {
+            console.warn('[Survey] Survey tables are not ready yet. Skip showing survey.');
+            return false;
+        }
+        throw error;
+    }
 
     if (!lastResponse) {
         return true;
@@ -47,7 +66,16 @@ export async function getSurveyQuestions(): Promise<SurveyQuestion[]> {
     const questions: SurveyQuestion[] = [];
 
     // 全ての質問IDを取得してから JS側でランダム抽出（質問数が少ないため全件取得で問題なし）
-    const allQuestions = await prisma.questionBank.findMany();
+    let allQuestions: QuestionBank[] = [];
+    try {
+        allQuestions = await prisma.questionBank.findMany();
+    } catch (error) {
+        if (isMissingSurveyTableError(error)) {
+            console.warn('[Survey] QuestionBank table is not ready yet. Returning empty questions.');
+            return [];
+        }
+        throw error;
+    }
 
     // カテゴリごとにグループ化
     const byCategory: Record<string, QuestionBank[]> = {};
@@ -93,9 +121,17 @@ export async function submitSurveyResponse(userId: string, answers: { questionId
     }
 
     // 1. 関連する質問を取得してカテゴリを確認
-    const questions = await prisma.questionBank.findMany({
-        where: { id: { in: questionIdsInput } }
-    });
+    let questions: QuestionBank[] = [];
+    try {
+        questions = await prisma.questionBank.findMany({
+            where: { id: { in: questionIdsInput } }
+        });
+    } catch (error) {
+        if (isMissingSurveyTableError(error)) {
+            throw new Error('アンケート機能の初期化が未完了です。しばらくしてから再試行してください。');
+        }
+        throw error;
+    }
 
     const questionMap = new Map(questions.map(q => [q.id, q]));
 
@@ -127,14 +163,21 @@ export async function submitSurveyResponse(userId: string, answers: { questionId
     }
 
     // 3. DB保存
-    return await prisma.surveyResponse.create({
-        data: {
-            userId,
-            details: detailedAnswers,
-            scores: finalScores,
-            answeredAt: new Date()
+    try {
+        return await prisma.surveyResponse.create({
+            data: {
+                userId,
+                details: detailedAnswers,
+                scores: finalScores,
+                answeredAt: new Date()
+            }
+        });
+    } catch (error) {
+        if (isMissingSurveyTableError(error)) {
+            throw new Error('アンケート機能の初期化が未完了です。しばらくしてから再試行してください。');
         }
-    });
+        throw error;
+    }
 }
 
 // ヘルパー関数

@@ -28,6 +28,19 @@ jobs:
       - name: チェックアウト
         uses: actions/checkout@v4
 
+      - name: Prisma マイグレーション同梱チェック
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          CHANGED_FILES="$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")"
+
+          if echo "$CHANGED_FILES" | grep -q '^prisma/schema\.prisma$'; then
+            if ! echo "$CHANGED_FILES" | grep -q '^prisma/migrations/'; then
+              echo "::error::prisma/schema.prisma を変更した場合は prisma/migrations/ の変更も同梱してください。"
+              exit 1
+            fi
+          fi
+
       - name: Node.js セットアップ
         uses: actions/setup-node@v4
         with:
