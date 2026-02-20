@@ -56,10 +56,10 @@ printf %s "$INTERNAL_API_SECRET" | gcloud secrets create internal-api-secret --r
   BUILD_SA="$(gcloud builds get-default-service-account --project "$PROJECT_ID")"
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="serviceAccount:$BUILD_SA" \
-    --role="roles/storage.admin"
+    --role="roles/storage.objectAdmin"
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="serviceAccount:$BUILD_SA" \
-    --role="roles/artifactregistry.createOnPushWriter"
+    --role="roles/artifactregistry.writer"
 
   # 9) （任意）Artifact Registry リポジトリを明示作成する場合
   # gcloud artifacts repositories create cloud-run-source-deploy --repository-format=docker --location="$REGION"

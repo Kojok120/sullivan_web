@@ -25,3 +25,17 @@ export function getDriveWebhookUrlOrError(): { webhookUrl: string } | { errorRes
     }
     return { webhookUrl: `${appUrl}/api/grading/webhook` };
 }
+
+export async function queueDriveCheck(source: string, logPrefix: string): Promise<NextResponse | null> {
+    try {
+        const { publishDriveCheckJob } = await import('@/lib/grading-job');
+        await publishDriveCheckJob(source, null, null);
+        return null;
+    } catch (error) {
+        console.error(`[${logPrefix}] Failed to queue drive check. source=${source}`, error);
+        return NextResponse.json(
+            { success: false, error: 'Queue mechanism unavailable' },
+            { status: 503 },
+        );
+    }
+}

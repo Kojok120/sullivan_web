@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { acquireGradingLock, releaseGradingLock } from '@/lib/grading-lock';
+import { isWorkerRuntime } from '@/lib/runtime-utils';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60; // Allow up to 60 seconds for fallback processing
-
-function isWorkerRuntime() {
-    return (process.env.SERVICE_ROLE || '').toLowerCase() === 'worker';
-}
 
 export async function GET(request: NextRequest) {
     if (!isWorkerRuntime()) {
@@ -22,27 +19,25 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    let lockAcquired = false;
     try {
         // Try to acquire lock using shared mechanism
-        const lockAcquired = await acquireGradingLock();
+        lockAcquired = await acquireGradingLock();
         if (!lockAcquired) {
             console.log('Grading check skipped: Lock is active.');
             return NextResponse.json({ success: false, message: 'Processing in progress' }, { status: 429 });
         }
 
-        try {
-            console.log('Triggering drive check...');
-            const { checkDriveForNewFiles } = await import('@/lib/grading-service');
-            await checkDriveForNewFiles();
-            return NextResponse.json({ success: true, message: 'Drive check completed' });
-        } finally {
-            // Release lock
-            await releaseGradingLock();
-        }
+        console.log('Triggering drive check...');
+        const { checkDriveForNewFiles } = await import('@/lib/grading-service');
+        await checkDriveForNewFiles();
+        return NextResponse.json({ success: true, message: 'Drive check completed' });
     } catch (error) {
         console.error('Drive check failed:', error);
-        // Ensure lock is released even on error
-        await releaseGradingLock();
         return NextResponse.json({ success: false, error: 'Internal Server Error' }, { status: 500 });
+    } finally {
+        if (lockAcquired) {
+            await releaseGradingLock();
+        }
     }
 }

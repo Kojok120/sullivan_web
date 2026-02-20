@@ -9,7 +9,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
     libzbar0 \
     && rm -rf /var/lib/apt/lists/* \
-    && pip3 install --break-system-packages opencv-python-headless pyzbar Pillow
+    && pip3 install --break-system-packages --no-cache-dir \
+      opencv-python-headless==4.10.0.84 \
+      pyzbar==0.1.9 \
+      Pillow==11.1.0
 
 FROM base AS deps
 WORKDIR /app
@@ -23,8 +26,8 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_OPTIONS="--max-old-space-size=2048"
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 worker
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 worker
 
 COPY --from=deps --chown=worker:nodejs /app/node_modules ./node_modules
 COPY --chown=worker:nodejs package.json ./package.json
@@ -38,5 +41,7 @@ USER worker
 
 EXPOSE 8080
 ENV BIND_HOST="0.0.0.0"
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD node -e "const req=require('http').get('http://127.0.0.1:8080/healthz',r=>process.exit(r.statusCode===200?0:1));req.on('error',()=>process.exit(1));req.setTimeout(4000,()=>{req.destroy();process.exit(1);});"
 
 CMD ["npm", "run", "start:worker"]

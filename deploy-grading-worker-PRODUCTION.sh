@@ -26,6 +26,10 @@ if [ -z "${QSTASH_TOKEN:-}" ]; then
   echo "QSTASH_TOKEN is required in .env.PRODUCTION for worker self-queue publishing."
   exit 1
 fi
+if [ -z "${QSTASH_CURRENT_SIGNING_KEY:-}" ] || [ -z "${QSTASH_NEXT_SIGNING_KEY:-}" ]; then
+  echo "QSTASH_CURRENT_SIGNING_KEY and QSTASH_NEXT_SIGNING_KEY are required in .env.PRODUCTION for webhook verification."
+  exit 1
+fi
 
 echo "Deploying grading worker to Project: $GOOGLE_CLOUD_PROJECT_ID"
 echo "Building worker image: $IMAGE_URI"

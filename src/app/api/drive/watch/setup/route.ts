@@ -1,23 +1,9 @@
 import { NextResponse } from 'next/server';
 import { watchDriveFolder } from '@/lib/drive-webhook-manager';
 import { saveWatchState, getWatchState } from '@/lib/drive-watch-state';
-import { getDriveWebhookUrlOrError, getShouldCheckFromRequest, verifyInternalApiAuthorization } from '@/lib/drive-watch-api';
+import { getDriveWebhookUrlOrError, getShouldCheckFromRequest, queueDriveCheck, verifyInternalApiAuthorization } from '@/lib/drive-watch-api';
 
 export const dynamic = 'force-dynamic';
-
-async function queueDriveCheck(source: string) {
-    try {
-        const { publishDriveCheckJob } = await import('@/lib/grading-job');
-        await publishDriveCheckJob(source, null, null);
-        return null;
-    } catch (error) {
-        console.error(`[DriveWatchSetup] Failed to queue drive check. source=${source}`, error);
-        return NextResponse.json(
-            { success: false, error: 'Queue mechanism unavailable' },
-            { status: 503 },
-        );
-    }
-}
 
 /**
  * POST /api/drive/watch/setup
@@ -45,7 +31,7 @@ export async function POST(request: Request) {
             const expiresIn = Math.round((existingState.expiration - Date.now()) / 1000 / 60);
             console.log(`Existing watch found, expires in ${expiresIn} minutes`);
             if (shouldCheck) {
-                const queueError = await queueDriveCheck('setup-skip');
+                const queueError = await queueDriveCheck('setup-skip', 'DriveWatchSetup');
                 if (queueError) return queueError;
             }
             return NextResponse.json({
@@ -70,7 +56,7 @@ export async function POST(request: Request) {
         const expiresAt = new Date(Number(result.expiration)).toISOString();
         console.log(`Watch registered successfully. Expires at: ${expiresAt}`);
         if (shouldCheck) {
-            const queueError = await queueDriveCheck('setup');
+            const queueError = await queueDriveCheck('setup', 'DriveWatchSetup');
             if (queueError) return queueError;
         }
 
@@ -126,4 +112,3 @@ export async function GET() {
         );
     }
 }
-

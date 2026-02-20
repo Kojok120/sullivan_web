@@ -40,11 +40,16 @@ jobs:
       - name: 必須シークレット検証 (Web)
         env:
           GRADING_WORKER_URL: ${{ secrets.GRADING_WORKER_URL }}
+          QSTASH_TOKEN: ${{ secrets.QSTASH_TOKEN }}
+          QSTASH_CURRENT_SIGNING_KEY: ${{ secrets.QSTASH_CURRENT_SIGNING_KEY }}
+          QSTASH_NEXT_SIGNING_KEY: ${{ secrets.QSTASH_NEXT_SIGNING_KEY }}
         run: |
-          if [ -z "$GRADING_WORKER_URL" ]; then
-            echo "Missing required secret: GRADING_WORKER_URL"
-            exit 1
-          fi
+          for var in GRADING_WORKER_URL QSTASH_TOKEN QSTASH_CURRENT_SIGNING_KEY QSTASH_NEXT_SIGNING_KEY; do
+            if [ -z "${!var}" ]; then
+              echo "Missing required secret: ${var}"
+              exit 1
+            fi
+          done
 
       - name: Docker 認証
         run: gcloud auth configure-docker asia.gcr.io --quiet
@@ -148,6 +153,44 @@ jobs:
 
       - name: gcloud CLI セットアップ
         uses: google-github-actions/setup-gcloud@v2
+
+      - name: 必須シークレット検証 (Grading Worker)
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          RUNTIME_SA_EMAIL: ${{ secrets.RUNTIME_SA_EMAIL }}
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
+          GEMINI_LIVE_MODEL: ${{ secrets.GEMINI_LIVE_MODEL }}
+          GEMINI_LIVE_API_VERSION: ${{ secrets.GEMINI_LIVE_API_VERSION }}
+          GEMINI_LIVE_VOICE: ${{ secrets.GEMINI_LIVE_VOICE }}
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+          GRADING_WORKER_URL: ${{ secrets.GRADING_WORKER_URL }}
+          QSTASH_TOKEN: ${{ secrets.QSTASH_TOKEN }}
+          QSTASH_CURRENT_SIGNING_KEY: ${{ secrets.QSTASH_CURRENT_SIGNING_KEY }}
+          QSTASH_NEXT_SIGNING_KEY: ${{ secrets.QSTASH_NEXT_SIGNING_KEY }}
+        run: |
+          for var in \
+            GCP_PROJECT_ID \
+            RUNTIME_SA_EMAIL \
+            UPSTASH_REDIS_REST_URL \
+            UPSTASH_REDIS_REST_TOKEN \
+            GEMINI_API_KEY \
+            GEMINI_MODEL \
+            GEMINI_LIVE_MODEL \
+            GEMINI_LIVE_API_VERSION \
+            GEMINI_LIVE_VOICE \
+            DRIVE_FOLDER_ID \
+            GRADING_WORKER_URL \
+            QSTASH_TOKEN \
+            QSTASH_CURRENT_SIGNING_KEY \
+            QSTASH_NEXT_SIGNING_KEY; do
+            if [ -z "${!var}" ]; then
+              echo "Missing required secret: ${var}"
+              exit 1
+            fi
+          done
 
       - name: Docker 認証
         run: gcloud auth configure-docker asia.gcr.io --quiet

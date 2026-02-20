@@ -397,17 +397,22 @@ async function renameFile(fileId: string, newName: string) {
 }
 
 async function getFileName(fileId: string): Promise<string | null> {
-    try {
-        const driveClient = getDrive();
-        const res = await driveClient.files.get({
-            fileId,
-            fields: 'name',
-        });
-        return res.data.name ?? null;
-    } catch (error) {
-        console.error('Error fetching file metadata:', error);
-        return null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+            const driveClient = getDrive();
+            const res = await driveClient.files.get({
+                fileId,
+                fields: 'name',
+            });
+            return res.data.name ?? null;
+        } catch (error) {
+            console.warn(`[Drive] Failed to fetch metadata (fileId=${fileId}, attempt=${attempt + 1}/3):`, error);
+            if (attempt < 2) {
+                await new Promise(resolve => setTimeout(resolve, 300 * (attempt + 1)));
+            }
+        }
     }
+    return null;
 }
 
 // Archive Logic

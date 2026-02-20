@@ -1,12 +1,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifySignatureAppRouter } from '@upstash/qstash/nextjs';
+import { isWorkerRuntime } from '@/lib/runtime-utils';
 
 export const maxDuration = 300; // Allow up to 5 minutes for AI grading
-
-function isWorkerRuntime() {
-    return (process.env.SERVICE_ROLE || '').toLowerCase() === 'worker';
-}
 
 async function handler(req: NextRequest) {
     try {
