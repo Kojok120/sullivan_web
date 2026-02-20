@@ -1,6 +1,5 @@
 import QRCode from 'qrcode';
-import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
-import type { GenerativeModel, ResponseSchema } from '@google/generative-ai';
+import { GoogleGenAI, Type } from '@google/genai';
 import { Client as QStashClient } from '@upstash/qstash';
 import { prisma } from '@/lib/prisma';
 import type { Prisma, User } from '@prisma/client';
@@ -12,7 +11,7 @@ import { emitRealtimeEvent } from '@/lib/realtime-events';
 import { incrementStampCount } from '@/lib/stamp-service';
 import { processGamificationUpdates, toGamificationPayload } from '@/lib/gamification-service';
 import { acquireGradingFileLock, releaseGradingFileLock } from '@/lib/grading-lock';
-import { claimGradingJob, markGradingJobCompleted, markGradingJobFailed } from '@/lib/grading-job';
+import { claimGradingJob, markGradingJobCompleted, markGradingJobFailed, publishGradingJob } from '@/lib/grading-job';
 
 // Priority adjustment logic (inlined from removed priority-algo.ts)
 type Evaluation = "A" | "B" | "C" | "D";
@@ -33,11 +32,11 @@ const DRIVE_FOLDER_ID = process.env.DRIVE_FOLDER_ID || ''; // Folder to watch
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 
 // Lazy Initialization
-let genAI: GoogleGenerativeAI | null = null;
+let genAI: GoogleGenAI | null = null;
 function getGenAI() {
     if (!genAI) {
         if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not set");
-        genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+        genAI = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
     }
     return genAI;
 }
@@ -115,7 +114,7 @@ export async function checkDriveForNewFiles() {
     try {
         const driveClient = getDrive();
         const res = await driveClient.files.list({
-            q: `'${DRIVE_FOLDER_ID}' in parents and trashed = false and mimeType != 'application/vnd.google-apps.folder'`,
+            q: `'${DRIVE_FOLDER_ID}' in parents and trashed = false and mimeType != 'application/vnd.google-apps.folder' and not name contains '[PROCESSED]' and not name contains '[ERROR]'`,
             fields: 'files(id, name, mimeType, createdTime)',
             orderBy: 'createdTime desc',
             pageSize: 10, // Process a few at a time
@@ -143,7 +142,7 @@ export async function checkDriveForNewFiles() {
         await Promise.all(
             filesToProcess.map((file: { id?: string | null; name?: string | null }) => {
                 console.log(`Queuing grading job for file: ${file.name} (${file.id})`);
-                return triggerGradingJob(file.id!, file.name!);
+                return publishGradingJob(file.id!, file.name!);
             })
         );
 
@@ -457,39 +456,7 @@ async function archiveProcessedFile(fileId: string, studentId: string, problemId
     }
 }
 
-// QStash Integration
-async function triggerGradingJob(fileId: string, fileName: string) {
-    const token = process.env.QSTASH_TOKEN;
-    if (!token) {
-        console.warn('QSTASH_TOKEN not set, falling back to synchronous processing');
-        await processFile(fileId, fileName);
-        return;
-    }
-
-    const client = new QStashClient({ token });
-    const appUrl = process.env.GRADING_WORKER_URL || process.env.APP_URL;
-
-    if (!appUrl) {
-        console.warn('GRADING_WORKER_URL/APP_URL not set, cannot use QStash. Processing synchronously.');
-        await processFile(fileId, fileName);
-        return;
-    }
-
-    const baseUrl = appUrl.replace(/\/+$/, '');
-
-    try {
-        await client.publishJSON({
-            url: `${baseUrl}/api/queue/grading`,
-            body: { fileId, fileName },
-            retries: 3,
-        });
-        console.log(`Published grading job to QStash for ${fileName}`);
-    } catch (error) {
-        console.error('Failed to publish to QStash:', error);
-        // Fallback to sync
-        await processFile(fileId, fileName);
-    }
-}
+// Removed triggerGradingJob; QStash publishing is now centralized in publishGradingJob
 
 // Helper to find or create a folder
 const folderCache = new Map<string, string>(); // Cache folder IDs key="${name}:${parentId}"
@@ -752,8 +719,7 @@ async function getQrDataWithFallback(filePath: string, prepared: PreparedFile): 
     if (!hasStudentId || !hasProblems) {
         console.log("Local QR read failed/skipped or incomplete. Attempting to scan QR with Gemini...");
         const modelName = process.env.GEMINI_MODEL || "gemini-2.5-pro";
-        const model = getGenAI().getGenerativeModel({ model: modelName });
-        qrData = await scanQRWithGemini(model, prepared.base64Data, prepared.mimeType);
+        qrData = await scanQRWithGemini(modelName, prepared.base64Data, prepared.mimeType);
     }
 
     return qrData;
@@ -834,42 +800,32 @@ async function gradeWithGemini(
     }));
 
     // 3. Define responseSchema for structured output
-    const gradingResponseSchema: ResponseSchema = {
-        type: SchemaType.ARRAY,
+    const gradingResponseSchema = {
+        type: Type.ARRAY,
         items: {
-            type: SchemaType.OBJECT,
+            type: Type.OBJECT,
             properties: {
                 problemIndex: {
-                    type: SchemaType.INTEGER,
+                    type: Type.INTEGER,
                     description: "問題のインデックス（0始まり、問題リストの順序に対応）"
                 },
                 studentAnswer: {
-                    type: SchemaType.STRING,
+                    type: Type.STRING,
                     description: "生徒の解答をそのまま転記"
                 },
                 evaluation: {
-                    type: SchemaType.STRING,
-                    format: "enum",
+                    type: Type.STRING,
                     enum: ["A", "B", "C", "D"],
                     description: "A=完璧, B=ほぼ正解, C=部分的に正解, D=不正解"
                 },
                 feedback: {
-                    type: SchemaType.STRING,
+                    type: Type.STRING,
                     description: "日本語でのフィードバック"
                 }
             },
             required: ["problemIndex", "studentAnswer", "evaluation", "feedback"]
         }
     };
-
-    // 4. Create model with structured output configuration
-    const model = getGenAI().getGenerativeModel({
-        model: modelName,
-        generationConfig: {
-            responseMimeType: "application/json",
-            responseSchema: gradingResponseSchema
-        }
-    });
 
     // 5. Build enhanced prompt
     // 5. Build enhanced prompt
@@ -891,17 +847,24 @@ async function gradeWithGemini(
             }
 
             console.log(`Calling Gemini generateContent for grading (attempt ${attempt})...`);
-            const result = await model.generateContent([
-                gradingPrompt,
-                {
-                    inlineData: {
-                        data: prepared.base64Data,
-                        mimeType: prepared.mimeType
+            const result = await getGenAI().models.generateContent({
+                model: modelName,
+                contents: [
+                    { text: gradingPrompt },
+                    {
+                        inlineData: {
+                            data: prepared.base64Data,
+                            mimeType: prepared.mimeType
+                        }
                     }
+                ],
+                config: {
+                    responseMimeType: "application/json",
+                    responseSchema: gradingResponseSchema
                 }
-            ]);
+            });
 
-            const text = result.response.text();
+            const text = result.text || '';
             console.log(`Gemini Grading Response (attempt ${attempt}):`, text);
 
             const resultsJson = parseJSON(text);
@@ -930,21 +893,24 @@ async function gradeWithGemini(
 }
 
 // Helper: Scan QR with Gemini
-async function scanQRWithGemini(model: GenerativeModel, base64Data: string, mimeType: string): Promise<QRData | null> {
+async function scanQRWithGemini(modelName: string, base64Data: string, mimeType: string): Promise<QRData | null> {
     try {
         const prompt = loadPrompt('qr-scan-prompt.md');
         // ...
 
-        const result = await model.generateContent([
-            prompt,
-            {
-                inlineData: {
-                    data: base64Data,
-                    mimeType: mimeType
+        const result = await getGenAI().models.generateContent({
+            model: modelName,
+            contents: [
+                { text: prompt },
+                {
+                    inlineData: {
+                        data: base64Data,
+                        mimeType: mimeType
+                    }
                 }
-            }
-        ]);
-        const text = result.response.text();
+            ]
+        });
+        const text = result.text || '';
         console.log("Gemini QR Scan Response:", text);
         const parsed = parseJSON(text);
         return normalizeQrData(parsed);
@@ -1405,7 +1371,7 @@ export async function checkStuckFiles() {
         const timeStr = timeoutThreshold.toISOString();
 
         const res = await driveClient.files.list({
-            q: `'${DRIVE_FOLDER_ID}' in parents and trashed = false and mimeType != 'application/vnd.google-apps.folder' and createdTime < '${timeStr}'`,
+            q: `'${DRIVE_FOLDER_ID}' in parents and trashed = false and mimeType != 'application/vnd.google-apps.folder' and createdTime < '${timeStr}' and not name contains '[PROCESSED]' and not name contains '[ERROR]'`,
             fields: 'files(id, name, createdTime)',
             orderBy: 'createdTime desc',
             pageSize: 20,

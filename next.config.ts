@@ -45,6 +45,7 @@ console.log(
 );
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ['googleapis', '@google/genai'],
   // CI では別ステップで tsc --noEmit を実行済みのため、ビルド中の重複チェックをスキップ
   // これによりビルド時のメモリ使用量と所要時間を大幅に削減できる
   // ⚠️ ローカルの npm run build では型エラーが検出されない

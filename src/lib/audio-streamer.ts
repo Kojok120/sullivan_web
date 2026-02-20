@@ -4,6 +4,7 @@ const INPUT_CHUNK_DURATION_MS = 100;
 const INPUT_CHUNK_SAMPLES = (GEMINI_INPUT_SAMPLE_RATE * INPUT_CHUNK_DURATION_MS) / 1000; // 1600 samples
 const SILENCE_RMS_THRESHOLD = 0.004;
 const DEFAULT_SILENCE_HOLD_MS = 500;
+const DEFAULT_MAX_TURN_MS = 20_000;
 
 function resolveSilenceHoldMs() {
     const raw = process.env.NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS;
@@ -17,6 +18,19 @@ function resolveSilenceHoldMs() {
 }
 
 const SILENCE_HOLD_MS = resolveSilenceHoldMs();
+
+function resolveMaxTurnMs() {
+    const raw = process.env.NEXT_PUBLIC_GEMINI_MAX_TURN_MS;
+    if (!raw) return DEFAULT_MAX_TURN_MS;
+
+    const parsed = Number.parseInt(raw, 10);
+    if (!Number.isFinite(parsed)) return DEFAULT_MAX_TURN_MS;
+
+    // 不自然な長話で turn が閉じないケースを防ぐため、上限を強制する。
+    return Math.min(120_000, Math.max(5_000, parsed));
+}
+
+const MAX_TURN_MS = resolveMaxTurnMs();
 
 type WindowWithWebkitAudioContext = Window & {
     webkitAudioContext?: typeof AudioContext;
@@ -32,10 +46,13 @@ export class AudioStreamer {
     private audioQueue: Float32Array[] = [];
     private isProcessingQueue: boolean = false;
     private scheduledTime: number = 0;
+    private activeSources: Set<AudioBufferSourceNode> = new Set();
+    private queueGeneration: number = 0;
     private inputRemainder: Float32Array = new Float32Array(0);
     private pendingInputPcm: number[] = [];
     private lastVoiceAtMs: number = 0;
     private sentAudioSinceTurnStart: boolean = false;
+    private turnStartedAtMs: number = 0;
     private onAudioData: (data: string) => void;
 
     constructor(onAudioData: (data: string) => void) {
@@ -118,12 +135,13 @@ export class AudioStreamer {
         this.inputRemainder = new Float32Array(0);
         this.pendingInputPcm = [];
         this.sentAudioSinceTurnStart = false;
+        this.turnStartedAtMs = 0;
         this.isRecording = true;
     }
 
     stopRecording() {
         this.flushInputChunkQueue(true);
-        this.sendAudioStreamEndIfNeeded();
+        this.sendAudioStreamEnd(true);
 
         if (this.workletNode) {
             this.workletNode.disconnect();
@@ -140,6 +158,7 @@ export class AudioStreamer {
         this.inputRemainder = new Float32Array(0);
         this.pendingInputPcm = [];
         this.sentAudioSinceTurnStart = false;
+        this.turnStartedAtMs = 0;
         this.isRecording = false;
     }
 
@@ -148,6 +167,17 @@ export class AudioStreamer {
         if (!float32Array || float32Array.length === 0) return;
 
         const nowMs = Date.now();
+
+        if (
+            this.sentAudioSinceTurnStart
+            && this.turnStartedAtMs > 0
+            && nowMs - this.turnStartedAtMs >= MAX_TURN_MS
+        ) {
+            this.flushInputChunkQueue(true);
+            this.sendAudioStreamEnd(true);
+            return;
+        }
+
         const rms = this.computeRms(float32Array);
         if (rms >= SILENCE_RMS_THRESHOLD) {
             this.lastVoiceAtMs = nowMs;
@@ -156,7 +186,7 @@ export class AudioStreamer {
         const hasRecentVoice = nowMs - this.lastVoiceAtMs <= SILENCE_HOLD_MS;
         if (!hasRecentVoice) {
             this.flushInputChunkQueue(true);
-            this.sendAudioStreamEndIfNeeded();
+            this.sendAudioStreamEnd(false);
             return;
         }
 
@@ -239,6 +269,10 @@ export class AudioStreamer {
     private sendRealtimeAudioChunk(samples: Int16Array) {
         if (samples.length === 0) return;
 
+        if (!this.sentAudioSinceTurnStart) {
+            this.turnStartedAtMs = Date.now();
+        }
+
         const base64 = this.arrayBufferToBase64(samples.buffer);
         this.onAudioData(JSON.stringify({
             realtimeInput: {
@@ -251,8 +285,8 @@ export class AudioStreamer {
         this.sentAudioSinceTurnStart = true;
     }
 
-    private sendAudioStreamEndIfNeeded() {
-        if (!this.sentAudioSinceTurnStart) return;
+    private sendAudioStreamEnd(force: boolean) {
+        if (!force && !this.sentAudioSinceTurnStart) return;
 
         this.onAudioData(JSON.stringify({
             realtimeInput: {
@@ -260,6 +294,12 @@ export class AudioStreamer {
             },
         }));
         this.sentAudioSinceTurnStart = false;
+        this.turnStartedAtMs = 0;
+    }
+
+    public forceAudioStreamEnd() {
+        this.flushInputChunkQueue(true);
+        this.sendAudioStreamEnd(true);
     }
 
     // Helper to convert Float32 to Int16 PCM
@@ -309,31 +349,72 @@ export class AudioStreamer {
 
     async processQueue() {
         this.isProcessingQueue = true;
-        while (this.audioQueue.length > 0) {
-            const data = this.audioQueue.shift();
-            if (data && this.audioContext) {
-                const buffer = this.audioContext.createBuffer(1, data.length, GEMINI_OUTPUT_SAMPLE_RATE);
-                buffer.getChannelData(0).set(data);
-
-                const source = this.audioContext.createBufferSource();
-                source.buffer = buffer;
-                source.connect(this.audioContext.destination);
-
-                // Simple scheduling to avoid gaps or overlaps
-                const currentTime = this.audioContext.currentTime;
-                if (this.scheduledTime < currentTime) {
-                    this.scheduledTime = currentTime;
+        const currentGeneration = this.queueGeneration;
+        try {
+            while (this.audioQueue.length > 0) {
+                if (currentGeneration !== this.queueGeneration) {
+                    break;
                 }
 
-                source.start(this.scheduledTime);
-                this.scheduledTime += buffer.duration;
+                const data = this.audioQueue.shift();
+                if (currentGeneration !== this.queueGeneration) {
+                    break;
+                }
+
+                if (data && this.audioContext) {
+                    const buffer = this.audioContext.createBuffer(1, data.length, GEMINI_OUTPUT_SAMPLE_RATE);
+                    buffer.getChannelData(0).set(data);
+
+                    const source = this.audioContext.createBufferSource();
+                    source.buffer = buffer;
+                    source.connect(this.audioContext.destination);
+                    this.activeSources.add(source);
+                    source.onended = () => {
+                        source.disconnect();
+                        this.activeSources.delete(source);
+                    };
+
+                    // Simple scheduling to avoid gaps or overlaps
+                    const currentTime = this.audioContext.currentTime;
+                    if (this.scheduledTime < currentTime) {
+                        this.scheduledTime = currentTime;
+                    }
+
+                    source.start(this.scheduledTime);
+                    this.scheduledTime += buffer.duration;
+                }
             }
+        } finally {
+            this.isProcessingQueue = false;
         }
+    }
+
+    clearPlaybackQueue() {
+        this.queueGeneration += 1;
+        this.audioQueue = [];
+
+        for (const source of this.activeSources) {
+            try {
+                source.stop();
+            } catch {
+                // stop済みsourceは例外を投げることがあるため握りつぶす
+            }
+            source.disconnect();
+        }
+        this.activeSources.clear();
+
+        if (this.audioContext) {
+            this.scheduledTime = this.audioContext.currentTime;
+        } else {
+            this.scheduledTime = 0;
+        }
+
         this.isProcessingQueue = false;
     }
 
     async close() {
         this.stopRecording();
+        this.clearPlaybackQueue();
         if (this.audioContext) {
             await this.audioContext.close();
             this.audioContext = null;

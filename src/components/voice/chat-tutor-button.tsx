@@ -29,6 +29,27 @@ type ChatTutorButtonProps = {
 };
 
 const INITIAL_ASSISTANT_MESSAGE = 'あなたのわからないところを教えてください。';
+const STORAGE_NAMESPACE = 'chat-tutor:messages';
+const MAX_STORED_MESSAGES = 40;
+
+function isValidTutorMessage(value: unknown): value is TutorMessage {
+    if (!value || typeof value !== 'object') return false;
+    const record = value as { role?: unknown; content?: unknown };
+    return (
+        (record.role === 'user' || record.role === 'assistant')
+        && typeof record.content === 'string'
+        && record.content.trim().length > 0
+    );
+}
+
+function toBase64Utf8(value: string) {
+    const bytes = new TextEncoder().encode(value);
+    let binary = '';
+    for (const byte of bytes) {
+        binary += String.fromCharCode(byte);
+    }
+    return window.btoa(binary);
+}
 
 export function ChatTutorButton({ problemContext, systemPrompt }: ChatTutorButtonProps) {
     const [isOpen, setIsOpen] = useState(false);
@@ -38,6 +59,20 @@ export function ChatTutorButton({ problemContext, systemPrompt }: ChatTutorButto
         { role: 'assistant', content: INITIAL_ASSISTANT_MESSAGE },
     ]);
     const messagesViewportRef = useRef<HTMLDivElement | null>(null);
+    const storageKey = useMemo(() => {
+        const raw = [
+            STORAGE_NAMESPACE,
+            problemContext.question || '',
+            problemContext.answer || '',
+            problemContext.userAnswer || '',
+        ].join('|');
+
+        if (typeof window === 'undefined') {
+            return raw;
+        }
+
+        return `${STORAGE_NAMESPACE}:${toBase64Utf8(raw)}`;
+    }, [problemContext.answer, problemContext.question, problemContext.userAnswer]);
 
     const canSend = input.trim().length > 0 && !isLoading;
 
@@ -52,6 +87,37 @@ export function ChatTutorButton({ problemContext, systemPrompt }: ChatTutorButto
         if (!viewport) return;
         viewport.scrollTop = viewport.scrollHeight;
     }, [isOpen, messages, isLoading]);
+
+    useEffect(() => {
+        const stored = window.sessionStorage.getItem(storageKey);
+        if (!stored) {
+            setMessages([{ role: 'assistant', content: INITIAL_ASSISTANT_MESSAGE }]);
+            return;
+        }
+
+        try {
+            const parsed = JSON.parse(stored) as unknown;
+            if (!Array.isArray(parsed)) {
+                setMessages([{ role: 'assistant', content: INITIAL_ASSISTANT_MESSAGE }]);
+                return;
+            }
+
+            const sanitized = parsed.filter(isValidTutorMessage).slice(-MAX_STORED_MESSAGES);
+            if (sanitized.length === 0) {
+                setMessages([{ role: 'assistant', content: INITIAL_ASSISTANT_MESSAGE }]);
+                return;
+            }
+
+            setMessages(sanitized);
+        } catch {
+            setMessages([{ role: 'assistant', content: INITIAL_ASSISTANT_MESSAGE }]);
+        }
+    }, [storageKey]);
+
+    useEffect(() => {
+        if (messages.length === 0) return;
+        window.sessionStorage.setItem(storageKey, JSON.stringify(messages.slice(-MAX_STORED_MESSAGES)));
+    }, [messages, storageKey]);
 
     const sendMessage = async () => {
         const userText = input.trim();
