@@ -114,7 +114,7 @@ export async function checkDriveForNewFiles() {
     try {
         const driveClient = getDrive();
         const res = await driveClient.files.list({
-            q: `'${DRIVE_FOLDER_ID}' in parents and trashed = false and mimeType != 'application/vnd.google-apps.folder'`,
+            q: `'${DRIVE_FOLDER_ID}' in parents and trashed = false and mimeType != 'application/vnd.google-apps.folder' and not name contains '[PROCESSED]' and not name contains '[ERROR]'`,
             fields: 'files(id, name, mimeType, createdTime)',
             orderBy: 'createdTime desc',
             pageSize: 10, // Process a few at a time
@@ -1403,7 +1403,7 @@ export async function checkStuckFiles() {
         const timeStr = timeoutThreshold.toISOString();
 
         const res = await driveClient.files.list({
-            q: `'${DRIVE_FOLDER_ID}' in parents and trashed = false and mimeType != 'application/vnd.google-apps.folder' and createdTime < '${timeStr}'`,
+            q: `'${DRIVE_FOLDER_ID}' in parents and trashed = false and mimeType != 'application/vnd.google-apps.folder' and createdTime < '${timeStr}' and not name contains '[PROCESSED]' and not name contains '[ERROR]'`,
             fields: 'files(id, name, createdTime)',
             orderBy: 'createdTime desc',
             pageSize: 20,

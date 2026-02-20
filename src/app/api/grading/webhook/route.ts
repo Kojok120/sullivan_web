@@ -1,14 +1,8 @@
 import { NextResponse } from 'next/server';
-import { checkDriveForNewFiles } from '@/lib/grading-service';
-import { acquireGradingLock, releaseGradingLock } from '@/lib/grading-lock';
+import { Client as QStashClient } from '@upstash/qstash';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60; // Allow up to 60 seconds (max for Hobby) for fallback processing
-
-
-// Debounce timing (still needed to throttle rapid webhook calls)
-let lastTriggerTime = 0;
-const DEBOUNCE_MS = 5000; // Ignore rapid-fire webhooks within 5 seconds
 
 export async function POST(request: Request) {
     try {
@@ -51,32 +45,33 @@ export async function POST(request: Request) {
         }
 
         if (resourceState === 'change' || resourceState === 'update' || resourceState === 'add') {
-            // Debounce rapid calls
-            const now = Date.now();
-            if (now - lastTriggerTime < DEBOUNCE_MS) {
-                console.log("Webhook ignored (Debounced)");
-                return NextResponse.json({ success: true, message: "Ignored (Debounced)" });
-            }
+            const token = process.env.QSTASH_TOKEN;
+            const appUrl = process.env.GRADING_WORKER_URL || process.env.APP_URL;
 
-            // Try to acquire shared lock
-            const lockAcquired = await acquireGradingLock();
-            if (!lockAcquired) {
-                console.log("Webhook ignored (Lock active)");
-                return NextResponse.json({ success: true, message: "Ignored (Busy)" });
-            }
-
-            lastTriggerTime = now;
-
-            try {
-                // Wait for Google Drive API consistency (files might not be visible immediately after webhook)
-                console.log("Waiting 5s for Drive API consistency...");
-                await new Promise(resolve => setTimeout(resolve, 5000));
-
-                await checkDriveForNewFiles();
-            } catch (e) {
-                console.error("Webhook processing error:", e);
-            } finally {
-                await releaseGradingLock();
+            if (token && appUrl) {
+                const client = new QStashClient({ token });
+                const baseUrl = appUrl.replace(/\/+$/, '');
+                try {
+                    await client.publishJSON({
+                        url: `${baseUrl}/api/queue/drive-check`,
+                        body: { source: 'webhook', state: resourceState, channelId },
+                        delay: "5s", // Wait 5 seconds for Drive API consistency
+                        retries: 3,
+                    });
+                    console.log(`Queued drive check via QStash`);
+                } catch (e) {
+                    console.error("Failed to queue drive check to QStash:", e);
+                    // Fallback to async check
+                    const { secureDriveCheck } = await import('@/lib/grading-service');
+                    secureDriveCheck('webhook-fallback-queue').catch(console.error);
+                }
+            } else {
+                console.warn("QStash config missing. Executing drive check synchronously (fallback).");
+                const { secureDriveCheck } = await import('@/lib/grading-service');
+                // Wait locally instead of QStash delay
+                setTimeout(() => {
+                    secureDriveCheck('webhook-fallback-sync').catch(console.error);
+                }, 5000);
             }
 
             return NextResponse.json({ success: true });
@@ -86,7 +81,6 @@ export async function POST(request: Request) {
 
     } catch (error) {
         console.error("Webhook Error:", error);
-        await releaseGradingLock();
         return NextResponse.json({ success: false }, { status: 500 });
     }
 }
