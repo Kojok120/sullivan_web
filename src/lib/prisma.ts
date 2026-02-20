@@ -37,11 +37,22 @@ function getPrismaClient(): PrismaClientSingleton {
 // ビルド時は import のみ発生するため、初回アクセスまで接続設定検証を遅延させる。
 export const prisma = new Proxy({} as PrismaClientSingleton, {
     get(_target, prop) {
+        // then を隠して Proxy が Promise-like と誤判定されるのを防ぐ。
+        if (prop === "then") {
+            return undefined;
+        }
+
         const client = getPrismaClient();
-        const value = (client as unknown as Record<PropertyKey, unknown>)[prop];
+
+        if (typeof prop !== "string") {
+            return Reflect.get(client, prop);
+        }
+
+        const value = Reflect.get(client, prop);
         if (typeof value === "function") {
             return (value as (...args: unknown[]) => unknown).bind(client);
         }
+
         return value;
     },
 });
