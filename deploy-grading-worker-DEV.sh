@@ -17,17 +17,16 @@ IMAGE_TAG="${IMAGE_TAG:-$(date +%Y%m%d-%H%M%S)}"
 IMAGE_URI="${IMAGE_URI:-asia.gcr.io/${GOOGLE_CLOUD_PROJECT_ID}/sullivan-grading-worker-dev:${IMAGE_TAG}}"
 WORKER_MIN_INSTANCES="${WORKER_MIN_INSTANCES:-0}"
 WORKER_MAX_INSTANCES="${WORKER_MAX_INSTANCES:-10}"
+QSTASH_TOKEN_SECRET_NAME="${QSTASH_TOKEN_SECRET_NAME:-qstash-token}"
+QSTASH_CURRENT_SIGNING_KEY_SECRET_NAME="${QSTASH_CURRENT_SIGNING_KEY_SECRET_NAME:-qstash-current-signing-key}"
+QSTASH_NEXT_SIGNING_KEY_SECRET_NAME="${QSTASH_NEXT_SIGNING_KEY_SECRET_NAME:-qstash-next-signing-key}"
 
 if [ -z "${GRADING_WORKER_URL:-}" ]; then
   echo "GRADING_WORKER_URL is required in .env.DEV for worker self-queue publishing."
   exit 1
 fi
-if [ -z "${QSTASH_TOKEN:-}" ]; then
-  echo "QSTASH_TOKEN is required in .env.DEV for worker self-queue publishing."
-  exit 1
-fi
-if [ -z "${QSTASH_CURRENT_SIGNING_KEY:-}" ] || [ -z "${QSTASH_NEXT_SIGNING_KEY:-}" ]; then
-  echo "QSTASH_CURRENT_SIGNING_KEY and QSTASH_NEXT_SIGNING_KEY are required in .env.DEV for webhook verification."
+if [ -z "${QSTASH_TOKEN_SECRET_NAME:-}" ] || [ -z "${QSTASH_CURRENT_SIGNING_KEY_SECRET_NAME:-}" ] || [ -z "${QSTASH_NEXT_SIGNING_KEY_SECRET_NAME:-}" ]; then
+  echo "QSTASH secret names are required (QSTASH_TOKEN_SECRET_NAME / QSTASH_CURRENT_SIGNING_KEY_SECRET_NAME / QSTASH_NEXT_SIGNING_KEY_SECRET_NAME)."
   exit 1
 fi
 
@@ -65,6 +64,6 @@ gcloud run deploy sullivan-grading-worker-dev \
   --set-env-vars "GEMINI_LIVE_VOICE=${GEMINI_LIVE_VOICE:-Aoede}" \
   --set-env-vars "DRIVE_FOLDER_ID=$DRIVE_FOLDER_ID" \
   --set-env-vars "GRADING_WORKER_URL=$GRADING_WORKER_URL" \
-  --set-env-vars "QSTASH_TOKEN=$QSTASH_TOKEN" \
-  --set-env-vars "QSTASH_CURRENT_SIGNING_KEY=$QSTASH_CURRENT_SIGNING_KEY" \
-  --set-env-vars "QSTASH_NEXT_SIGNING_KEY=$QSTASH_NEXT_SIGNING_KEY"
+  --update-secrets "QSTASH_TOKEN=${QSTASH_TOKEN_SECRET_NAME}:latest" \
+  --update-secrets "QSTASH_CURRENT_SIGNING_KEY=${QSTASH_CURRENT_SIGNING_KEY_SECRET_NAME}:latest" \
+  --update-secrets "QSTASH_NEXT_SIGNING_KEY=${QSTASH_NEXT_SIGNING_KEY_SECRET_NAME}:latest"
