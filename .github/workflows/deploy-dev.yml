@@ -55,6 +55,7 @@ jobs:
         run: docker push asia.gcr.io/${{ secrets.GCP_PROJECT_ID }}/sullivan-app-dev:${{ github.sha }}
 
       - name: Cloud Run デプロイ (Web)
+        id: deploy_web
         run: |
           gcloud run deploy sullivan-app-dev \
             --project "${{ secrets.GCP_PROJECT_ID }}" \
@@ -90,6 +91,30 @@ jobs:
             --update-secrets "DRIVE_WEBHOOK_TOKEN=drive-webhook-token:latest" \
             --set-env-vars "DRIVE_WEBHOOK_CHANNEL_ID=${{ secrets.DRIVE_WEBHOOK_CHANNEL_ID }}" \
             --set-env-vars "GRADING_WORKER_URL=${{ secrets.GRADING_WORKER_URL }}"
+
+      - name: Cloud Run 起動ログ取得 (Web, 失敗時)
+        if: failure() && steps.deploy_web.outcome == 'failure'
+        run: |
+          echo "Cloud Run web deploy failed. Fetching diagnostic logs..."
+
+          REVISION="$(gcloud run services describe sullivan-app-dev \
+            --project "${{ secrets.GCP_PROJECT_ID }}" \
+            --region ${{ env.GCP_REGION }} \
+            --format='value(status.latestCreatedRevisionName)' 2>/dev/null || true)"
+
+          if [ -z "$REVISION" ]; then
+            echo "Could not determine latest revision."
+            exit 0
+          fi
+
+          echo "latestCreatedRevision=$REVISION"
+
+          gcloud logging read \
+            "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"sullivan-app-dev\" AND resource.labels.revision_name=\"$REVISION\"" \
+            --project "${{ secrets.GCP_PROJECT_ID }}" \
+            --limit=200 \
+            --format='value(timestamp,logName,textPayload,jsonPayload.message,jsonPayload)' \
+            || true
 
   deploy-grading-worker:
     name: Deploy Grading Worker (DEV)
