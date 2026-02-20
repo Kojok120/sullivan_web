@@ -28,4 +28,15 @@ async function handler(req: NextRequest) {
 }
 
 export const dynamic = 'force-dynamic';
-export const POST = verifySignatureAppRouter(handler);
+
+export const POST = async (req: NextRequest, ...args: any[]) => {
+    // 実行時に環境変数をチェックすることで、ビルド時（環境変数がない状態）のエラーを回避
+    if (!process.env.QSTASH_CURRENT_SIGNING_KEY || !process.env.QSTASH_NEXT_SIGNING_KEY) {
+        console.error('[API] QStash signing keys are missing');
+        return NextResponse.json({ error: 'Server Configuration Error' }, { status: 500 });
+    }
+
+    // 遅延してラッパーを生成
+    const wrapped = verifySignatureAppRouter(handler);
+    return wrapped(req as any, ...args as any[]);
+};

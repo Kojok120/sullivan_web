@@ -38,11 +38,12 @@ gcloud run deploy sullivan-app-dev \
   --source . \
   --platform managed \
   --region asia-northeast1 \
+  --port 8080 \
   --memory 4Gi \
   --cpu 2 \
   --allow-unauthenticated \
   --set-env-vars "BIND_HOST=0.0.0.0" \
-  --set-env-vars "NODE_ENV=development" \
+  --set-env-vars "NODE_ENV=production" \
   --update-secrets "DATABASE_URL=database-url:latest" \
   --update-secrets "DIRECT_URL=direct-url:latest" \
   --set-env-vars "QSTASH_TOKEN=$QSTASH_TOKEN" \
