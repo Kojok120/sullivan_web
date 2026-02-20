@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { checkDriveForNewFiles } from '@/lib/grading-service';
 import { acquireGradingLock, releaseGradingLock } from '@/lib/grading-lock';
+import { isWorkerRuntime } from '@/lib/runtime-utils';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60; // Allow up to 60 seconds for fallback processing
 
-
 export async function GET(request: NextRequest) {
+    if (!isWorkerRuntime()) {
+        console.error('[API] /api/grading/check is disabled on non-worker service');
+        return NextResponse.json({ error: 'Worker service only' }, { status: 503 });
+    }
+
     // SECURITY: Require internal API secret for this endpoint
     const authHeader = request.headers.get('Authorization');
     const expectedSecret = process.env.INTERNAL_API_SECRET;
@@ -15,27 +19,25 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    let lockAcquired = false;
     try {
         // Try to acquire lock using shared mechanism
-        const lockAcquired = await acquireGradingLock();
+        lockAcquired = await acquireGradingLock();
         if (!lockAcquired) {
             console.log('Grading check skipped: Lock is active.');
             return NextResponse.json({ success: false, message: 'Processing in progress' }, { status: 429 });
         }
 
-        try {
-            console.log('Triggering drive check...');
-            await checkDriveForNewFiles();
-            return NextResponse.json({ success: true, message: 'Drive check completed' });
-        } finally {
-            // Release lock
-            await releaseGradingLock();
-        }
+        console.log('Triggering drive check...');
+        const { checkDriveForNewFiles } = await import('@/lib/grading-service');
+        await checkDriveForNewFiles();
+        return NextResponse.json({ success: true, message: 'Drive check completed' });
     } catch (error) {
         console.error('Drive check failed:', error);
-        // Ensure lock is released even on error
-        await releaseGradingLock();
         return NextResponse.json({ success: false, error: 'Internal Server Error' }, { status: 500 });
+    } finally {
+        if (lockAcquired) {
+            await releaseGradingLock();
+        }
     }
 }
-

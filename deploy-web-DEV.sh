@@ -20,6 +20,10 @@ require_env "NEXT_PUBLIC_SUPABASE_URL"
 require_env "NEXT_PUBLIC_SUPABASE_ANON_KEY"
 require_env "SUPABASE_SERVICE_ROLE_KEY"
 require_env "GEMINI_API_KEY"
+require_env "GRADING_WORKER_URL"
+require_env "QSTASH_TOKEN"
+require_env "QSTASH_CURRENT_SIGNING_KEY"
+require_env "QSTASH_NEXT_SIGNING_KEY"
 
 cat > .env.build <<EOF
 NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
@@ -41,8 +45,9 @@ gcloud run deploy sullivan-app-dev \
   --port 8080 \
   --memory 4Gi \
   --cpu 2 \
+  --concurrency 20 \
   --allow-unauthenticated \
-  --set-env-vars "BIND_HOST=0.0.0.0" \
+  --set-env-vars "BIND_HOST=0.0.0.0,SERVICE_ROLE=web" \
   --set-env-vars "NODE_ENV=production" \
   --update-secrets "DATABASE_URL=database-url:latest" \
   --update-secrets "DIRECT_URL=direct-url:latest" \

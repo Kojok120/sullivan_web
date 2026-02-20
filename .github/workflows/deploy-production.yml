@@ -18,7 +18,7 @@ jobs:
     name: Deploy Web App (PRODUCTION)
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: [migrate-db]
+    needs: [migrate-db, deploy-grading-worker]
     environment: production
     permissions:
       contents: read
@@ -36,6 +36,20 @@ jobs:
 
       - name: gcloud CLI セットアップ
         uses: google-github-actions/setup-gcloud@v2
+
+      - name: 必須シークレット検証 (Web)
+        env:
+          GRADING_WORKER_URL: ${{ secrets.GRADING_WORKER_URL }}
+          QSTASH_TOKEN: ${{ secrets.QSTASH_TOKEN }}
+          QSTASH_CURRENT_SIGNING_KEY: ${{ secrets.QSTASH_CURRENT_SIGNING_KEY }}
+          QSTASH_NEXT_SIGNING_KEY: ${{ secrets.QSTASH_NEXT_SIGNING_KEY }}
+        run: |
+          for var in GRADING_WORKER_URL QSTASH_TOKEN QSTASH_CURRENT_SIGNING_KEY QSTASH_NEXT_SIGNING_KEY; do
+            if [ -z "${!var}" ]; then
+              echo "Missing required secret: ${var}"
+              exit 1
+            fi
+          done
 
       - name: Docker 認証
         run: gcloud auth configure-docker asia.gcr.io --quiet
@@ -64,8 +78,9 @@ jobs:
             --region ${{ env.GCP_REGION }} \
             --memory 4Gi \
             --cpu 2 \
+            --concurrency 20 \
             --allow-unauthenticated \
-            --set-env-vars "BIND_HOST=0.0.0.0" \
+            --set-env-vars "BIND_HOST=0.0.0.0,SERVICE_ROLE=web" \
             --set-env-vars "NODE_ENV=production" \
             --update-secrets "DATABASE_URL=database-url:latest" \
             --update-secrets "DIRECT_URL=direct-url:latest" \
@@ -113,20 +128,75 @@ jobs:
       - name: gcloud CLI セットアップ
         uses: google-github-actions/setup-gcloud@v2
 
+      - name: 必須シークレット検証 (Grading Worker)
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          RUNTIME_SA_EMAIL: ${{ secrets.RUNTIME_SA_EMAIL }}
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
+          GEMINI_LIVE_MODEL: ${{ secrets.GEMINI_LIVE_MODEL }}
+          GEMINI_LIVE_API_VERSION: ${{ secrets.GEMINI_LIVE_API_VERSION }}
+          GEMINI_LIVE_VOICE: ${{ secrets.GEMINI_LIVE_VOICE }}
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+          GRADING_WORKER_URL: ${{ secrets.GRADING_WORKER_URL }}
+          QSTASH_TOKEN: ${{ secrets.QSTASH_TOKEN }}
+          QSTASH_CURRENT_SIGNING_KEY: ${{ secrets.QSTASH_CURRENT_SIGNING_KEY }}
+          QSTASH_NEXT_SIGNING_KEY: ${{ secrets.QSTASH_NEXT_SIGNING_KEY }}
+        run: |
+          for var in \
+            GCP_PROJECT_ID \
+            RUNTIME_SA_EMAIL \
+            UPSTASH_REDIS_REST_URL \
+            UPSTASH_REDIS_REST_TOKEN \
+            GEMINI_API_KEY \
+            GEMINI_MODEL \
+            GEMINI_LIVE_MODEL \
+            GEMINI_LIVE_API_VERSION \
+            GEMINI_LIVE_VOICE \
+            DRIVE_FOLDER_ID \
+            GRADING_WORKER_URL \
+            QSTASH_TOKEN \
+            QSTASH_CURRENT_SIGNING_KEY \
+            QSTASH_NEXT_SIGNING_KEY; do
+            if [ -z "${!var}" ]; then
+              echo "Missing required secret: ${var}"
+              exit 1
+            fi
+          done
+
+      - name: Docker 認証
+        run: gcloud auth configure-docker asia.gcr.io --quiet
+
+      - name: Docker ビルド (Grading Worker)
+        run: |
+          docker build \
+            -f Dockerfile.worker \
+            -t asia.gcr.io/${{ secrets.GCP_PROJECT_ID }}/sullivan-grading-worker-production:${{ github.sha }} \
+            .
+
+      - name: Docker プッシュ (Grading Worker)
+        run: docker push asia.gcr.io/${{ secrets.GCP_PROJECT_ID }}/sullivan-grading-worker-production:${{ github.sha }}
+
       - name: Cloud Run デプロイ (Grading Worker)
         run: |
           gcloud run deploy sullivan-grading-worker-production \
             --project "${{ secrets.GCP_PROJECT_ID }}" \
             --service-account "${{ secrets.RUNTIME_SA_EMAIL }}" \
-            --source . \
+            --image asia.gcr.io/${{ secrets.GCP_PROJECT_ID }}/sullivan-grading-worker-production:${{ github.sha }} \
             --platform managed \
             --region ${{ env.GCP_REGION }} \
             --memory 4Gi \
             --cpu 2 \
+            --concurrency 1 \
+            --min-instances 10 \
+            --max-instances 50 \
             --allow-unauthenticated \
-            --set-env-vars "NODE_ENV=production" \
+            --set-env-vars "NODE_ENV=production,SERVICE_ROLE=worker" \
             --update-secrets "DATABASE_URL=database-url:latest" \
             --update-secrets "DIRECT_URL=direct-url:latest" \
+            --update-secrets "INTERNAL_API_SECRET=internal-api-secret:latest" \
             --set-env-vars "UPSTASH_REDIS_REST_URL=${{ secrets.UPSTASH_REDIS_REST_URL }}" \
             --set-env-vars "UPSTASH_REDIS_REST_TOKEN=${{ secrets.UPSTASH_REDIS_REST_TOKEN }}" \
             --set-env-vars "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" \
@@ -135,6 +205,8 @@ jobs:
             --set-env-vars "GEMINI_LIVE_API_VERSION=${{ secrets.GEMINI_LIVE_API_VERSION }}" \
             --set-env-vars "GEMINI_LIVE_VOICE=${{ secrets.GEMINI_LIVE_VOICE }}" \
             --set-env-vars "DRIVE_FOLDER_ID=${{ secrets.DRIVE_FOLDER_ID }}" \
+            --set-env-vars "GRADING_WORKER_URL=${{ secrets.GRADING_WORKER_URL }}" \
+            --set-env-vars "QSTASH_TOKEN=${{ secrets.QSTASH_TOKEN }}" \
             --set-env-vars "QSTASH_CURRENT_SIGNING_KEY=${{ secrets.QSTASH_CURRENT_SIGNING_KEY }}" \
             --set-env-vars "QSTASH_NEXT_SIGNING_KEY=${{ secrets.QSTASH_NEXT_SIGNING_KEY }}"
 
