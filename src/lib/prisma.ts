@@ -18,8 +18,9 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 function getPrismaClient(): PrismaClientSingleton {
-    if (globalForPrisma.prisma) {
-        return globalForPrisma.prisma;
+    const existingClient = globalForPrisma.prisma;
+    if (existingClient) {
+        return existingClient;
     }
 
     const client = prismaClientSingleton();
@@ -27,9 +28,8 @@ function getPrismaClient(): PrismaClientSingleton {
         throw new Error("DATABASE_URL が設定されていません。");
     }
 
-    if (process.env.NODE_ENV !== "production") {
-        globalForPrisma.prisma = client;
-    }
+    // 本番/開発に関係なくプロセス内で単一インスタンスを再利用する。
+    globalForPrisma.prisma = client;
 
     return client;
 }
@@ -45,5 +45,3 @@ export const prisma = new Proxy({} as PrismaClientSingleton, {
         return value;
     },
 });
-
-// Trigger reload
