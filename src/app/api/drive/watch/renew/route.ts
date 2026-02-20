@@ -1,13 +1,26 @@
 import { NextResponse } from 'next/server';
 import { watchDriveFolder, stopWatching } from '@/lib/drive-webhook-manager';
 import { saveWatchState, getWatchState, clearWatchState } from '@/lib/drive-watch-state';
-import { secureDriveCheck } from '@/lib/grading-service';
 import { getDriveWebhookUrlOrError, getShouldCheckFromRequest, verifyInternalApiAuthorization } from '@/lib/drive-watch-api';
 
 export const dynamic = 'force-dynamic';
 
 // Renew watch if it expires within this time (6 hours before expiration)
 const RENEW_THRESHOLD_MS = 6 * 60 * 60 * 1000;
+
+async function queueDriveCheck(source: string) {
+    try {
+        const { publishDriveCheckJob } = await import('@/lib/grading-job');
+        await publishDriveCheckJob(source, null, null);
+        return null;
+    } catch (error) {
+        console.error(`[DriveWatchRenew] Failed to queue drive check. source=${source}`, error);
+        return NextResponse.json(
+            { success: false, error: 'Queue mechanism unavailable' },
+            { status: 503 },
+        );
+    }
+}
 
 /**
  * POST /api/drive/watch/renew
@@ -37,7 +50,8 @@ export async function POST(request: Request) {
                 const hoursRemaining = Math.round(timeUntilExpiry / 1000 / 60 / 60);
                 console.log(`Watch still valid for ${hoursRemaining} hours. Skipping renewal.`);
                 if (shouldCheck) {
-                    await secureDriveCheck('renew-skip');
+                    const queueError = await queueDriveCheck('renew-skip');
+                    if (queueError) return queueError;
                 }
                 return NextResponse.json({
                     success: true,
@@ -71,7 +85,8 @@ export async function POST(request: Request) {
         const expiresAt = new Date(Number(result.expiration)).toISOString();
         console.log(`Watch renewed successfully. New expiration: ${expiresAt}`);
         if (shouldCheck) {
-            await secureDriveCheck('renewed');
+            const queueError = await queueDriveCheck('renewed');
+            if (queueError) return queueError;
         }
 
         return NextResponse.json({
@@ -124,5 +139,4 @@ export async function DELETE() {
         );
     }
 }
-
 

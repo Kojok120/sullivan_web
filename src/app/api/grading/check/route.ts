@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { checkDriveForNewFiles } from '@/lib/grading-service';
 import { acquireGradingLock, releaseGradingLock } from '@/lib/grading-lock';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60; // Allow up to 60 seconds for fallback processing
 
+function isWorkerRuntime() {
+    return (process.env.SERVICE_ROLE || '').toLowerCase() === 'worker';
+}
 
 export async function GET(request: NextRequest) {
+    if (!isWorkerRuntime()) {
+        console.error('[API] /api/grading/check is disabled on non-worker service');
+        return NextResponse.json({ error: 'Worker service only' }, { status: 503 });
+    }
+
     // SECURITY: Require internal API secret for this endpoint
     const authHeader = request.headers.get('Authorization');
     const expectedSecret = process.env.INTERNAL_API_SECRET;
@@ -25,6 +32,7 @@ export async function GET(request: NextRequest) {
 
         try {
             console.log('Triggering drive check...');
+            const { checkDriveForNewFiles } = await import('@/lib/grading-service');
             await checkDriveForNewFiles();
             return NextResponse.json({ success: true, message: 'Drive check completed' });
         } finally {
@@ -38,4 +46,3 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ success: false, error: 'Internal Server Error' }, { status: 500 });
     }
 }
-

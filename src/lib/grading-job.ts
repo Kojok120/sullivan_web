@@ -68,16 +68,24 @@ export async function markGradingJobFailed(fileId: string, message: string): Pro
 // ==========================================
 import { Client as QStashClient } from '@upstash/qstash';
 
+function resolveWorkerBaseUrl() {
+  // Webサービスへの誤配信を防ぐため、採点ジョブ送信先は専用Workerのみを許可する。
+  const workerUrl = process.env.GRADING_WORKER_URL?.trim();
+  if (!workerUrl) {
+    throw new Error('GRADING_WORKER_URL is missing');
+  }
+  return workerUrl.replace(/\/+$/, '');
+}
+
 export async function publishGradingJob(fileId: string, fileName: string): Promise<void> {
   const token = process.env.QSTASH_TOKEN;
-  const appUrl = process.env.GRADING_WORKER_URL || process.env.APP_URL;
+  const baseUrl = resolveWorkerBaseUrl();
 
-  if (!token || !appUrl) {
-    throw new Error('QStash configuration (QSTASH_TOKEN or APP_URL) is missing');
+  if (!token) {
+    throw new Error('QStash configuration (QSTASH_TOKEN) is missing');
   }
 
   const client = new QStashClient({ token });
-  const baseUrl = appUrl.replace(/\/+$/, '');
 
   await client.publishJSON({
     url: `${baseUrl}/api/queue/grading`,
@@ -89,14 +97,13 @@ export async function publishGradingJob(fileId: string, fileName: string): Promi
 
 export async function publishDriveCheckJob(source: string, state: string | null, channelId: string | null): Promise<void> {
   const token = process.env.QSTASH_TOKEN;
-  const appUrl = process.env.GRADING_WORKER_URL || process.env.APP_URL;
+  const baseUrl = resolveWorkerBaseUrl();
 
-  if (!token || !appUrl) {
-    throw new Error('QStash configuration (QSTASH_TOKEN or APP_URL) is missing');
+  if (!token) {
+    throw new Error('QStash configuration (QSTASH_TOKEN) is missing');
   }
 
   const client = new QStashClient({ token });
-  const baseUrl = appUrl.replace(/\/+$/, '');
 
   await client.publishJSON({
     url: `${baseUrl}/api/queue/drive-check`,

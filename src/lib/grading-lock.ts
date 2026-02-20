@@ -44,3 +44,11 @@ export async function acquireGradingFileLock(fileId: string): Promise<boolean> {
 export async function releaseGradingFileLock(fileId: string): Promise<void> {
   await redis.del(fileLockKey(fileId));
 }
+
+/**
+ * Returns true when the file-level lock exists.
+ */
+export async function isGradingFileLocked(fileId: string): Promise<boolean> {
+  const result = await redis.exists(fileLockKey(fileId));
+  return result === 1;
+}

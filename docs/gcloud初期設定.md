@@ -51,6 +51,16 @@ printf %s "$INTERNAL_API_SECRET" | gcloud secrets create internal-api-secret --r
   # 8) Cloud Run 実行SAに Secret 参照権限を付与
   gcloud secrets add-iam-policy-binding internal-api-secret --member="serviceAccount:$RUNTIME_SA_EMAIL" --role="roles/secretmanager.secretAccessor"
 
+  # 8.1) Cloud Build のデフォルト実行SAに権限を付与
+  #      （deploy-grading-worker-*.sh の gcloud builds submit に必要）
+  BUILD_SA="$(gcloud builds get-default-service-account --project "$PROJECT_ID")"
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="serviceAccount:$BUILD_SA" \
+    --role="roles/storage.admin"
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="serviceAccount:$BUILD_SA" \
+    --role="roles/artifactregistry.createOnPushWriter"
+
   # 9) （任意）Artifact Registry リポジトリを明示作成する場合
   # gcloud artifacts repositories create cloud-run-source-deploy --repository-format=docker --location="$REGION"
 

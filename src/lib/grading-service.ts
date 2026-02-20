@@ -1,6 +1,5 @@
 import QRCode from 'qrcode';
 import { GoogleGenAI, Type } from '@google/genai';
-import { Client as QStashClient } from '@upstash/qstash';
 import { prisma } from '@/lib/prisma';
 import type { Prisma, User } from '@prisma/client';
 import fs from 'fs';
@@ -10,7 +9,7 @@ import { calculateCoreProblemStatus } from '@/lib/progression';
 import { emitRealtimeEvent } from '@/lib/realtime-events';
 import { incrementStampCount } from '@/lib/stamp-service';
 import { processGamificationUpdates, toGamificationPayload } from '@/lib/gamification-service';
-import { acquireGradingFileLock, releaseGradingFileLock } from '@/lib/grading-lock';
+import { acquireGradingFileLock, isGradingFileLocked, releaseGradingFileLock } from '@/lib/grading-lock';
 import { claimGradingJob, markGradingJobCompleted, markGradingJobFailed, publishGradingJob } from '@/lib/grading-job';
 
 // Priority adjustment logic (inlined from removed priority-algo.ts)
@@ -30,6 +29,13 @@ import { getDriveClient } from '@/lib/drive-client';
 
 const DRIVE_FOLDER_ID = process.env.DRIVE_FOLDER_ID || ''; // Folder to watch
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+const DEFAULT_MAX_GRADING_FILE_SIZE_MB = 20;
+const MAX_GRADING_FILE_SIZE_MB = (() => {
+    const parsed = Number.parseInt(process.env.MAX_GRADING_FILE_SIZE_MB || '', 10);
+    if (!Number.isFinite(parsed)) return DEFAULT_MAX_GRADING_FILE_SIZE_MB;
+    return Math.min(100, Math.max(1, parsed));
+})();
+const MAX_GRADING_FILE_SIZE_BYTES = MAX_GRADING_FILE_SIZE_MB * 1024 * 1024;
 
 // Lazy Initialization
 let genAI: GoogleGenAI | null = null;
@@ -249,6 +255,19 @@ export async function processFile(fileId: string, fileName: string) {
             return;
         }
 
+        // すでにエラー/処理済みのファイルは再採点しない（重複キュー対策）。
+        const currentName = await getFileName(fileId);
+        if (currentName?.startsWith('[ERROR]')) {
+            console.log(`[Idempotency] Skip file ${fileId}: already marked as error (${currentName}).`);
+            await finalizeFailure('File already marked as error');
+            return;
+        }
+        if (currentName?.startsWith('[PROCESSED]')) {
+            console.log(`[Idempotency] Skip file ${fileId}: already processed (${currentName}).`);
+            await finalizeSuccess();
+            return;
+        }
+
         // Use helper for download and analysis
         const { destPath, prepared, qrData, studentId, user, cleanup } = await downloadAndAnalyzeFile(fileId, fileName);
         cleanupFn = cleanup;
@@ -290,6 +309,16 @@ export async function processFile(fileId: string, fileName: string) {
 
         // Grade using Gemini with prepared data
         const results = await gradeWithGemini(prepared, qrData, user.id);
+        // 採点後は巨大文字列を早めに解放してピークメモリを下げる。
+        prepared.base64Data = '';
+
+        // 処理中にタイムアウト監視等でERROR化された場合は保存・アーカイブしない。
+        const latestName = await getFileName(fileId);
+        if (latestName?.startsWith('[ERROR]')) {
+            console.warn(`[Process] Skip post-processing ${fileId}: file is marked as error (${latestName}).`);
+            await finalizeFailure('File marked as error during processing');
+            return;
+        }
 
         // Update DB
         if (results && results.length > 0) {
@@ -364,6 +393,20 @@ async function renameFile(fileId: string, newName: string) {
         });
     } catch (error) {
         console.error('Error renaming file:', error);
+    }
+}
+
+async function getFileName(fileId: string): Promise<string | null> {
+    try {
+        const driveClient = getDrive();
+        const res = await driveClient.files.get({
+            fileId,
+            fields: 'name',
+        });
+        return res.data.name ?? null;
+    } catch (error) {
+        console.error('Error fetching file metadata:', error);
+        return null;
     }
 }
 
@@ -688,16 +731,37 @@ type PreparedFile = {
 };
 
 async function prepareFileForGemini(filePath: string): Promise<PreparedFile> {
-    // ファイル全体を1回で読み込み（ヘッダ判定と全読込を統合）
-    const fileBuffer = await fs.promises.readFile(filePath);
+    const stats = await fs.promises.stat(filePath);
+    if (stats.size <= 0) {
+        throw new Error('Input file is empty');
+    }
+
+    if (stats.size > MAX_GRADING_FILE_SIZE_BYTES) {
+        throw new Error(
+            `Input file is too large (${stats.size} bytes > ${MAX_GRADING_FILE_SIZE_BYTES} bytes)`,
+        );
+    }
+
+    // 先頭4バイトのみ読み込み、メモリ使用量を抑えてMIMEを判定する。
+    const headerBuffer = Buffer.alloc(4);
+    const fileHandle = await fs.promises.open(filePath, 'r');
+    try {
+        await fileHandle.read(headerBuffer, 0, 4, 0);
+    } finally {
+        await fileHandle.close();
+    }
+
+    // Base64文字列で直接読み込むことで、Buffer保持期間を短くする。
+    const base64Data = await fs.promises.readFile(filePath, { encoding: 'base64' });
 
     // ヘッダの最初の4バイトでPDFかどうか判定
-    const isPdfHeader = fileBuffer.slice(0, 4).toString('hex') === '25504446'; // %PDF
+    const headerHex = headerBuffer.toString('hex');
+    const isPdfHeader = headerHex === '25504446'; // %PDF
     const mimeType = isPdfHeader ? 'application/pdf' : (filePath.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
-    console.log(`Detected MIME Type: ${mimeType} (Header: ${fileBuffer.slice(0, 4).toString('hex')})`);
+    console.log(`Detected MIME Type: ${mimeType} (Header: ${headerHex}, size=${stats.size})`);
 
     return {
-        base64Data: fileBuffer.toString('base64'),
+        base64Data,
         mimeType,
         isPdfHeader
     };
@@ -1385,6 +1449,12 @@ export async function checkStuckFiles() {
             const id = file.id || '';
 
             if (!name || name.startsWith('[PROCESSED]') || name.startsWith('[ERROR]')) {
+                continue;
+            }
+
+            // 現在処理中のファイルはタイムアウト扱いにしない。
+            const isLocked = await isGradingFileLocked(id);
+            if (isLocked) {
                 continue;
             }
 

@@ -1,10 +1,23 @@
 import { NextResponse } from 'next/server';
 import { watchDriveFolder } from '@/lib/drive-webhook-manager';
 import { saveWatchState, getWatchState } from '@/lib/drive-watch-state';
-import { secureDriveCheck } from '@/lib/grading-service';
 import { getDriveWebhookUrlOrError, getShouldCheckFromRequest, verifyInternalApiAuthorization } from '@/lib/drive-watch-api';
 
 export const dynamic = 'force-dynamic';
+
+async function queueDriveCheck(source: string) {
+    try {
+        const { publishDriveCheckJob } = await import('@/lib/grading-job');
+        await publishDriveCheckJob(source, null, null);
+        return null;
+    } catch (error) {
+        console.error(`[DriveWatchSetup] Failed to queue drive check. source=${source}`, error);
+        return NextResponse.json(
+            { success: false, error: 'Queue mechanism unavailable' },
+            { status: 503 },
+        );
+    }
+}
 
 /**
  * POST /api/drive/watch/setup
@@ -32,7 +45,8 @@ export async function POST(request: Request) {
             const expiresIn = Math.round((existingState.expiration - Date.now()) / 1000 / 60);
             console.log(`Existing watch found, expires in ${expiresIn} minutes`);
             if (shouldCheck) {
-                await secureDriveCheck('setup-skip');
+                const queueError = await queueDriveCheck('setup-skip');
+                if (queueError) return queueError;
             }
             return NextResponse.json({
                 success: true,
@@ -56,7 +70,8 @@ export async function POST(request: Request) {
         const expiresAt = new Date(Number(result.expiration)).toISOString();
         console.log(`Watch registered successfully. Expires at: ${expiresAt}`);
         if (shouldCheck) {
-            await secureDriveCheck('setup');
+            const queueError = await queueDriveCheck('setup');
+            if (queueError) return queueError;
         }
 
         return NextResponse.json({
@@ -111,5 +126,4 @@ export async function GET() {
         );
     }
 }
-
 
