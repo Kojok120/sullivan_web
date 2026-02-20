@@ -29,6 +29,12 @@ if [ -z "${QSTASH_TOKEN_SECRET_NAME:-}" ] || [ -z "${QSTASH_CURRENT_SIGNING_KEY_
   echo "QSTASH secret names are required (QSTASH_TOKEN_SECRET_NAME / QSTASH_CURRENT_SIGNING_KEY_SECRET_NAME / QSTASH_NEXT_SIGNING_KEY_SECRET_NAME)."
   exit 1
 fi
+for secret_name in "$QSTASH_TOKEN_SECRET_NAME" "$QSTASH_CURRENT_SIGNING_KEY_SECRET_NAME" "$QSTASH_NEXT_SIGNING_KEY_SECRET_NAME"; do
+  if ! gcloud secrets describe "$secret_name" --project "$GOOGLE_CLOUD_PROJECT_ID" >/dev/null 2>&1; then
+    echo "Secret not found: $secret_name (required for QStash signature verification / publishing)."
+    exit 1
+  fi
+done
 
 echo "Deploying grading worker to Project: $GOOGLE_CLOUD_PROJECT_ID"
 echo "Building worker image: $IMAGE_URI"
