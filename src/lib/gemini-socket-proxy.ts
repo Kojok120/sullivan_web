@@ -84,8 +84,8 @@ function safeClose(ws: WebSocket, code?: number, reason?: string) {
             return;
         }
         ws.close(safeCode);
-    } catch (err) {
-        console.error('[GeminiProxy] Failed to close socket cleanly, terminating:', err);
+    } catch {
+        console.error('[GeminiProxy] Failed to close socket cleanly, terminating');
         ws.terminate();
     }
 }
@@ -119,6 +119,34 @@ function shouldRetryGeminiClose(code: number, reasonText: string) {
     }
 
     return true;
+}
+
+function sanitizeSecretForLog(text: string, apiKey: string) {
+    // ログから認証情報を除去する（query param と実値の両方をマスク）。
+    let sanitized = text
+        .replace(/([?&](?:key|access_token)=)[^&\s]+/gi, '$1[REDACTED]')
+        .replace(/([?&](?:token)=)[^&\s]+/gi, '$1[REDACTED]');
+
+    if (apiKey) {
+        sanitized = sanitized.split(apiKey).join('[REDACTED]');
+    }
+
+    return sanitized;
+}
+
+function sanitizeUnknownForLog(value: unknown, apiKey: string) {
+    if (value instanceof Error) {
+        const name = value.name ? `${value.name}: ` : '';
+        return sanitizeSecretForLog(`${name}${value.message}`, apiKey);
+    }
+    if (typeof value === 'string') {
+        return sanitizeSecretForLog(value, apiKey);
+    }
+    try {
+        return sanitizeSecretForLog(JSON.stringify(value), apiKey);
+    } catch {
+        return '[Unserializable log payload]';
+    }
 }
 
 function buildSetupMessage(resumeHandle?: string) {
@@ -175,6 +203,7 @@ export function setupGeminiSocket(clientWs: WebSocket, options: SetupGeminiSocke
 
     const geminiUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.${GEMINI_API_VERSION}.GenerativeService.BidiGenerateContent?key=${apiKey}`;
     const userLogId = anonymizeUserId(options.userId);
+    const sanitizeLog = (value: unknown) => sanitizeUnknownForLog(value, apiKey);
 
     let geminiWs: WebSocket | null = null;
     let isSetupComplete = false;
@@ -288,11 +317,13 @@ export function setupGeminiSocket(clientWs: WebSocket, options: SetupGeminiSocke
                 }
 
                 if (parsed?.error) {
-                    console.error(`[GeminiProxy] error frame from Gemini: ${JSON.stringify(parsed.error).slice(0, 500)}`);
+                    const errorPayload = sanitizeLog(JSON.stringify(parsed.error).slice(0, 500));
+                    console.error(`[GeminiProxy] error frame from Gemini: ${errorPayload}`);
                 }
 
                 if (parsed?.goAway) {
-                    console.warn(`[GeminiProxy] goAway from Gemini user=${userLogId}: ${JSON.stringify(parsed.goAway).slice(0, 300)}`);
+                    const goAwayPayload = sanitizeLog(JSON.stringify(parsed.goAway).slice(0, 300));
+                    console.warn(`[GeminiProxy] goAway from Gemini user=${userLogId}: ${goAwayPayload}`);
                 }
 
                 if (parsed?.sessionResumptionUpdate) {
@@ -320,13 +351,13 @@ export function setupGeminiSocket(clientWs: WebSocket, options: SetupGeminiSocke
 
                 safeClose(ws, 1000, 'Client not open');
             } catch (err) {
-                console.error('[GeminiProxy] Error forwarding Gemini message:', err);
+                console.error('[GeminiProxy] Error forwarding Gemini message:', sanitizeLog(err));
             }
         });
 
         ws.on('error', (err: Error) => {
             if (geminiWs !== ws) return;
-            console.error('[GeminiProxy] Gemini WS Error:', err.message);
+            console.error('[GeminiProxy] Gemini WS Error:', sanitizeLog(err));
         });
 
         ws.on('close', (code: number, reason: Buffer) => {
@@ -335,8 +366,9 @@ export function setupGeminiSocket(clientWs: WebSocket, options: SetupGeminiSocke
             }
 
             const reasonText = reason.toString('utf-8');
+            const safeReasonText = sanitizeLog(reasonText);
             const safeCode = normalizeCloseCode(code);
-            console.log(`[GeminiProxy] Gemini WS closed user=${userLogId} code=${safeCode} reason=${reasonText}`);
+            console.log(`[GeminiProxy] Gemini WS closed user=${userLogId} code=${safeCode} reason=${safeReasonText}`);
 
             if (isShuttingDown) {
                 return;
@@ -346,7 +378,7 @@ export function setupGeminiSocket(clientWs: WebSocket, options: SetupGeminiSocke
 
             if (!shouldRetryGeminiClose(safeCode, reasonText)) {
                 console.error(
-                    `[GeminiProxy] Non-retryable Gemini close user=${userLogId} code=${safeCode} reason=${reasonText}`,
+                    `[GeminiProxy] Non-retryable Gemini close user=${userLogId} code=${safeCode} reason=${safeReasonText}`,
                 );
                 if (clientWs.readyState === WebSocket.OPEN || clientWs.readyState === WebSocket.CONNECTING) {
                     safeClose(clientWs, 1011, 'Gemini setup rejected');
@@ -391,12 +423,12 @@ export function setupGeminiSocket(clientWs: WebSocket, options: SetupGeminiSocke
             }
             queueOrForwardMessage(message);
         } catch (err) {
-            console.error('[GeminiProxy] Error forwarding client message:', err);
+            console.error('[GeminiProxy] Error forwarding client message:', sanitizeLog(err));
         }
     });
 
     clientWs.on('error', (err: Error) => {
-        console.error('[GeminiProxy] Client WS Error:', err.message);
+        console.error('[GeminiProxy] Client WS Error:', sanitizeLog(err));
         isShuttingDown = true;
         cleanup();
         if (geminiWs && (geminiWs.readyState === WebSocket.OPEN || geminiWs.readyState === WebSocket.CONNECTING)) {
@@ -406,7 +438,8 @@ export function setupGeminiSocket(clientWs: WebSocket, options: SetupGeminiSocke
 
     clientWs.on('close', (code: number, reason: Buffer) => {
         const reasonText = reason.toString('utf-8');
-        console.log(`[GeminiProxy] Client WS closed user=${userLogId} code=${normalizeCloseCode(code)} reason=${reasonText}`);
+        const safeReasonText = sanitizeLog(reasonText);
+        console.log(`[GeminiProxy] Client WS closed user=${userLogId} code=${normalizeCloseCode(code)} reason=${safeReasonText}`);
 
         isShuttingDown = true;
         cleanup();
