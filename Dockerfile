@@ -24,7 +24,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV NODE_OPTIONS="--max-old-space-size=4096"
+ARG NODE_OPTIONS_DEFAULT="--max-old-space-size=3584"
+ENV NODE_OPTIONS=$NODE_OPTIONS_DEFAULT
 
 ARG NEXT_PUBLIC_SUPABASE_URL
 ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -42,6 +43,8 @@ FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ARG NODE_OPTIONS_DEFAULT="--max-old-space-size=3584"
+ENV NODE_OPTIONS=$NODE_OPTIONS_DEFAULT
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs

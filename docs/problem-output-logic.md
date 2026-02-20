@@ -18,7 +18,7 @@
 4. `PrintLayout` が問題一覧をページ分割し、印刷用の問題ページ + 解答用紙ページを出力する（`window.print()`）。
 
 ### 2.2 スキャン/採点
-1. Drive Webhook（`/api/grading/webhook`）または内部チェック（`/api/grading/check`）で `checkDriveForNewFiles` を起動。
+1. Drive Webhook（`/api/grading/webhook`）または内部チェック（**Workerサービスの** `/api/grading/check`）で `checkDriveForNewFiles` を起動。
 2. `checkDriveForNewFiles` が対象ファイルを抽出し、QStash もしくは同期処理で採点ジョブを実行。
 3. `processFile` がファイルをダウンロードし、QR解析 + Gemini採点を実施。
 4. 採点結果を保存し、優先度/アンロックを更新、ファイルをアーカイブ、Realtime通知を送出。
@@ -94,13 +94,13 @@
 ### 6.1 トリガと排他制御
 - Webhook は `x-goog-channel-id` をRedis保存のWatch stateの `channelId` と照合し、`resourceState=change|update|add` のみ処理。
 - 連続呼び出しを 5 秒でデバウンス（`DEBOUNCE_MS = 5000`）。
-- 排他制御は `/tmp/sullivan_grading.lock` を使うファイルロック（`src/lib/grading-lock.ts`）。
-- 内部手動チェック用の `/api/grading/check` は `INTERNAL_API_SECRET` が必要。
+- 排他制御は Redis ロック（`sullivan:grading:scan:lock` / `sullivan:grading:file:<fileId>`）で実施（`src/lib/grading-lock.ts`）。
+- 内部手動チェック用の `/api/grading/check` は **Workerサービス** で受け付け、`INTERNAL_API_SECRET` が必要。
 
 ### 6.2 Driveファイル抽出とジョブ発行
 - `checkDriveForNewFiles` で `DRIVE_FOLDER_ID` 配下の最新ファイルを取得。
 - ファイル名が `[PROCESSED]` / `[ERROR]` で始まるものは対象外。
-- `QSTASH_TOKEN` + `GRADING_WORKER_URL`（未設定時は `APP_URL`）がある場合は `/api/queue/grading` へ非同期発行。無ければ同期で `processFile` 実行。
+- `QSTASH_TOKEN` + `GRADING_WORKER_URL` が必須で、`/api/queue/grading` へ非同期発行する（Webサービスでの同期採点フォールバックは無効）。
 
 ### 6.3 ファイル処理
 - Drive からファイルを `/tmp` にストリーム保存。

@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import { watchDriveFolder, stopWatching } from '@/lib/drive-webhook-manager';
 import { saveWatchState, getWatchState, clearWatchState } from '@/lib/drive-watch-state';
-import { secureDriveCheck } from '@/lib/grading-service';
-import { getDriveWebhookUrlOrError, getShouldCheckFromRequest, verifyInternalApiAuthorization } from '@/lib/drive-watch-api';
+import { getDriveWebhookUrlOrError, getShouldCheckFromRequest, queueDriveCheck, verifyInternalApiAuthorization } from '@/lib/drive-watch-api';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,7 +36,8 @@ export async function POST(request: Request) {
                 const hoursRemaining = Math.round(timeUntilExpiry / 1000 / 60 / 60);
                 console.log(`Watch still valid for ${hoursRemaining} hours. Skipping renewal.`);
                 if (shouldCheck) {
-                    await secureDriveCheck('renew-skip');
+                    const queueError = await queueDriveCheck('renew-skip', 'DriveWatchRenew');
+                    if (queueError) return queueError;
                 }
                 return NextResponse.json({
                     success: true,
@@ -71,7 +71,8 @@ export async function POST(request: Request) {
         const expiresAt = new Date(Number(result.expiration)).toISOString();
         console.log(`Watch renewed successfully. New expiration: ${expiresAt}`);
         if (shouldCheck) {
-            await secureDriveCheck('renewed');
+            const queueError = await queueDriveCheck('renewed', 'DriveWatchRenew');
+            if (queueError) return queueError;
         }
 
         return NextResponse.json({
@@ -124,5 +125,3 @@ export async function DELETE() {
         );
     }
 }
-
-

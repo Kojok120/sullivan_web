@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import { watchDriveFolder } from '@/lib/drive-webhook-manager';
 import { saveWatchState, getWatchState } from '@/lib/drive-watch-state';
-import { secureDriveCheck } from '@/lib/grading-service';
-import { getDriveWebhookUrlOrError, getShouldCheckFromRequest, verifyInternalApiAuthorization } from '@/lib/drive-watch-api';
+import { getDriveWebhookUrlOrError, getShouldCheckFromRequest, queueDriveCheck, verifyInternalApiAuthorization } from '@/lib/drive-watch-api';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,7 +31,8 @@ export async function POST(request: Request) {
             const expiresIn = Math.round((existingState.expiration - Date.now()) / 1000 / 60);
             console.log(`Existing watch found, expires in ${expiresIn} minutes`);
             if (shouldCheck) {
-                await secureDriveCheck('setup-skip');
+                const queueError = await queueDriveCheck('setup-skip', 'DriveWatchSetup');
+                if (queueError) return queueError;
             }
             return NextResponse.json({
                 success: true,
@@ -56,7 +56,8 @@ export async function POST(request: Request) {
         const expiresAt = new Date(Number(result.expiration)).toISOString();
         console.log(`Watch registered successfully. Expires at: ${expiresAt}`);
         if (shouldCheck) {
-            await secureDriveCheck('setup');
+            const queueError = await queueDriveCheck('setup', 'DriveWatchSetup');
+            if (queueError) return queueError;
         }
 
         return NextResponse.json({
@@ -111,5 +112,3 @@ export async function GET() {
         );
     }
 }
-
-
