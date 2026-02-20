@@ -62,3 +62,47 @@ export async function markGradingJobFailed(fileId: string, message: string): Pro
     data: { status: 'FAILED', lastError: message.slice(0, 2000) },
   });
 }
+
+// ==========================================
+// QStash Helpers
+// ==========================================
+import { Client as QStashClient } from '@upstash/qstash';
+
+export async function publishGradingJob(fileId: string, fileName: string): Promise<void> {
+  const token = process.env.QSTASH_TOKEN;
+  const appUrl = process.env.GRADING_WORKER_URL || process.env.APP_URL;
+
+  if (!token || !appUrl) {
+    throw new Error('QStash configuration (QSTASH_TOKEN or APP_URL) is missing');
+  }
+
+  const client = new QStashClient({ token });
+  const baseUrl = appUrl.replace(/\/+$/, '');
+
+  await client.publishJSON({
+    url: `${baseUrl}/api/queue/grading`,
+    body: { fileId, fileName },
+    retries: 3,
+  });
+  console.log(`Published grading job to QStash for ${fileName}`);
+}
+
+export async function publishDriveCheckJob(source: string, state: string | null, channelId: string | null): Promise<void> {
+  const token = process.env.QSTASH_TOKEN;
+  const appUrl = process.env.GRADING_WORKER_URL || process.env.APP_URL;
+
+  if (!token || !appUrl) {
+    throw new Error('QStash configuration (QSTASH_TOKEN or APP_URL) is missing');
+  }
+
+  const client = new QStashClient({ token });
+  const baseUrl = appUrl.replace(/\/+$/, '');
+
+  await client.publishJSON({
+    url: `${baseUrl}/api/queue/drive-check`,
+    body: { source, state, channelId },
+    delay: "5s", // Wait 5 seconds for Drive API consistency
+    retries: 3,
+  });
+  console.log(`Queued drive check via QStash (from: ${source})`);
+}

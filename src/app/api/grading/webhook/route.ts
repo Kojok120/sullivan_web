@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { Client as QStashClient } from '@upstash/qstash';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60; // Allow up to 60 seconds (max for Hobby) for fallback processing
@@ -11,7 +10,7 @@ export async function POST(request: Request) {
         const channelToken = headers.get('x-goog-channel-token');
         const resourceState = headers.get('x-goog-resource-state');
 
-        // SECURITY: Verify webhook channel ID matches the active watch stored in Redis
+        // セキュリティ: WebhookのチャンネルIDがRedisに保存されている有効な監視設定と一致するか確認
         const { getWatchState } = await import('@/lib/drive-watch-state');
         const activeState = await getWatchState();
 
@@ -22,7 +21,7 @@ export async function POST(request: Request) {
 
         if (channelId !== activeState.channelId) {
             console.log(`Webhook rejected: Channel ID mismatch. Expected ${activeState.channelId}, got ${channelId}`);
-            // Note: This might happen if an old watch sends a notification. We should ignore it.
+            // メモ: 古い監視設定が通知を送信した場合に発生する可能性があります。無視して問題ありません。
             return NextResponse.json({ error: 'Unauthorized Channel' }, { status: 401 });
         }
 
@@ -38,40 +37,20 @@ export async function POST(request: Request) {
 
         console.log(`Webhook received. State: ${resourceState}, Channel: ${channelId}`);
 
-        // Handle specific states
+        // 特定のステータスを処理
         if (resourceState === 'sync') {
             console.log("Webhook Sync event received.");
             return NextResponse.json({ success: true });
         }
 
         if (resourceState === 'change' || resourceState === 'update' || resourceState === 'add') {
-            const token = process.env.QSTASH_TOKEN;
-            const appUrl = process.env.GRADING_WORKER_URL || process.env.APP_URL;
-
-            if (token && appUrl) {
-                const client = new QStashClient({ token });
-                const baseUrl = appUrl.replace(/\/+$/, '');
-                try {
-                    await client.publishJSON({
-                        url: `${baseUrl}/api/queue/drive-check`,
-                        body: { source: 'webhook', state: resourceState, channelId },
-                        delay: "5s", // Wait 5 seconds for Drive API consistency
-                        retries: 3,
-                    });
-                    console.log(`Queued drive check via QStash`);
-                } catch (e) {
-                    console.error("Failed to queue drive check to QStash:", e);
-                    // Fallback to async check
-                    const { secureDriveCheck } = await import('@/lib/grading-service');
-                    secureDriveCheck('webhook-fallback-queue').catch(console.error);
-                }
-            } else {
-                console.warn("QStash config missing. Executing drive check synchronously (fallback).");
-                const { secureDriveCheck } = await import('@/lib/grading-service');
-                // Wait locally instead of QStash delay
-                setTimeout(() => {
-                    secureDriveCheck('webhook-fallback-sync').catch(console.error);
-                }, 5000);
+            try {
+                const { publishDriveCheckJob } = await import('@/lib/grading-job');
+                await publishDriveCheckJob('webhook', resourceState, channelId);
+            } catch (e) {
+                console.error("QStashキューへの追加に失敗しました:", e);
+                // キュー登録不可の場合は処理を継続せず、エラーで返して再送を促す
+                return NextResponse.json({ success: false, error: 'Queue mechanism unavailable' }, { status: 503 });
             }
 
             return NextResponse.json({ success: true });

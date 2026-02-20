@@ -19,16 +19,16 @@ async function handler(req: NextRequest) {
     }
 }
 
-// Enable QStash signature verification
-const hasQStashKeys = process.env.QSTASH_CURRENT_SIGNING_KEY && process.env.QSTASH_NEXT_SIGNING_KEY;
+export const dynamic = 'force-dynamic';
 
-export const POST = hasQStashKeys
-    ? verifySignatureAppRouter(handler)
-    : async (req: NextRequest) => {
-        // Fallback protection (Fail-Closed) if keys are missing
-        const authHeader = req.headers.get('Authorization');
-        if (!process.env.INTERNAL_API_SECRET || authHeader !== `Bearer ${process.env.INTERNAL_API_SECRET}`) {
-            return NextResponse.json({ error: 'Unauthorized (QStash keys missing & no Secret)' }, { status: 401 });
-        }
-        return handler(req);
-    };
+export const POST = async (req: NextRequest, ...args: any[]) => {
+    // 実行時に環境変数をチェックすることで、ビルド時（環境変数がない状態）のエラーを回避
+    if (!process.env.QSTASH_CURRENT_SIGNING_KEY || !process.env.QSTASH_NEXT_SIGNING_KEY) {
+        console.error('[API] QStash signing keys are missing');
+        return NextResponse.json({ error: 'Server Configuration Error' }, { status: 500 });
+    }
+
+    // 遅延してラッパーを生成
+    const wrapped = verifySignatureAppRouter(handler);
+    return wrapped(req as any, ...args as any[]);
+};
