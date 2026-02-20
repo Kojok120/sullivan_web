@@ -10,9 +10,11 @@ export default defineConfig({
   },
   // Prisma 7 では generate 時に DB 接続情報が不要なため、URL未設定でも generate は通す。
   // migrate / db push を使うときだけ DIRECT_URL または DATABASE_URL が必須になる。
-  datasource: migrationDatasourceUrl
+  ...(migrationDatasourceUrl
     ? {
-        url: migrationDatasourceUrl,
+        datasource: {
+          url: migrationDatasourceUrl,
+        },
       }
-    : undefined,
+    : {}),
 });

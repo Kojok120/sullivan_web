@@ -32,7 +32,7 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           git fetch origin "${{ github.base_ref }}" --depth=1
-          CHANGED_FILES="$(git diff --name-only "origin/${{ github.base_ref }}" "HEAD")"
+          CHANGED_FILES="$(git diff --name-only --diff-filter=AM "origin/${{ github.base_ref }}" "HEAD")"
 
           if echo "$CHANGED_FILES" | grep -q '^prisma/schema\.prisma$'; then
             if ! echo "$CHANGED_FILES" | grep -q '^prisma/migrations/'; then

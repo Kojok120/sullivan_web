@@ -4,21 +4,44 @@ import { PrismaClient } from "@prisma/client";
 const prismaClientSingleton = () => {
     const databaseUrl = process.env.DATABASE_URL;
     if (!databaseUrl) {
-        throw new Error("DATABASE_URL が設定されていません。");
+        return null;
     }
 
     const adapter = new PrismaPg({ connectionString: databaseUrl });
     return new PrismaClient({ adapter });
 };
 
-type PrismaClientSingleton = ReturnType<typeof prismaClientSingleton>;
+type PrismaClientSingleton = PrismaClient;
 
 const globalForPrisma = globalThis as unknown as {
     prisma: PrismaClientSingleton | undefined;
 };
 
-export const prisma = globalForPrisma.prisma ?? prismaClientSingleton();
+function getPrismaClient(): PrismaClientSingleton {
+    const existingClient = globalForPrisma.prisma;
+    if (existingClient) {
+        return existingClient;
+    }
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+    const client = prismaClientSingleton();
+    if (!client) {
+        throw new Error("DATABASE_URL が設定されていません。");
+    }
 
-// Trigger reload
+    // 本番/開発に関係なくプロセス内で単一インスタンスを再利用する。
+    globalForPrisma.prisma = client;
+
+    return client;
+}
+
+// ビルド時は import のみ発生するため、初回アクセスまで接続設定検証を遅延させる。
+export const prisma = new Proxy({} as PrismaClientSingleton, {
+    get(_target, prop) {
+        const client = getPrismaClient();
+        const value = (client as unknown as Record<PropertyKey, unknown>)[prop];
+        if (typeof value === "function") {
+            return (value as (...args: unknown[]) => unknown).bind(client);
+        }
+        return value;
+    },
+});

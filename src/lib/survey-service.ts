@@ -17,6 +17,9 @@ export type SurveyQuestion = {
     question: string;
 };
 
+const MISSING_SURVEY_INIT_ERROR_MESSAGE =
+    'アンケート機能の初期化が未完了です。しばらくしてから再試行してください。';
+
 function isMissingSurveyTableError(error: unknown): boolean {
     return error instanceof Prisma.PrismaClientKnownRequestError
         && error.code === 'P2021'
@@ -128,7 +131,7 @@ export async function submitSurveyResponse(userId: string, answers: { questionId
         });
     } catch (error) {
         if (isMissingSurveyTableError(error)) {
-            throw new Error('アンケート機能の初期化が未完了です。しばらくしてから再試行してください。');
+            throw new Error(MISSING_SURVEY_INIT_ERROR_MESSAGE);
         }
         throw error;
     }
@@ -174,7 +177,7 @@ export async function submitSurveyResponse(userId: string, answers: { questionId
         });
     } catch (error) {
         if (isMissingSurveyTableError(error)) {
-            throw new Error('アンケート機能の初期化が未完了です。しばらくしてから再試行してください。');
+            throw new Error(MISSING_SURVEY_INIT_ERROR_MESSAGE);
         }
         throw error;
     }
