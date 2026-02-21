@@ -47,7 +47,7 @@ export function UnitFocusDetailClient({
         setWatchedCount(newCount);
 
         // 最後の動画を視聴したら視聴完了を記録
-        if (newCount >= totalVideos && !isWatched) {
+        if (newCount >= totalVideos && !isWatched && !isSubmitting) {
             setIsSubmitting(true);
             const success = await markLectureAsWatched({ coreProblemId: coreProblem.id });
             if (success) {
@@ -228,7 +228,7 @@ export function UnitFocusDetailClient({
                                             url: v.url
                                         }))}
                                         onVideoEnd={handleVideoEnd}
-                                        autoCloseOnLastVideoEnd={true}
+                                        autoCloseOnLastVideoEnd={false}
                                     />
                                 </div>
                             ) : (
