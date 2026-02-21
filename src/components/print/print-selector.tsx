@@ -216,11 +216,15 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
             <Dialog open={!!gateModal} onOpenChange={(open) => !open && setGateModal(null)}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>講義動画の視聴が必要です</DialogTitle>
+                        <DialogTitle>
+                            {gateModal?.coreProblemName
+                                ? `「${gateModal.coreProblemName}」がアンロックされました`
+                                : '新しい単元がアンロックされました'}
+                        </DialogTitle>
                         <DialogDescription>
                             {gateModal?.coreProblemName
-                                ? `「${gateModal.coreProblemName}」の講義動画を視聴すると印刷できます。`
-                                : '講義動画を視聴すると印刷できます。'}
+                                ? `印刷するには「${gateModal.coreProblemName}」の講義動画を視聴してください。`
+                                : '印刷するには講義動画を視聴してください。'}
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>

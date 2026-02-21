@@ -73,8 +73,8 @@ describe('PrintSelector', () => {
         fireEvent.click(screen.getByRole('button', { name: '印刷する' }))
 
         await waitFor(() => {
-            expect(screen.getByText('講義動画の視聴が必要です')).toBeInTheDocument()
-            expect(screen.getByText('「主語と動詞」の講義動画を視聴すると印刷できます。')).toBeInTheDocument()
+            expect(screen.getByText('「主語と動詞」がアンロックされました')).toBeInTheDocument()
+            expect(screen.getByText('印刷するには「主語と動詞」の講義動画を視聴してください。')).toBeInTheDocument()
         })
 
         fireEvent.click(screen.getByRole('button', { name: '講義動画ページへ移動' }))
