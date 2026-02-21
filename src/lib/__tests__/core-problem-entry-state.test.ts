@@ -16,12 +16,12 @@ vi.mock('@/lib/prisma', () => ({
     },
 }))
 
-describe('core-problem-entry-state', () => {
+describe('初回CoreProblem状態の初期化', () => {
     beforeEach(() => {
         vi.clearAllMocks()
     })
 
-    describe('getEntryCoreProblemIds', () => {
+    describe('getEntryCoreProblemIds（教科ごとの先頭取得）', () => {
         it('教科ごとに最初のCoreProblem IDのみ返す', async () => {
             vi.mocked(prisma.coreProblem.findMany).mockResolvedValue([
                 { id: 'cp-s1-a', subjectId: 's1' },
@@ -47,7 +47,7 @@ describe('core-problem-entry-state', () => {
         })
     })
 
-    describe('ensureInitialCoreProblemStates', () => {
+    describe('ensureInitialCoreProblemStates（初期状態作成）', () => {
         it('初回CoreProblem状態をcreateManyで作成する', async () => {
             vi.mocked(prisma.coreProblem.findMany).mockResolvedValue([
                 { id: 'cp-s1-a', subjectId: 's1' },

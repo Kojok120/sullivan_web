@@ -180,13 +180,16 @@ function FullScreenVideoPlayerContent({
             {!videoEnded && (
                 <div className="absolute bottom-10 left-10 z-10 flex items-center gap-1">
                     {youTubeId && (
-                        <button
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
                             onClick={() => seekRelative(-10)}
-                            className="px-3 py-1.5 rounded text-sm font-medium transition-colors bg-white/20 text-white/80 hover:bg-white/30 flex items-center gap-1"
+                            className="h-8 px-3 text-sm font-medium transition-colors bg-white/20 text-white/80 hover:bg-white/30 hover:text-white flex items-center gap-1"
                         >
                             <RotateCcw className="h-3.5 w-3.5" />
                             10秒戻す
-                        </button>
+                        </Button>
                     )}
                     {allowedRates.map((rate) => (
                         <button

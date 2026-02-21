@@ -33,25 +33,19 @@ export default async function UnitFocusDetailPage({
     }
 
     const unlockedCoreProblemIds = await getUnlockedCoreProblemIds(session.userId, coreProblem.subjectId);
-    const entryCoreProblem = await prisma.coreProblem.findFirst({
-        where: { subjectId: coreProblem.subjectId },
-        orderBy: [{ order: 'asc' }, { id: 'asc' }],
-        select: { id: true },
-    });
 
     const state = coreProblem.userStates[0];
     const isUnlocked = unlockedCoreProblemIds.has(coreProblem.id);
     const lectureVideos = normalizeLectureVideos(coreProblem.lectureVideos);
     const hasVideos = lectureVideos.length > 0;
-    const isEntryCoreProblem = entryCoreProblem?.id === coreProblem.id;
-    // 最初の単元は無条件アンロック仕様のため、state未作成時も視聴済みとして扱う
-    const isLectureWatched = !hasVideos ? true : (state?.isLectureWatched ?? isEntryCoreProblem);
+    // 初回単元でも印刷前に講義視聴が必要なため、state未作成時は未視聴として扱う
+    const isLectureWatched = !hasVideos ? true : (state?.isLectureWatched ?? false);
 
     const fromPrint = query.from === 'print';
     const returnSubjectId = query.subjectId;
     const rawSets = Number.parseInt(query.sets ?? '1', 10);
     const safeSets = Number.isFinite(rawSets) ? Math.min(Math.max(rawSets, 1), 10) : 1;
-    const returnToPrintUrl = fromPrint && returnSubjectId
+    const returnToPrintUrl = fromPrint && returnSubjectId && returnSubjectId === coreProblem.subjectId
         ? `/dashboard/print?subjectId=${encodeURIComponent(returnSubjectId)}&sets=${safeSets}`
         : null;
 

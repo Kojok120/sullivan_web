@@ -9,16 +9,13 @@ export default async function ProblemsPage({
 }: {
     searchParams: Promise<{ page?: string; q?: string; grade?: string; coreProblemId?: string; subjectId?: string; sortBy?: string; sortOrder?: string; video?: string }>;
 }) {
-    // In Next.js 15+, searchParams is a Promise
+    // Next.js 15 以降では searchParams は Promise
     const params = await searchParams;
     const page = Number(params.page) || 1;
     const query = params.q || '';
-    const sortBy =
-        params.sortBy === 'masterNumber' ||
-        params.sortBy === 'customId' ||
-        params.sortBy === 'createdAt' ||
-        params.sortBy === 'updatedAt'
-        ? params.sortBy
+    const allowedSortKeys = ['masterNumber', 'customId', 'createdAt', 'updatedAt'] as const;
+    const sortBy = allowedSortKeys.includes((params.sortBy ?? '') as typeof allowedSortKeys[number])
+        ? (params.sortBy as typeof allowedSortKeys[number])
         : 'updatedAt';
     const sortOrder = params.sortOrder === 'asc' ? 'asc' : 'desc';
 
@@ -30,7 +27,7 @@ export default async function ProblemsPage({
         }))
         : [];
 
-    // Initial data fetch
+    // 初期データ取得
     const result = await getProblems(
         page,
         20,

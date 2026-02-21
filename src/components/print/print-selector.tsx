@@ -20,7 +20,7 @@ import {
 export interface PrintSubject {
     subjectId: string;
     subjectName: string;
-    // progressPercentage is optional as it's not used in logic, but passing it is fine
+    // progressPercentage は表示ロジックでは未使用だが、上位互換のため許容する
     progressPercentage?: number;
 }
 
@@ -47,6 +47,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
     const [sets, setSets] = useState(1);
     const [isCheckingGate, setIsCheckingGate] = useState(false);
     const [gateModal, setGateModal] = useState<GateModalState | null>(null);
+    const [gateErrorMessage, setGateErrorMessage] = useState<string | null>(null);
 
     const getSubjectStyle = (name: string) => {
         const config = getSubjectConfig(name);
@@ -57,11 +58,12 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
     const decrementSets = () => setSets(prev => Math.max(prev - 1, 1));
 
     const handleSubjectClick = (id: string) => {
+        setGateErrorMessage(null);
         if (selectedSubjectId === id) {
-            // Already selected -> Increment sets
+            // すでに選択中の場合はセット数を増やす
             incrementSets();
         } else {
-            // New selection -> Select and reset sets
+            // 新しい教科を選んだ場合はセット数を初期化
             setSelectedSubjectId(id);
             setSets(1);
         }
@@ -72,6 +74,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
 
         const printUrl = `/dashboard/print?subjectId=${selectedSubjectId}&sets=${sets}`;
         setIsCheckingGate(true);
+        setGateErrorMessage(null);
         try {
             const response = await fetch(`/api/print-gate?subjectId=${encodeURIComponent(selectedSubjectId)}`, {
                 method: 'GET',
@@ -79,8 +82,8 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
             });
 
             if (!response.ok) {
-                console.error(`Print gate check failed: ${response.status}`);
-                router.push(printUrl);
+                console.error(`印刷ゲート判定に失敗しました: ${response.status}`);
+                setGateErrorMessage('印刷可否の確認に失敗しました。通信状態を確認して、もう一度お試しください。');
                 return;
             }
 
@@ -97,8 +100,8 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
 
             router.push(printUrl);
         } catch (error) {
-            console.error('Failed to check print gate:', error);
-            router.push(printUrl);
+            console.error('印刷ゲート判定中に例外が発生しました:', error);
+            setGateErrorMessage('印刷可否の確認中にエラーが発生しました。時間をおいて再試行してください。');
         } finally {
             setIsCheckingGate(false);
         }
@@ -147,7 +150,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                                     <span className="text-white/90 font-medium tracking-wider select-none">{style.full}</span>
                                 </CardContent>
 
-                                {/* Overlay for non-selected items when one is selected */}
+                                {/* 教科選択中に未選択カードを覆うオーバーレイ */}
                                 {selectedSubjectId && !isSelected && (
                                     <div className="absolute inset-0 bg-white/60 z-10" />
                                 )}
@@ -203,6 +206,11 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                                                 <p className="text-xs text-center text-muted-foreground">
                                                     {sets * 10}問 / {sets}セット
                                                 </p>
+                                                {gateErrorMessage && (
+                                                    <p className="text-xs text-center text-red-600">
+                                                        {gateErrorMessage}
+                                                    </p>
+                                                )}
                                             </CardContent>
                                         </Card>
                                     </motion.div>

@@ -2,6 +2,16 @@ import 'dotenv/config';
 import { prisma } from '../src/lib/prisma';
 import { ensureInitialCoreProblemStates, getEntryCoreProblemIds } from '../src/lib/core-problem-entry-state';
 
+const USER_BATCH_SIZE = 500;
+
+function chunk<T>(items: T[], size: number): T[][] {
+    const batches: T[][] = [];
+    for (let i = 0; i < items.length; i += size) {
+        batches.push(items.slice(i, i + size));
+    }
+    return batches;
+}
+
 async function main() {
     const isDryRun = process.argv.includes('--dry-run');
 
@@ -22,19 +32,23 @@ async function main() {
         return;
     }
 
-    const existingStates = await prisma.userCoreProblemState.findMany({
-        where: {
-            userId: { in: students.map((student) => student.id) },
-            coreProblemId: { in: entryCoreProblemIds },
-        },
-        select: {
-            userId: true,
-        },
-    });
-
     const existingCountByUser = new Map<string, number>();
-    for (const state of existingStates) {
-        existingCountByUser.set(state.userId, (existingCountByUser.get(state.userId) ?? 0) + 1);
+    const studentIdBatches = chunk(students.map((student) => student.id), USER_BATCH_SIZE);
+
+    for (const batchIds of studentIdBatches) {
+        const batchStates = await prisma.userCoreProblemState.findMany({
+            where: {
+                userId: { in: batchIds },
+                coreProblemId: { in: entryCoreProblemIds },
+            },
+            select: {
+                userId: true,
+            },
+        });
+
+        for (const state of batchStates) {
+            existingCountByUser.set(state.userId, (existingCountByUser.get(state.userId) ?? 0) + 1);
+        }
     }
 
     const expectedPerUser = entryCoreProblemIds.length;
@@ -68,7 +82,7 @@ async function main() {
 
 main()
     .catch((error) => {
-        console.error('backfill failed:', error);
+        console.error('バックフィル処理に失敗しました:', error);
         process.exitCode = 1;
     })
     .finally(async () => {

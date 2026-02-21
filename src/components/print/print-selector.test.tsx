@@ -7,7 +7,7 @@ vi.mock('next/navigation', () => ({
     useRouter: vi.fn(),
 }))
 
-describe('PrintSelector', () => {
+describe('印刷セレクター', () => {
     const mockRouter = {
         push: vi.fn(),
         refresh: vi.fn(),
@@ -81,6 +81,27 @@ describe('PrintSelector', () => {
 
         await waitFor(() => {
             expect(mockRouter.push).toHaveBeenCalledWith('/unit-focus/cp-1?from=print&subjectId=subject-1&sets=1')
+        })
+    })
+
+    it('印刷ゲート判定APIが失敗した場合は印刷ページへ遷移しない', async () => {
+        mockFetch.mockResolvedValue({
+            ok: false,
+            status: 500,
+        })
+
+        render(
+            <PrintSelector
+                subjects={[{ subjectId: 'subject-1', subjectName: '英語' }]}
+            />
+        )
+
+        fireEvent.click(screen.getByText('English'))
+        fireEvent.click(screen.getByRole('button', { name: '印刷する' }))
+
+        await waitFor(() => {
+            expect(mockRouter.push).not.toHaveBeenCalled()
+            expect(screen.getByText('印刷可否の確認に失敗しました。通信状態を確認して、もう一度お試しください。')).toBeInTheDocument()
         })
     })
 })

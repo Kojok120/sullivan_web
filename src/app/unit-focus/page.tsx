@@ -3,13 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { UnitFocusListClient } from "./components/unit-focus-list-client";
 import { normalizeLectureVideos } from "@/lib/lecture-videos";
-import { getUnlockedCoreProblemIds } from "@/lib/progression";
+import { getUnlockedCoreProblemIdsBySubject } from "@/lib/progression";
 
 export default async function UnitFocusPage() {
     const session = await getSession();
     if (!session) redirect("/login");
 
-    // Fetch Subjects with CoreProblems and User States
+    // 教科と CoreProblem を取得
     const subjectsRaw = await prisma.subject.findMany({
         orderBy: { order: 'asc' },
         include: {
@@ -19,13 +19,16 @@ export default async function UnitFocusPage() {
         }
     });
 
-    const unlockedPairs = await Promise.all(
-        subjectsRaw.map(async (subject) => {
-            const unlockedIds = await getUnlockedCoreProblemIds(session.userId, subject.id);
-            return [subject.id, unlockedIds] as const;
-        })
+    const unlockedBySubject = await getUnlockedCoreProblemIdsBySubject(
+        session.userId,
+        subjectsRaw.map((subject) => ({
+            subjectId: subject.id,
+            coreProblems: subject.coreProblems.map((cp) => ({
+                id: cp.id,
+                order: cp.order,
+            })),
+        }))
     );
-    const unlockedBySubject = new Map(unlockedPairs);
 
     const subjects = subjectsRaw.map(s => ({
         ...s,
