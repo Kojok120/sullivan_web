@@ -16,7 +16,7 @@ vi.mock('@/lib/prisma', () => ({
     },
 }))
 
-describe('progression unlock/ready rules', () => {
+describe('進行のアンロック・出題可能判定ルール', () => {
     beforeEach(() => {
         vi.clearAllMocks()
     })
@@ -44,7 +44,7 @@ describe('progression unlock/ready rules', () => {
         })
     })
 
-    it('初回CoreProblemは講義動画があっても常時Ready', async () => {
+    it('初回CoreProblemは講義動画があっても常時出題可能', async () => {
         vi.mocked(prisma.coreProblem.findMany).mockResolvedValue([
             { id: 'cp-b', order: 1, lectureVideos: [{ title: 'v-b', url: 'https://example.com/b' }] },
             { id: 'cp-a', order: 1, lectureVideos: [{ title: 'v-a', url: 'https://example.com/a' }] },

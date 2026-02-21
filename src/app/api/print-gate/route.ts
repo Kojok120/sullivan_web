@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { getCurrentUser } from '@/lib/auth';
 import { getPrintGate } from '@/lib/print-gate-service';
 
 export async function GET(request: NextRequest) {
-    const session = await getSession();
-    if (!session) {
+    const user = await getCurrentUser();
+    if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    if (session.role !== 'STUDENT') {
+    if (user.role !== 'STUDENT') {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-        const result = await getPrintGate(session.userId, subjectId);
+        const result = await getPrintGate(user.userId, subjectId);
         return NextResponse.json(result);
     } catch (error) {
         console.error('Failed to evaluate print gate:', error);

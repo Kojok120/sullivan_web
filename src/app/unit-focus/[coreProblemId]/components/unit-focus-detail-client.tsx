@@ -49,12 +49,15 @@ export function UnitFocusDetailClient({
         // 最後の動画を視聴したら視聴完了を記録
         if (newCount >= totalVideos && !isWatched && !isSubmitting) {
             setIsSubmitting(true);
-            const success = await markLectureAsWatched({ coreProblemId: coreProblem.id });
-            if (success) {
-                setIsWatched(true);
-                router.refresh(); // ページを更新して最新データを取得
+            try {
+                const success = await markLectureAsWatched({ coreProblemId: coreProblem.id });
+                if (success) {
+                    setIsWatched(true);
+                    router.refresh(); // ページを更新して最新データを取得
+                }
+            } finally {
+                setIsSubmitting(false);
             }
-            setIsSubmitting(false);
         }
     };
 
@@ -142,7 +145,7 @@ export function UnitFocusDetailClient({
             )}
 
             <div className="grid gap-8">
-                {/* 1. Video Section */}
+                {/* 1. 講義動画セクション */}
                 <section>
                     <Card className={`overflow-hidden shadow-lg ${needsWatching ? 'border-2 border-amber-400' : 'border-2 border-primary/10'}`}>
                         <CardHeader className="bg-muted/30 pb-4">
@@ -160,7 +163,7 @@ export function UnitFocusDetailClient({
                         <CardContent className="p-0">
                             {lectureVideos.length > 0 ? (
                                 <div className="p-6">
-                                    {/* Main Play Button (starts from beginning) */}
+                                    {/* メイン再生ボタン（先頭から再生） */}
                                     <div className={`aspect-video w-full flex flex-col items-center justify-center rounded-lg border-2 border-dashed mb-4 group cursor-pointer transition-colors ${needsWatching
                                         ? 'bg-amber-50 border-amber-300 hover:bg-amber-100'
                                         : 'bg-black/5 border-gray-200 hover:bg-black/10'
@@ -193,7 +196,7 @@ export function UnitFocusDetailClient({
                                         {isSubmitting ? '処理中...' : `講義動画を見る ${lectureVideos.length > 1 ? `(${lectureVideos.length})` : ''}`}
                                     </Button>
 
-                                    {/* Individual Video Selection List */}
+                                    {/* 動画個別選択リスト */}
                                     {lectureVideos.length > 1 && (
                                         <div className="border-t pt-4 mt-2">
                                             <p className="text-sm font-medium mb-3 text-muted-foreground">動画を選んで再生:</p>
@@ -241,9 +244,9 @@ export function UnitFocusDetailClient({
                     </Card>
                 </section>
 
-                {/* 2. Print Section */}
+                {/* 2. 印刷セクション */}
                 <section>
-                    <Card className={`border-2 shadow-md ${needsWatching ? 'border-gray-200 bg-gray-50 opacity-60' : 'border-primary/20 bg-primary/5'}`}>
+                    <Card className={`border-2 shadow-md ${isPrintLocked ? 'border-gray-200 bg-gray-50 opacity-60' : 'border-primary/20 bg-primary/5'}`}>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
                                 {isPrintLocked ? (

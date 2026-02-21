@@ -10,6 +10,7 @@ export default async function StudentPrintPage({
 }) {
     const session = await getSession();
     if (!session) redirect('/login');
+    if (session.role !== 'STUDENT') redirect('/dashboard');
 
     const params = await searchParams;
     if (params.subjectId) {

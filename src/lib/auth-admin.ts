@@ -26,7 +26,7 @@ export async function createOrUpdateSupabaseUser({
 }: CreateSupabaseUserParams) {
     const supabaseAdmin = createAdminClient();
 
-    // Try to create the user
+    // 新規作成を試す
     const { error: createError } = await supabaseAdmin.auth.admin.createUser({
         email,
         password,
@@ -46,7 +46,7 @@ export async function createOrUpdateSupabaseUser({
         return { success: true };
     }
 
-    // If user exists, try to update
+    // 既存ユーザーがいる場合は更新
     if (createError.code === 'email_exists') {
         const existing = await findSupabaseUser({
             email,
@@ -89,8 +89,8 @@ export async function createOrUpdateSupabaseUser({
 }
 
 /**
- * Finds a Supabase user by lookup keys with pagination support.
- * `prismaUserId` is checked first (more stable), then `email`.
+ * lookupキーで Supabase ユーザーを検索する（ページング対応）。
+ * `prismaUserId` を優先し、次に `email` を照合する。
  */
 export async function findSupabaseUser({ email, prismaUserId }: SupabaseUserLookup): Promise<SupabaseUser | null> {
     if (!email && !prismaUserId) return null;
@@ -129,4 +129,27 @@ export async function findSupabaseUser({ email, prismaUserId }: SupabaseUserLook
     }
 
     return null;
+}
+
+/**
+ * lookupキーに一致する Supabase ユーザーを削除する。
+ * 一致しない場合は削除済み扱い（成功）で返す。
+ */
+export async function deleteSupabaseUserByLookup(
+    lookup: SupabaseUserLookup
+): Promise<{ success: boolean; deleted: boolean; error?: string }> {
+    const supabaseAdmin = createAdminClient();
+    const targetUser = await findSupabaseUser(lookup);
+
+    if (!targetUser) {
+        return { success: true, deleted: false };
+    }
+
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(targetUser.id);
+    if (error) {
+        console.error('Supabaseユーザー削除に失敗しました:', error);
+        return { success: false, deleted: false, error: error.message };
+    }
+
+    return { success: true, deleted: true };
 }
