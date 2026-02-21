@@ -10,6 +10,34 @@ export type CoreProblemStatus = {
     correctRate: number;
 };
 
+type CoreProblemLite = {
+    id: string;
+    order: number;
+};
+
+function sortCoreProblems<T extends CoreProblemLite>(coreProblems: T[]): T[] {
+    return [...coreProblems].sort((a, b) => {
+        if (a.order !== b.order) {
+            return a.order - b.order;
+        }
+        return a.id.localeCompare(b.id);
+    });
+}
+
+/**
+ * 教科内の「最初のCoreProblem ID」を返す。
+ * 同順位(order)がある場合はid昇順で先頭を採用する。
+ */
+export function getEntryCoreProblemId<T extends CoreProblemLite>(coreProblems: T[]): string | null {
+    if (coreProblems.length === 0) return null;
+    const sorted = sortCoreProblems(coreProblems);
+    return sorted[0].id;
+}
+
+export function hasLectureVideos(lectureVideos: unknown): boolean {
+    return Array.isArray(lectureVideos) && lectureVideos.length > 0;
+}
+
 /**
  * Calculates the progress status of a CoreProblem.
  * 
@@ -50,7 +78,7 @@ export async function getUnlockedCoreProblemIds(userId: string, subjectId: strin
     // 1. Fetch all CoreProblems for the subject to identify the first one
     const coreProblems = await prisma.coreProblem.findMany({
         where: { subjectId },
-        orderBy: { order: 'asc' },
+        orderBy: [{ order: 'asc' }, { id: 'asc' }],
         select: { id: true, order: true }
     });
 
@@ -70,8 +98,9 @@ export async function getUnlockedCoreProblemIds(userId: string, subjectId: strin
 
     // 3. Ensure First CP is Unlocked
     // We assume the one with lowest order is the first.
-    if (coreProblems.length > 0) {
-        unlockedIds.add(coreProblems[0].id);
+    const entryCoreProblemId = getEntryCoreProblemId(coreProblems);
+    if (entryCoreProblemId) {
+        unlockedIds.add(entryCoreProblemId);
     }
 
     return unlockedIds;
@@ -86,7 +115,7 @@ export async function getReadyCoreProblemIds(userId: string, subjectId: string):
     // 1. Fetch all CoreProblems for the subject with lectureVideos info
     const coreProblems = await prisma.coreProblem.findMany({
         where: { subjectId },
-        orderBy: { order: 'asc' },
+        orderBy: [{ order: 'asc' }, { id: 'asc' }],
         select: { id: true, order: true, lectureVideos: true }
     });
 
@@ -105,19 +134,15 @@ export async function getReadyCoreProblemIds(userId: string, subjectId: string):
     const stateMap = new Map(userStates.map(s => [s.coreProblemId, s]));
 
     const readyIds = new Set<string>();
+    const entryCoreProblemId = getEntryCoreProblemId(coreProblems);
 
     for (const cp of coreProblems) {
         const state = stateMap.get(cp.id);
-        const hasLectureVideos = Array.isArray(cp.lectureVideos) && cp.lectureVideos.length > 0;
+        const hasVideos = hasLectureVideos(cp.lectureVideos);
 
-        // 最初の単元は常にReady
-        if (cp.order === coreProblems[0].order) {
-            // 最初の単元でも講義動画がある場合は視聴必須
-            if (!hasLectureVideos) {
-                readyIds.add(cp.id);
-            } else if (state?.isLectureWatched) {
-                readyIds.add(cp.id);
-            }
+        // 最初の単元は無条件でReady（仕様）
+        if (entryCoreProblemId && cp.id === entryCoreProblemId) {
+            readyIds.add(cp.id);
             continue;
         }
 
@@ -125,7 +150,7 @@ export async function getReadyCoreProblemIds(userId: string, subjectId: string):
         if (!state) continue;
 
         // 講義動画がない場合、または視聴済みの場合はReady
-        if (!hasLectureVideos || state.isLectureWatched) {
+        if (!hasVideos || state.isLectureWatched) {
             readyIds.add(cp.id);
         }
     }

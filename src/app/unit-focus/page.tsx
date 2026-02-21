@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { UnitFocusListClient } from "./components/unit-focus-list-client";
 import { normalizeLectureVideos } from "@/lib/lecture-videos";
+import { getUnlockedCoreProblemIds } from "@/lib/progression";
 
 export default async function UnitFocusPage() {
     const session = await getSession();
@@ -13,21 +14,25 @@ export default async function UnitFocusPage() {
         orderBy: { order: 'asc' },
         include: {
             coreProblems: {
-                orderBy: { order: 'asc' },
-                include: {
-                    userStates: {
-                        where: { userId: session.userId }
-                    }
-                }
+                orderBy: [{ order: 'asc' }, { id: 'asc' }],
             }
         }
     });
+
+    const unlockedPairs = await Promise.all(
+        subjectsRaw.map(async (subject) => {
+            const unlockedIds = await getUnlockedCoreProblemIds(session.userId, subject.id);
+            return [subject.id, unlockedIds] as const;
+        })
+    );
+    const unlockedBySubject = new Map(unlockedPairs);
 
     const subjects = subjectsRaw.map(s => ({
         ...s,
         coreProblems: s.coreProblems.map(cp => ({
             ...cp,
-            lectureVideos: normalizeLectureVideos(cp.lectureVideos)
+            lectureVideos: normalizeLectureVideos(cp.lectureVideos),
+            isUnlocked: unlockedBySubject.get(s.id)?.has(cp.id) ?? false,
         }))
     }));
 
