@@ -229,6 +229,7 @@ export function PrintLayout({ studentName, subjectName, problems, studentLoginId
                         const flatSetProblems = setPages.flat();
                         const qrCode = qrCodeDataUrls[setIndex];
                         const setLabel = paginatedSets.length > 1 ? ` (Set ${setIndex + 1})` : '';
+                        const shouldBreakBeforeAnswer = setPages.length > 0 || setIndex > 0;
 
                         return (
                             <div key={`set-${setIndex}`}>
@@ -264,7 +265,7 @@ export function PrintLayout({ studentName, subjectName, problems, studentLoginId
                                 })}
 
                                 {/* Answer Sheet Page */}
-                                <div className={`print-page p-[15mm] relative flex flex-col break-before-page answer-sheet-page`}>
+                                <div className={`print-page p-[15mm] relative flex flex-col ${shouldBreakBeforeAnswer ? 'break-before-page' : ''}`}>
                                     <Header
                                         studentName={studentName}
                                         studentLoginId={studentLoginId}
@@ -326,23 +327,13 @@ export function PrintLayout({ studentName, subjectName, problems, studentLoginId
     .print-page {
         height: 297mm;
         width: 210mm;
-        page-break-after: always;
-        break-after: page;
         position: relative;
         box-sizing: border-box;
         overflow: hidden;
     }
-    .print-page:last-child {
-        page-break-after: auto;
-        break-after: auto;
-    }
-    .answer-sheet-page {
+    .break-before-page {
         page-break-before: always !important;
         break-before: page !important;
-    }
-    .break-before-page {
-        page-break-before: always;
-        break-before: page;
     }
     .break-inside-avoid {
         break-inside: avoid;
