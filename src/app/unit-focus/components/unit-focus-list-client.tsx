@@ -12,7 +12,7 @@ interface CoreProblemData {
     id: string;
     name: string;
     lectureVideos: LectureVideo[];
-    userStates: { isUnlocked: boolean }[];
+    isUnlocked: boolean;
 }
 
 interface SubjectData {
@@ -57,8 +57,7 @@ export function UnitFocusListClient({ subjects }: UnitFocusListClientProps) {
                     <TabsContent key={subject.id} value={subject.id} className="mt-0 focus-visible:outline-none focus-visible:ring-0">
                         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 animation-fade-in">
                             {subject.coreProblems.map((coreProblem) => {
-                                const state = coreProblem.userStates[0];
-                                const isUnlocked = state?.isUnlocked ?? false;
+                                const isUnlocked = coreProblem.isUnlocked;
 
                                 return (
                                     <Link

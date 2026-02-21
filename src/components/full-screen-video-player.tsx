@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import YouTube, { YouTubeEvent } from "react-youtube";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -50,6 +50,7 @@ function FullScreenVideoPlayerContent({
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
     const [videoEnded, setVideoEnded] = useState(false);
     const [showButton, setShowButton] = useState(false);
+    const [instanceKey, setInstanceKey] = useState(0);
     const {
         allowedRates,
         currentRate,
@@ -59,6 +60,7 @@ function FullScreenVideoPlayerContent({
         handlePlaybackRateChange,
         handleStateChange,
         changeSpeed,
+        seekRelative,
     } = useYouTubePlaybackGuard();
 
     useEffect(() => {
@@ -96,6 +98,14 @@ function FullScreenVideoPlayerContent({
         setCurrentIndex(nextIndex);
         setVideoEnded(false);
         setShowButton(false);
+        setInstanceKey((prev) => prev + 1);
+        resetTracking();
+    };
+
+    const replayCurrentVideo = () => {
+        setVideoEnded(false);
+        setShowButton(false);
+        setInstanceKey((prev) => prev + 1);
         resetTracking();
     };
 
@@ -128,7 +138,7 @@ function FullScreenVideoPlayerContent({
             <div className="flex-1 w-full h-full bg-black flex items-center justify-center relative">
                 {youTubeId ? (
                     <YouTube
-                        key={currentVideo.url}
+                        key={`${currentVideo.url}-${instanceKey}`}
                         videoId={youTubeId}
                         className="w-full h-full"
                         iframeClassName="w-full h-full"
@@ -152,6 +162,7 @@ function FullScreenVideoPlayerContent({
                     />
                 ) : (
                     <iframe
+                        key={`${currentVideo.url}-${instanceKey}`}
                         src={embedUrl}
                         className="w-full h-full"
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -168,6 +179,15 @@ function FullScreenVideoPlayerContent({
 
             {!videoEnded && (
                 <div className="absolute bottom-10 left-10 z-10 flex items-center gap-1">
+                    {youTubeId && (
+                        <button
+                            onClick={() => seekRelative(-10)}
+                            className="px-3 py-1.5 rounded text-sm font-medium transition-colors bg-white/20 text-white/80 hover:bg-white/30 flex items-center gap-1"
+                        >
+                            <RotateCcw className="h-3.5 w-3.5" />
+                            10秒戻す
+                        </button>
+                    )}
                     {allowedRates.map((rate) => (
                         <button
                             key={rate}
@@ -186,9 +206,14 @@ function FullScreenVideoPlayerContent({
             <DialogFooter className="absolute bottom-10 right-10 z-10">
                 {showButton ? (
                     isLastVideo ? (
-                        <Button variant="secondary" onClick={closePlayer} className="bg-white/90 hover:bg-white text-black">
-                            {closeButtonLabel}
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <Button variant="secondary" onClick={replayCurrentVideo} className="bg-white/90 hover:bg-white text-black">
+                                もう一度再生
+                            </Button>
+                            <Button variant="secondary" onClick={closePlayer} className="bg-white/90 hover:bg-white text-black">
+                                {closeButtonLabel}
+                            </Button>
+                        </div>
                     ) : showNextButton ? (
                         <Button
                             variant="default"

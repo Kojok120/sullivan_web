@@ -1,8 +1,10 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import {
     calculateCoreProblemStatus,
     UNLOCK_ANSWER_RATE,
     UNLOCK_CORRECT_RATE,
+    getEntryCoreProblemId,
+    hasLectureVideos,
 } from '@/lib/progression'
 
 describe('calculateCoreProblemStatus', () => {
@@ -70,5 +72,41 @@ describe('calculateCoreProblemStatus', () => {
         expect(result.correctRate).toBe(1.0) // 2/2 = 100%
         expect(result.answerRate).toBe(0.02) // 2/100 = 2%
         expect(result.isPassed).toBe(false) // 回答率が足りない
+    })
+})
+
+describe('getEntryCoreProblemId', () => {
+    it('order昇順で最初のCoreProblemを返す', () => {
+        const result = getEntryCoreProblemId([
+            { id: 'cp-2', order: 2 },
+            { id: 'cp-1', order: 1 },
+            { id: 'cp-3', order: 3 },
+        ])
+        expect(result).toBe('cp-1')
+    })
+
+    it('order同値の場合はid昇順で先頭を返す', () => {
+        const result = getEntryCoreProblemId([
+            { id: 'cp-b', order: 1 },
+            { id: 'cp-a', order: 1 },
+            { id: 'cp-c', order: 1 },
+        ])
+        expect(result).toBe('cp-a')
+    })
+
+    it('空配列の場合はnullを返す', () => {
+        expect(getEntryCoreProblemId([])).toBeNull()
+    })
+})
+
+describe('hasLectureVideos', () => {
+    it('配列で1件以上あればtrue', () => {
+        expect(hasLectureVideos([{ title: '動画1', url: 'https://example.com' }])).toBe(true)
+    })
+
+    it('空配列または配列以外はfalse', () => {
+        expect(hasLectureVideos([])).toBe(false)
+        expect(hasLectureVideos(null)).toBe(false)
+        expect(hasLectureVideos({ title: '動画1' })).toBe(false)
     })
 })

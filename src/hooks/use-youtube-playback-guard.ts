@@ -90,6 +90,22 @@ export function useYouTubePlaybackGuard(allowedRates: number[] = DEFAULT_ALLOWED
         setCurrentRate(rate);
     }, [allowedRates]);
 
+    const seekRelative = useCallback((offsetSeconds: number) => {
+        if (!playerRef.current) {
+            return false;
+        }
+
+        try {
+            const currentTime = playerRef.current.getCurrentTime();
+            const nextTime = Math.max(0, currentTime + offsetSeconds);
+            playerRef.current.seekTo(nextTime, true);
+            lastTimeRef.current = nextTime;
+            return true;
+        } catch {
+            return false;
+        }
+    }, []);
+
     const handleStateChange = useCallback((event: YouTubeLikeEvent) => {
         // 1: PLAYING
         if (event.data !== 1) {
@@ -118,5 +134,6 @@ export function useYouTubePlaybackGuard(allowedRates: number[] = DEFAULT_ALLOWED
         handlePlaybackRateChange,
         handleStateChange,
         changeSpeed,
+        seekRelative,
     };
 }
