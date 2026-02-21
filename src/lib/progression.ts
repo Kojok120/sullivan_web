@@ -1,22 +1,56 @@
 import { prisma } from '@/lib/prisma';
 
-// Configuration for progression/unlock thresholds
+// 進行判定（アンロック）しきい値
 export const UNLOCK_ANSWER_RATE = 0.5; // 50%
 export const UNLOCK_CORRECT_RATE = 0.6; // 60%
 
+// CoreProblem 単位の進行状態
 export type CoreProblemStatus = {
     isPassed: boolean;
     answerRate: number;
     correctRate: number;
 };
 
+type CoreProblemLite = {
+    id: string;
+    order: number;
+};
+
+type SubjectCoreProblemsLite = {
+    subjectId: string;
+    coreProblems: CoreProblemLite[];
+};
+
+function sortCoreProblems<T extends CoreProblemLite>(coreProblems: T[]): T[] {
+    return [...coreProblems].sort((a, b) => {
+        if (a.order !== b.order) {
+            return a.order - b.order;
+        }
+        return a.id.localeCompare(b.id);
+    });
+}
+
 /**
- * Calculates the progress status of a CoreProblem.
- * 
- * @param totalProblems Total number of problems in the CoreProblem
- * @param answeredCount Number of unique problems answered (at least once)
- * @param correctCount Number of unique problems answered correctly (isCleared=true)
- * @returns CoreProblemStatus
+ * 教科内の「最初のCoreProblem ID」を返す。
+ * 同順位(order)がある場合はid昇順で先頭を採用する。
+ */
+export function getEntryCoreProblemId<T extends CoreProblemLite>(coreProblems: T[]): string | null {
+    if (coreProblems.length === 0) return null;
+    const sorted = sortCoreProblems(coreProblems);
+    return sorted[0].id;
+}
+
+export function hasLectureVideos(lectureVideos: unknown): boolean {
+    return Array.isArray(lectureVideos) && lectureVideos.length > 0;
+}
+
+/**
+ * CoreProblem の進行状態を計算する。
+ *
+ * @param totalProblems CoreProblem に含まれる総問題数
+ * @param answeredCount 一度でも回答したユニーク問題数
+ * @param correctCount 正答したユニーク問題数（isCleared=true）
+ * @returns 進行判定に使う状態
  */
 export function calculateCoreProblemStatus(
     totalProblems: number,
@@ -28,8 +62,8 @@ export function calculateCoreProblemStatus(
     }
 
     const answerRate = answeredCount / totalProblems;
-    // Correct rate is based on ANSWERED problems, not total problems.
-    // "正解したユニークな問題数 / 一度でも解いた問題数"
+    // 正解率は「正解したユニーク問題数 / 一度でも解いたユニーク問題数」
+    // （総問題数では割らない）
     const correctRate = answeredCount > 0 ? correctCount / answeredCount : 0;
 
     const isPassed = answerRate >= UNLOCK_ANSWER_RATE && correctRate >= UNLOCK_CORRECT_RATE;
@@ -42,39 +76,74 @@ export function calculateCoreProblemStatus(
 }
 
 /**
- * Retrieves the set of unlocked CoreProblem IDs for a user in a specific subject.
- * Relies primarily on the 'UserCoreProblemState.isUnlocked' flag.
- * Ensures the first CoreProblem is always unlocked.
+ * 複数教科分のアンロック済み CoreProblem ID を一括取得する。
+ * 主に UserCoreProblemState.isUnlocked を参照しつつ、各教科の先頭 CoreProblem は常に含める。
+ */
+export async function getUnlockedCoreProblemIdsBySubject(
+    userId: string,
+    subjects: SubjectCoreProblemsLite[]
+): Promise<Map<string, Set<string>>> {
+    const unlockedBySubject = new Map<string, Set<string>>();
+    if (subjects.length === 0) return unlockedBySubject;
+
+    const allCoreProblemIds: string[] = [];
+    for (const subject of subjects) {
+        unlockedBySubject.set(subject.subjectId, new Set<string>());
+        for (const coreProblem of subject.coreProblems) {
+            allCoreProblemIds.push(coreProblem.id);
+        }
+    }
+
+    if (allCoreProblemIds.length === 0) return unlockedBySubject;
+
+    const userStates = await prisma.userCoreProblemState.findMany({
+        where: {
+            userId,
+            coreProblemId: { in: allCoreProblemIds },
+            isUnlocked: true
+        },
+        select: { coreProblemId: true }
+    });
+    const unlockedIds = new Set(userStates.map(s => s.coreProblemId));
+
+    for (const subject of subjects) {
+        const currentSet = unlockedBySubject.get(subject.subjectId) ?? new Set<string>();
+
+        for (const coreProblem of subject.coreProblems) {
+            if (unlockedIds.has(coreProblem.id)) {
+                currentSet.add(coreProblem.id);
+            }
+        }
+
+        // order が最小のものを先頭単元として常時アンロック
+        const entryCoreProblemId = getEntryCoreProblemId(subject.coreProblems);
+        if (entryCoreProblemId) {
+            currentSet.add(entryCoreProblemId);
+        }
+
+        unlockedBySubject.set(subject.subjectId, currentSet);
+    }
+
+    return unlockedBySubject;
+}
+
+/**
+ * 指定教科でアンロック済みの CoreProblem ID 集合を取得する。
  */
 export async function getUnlockedCoreProblemIds(userId: string, subjectId: string): Promise<Set<string>> {
-    // 1. Fetch all CoreProblems for the subject to identify the first one
     const coreProblems = await prisma.coreProblem.findMany({
         where: { subjectId },
-        orderBy: { order: 'asc' },
+        orderBy: [{ order: 'asc' }, { id: 'asc' }],
         select: { id: true, order: true }
     });
 
     if (coreProblems.length === 0) return new Set();
 
-    // 2. Fetch User States
-    const userStates = await prisma.userCoreProblemState.findMany({
-        where: {
-            userId,
-            coreProblemId: { in: coreProblems.map(cp => cp.id) },
-            isUnlocked: true
-        },
-        select: { coreProblemId: true }
-    });
+    const unlockedBySubject = await getUnlockedCoreProblemIdsBySubject(userId, [
+        { subjectId, coreProblems },
+    ]);
 
-    const unlockedIds = new Set(userStates.map(s => s.coreProblemId));
-
-    // 3. Ensure First CP is Unlocked
-    // We assume the one with lowest order is the first.
-    if (coreProblems.length > 0) {
-        unlockedIds.add(coreProblems[0].id);
-    }
-
-    return unlockedIds;
+    return unlockedBySubject.get(subjectId) ?? new Set();
 }
 
 /**
@@ -83,16 +152,16 @@ export async function getUnlockedCoreProblemIds(userId: string, subjectId: strin
  * 印刷出題時などに使用する。
  */
 export async function getReadyCoreProblemIds(userId: string, subjectId: string): Promise<Set<string>> {
-    // 1. Fetch all CoreProblems for the subject with lectureVideos info
+    // 1. 対象教科の CoreProblem 一覧（講義動画情報付き）を取得
     const coreProblems = await prisma.coreProblem.findMany({
         where: { subjectId },
-        orderBy: { order: 'asc' },
+        orderBy: [{ order: 'asc' }, { id: 'asc' }],
         select: { id: true, order: true, lectureVideos: true }
     });
 
     if (coreProblems.length === 0) return new Set();
 
-    // 2. Fetch User States (unlocked ones)
+    // 2. ユーザー状態（アンロック済み）を取得
     const userStates = await prisma.userCoreProblemState.findMany({
         where: {
             userId,
@@ -105,27 +174,23 @@ export async function getReadyCoreProblemIds(userId: string, subjectId: string):
     const stateMap = new Map(userStates.map(s => [s.coreProblemId, s]));
 
     const readyIds = new Set<string>();
+    const entryCoreProblemId = getEntryCoreProblemId(coreProblems);
 
     for (const cp of coreProblems) {
         const state = stateMap.get(cp.id);
-        const hasLectureVideos = Array.isArray(cp.lectureVideos) && cp.lectureVideos.length > 0;
+        const hasVideos = hasLectureVideos(cp.lectureVideos);
 
-        // 最初の単元は常にReady
-        if (cp.order === coreProblems[0].order) {
-            // 最初の単元でも講義動画がある場合は視聴必須
-            if (!hasLectureVideos) {
-                readyIds.add(cp.id);
-            } else if (state?.isLectureWatched) {
-                readyIds.add(cp.id);
-            }
+        // 最初の単元は無条件で出題可能（仕様）
+        if (entryCoreProblemId && cp.id === entryCoreProblemId) {
+            readyIds.add(cp.id);
             continue;
         }
 
         // アンロック済みでない場合はスキップ
         if (!state) continue;
 
-        // 講義動画がない場合、または視聴済みの場合はReady
-        if (!hasLectureVideos || state.isLectureWatched) {
+        // 講義動画がない場合、または視聴済みの場合は出題可能
+        if (!hasVideos || state.isLectureWatched) {
             readyIds.add(cp.id);
         }
     }

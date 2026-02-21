@@ -1,7 +1,8 @@
 import { prisma } from '@/lib/prisma';
 import { Role } from '@prisma/client';
-import { createOrUpdateSupabaseUser } from '@/lib/auth-admin';
+import { createOrUpdateSupabaseUser, deleteSupabaseUserByLookup } from '@/lib/auth-admin';
 import { createUser as createPrismaUser } from '@/lib/user-service';
+import { ensureInitialCoreProblemStates } from '@/lib/core-problem-entry-state';
 import crypto from 'crypto';
 
 export interface RegisterUserParams {
@@ -13,8 +14,8 @@ export interface RegisterUserParams {
 }
 
 /**
- * Registers a new user internally (Prisma) and in Supabase Auth.
- * Handles rollback if Supabase registration fails.
+ * Prisma と Supabase Auth の両方にユーザーを登録する。
+ * 途中失敗時は作成済みデータをロールバックする。
  */
 export async function registerUser({
     name,
@@ -23,10 +24,31 @@ export async function registerUser({
     group,
     classroomId
 }: RegisterUserParams) {
-    // 1. Determine password (using crypto.randomBytes for security)
+    async function rollbackPrismaUser(userId: string) {
+        try {
+            await prisma.userCoreProblemState.deleteMany({ where: { userId } });
+            await prisma.user.delete({ where: { id: userId } });
+            console.log(`ユーザー ${userId} をロールバックしました。`);
+        } catch (rollbackError) {
+            console.error('重大: ユーザー作成ロールバックに失敗しました:', rollbackError);
+        }
+    }
+
+    async function rollbackSupabaseUser(email: string, prismaUserId: string) {
+        try {
+            const result = await deleteSupabaseUserByLookup({ email, prismaUserId });
+            if (!result.success) {
+                console.error('Supabaseユーザーのロールバックに失敗しました:', result.error);
+            }
+        } catch (rollbackError) {
+            console.error('Supabaseユーザーのロールバック中に例外が発生しました:', rollbackError);
+        }
+    }
+
+    // 1. パスワードを決定（crypto.randomBytesを使用）
     const finalPassword = password || crypto.randomBytes(8).toString('base64url').slice(0, 12);
 
-    // 2. Create User in Prisma
+    // 2. Prismaにユーザーを作成
     let user;
     try {
         user = await createPrismaUser({
@@ -36,11 +58,11 @@ export async function registerUser({
             classroomId
         });
     } catch (e) {
-        console.error('Prisma user creation failed:', e);
+        console.error('Prismaユーザー作成に失敗しました:', e);
         return { error: 'ユーザーの作成に失敗しました(DB)' };
     }
 
-    // 3. Register in Supabase
+    // 3. Supabaseに登録
     const email = `${user.loginId}@sullivan-internal.local`;
 
     const authResult = await createOrUpdateSupabaseUser({
@@ -53,16 +75,21 @@ export async function registerUser({
     });
 
     if (authResult.error) {
-        // Rollback: Delete Prisma user if Supabase registration fails
-        try {
-            await prisma.user.delete({ where: { id: user.id } });
-            console.log(`Rolled back user ${user.id} due to Supabase error.`);
-        } catch (rollbackError) {
-            console.error('Critical: Failed to rollback user creation:', rollbackError);
-        }
+        // Supabase登録に失敗した場合はPrisma側をロールバック
+        await rollbackPrismaUser(user.id);
 
-        console.error('Supabase registration failed:', authResult.error);
+        console.error('Supabase登録に失敗しました:', authResult.error);
         return { error: `Auth作成失敗: ${authResult.error}` };
+    }
+
+    // 4. 初回CoreProblem状態を作成（最初の単元は無条件アンロック）
+    try {
+        await ensureInitialCoreProblemStates(user.id);
+    } catch (e) {
+        console.error('初回CoreProblem状態の初期化に失敗しました:', e);
+        await rollbackSupabaseUser(email, user.id);
+        await rollbackPrismaUser(user.id);
+        return { error: '初期単元状態の作成に失敗しました' };
     }
 
     return { success: true, user, password: finalPassword };

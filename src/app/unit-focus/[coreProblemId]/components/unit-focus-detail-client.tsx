@@ -19,10 +19,20 @@ interface VideoData {
 interface UnitFocusDetailClientProps {
     coreProblem: CoreProblem & { subject: Subject };
     lectureVideos: VideoData[];
+    isUnlocked: boolean;
     isLectureWatched: boolean;
+    fromPrint: boolean;
+    returnToPrintUrl: string | null;
 }
 
-export function UnitFocusDetailClient({ coreProblem, lectureVideos, isLectureWatched }: UnitFocusDetailClientProps) {
+export function UnitFocusDetailClient({
+    coreProblem,
+    lectureVideos,
+    isUnlocked,
+    isLectureWatched,
+    fromPrint,
+    returnToPrintUrl
+}: UnitFocusDetailClientProps) {
     const router = useRouter();
     const [isVideoOpen, setIsVideoOpen] = useState(false);
     const [startIndex, setStartIndex] = useState(0);
@@ -37,14 +47,17 @@ export function UnitFocusDetailClient({ coreProblem, lectureVideos, isLectureWat
         setWatchedCount(newCount);
 
         // 最後の動画を視聴したら視聴完了を記録
-        if (newCount >= totalVideos && !isWatched) {
+        if (newCount >= totalVideos && !isWatched && !isSubmitting) {
             setIsSubmitting(true);
-            const success = await markLectureAsWatched({ coreProblemId: coreProblem.id });
-            if (success) {
-                setIsWatched(true);
-                router.refresh(); // ページを更新して最新データを取得
+            try {
+                const success = await markLectureAsWatched({ coreProblemId: coreProblem.id });
+                if (success) {
+                    setIsWatched(true);
+                    router.refresh(); // ページを更新して最新データを取得
+                }
+            } finally {
+                setIsSubmitting(false);
             }
-            setIsSubmitting(false);
         }
     };
 
@@ -55,6 +68,7 @@ export function UnitFocusDetailClient({ coreProblem, lectureVideos, isLectureWat
 
     const hasVideos = lectureVideos.length > 0;
     const needsWatching = hasVideos && !isWatched;
+    const isPrintLocked = !isUnlocked || needsWatching;
 
     return (
         <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -86,6 +100,39 @@ export function UnitFocusDetailClient({ coreProblem, lectureVideos, isLectureWat
                 </Alert>
             )}
 
+            {/* ロック中の警告 */}
+            {!isUnlocked && (
+                <Alert className="mb-6 bg-red-50 border-red-200 text-red-800">
+                    <Lock className="h-4 w-4" />
+                    <AlertTitle>この単元はまだロック中です</AlertTitle>
+                    <AlertDescription>
+                        前の単元の採点基準を満たすと、この単元がアンロックされます。
+                    </AlertDescription>
+                </Alert>
+            )}
+
+            {/* 印刷導線から遷移した場合の案内 */}
+            {fromPrint && returnToPrintUrl && (
+                <Alert className="mb-6 bg-blue-50 border-blue-200 text-blue-800">
+                    <Printer className="h-4 w-4" />
+                    <AlertTitle>印刷前に講義動画の確認が必要です</AlertTitle>
+                    <AlertDescription className="space-y-3">
+                        <p>
+                            講義動画の視聴後に、印刷画面へ戻ってください。
+                        </p>
+                        {needsWatching ? (
+                            <Button type="button" variant="outline" disabled className="w-full sm:w-auto">
+                                動画視聴後に印刷画面へ戻れます
+                            </Button>
+                        ) : (
+                            <Button type="button" variant="outline" asChild className="w-full sm:w-auto">
+                                <Link href={returnToPrintUrl}>印刷画面へ戻る</Link>
+                            </Button>
+                        )}
+                    </AlertDescription>
+                </Alert>
+            )}
+
             {/* 視聴完了済みの場合の表示 */}
             {hasVideos && isWatched && (
                 <Alert className="mb-6 bg-green-50 border-green-200 text-green-800">
@@ -98,7 +145,7 @@ export function UnitFocusDetailClient({ coreProblem, lectureVideos, isLectureWat
             )}
 
             <div className="grid gap-8">
-                {/* 1. Video Section */}
+                {/* 1. 講義動画セクション */}
                 <section>
                     <Card className={`overflow-hidden shadow-lg ${needsWatching ? 'border-2 border-amber-400' : 'border-2 border-primary/10'}`}>
                         <CardHeader className="bg-muted/30 pb-4">
@@ -116,7 +163,7 @@ export function UnitFocusDetailClient({ coreProblem, lectureVideos, isLectureWat
                         <CardContent className="p-0">
                             {lectureVideos.length > 0 ? (
                                 <div className="p-6">
-                                    {/* Main Play Button (starts from beginning) */}
+                                    {/* メイン再生ボタン（先頭から再生） */}
                                     <div className={`aspect-video w-full flex flex-col items-center justify-center rounded-lg border-2 border-dashed mb-4 group cursor-pointer transition-colors ${needsWatching
                                         ? 'bg-amber-50 border-amber-300 hover:bg-amber-100'
                                         : 'bg-black/5 border-gray-200 hover:bg-black/10'
@@ -149,7 +196,7 @@ export function UnitFocusDetailClient({ coreProblem, lectureVideos, isLectureWat
                                         {isSubmitting ? '処理中...' : `講義動画を見る ${lectureVideos.length > 1 ? `(${lectureVideos.length})` : ''}`}
                                     </Button>
 
-                                    {/* Individual Video Selection List */}
+                                    {/* 動画個別選択リスト */}
                                     {lectureVideos.length > 1 && (
                                         <div className="border-t pt-4 mt-2">
                                             <p className="text-sm font-medium mb-3 text-muted-foreground">動画を選んで再生:</p>
@@ -184,7 +231,7 @@ export function UnitFocusDetailClient({ coreProblem, lectureVideos, isLectureWat
                                             url: v.url
                                         }))}
                                         onVideoEnd={handleVideoEnd}
-                                        autoCloseOnLastVideoEnd={true}
+                                        autoCloseOnLastVideoEnd={false}
                                     />
                                 </div>
                             ) : (
@@ -197,21 +244,23 @@ export function UnitFocusDetailClient({ coreProblem, lectureVideos, isLectureWat
                     </Card>
                 </section>
 
-                {/* 2. Print Section */}
+                {/* 2. 印刷セクション */}
                 <section>
-                    <Card className={`border-2 shadow-md ${needsWatching ? 'border-gray-200 bg-gray-50 opacity-60' : 'border-primary/20 bg-primary/5'}`}>
+                    <Card className={`border-2 shadow-md ${isPrintLocked ? 'border-gray-200 bg-gray-50 opacity-60' : 'border-primary/20 bg-primary/5'}`}>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
-                                {needsWatching ? (
+                                {isPrintLocked ? (
                                     <Lock className="w-6 h-6 text-gray-400" />
                                 ) : (
                                     <Printer className="w-6 h-6 text-primary" />
                                 )}
                                 問題を印刷する
-                                {needsWatching && <span className="text-xs bg-gray-400 text-white px-2 py-0.5 rounded-full ml-2">講義動画視聴後</span>}
+                                {isPrintLocked && <span className="text-xs bg-gray-400 text-white px-2 py-0.5 rounded-full ml-2">条件達成後</span>}
                             </CardTitle>
                             <CardDescription>
-                                {needsWatching
+                                {!isUnlocked
+                                    ? 'この単元はまだアンロックされていません'
+                                    : needsWatching
                                     ? '講義動画を視聴すると印刷できるようになります'
                                     : 'この単元の問題を出題します'}
                             </CardDescription>
@@ -221,19 +270,23 @@ export function UnitFocusDetailClient({ coreProblem, lectureVideos, isLectureWat
                                 size="lg"
                                 className="w-full sm:w-auto text-lg py-6 gap-3 shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5"
                                 asChild
-                                disabled={needsWatching}
+                                disabled={isPrintLocked}
                             >
                                 <Link
-                                    href={needsWatching ? '#' : `/dashboard/print?subjectId=${coreProblem.subjectId}&coreProblemId=${coreProblem.id}`}
-                                    onClick={(e) => needsWatching && e.preventDefault()}
-                                    className={needsWatching ? 'pointer-events-none' : ''}
+                                    href={isPrintLocked ? '#' : `/dashboard/print?subjectId=${coreProblem.subjectId}&coreProblemId=${coreProblem.id}`}
+                                    onClick={(e) => isPrintLocked && e.preventDefault()}
+                                    className={isPrintLocked ? 'pointer-events-none' : ''}
                                 >
-                                    {needsWatching ? (
+                                    {isPrintLocked ? (
                                         <Lock className="w-5 h-5" />
                                     ) : (
                                         <Printer className="w-5 h-5" />
                                     )}
-                                    {needsWatching ? '講義動画を視聴してください' : '今すぐ問題を印刷する'}
+                                    {!isUnlocked
+                                        ? '前の単元をクリアしてください'
+                                        : needsWatching
+                                            ? '講義動画を視聴してください'
+                                            : '今すぐ問題を印刷する'}
                                 </Link>
                             </Button>
                         </CardContent>
