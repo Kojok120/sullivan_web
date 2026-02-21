@@ -119,7 +119,7 @@ export function ProblemManager({
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-1">
                     <form onSubmit={handleSearch} className="flex gap-2 w-full sm:max-w-sm">
                         <Input
-                            placeholder="問題文、解答、ID、単元名で検索..."
+                            placeholder="問題文、解答、ID、マスタNo、単元名で検索..."
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
                         />

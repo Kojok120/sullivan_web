@@ -13,7 +13,11 @@ export default async function ProblemsPage({
     const params = await searchParams;
     const page = Number(params.page) || 1;
     const query = params.q || '';
-    const sortBy = params.sortBy === 'customId' || params.sortBy === 'createdAt' || params.sortBy === 'updatedAt'
+    const sortBy =
+        params.sortBy === 'masterNumber' ||
+        params.sortBy === 'customId' ||
+        params.sortBy === 'createdAt' ||
+        params.sortBy === 'updatedAt'
         ? params.sortBy
         : 'updatedAt';
     const sortOrder = params.sortOrder === 'asc' ? 'asc' : 'desc';

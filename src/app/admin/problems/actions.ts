@@ -104,6 +104,13 @@ function conditionsToPrismaWhere(conditions: FilterCondition[]): Prisma.ProblemW
                         }
                     },
                 ];
+                // 数値のみの検索語はマスタNo（masterNumber）一致検索にも使う
+                if (/^\d+$/.test(cond.value)) {
+                    const parsedMasterNumber = Number.parseInt(cond.value, 10);
+                    if (Number.isSafeInteger(parsedMasterNumber)) {
+                        where.OR.push({ masterNumber: parsedMasterNumber });
+                    }
+                }
                 break;
         }
     }
