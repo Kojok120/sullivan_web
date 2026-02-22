@@ -344,7 +344,6 @@ export type LearningSession = {
     groupId: string;
     date: Date;
     subjectName: string;
-    coreProblemName: string;
     totalProblems: number;
     correctCount: number;
     hasUnread: boolean;
@@ -358,7 +357,6 @@ export async function getLearningSessions(userId: string, limit = 10, offset = 0
         groupId: string;
         date: Date;
         subjectName: string | null;
-        coreProblemName: string | null;
         total: bigint;
         correct: bigint;
         unreadCount: bigint;
@@ -387,12 +385,11 @@ export async function getLearningSessions(userId: string, limit = 10, offset = 0
         session_label AS (
             SELECT
                 sa."groupId",
-                s.name as "subjectName",
-                cp.name as "coreProblemName"
+                s.name as "subjectName"
             FROM session_agg sa
             JOIN "LearningHistory" first_lh ON first_lh.id = sa."firstHistoryId"
             LEFT JOIN LATERAL (
-                SELECT cp2.id, cp2.name, cp2."subjectId"
+                SELECT cp2."subjectId"
                 FROM "_CoreProblemToProblem" cpp
                 JOIN "CoreProblem" cp2 ON cp2.id = cpp."A"
                 WHERE cpp."B" = first_lh."problemId"
@@ -405,7 +402,6 @@ export async function getLearningSessions(userId: string, limit = 10, offset = 0
             sa."groupId",
             sa."date",
             sl."subjectName",
-            sl."coreProblemName",
             sa."total",
             sa."correct",
             sa."unreadCount",
@@ -422,7 +418,6 @@ export async function getLearningSessions(userId: string, limit = 10, offset = 0
         groupId: s.groupId,
         date: s.date,
         subjectName: s.subjectName || "不明な教科",
-        coreProblemName: s.coreProblemName || "不明な単元",
         totalProblems: Number(s.total),
         correctCount: Number(s.correct),
         hasUnread: Number(s.unreadCount) > 0,

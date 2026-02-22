@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from "react";
 import YouTube, { YouTubeEvent } from "react-youtube";
-import { ArrowRight, RotateCcw } from "lucide-react";
+import { Loader2, RotateCcw, SkipForward, X } from "lucide-react";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
     DialogContent,
     DialogDescription,
-    DialogFooter,
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
@@ -114,12 +114,7 @@ function FullScreenVideoPlayerContent({
         stopTracking();
         onVideoEnd?.(currentVideo, currentIndex);
 
-        if (!isLastVideo) {
-            moveNext();
-            return;
-        }
-
-        if (autoCloseOnLastVideoEnd) {
+        if (autoCloseOnLastVideoEnd && isLastVideo) {
             closePlayer();
         }
     };
@@ -171,8 +166,46 @@ function FullScreenVideoPlayerContent({
                 )}
                 <div className="absolute bottom-0 right-0 w-40 h-16 z-[5]" style={{ pointerEvents: "auto" }} />
                 {videoEnded && (
-                    <div className="absolute inset-0 z-[6] bg-black flex items-center justify-center">
-                        <div className="text-white/60 text-lg">動画の再生が完了しました</div>
+                    <div className="absolute inset-0 z-[6] bg-black">
+                        {showButton ? (
+                            <>
+                                <Button
+                                    type="button"
+                                    onClick={replayCurrentVideo}
+                                    aria-label="もう一度再生"
+                                    title="もう一度再生"
+                                    className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-20 w-20 rounded-full bg-white/90 text-black hover:bg-white transition-colors flex items-center justify-center shadow-lg"
+                                >
+                                    <RotateCcw className="h-9 w-9" />
+                                </Button>
+                                <Button
+                                    type="button"
+                                    onClick={!isLastVideo && showNextButton ? moveNext : closePlayer}
+                                    aria-label={!isLastVideo && showNextButton ? nextButtonLabel : closeButtonLabel}
+                                    title={!isLastVideo && showNextButton ? nextButtonLabel : closeButtonLabel}
+                                    className="absolute bottom-8 right-8 h-14 w-14 rounded-full bg-white/90 text-black hover:bg-white transition-colors flex items-center justify-center shadow-lg"
+                                >
+                                    {!isLastVideo && showNextButton ? (
+                                        <SkipForward className="h-7 w-7" />
+                                    ) : (
+                                        <X className="h-7 w-7" />
+                                    )}
+                                </Button>
+                            </>
+                        ) : (
+                            <div
+                                aria-live="polite"
+                                aria-label="操作を表示しています"
+                                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center"
+                            >
+                                <motion.div
+                                    animate={{ rotate: 360 }}
+                                    transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                                >
+                                    <Loader2 className="h-8 w-8 text-white/90" />
+                                </motion.div>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
@@ -205,33 +238,6 @@ function FullScreenVideoPlayerContent({
                     ))}
                 </div>
             )}
-
-            <DialogFooter className="absolute bottom-10 right-10 z-10">
-                {showButton ? (
-                    isLastVideo ? (
-                        <div className="flex items-center gap-2">
-                            <Button variant="secondary" onClick={replayCurrentVideo} className="bg-white/90 hover:bg-white text-black">
-                                もう一度再生
-                            </Button>
-                            <Button variant="secondary" onClick={closePlayer} className="bg-white/90 hover:bg-white text-black">
-                                {closeButtonLabel}
-                            </Button>
-                        </div>
-                    ) : showNextButton ? (
-                        <Button
-                            variant="default"
-                            onClick={moveNext}
-                            className="bg-white text-black hover:bg-gray-200 gap-2"
-                        >
-                            {nextButtonLabel} <ArrowRight className="h-4 w-4" />
-                        </Button>
-                    ) : null
-                ) : (
-                    <div className="text-white/70 text-sm bg-black/50 px-4 py-2 rounded-lg">
-                        動画を最後まで視聴してください
-                    </div>
-                )}
-            </DialogFooter>
         </DialogContent>
     );
 }

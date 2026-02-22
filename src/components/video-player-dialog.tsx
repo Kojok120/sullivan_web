@@ -94,14 +94,6 @@ export function VideoPlayerDialog({
                 playlist={playerPlaylist}
                 initialIndex={initialIndex !== -1 ? initialIndex : 0}
                 onVideoEnd={handleVideoEnd}
-                // When "Next" is clicked in the player, we should probably mark the *previous* one as watched too, 
-                // but handleVideoEnd handles that automatically if auto-advance triggers it.
-                // However, if user clicks "Next" manually before end, we might want to mark current as watched?
-                // The original logic marked it on 'next'.
-                onNext={(currentIndex) => {
-                    const current = playerPlaylist[currentIndex];
-                    if (current.id) handleMarkWatched(current.id);
-                }}
             />
         </>
     );
