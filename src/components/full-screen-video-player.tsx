@@ -191,8 +191,7 @@ function FullScreenVideoPlayerContent({
                                     )}
                                 </Button>
                             </>
-                        ) : null}
-                        {videoEnded && !showButton && (
+                        ) : (
                             <div
                                 aria-live="polite"
                                 aria-label="操作を表示しています"
