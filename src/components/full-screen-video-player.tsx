@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import YouTube, { YouTubeEvent } from "react-youtube";
-import { RotateCcw, SkipForward, X } from "lucide-react";
+import { Loader2, RotateCcw, SkipForward, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -113,7 +113,7 @@ function FullScreenVideoPlayerContent({
         stopTracking();
         onVideoEnd?.(currentVideo, currentIndex);
 
-        if (autoCloseOnLastVideoEnd) {
+        if (autoCloseOnLastVideoEnd && isLastVideo) {
             closePlayer();
         }
     };
@@ -168,7 +168,7 @@ function FullScreenVideoPlayerContent({
                     <div className="absolute inset-0 z-[6] bg-black">
                         {showButton ? (
                             <>
-                                <button
+                                <Button
                                     type="button"
                                     onClick={replayCurrentVideo}
                                     aria-label="もう一度再生"
@@ -176,8 +176,8 @@ function FullScreenVideoPlayerContent({
                                     className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-20 w-20 rounded-full bg-white/90 text-black hover:bg-white transition-colors flex items-center justify-center shadow-lg"
                                 >
                                     <RotateCcw className="h-9 w-9" />
-                                </button>
-                                <button
+                                </Button>
+                                <Button
                                     type="button"
                                     onClick={!isLastVideo && showNextButton ? moveNext : closePlayer}
                                     aria-label={!isLastVideo && showNextButton ? nextButtonLabel : closeButtonLabel}
@@ -189,9 +189,18 @@ function FullScreenVideoPlayerContent({
                                     ) : (
                                         <X className="h-7 w-7" />
                                     )}
-                                </button>
+                                </Button>
                             </>
                         ) : null}
+                        {videoEnded && !showButton && (
+                            <div
+                                aria-live="polite"
+                                aria-label="操作を表示しています"
+                                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center"
+                            >
+                                <Loader2 className="h-8 w-8 text-white/90 animate-spin" />
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
