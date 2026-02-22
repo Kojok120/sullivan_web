@@ -138,9 +138,6 @@ export function SessionListClient({ initialSessions, userId, basePath }: Session
                                                 <Badge className="bg-orange-500 hover:bg-orange-600 text-[10px] h-5 px-1.5">NEW</Badge>
                                             )}
                                         </div>
-                                        <div className="text-md font-medium text-foreground/90 mt-0.5">
-                                            {session.coreProblemName}
-                                        </div>
                                         <div className="text-sm text-muted-foreground mt-1">
                                             <DateDisplay date={session.date} showTime />
                                         </div>
