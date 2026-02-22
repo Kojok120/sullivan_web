@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import YouTube, { YouTubeEvent } from "react-youtube";
 import { Loader2, RotateCcw, SkipForward, X } from "lucide-react";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -197,7 +198,12 @@ function FullScreenVideoPlayerContent({
                                 aria-label="操作を表示しています"
                                 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center"
                             >
-                                <Loader2 className="h-8 w-8 text-white/90 animate-spin" />
+                                <motion.div
+                                    animate={{ rotate: 360 }}
+                                    transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                                >
+                                    <Loader2 className="h-8 w-8 text-white/90" />
+                                </motion.div>
                             </div>
                         )}
                     </div>
