@@ -1,6 +1,7 @@
 import { getSession, isTeacherOrAdmin } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { SessionDetail } from "@/components/history/session-detail";
+import { canAccessUserWithinClassroomScope } from '@/lib/authorization';
 
 export default async function TeacherSessionDetailsPage({
     params
@@ -11,6 +12,16 @@ export default async function TeacherSessionDetailsPage({
     if (!isTeacherOrAdmin(session)) redirect('/login');
 
     const { userId, groupId } = await params;
+    if (session.role !== 'ADMIN') {
+        const canAccess = await canAccessUserWithinClassroomScope({
+            actorUserId: session.userId,
+            actorRole: session.role,
+            targetUserId: userId,
+        });
+        if (!canAccess) {
+            redirect('/teacher');
+        }
+    }
 
     return (
         <SessionDetail

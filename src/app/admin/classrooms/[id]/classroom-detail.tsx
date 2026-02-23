@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Trash2, Plus, Users, ArrowLeft, Save } from 'lucide-react';
 import { toast } from 'sonner';
-import { updateClassroomGroups } from '../actions';
+import { updateClassroomGroups, updateClassroomPlan } from '../actions';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -19,12 +19,28 @@ import {
 } from '@/components/ui/table';
 import { RoleBadge } from '@/components/ui/role-badge';
 import type { ClassroomWithUsers } from '@/lib/types/classroom';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 
-export function ClassroomDetail({ classroom }: { classroom: ClassroomWithUsers }) {
+export function ClassroomDetail({
+    classroom,
+    canEditPlan,
+}: {
+    classroom: ClassroomWithUsers;
+    canEditPlan: boolean;
+}) {
     const router = useRouter();
     const [groups, setGroups] = useState<string[]>(classroom.groups || []);
     const [newGroup, setNewGroup] = useState('');
     const [isSaving, setIsSaving] = useState(false);
+    const [plan, setPlan] = useState<'STANDARD' | 'PREMIUM'>(classroom.plan);
+    const [isPlanSaving, setIsPlanSaving] = useState(false);
 
     async function handleSaveGroups() {
         setIsSaving(true);
@@ -35,6 +51,19 @@ export function ClassroomDetail({ classroom }: { classroom: ClassroomWithUsers }
             toast.error(result.error);
         } else {
             toast.success('グループを更新しました');
+            router.refresh();
+        }
+    }
+
+    async function handleSavePlan() {
+        setIsPlanSaving(true);
+        const result = await updateClassroomPlan(classroom.id, plan);
+        setIsPlanSaving(false);
+
+        if (result.error) {
+            toast.error(result.error);
+        } else {
+            toast.success('プランを更新しました');
             router.refresh();
         }
     }
@@ -77,6 +106,39 @@ export function ClassroomDetail({ classroom }: { classroom: ClassroomWithUsers }
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
+                        <div className="space-y-2 border rounded-md p-3 bg-muted/30">
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium">教室プラン</span>
+                                <Badge variant={plan === 'PREMIUM' ? 'default' : 'secondary'}>
+                                    {plan === 'PREMIUM' ? 'プレミアム' : 'スタンダード'}
+                                </Badge>
+                            </div>
+                            <Select
+                                value={plan}
+                                onValueChange={(value: 'STANDARD' | 'PREMIUM') => setPlan(value)}
+                                disabled={!canEditPlan}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="プランを選択" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="STANDARD">スタンダード</SelectItem>
+                                    <SelectItem value="PREMIUM">プレミアム</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            {canEditPlan && (
+                                <Button
+                                    onClick={handleSavePlan}
+                                    disabled={isPlanSaving}
+                                    variant="secondary"
+                                    className="w-full"
+                                >
+                                    <Save className="mr-2 h-4 w-4" />
+                                    プランを保存
+                                </Button>
+                            )}
+                        </div>
+
                         <div className="flex gap-2">
                             <Input
                                 placeholder="新しいグループ名"

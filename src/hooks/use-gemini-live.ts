@@ -58,12 +58,17 @@ function buildReconnectDelay(attempt: number) {
     return Math.min(8_000, base + jitter);
 }
 
-async function fetchLiveSessionToken() {
+async function fetchLiveSessionToken(targetStudentId: string) {
+    if (!targetStudentId) {
+        throw new Error('targetStudentId is required to fetch Live token');
+    }
+
     const response = await fetch('/api/gemini-live/token', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ targetStudentId }),
     });
 
     if (!response.ok) {
@@ -93,6 +98,7 @@ export function useGeminiLive() {
     const setupTimeoutRef = useRef<number | null>(null);
     const isSetupCompleteRef = useRef(false);
     const initialContextRef = useRef<string>('');
+    const targetStudentIdRef = useRef<string>('');
     const resumeHandleRef = useRef<string | null>(null);
     const talkingTimerRef = useRef<number | null>(null);
     const openSocketRef = useRef<((options: { allowReconnect: boolean }) => Promise<void>) | null>(null);
@@ -174,7 +180,7 @@ export function useGeminiLive() {
 
         setConnectionState('connecting');
 
-        const token = await fetchLiveSessionToken();
+        const token = await fetchLiveSessionToken(targetStudentIdRef.current);
         if (manualDisconnectRef.current) {
             setConnectionState('disconnected');
             return;
@@ -368,7 +374,7 @@ export function useGeminiLive() {
         });
     }, []);
 
-    const connect = useCallback(async (initialContext?: string) => {
+    const connect = useCallback(async (initialContext?: string, targetStudentId?: string) => {
         if (
             wsRef.current?.readyState === WebSocket.OPEN
             || wsRef.current?.readyState === WebSocket.CONNECTING
@@ -380,8 +386,13 @@ export function useGeminiLive() {
         reconnectAttemptRef.current = 0;
         resumeHandleRef.current = null;
         initialContextRef.current = typeof initialContext === 'string' ? initialContext : '';
+        targetStudentIdRef.current = typeof targetStudentId === 'string' ? targetStudentId.trim() : '';
         isMicMutedRef.current = false;
         setIsMicMuted(false);
+
+        if (!targetStudentIdRef.current) {
+            throw new Error('targetStudentId is required');
+        }
 
         ensureAudioStreamer();
 
@@ -409,6 +420,7 @@ export function useGeminiLive() {
         audioStreamerRef.current = null;
 
         resumeHandleRef.current = null;
+        targetStudentIdRef.current = '';
         reconnectAttemptRef.current = 0;
         isSetupCompleteRef.current = false;
         isMicMutedRef.current = false;

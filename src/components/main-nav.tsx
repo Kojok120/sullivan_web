@@ -10,6 +10,7 @@ import { logoutAction } from "@/app/actions";
 
 export function MainNav({ role }: { role?: string }) {
     const pathname = usePathname();
+    const isTeacherRole = role === 'TEACHER' || role === 'HEAD_TEACHER';
 
     // Do not render on admin pages or login/signup pages
     if (pathname.startsWith("/admin") || pathname.startsWith("/login") || pathname.startsWith("/signup")) {
@@ -20,7 +21,7 @@ export function MainNav({ role }: { role?: string }) {
         <header className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
             <div className="container flex h-14 items-center justify-between">
                 <div className="flex items-center gap-6">
-                    <Link href={role === 'TEACHER' ? "/teacher" : "/"} className="flex items-center space-x-2">
+                    <Link href={isTeacherRole ? "/teacher" : "/"} className="flex items-center space-x-2">
                         <div className="relative h-10 w-40">
                             <Image
                                 src={SullivanLogo}
@@ -33,7 +34,7 @@ export function MainNav({ role }: { role?: string }) {
                         </div>
                     </Link>
                     <nav className="flex items-center gap-4 text-sm font-medium">
-                        {role !== 'TEACHER' && (
+                        {!isTeacherRole && (
                             <>
                                 <Link
                                     href="/"
@@ -61,7 +62,7 @@ export function MainNav({ role }: { role?: string }) {
                                 </Link>
                             </>
                         )}
-                        {(role === 'TEACHER' || role === 'ADMIN') && (
+                        {(isTeacherRole || role === 'ADMIN') && (
                             <Link
                                 href="/teacher"
                                 className={pathname.startsWith("/teacher") ? "text-foreground" : "text-foreground/60 transition-colors hover:text-foreground"}

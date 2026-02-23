@@ -40,17 +40,19 @@ interface UserFormDialogProps {
 type UserFormState = {
     name: string;
     role: Role;
-    password: string;
     groupId: string;
     classroomId: string;
 };
+
+function requiresClassroom(role: Role) {
+    return role === 'STUDENT' || role === 'TEACHER' || role === 'HEAD_TEACHER';
+}
 
 function createInitialFormState(mode: 'create' | 'edit', user?: UserWithGroup | null): UserFormState {
     if (mode === 'edit' && user) {
         return {
             name: user.name || '',
             role: user.role,
-            password: '',
             groupId: user.group || NONE_SELECTION_VALUE,
             classroomId: user.classroomId || NONE_SELECTION_VALUE,
         };
@@ -59,7 +61,6 @@ function createInitialFormState(mode: 'create' | 'edit', user?: UserWithGroup | 
     return {
         name: '',
         role: 'STUDENT',
-        password: '',
         groupId: NONE_SELECTION_VALUE,
         classroomId: NONE_SELECTION_VALUE,
     };
@@ -81,12 +82,17 @@ function UserFormDialogContent({
             let result;
             const normalizedGroup = normalizeOptionalSelection(formData.groupId);
             const normalizedClassroom = normalizeOptionalSelection(formData.classroomId);
+            const classroomRequired = requiresClassroom(formData.role);
+
+            if (classroomRequired && !normalizedClassroom) {
+                alert('この役割では教室選択が必須です');
+                return;
+            }
 
             if (mode === 'create') {
                 result = await createUser({
                     name: formData.name,
                     role: formData.role,
-                    password: formData.password || undefined,
                     group: normalizedGroup,
                     classroomId: normalizedClassroom,
                 });
@@ -145,21 +151,19 @@ function UserFormDialogContent({
                         <SelectContent>
                             <SelectItem value="STUDENT">生徒 (Student)</SelectItem>
                             <SelectItem value="TEACHER">講師 (Teacher)</SelectItem>
+                            <SelectItem value="HEAD_TEACHER">校舎長 (Head Teacher)</SelectItem>
                             <SelectItem value="PARENT">保護者 (Parent)</SelectItem>
                             <SelectItem value="ADMIN">管理者 (Admin)</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="password" className="text-right">パスワード</Label>
-                    <Input
-                        id="password"
-                        type="password"
-                        placeholder={isEdit ? "変更しない場合は空欄" : "未入力で 'password123'"}
-                        value={formData.password}
-                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                        className="col-span-3"
-                    />
+                    <Label className="text-right">初期パスワード</Label>
+                    <div className="col-span-3 text-sm text-muted-foreground">
+                        {isEdit ? 'パスワード変更は「パスワード変更」メニューから実行してください。' : (
+                            <>新規作成時の初期パスワードは <code>password123</code> です（初回変更必須）。</>
+                        )}
+                    </div>
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="classroomId" className="text-right">教室</Label>
@@ -168,7 +172,7 @@ function UserFormDialogContent({
                         onValueChange={(value) => setFormData({ ...formData, classroomId: value })}
                     >
                         <SelectTrigger className="col-span-3">
-                            <SelectValue placeholder="教室を選択 (任意)" />
+                            <SelectValue placeholder={requiresClassroom(formData.role) ? "教室を選択 (必須)" : "教室を選択 (任意)"} />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value={NONE_SELECTION_VALUE}>なし</SelectItem>

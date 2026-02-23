@@ -33,7 +33,7 @@ function toLectureVideosJson(videos?: LectureVideo[]): Prisma.InputJsonValue | u
 
 export async function getCoreProblemsForSubject(subjectId: string) {
     const session = await getSession();
-    if (!session || (session.role !== 'TEACHER' && session.role !== 'ADMIN')) {
+    if (!session || (session.role !== 'TEACHER' && session.role !== 'HEAD_TEACHER' && session.role !== 'ADMIN')) {
         return { error: 'Unauthorized' };
     }
 

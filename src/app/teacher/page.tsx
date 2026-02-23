@@ -8,6 +8,8 @@ import Link from 'next/link';
 import { getStudentsWithStats } from '@/lib/analytics';
 import { Search } from 'lucide-react';
 import { StudentList } from './components/student-list';
+import { prisma } from '@/lib/prisma';
+import { CreateUserDialog } from './components/create-user-dialog';
 
 export default async function TeacherDashboardPage({
     searchParams,
@@ -19,8 +21,22 @@ export default async function TeacherDashboardPage({
 
     const { q: query } = await searchParams;
 
-    // Fetch students with stats in one go
-    const studentStats = await getStudentsWithStats(query);
+    const actor = await prisma.user.findUnique({
+        where: { id: session.userId },
+        select: {
+            classroomId: true,
+            classroom: {
+                select: {
+                    groups: true,
+                },
+            },
+        },
+    });
+    const studentStats = session.role === 'ADMIN'
+        ? await getStudentsWithStats(query, 0, 50)
+        : actor?.classroomId
+            ? await getStudentsWithStats(query, 0, 50, actor.classroomId)
+            : [];
 
     return (
         <div className="container mx-auto py-8 px-4">
@@ -28,7 +44,15 @@ export default async function TeacherDashboardPage({
 
             <Card className="mb-8">
                 <CardHeader>
-                    <CardTitle>生徒検索</CardTitle>
+                    <div className="flex items-center justify-between gap-4">
+                        <CardTitle>生徒検索</CardTitle>
+                        {(session.role === 'TEACHER' || session.role === 'HEAD_TEACHER') && (
+                            <CreateUserDialog
+                                canCreateTeacher={session.role === 'HEAD_TEACHER'}
+                                groups={actor?.classroom?.groups || []}
+                            />
+                        )}
+                    </div>
                 </CardHeader>
                 <CardContent>
                     <form className="flex gap-4">

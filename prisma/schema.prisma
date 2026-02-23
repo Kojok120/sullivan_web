@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
+  provider = "postgresql"
 }
 
 model Subject {
@@ -17,16 +17,16 @@ model Subject {
 }
 
 model CoreProblem {
-  id              String                 @id @default(cuid())
-  name            String
-  subjectId       String
-  subject         Subject                @relation(fields: [subjectId], references: [id])
-  problems        Problem[]
-  userStates      UserCoreProblemState[]
-  order           Int
-  lectureVideos   Json?                  // 講義動画 [{ title: string, url: string }]
-  createdAt       DateTime               @default(now())
-  updatedAt       DateTime               @updatedAt
+  id            String                 @id @default(cuid())
+  name          String
+  subjectId     String
+  subject       Subject                @relation(fields: [subjectId], references: [id])
+  problems      Problem[]
+  userStates    UserCoreProblemState[]
+  order         Int
+  lectureVideos Json? // 講義動画 [{ title: string, url: string }]
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
 }
 
 model Problem {
@@ -35,7 +35,7 @@ model Problem {
   answer          String?
   customId        String?            @unique // Custom ID (e.g., E-1, S-10)
   acceptedAnswers String[]           @default([]) // 許容解答（複数）
-  grade           String?            // 学年 (e.g., "中1", "高2")
+  grade           String? // 学年 (e.g., "中1", "高2")
   masterNumber    Int?               @unique // マスタ内問題番号
   coreProblems    CoreProblem[]
   order           Int // Chain order
@@ -49,8 +49,14 @@ model Problem {
 enum Role {
   STUDENT
   TEACHER
+  HEAD_TEACHER
   PARENT
   ADMIN
+}
+
+enum ClassroomPlan {
+  STANDARD
+  PREMIUM
 }
 
 model User {
@@ -58,28 +64,27 @@ model User {
   loginId   String   @unique // Auto-generated ID (e.g., S0001)
   role      Role     @default(STUDENT)
   name      String?
-  group     String?  // 所属グループ名 (e.g., "月曜")
+  group     String? // 所属グループ名 (e.g., "月曜")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   metadata  Json?
 
-  learningHistory       LearningHistory[]
-  userProblemStates     UserProblemState[]
+  learningHistory   LearningHistory[]
+  userProblemStates UserProblemState[]
 
   userCoreProblemStates UserCoreProblemState[]
 
   // Gamification
-  xp             Int      @default(0)
-  level          Int      @default(1)
-  currentStreak  Int      @default(0)
-  maxStreak      Int      @default(0)
-  lastStudyDate  DateTime?
+  xp            Int       @default(0)
+  level         Int       @default(1)
+  currentStreak Int       @default(0)
+  maxStreak     Int       @default(0)
+  lastStudyDate DateTime?
 
-  achievements   UserAchievement[]
-  dailySummaries DailyLearningSummary[]
-  realtimeEvents RealtimeEvent[]
+  achievements    UserAchievement[]
+  dailySummaries  DailyLearningSummary[]
+  realtimeEvents  RealtimeEvent[]
   surveyResponses SurveyResponse[]
-
 
   // Teacher specific fields
   bio             String? // 生徒プロフィール（部活、志望校など）
@@ -95,12 +100,13 @@ model User {
 }
 
 model Classroom {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  groups    String[] @default([]) // 教室内のグループ（曜日など）
+  id        String        @id @default(cuid())
+  name      String        @unique
+  plan      ClassroomPlan @default(STANDARD)
+  groups    String[]      @default([]) // 教室内のグループ（曜日など）
   users     User[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 }
 
 enum GuidanceType {
@@ -132,10 +138,10 @@ model LearningHistory {
   userAnswer String? // User's text answer
   feedback   String? // AI feedback
   answeredAt DateTime @default(now())
-  
+
   // Grouping & Video Logic
-  groupId        String?   // UUID for batch grouping
-  isVideoWatched Boolean   @default(false)
+  groupId           String? // UUID for batch grouping
+  isVideoWatched    Boolean @default(false)
   isStudentReviewed Boolean @default(false) // New: Has the student reviewed this history?
 }
 
@@ -161,23 +167,23 @@ model UserCoreProblemState {
   priority         Int         @default(0) // ポイント
   isUnlocked       Boolean     @default(false)
   isLectureWatched Boolean     @default(true) // 講義動画視聴済みフラグ（既存データはtrue）
-  lectureWatchedAt DateTime?                  // 視聴完了日時
+  lectureWatchedAt DateTime? // 視聴完了日時
 
   @@unique([userId, coreProblemId])
 }
 
 model Achievement {
-  id          String   @id @default(cuid())
-  slug        String   @unique // e.g., "streak-7"
+  id          String  @id @default(cuid())
+  slug        String  @unique // e.g., "streak-7"
   name        String
   description String
   icon        String
-  xpReward    Int      @default(0)
-  isHidden    Boolean  @default(false)
+  xpReward    Int     @default(0)
+  isHidden    Boolean @default(false)
 
-  users       UserAchievement[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  users     UserAchievement[]
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
 }
 
 model UserAchievement {
@@ -193,11 +199,11 @@ model UserAchievement {
 }
 
 model DailyLearningSummary {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  date        DateTime // YYYY-MM-DD 00:00:00
-  count       Int      @default(0)
+  id     String   @id @default(cuid())
+  userId String
+  user   User     @relation(fields: [userId], references: [id])
+  date   DateTime // YYYY-MM-DD 00:00:00
+  count  Int      @default(0)
 
   @@unique([userId, date])
 }
@@ -254,8 +260,8 @@ model SurveyResponse {
   userId     String
   user       User     @relation(fields: [userId], references: [id])
   answeredAt DateTime @default(now())
-  details    Json     // 詳細な回答データ
-  scores     Json     // カテゴリごとのスコア
+  details    Json // 詳細な回答データ
+  scores     Json // カテゴリごとのスコア
 
   @@index([userId, answeredAt(sort: Desc)])
 }

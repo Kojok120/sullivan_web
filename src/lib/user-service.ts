@@ -13,7 +13,14 @@ export async function createUser({
     classroomId?: string;
 }) {
     // Generate Login ID (S0001, T0001, etc.)
-    const prefix = role === 'STUDENT' ? 'S' : role === 'TEACHER' ? 'T' : 'A';
+    const prefix =
+        role === 'STUDENT'
+            ? 'S'
+            : role === 'TEACHER'
+                ? 'T'
+                : role === 'HEAD_TEACHER'
+                    ? 'H'
+                    : 'A';
 
     // Find the last user with this prefix to increment ID
     const lastUser = await prisma.user.findFirst({
@@ -43,4 +50,3 @@ export async function createUser({
 
     return user;
 }
-

@@ -108,12 +108,18 @@ async function fetchInternalStudentStats(userIds: string[]): Promise<Map<string,
 
 }
 
-export async function getStudentsWithStats(query?: string, skip = 0, take = 50) {
+export async function getStudentsWithStats(
+    query?: string,
+    skip = 0,
+    take = 50,
+    classroomId?: string | null
+) {
     const students = await prisma.user.findMany({
         skip,
         take,
         where: {
             role: 'STUDENT',
+            classroomId: classroomId ?? undefined,
             OR: query ? [
                 { name: { contains: query, mode: 'insensitive' } },
                 { loginId: { contains: query, mode: 'insensitive' } },

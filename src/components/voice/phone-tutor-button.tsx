@@ -8,6 +8,7 @@ import { CallOverlay } from '@/components/voice/call-overlay';
 import { toast } from 'sonner';
 
 type PhoneTutorButtonProps = {
+    targetStudentId: string;
     problemContext: {
         question: string;
         answer?: string;
@@ -17,7 +18,7 @@ type PhoneTutorButtonProps = {
     systemPrompt: string;
 };
 
-export function PhoneTutorButton({ problemContext, systemPrompt }: PhoneTutorButtonProps) {
+export function PhoneTutorButton({ targetStudentId, problemContext, systemPrompt }: PhoneTutorButtonProps) {
     const { connect, disconnect, connectionState, isTalking, isMicMuted, toggleMic } = useGeminiLive();
     const [isOverlayOpen, setIsOverlayOpen] = useState(false);
 
@@ -43,7 +44,7 @@ ${systemPrompt}
 `;
 
         setIsOverlayOpen(true);
-        void connect(initialContext).catch((error) => {
+        void connect(initialContext, targetStudentId).catch((error) => {
             console.error('[PhoneTutorButton] Failed to connect:', error);
             toast.error('通話の開始に失敗しました');
             setIsOverlayOpen(false);

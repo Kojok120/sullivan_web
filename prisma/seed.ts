@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { PrismaClient, Role } from '@prisma/client';
+import { PrismaClient, Role, ClassroomPlan } from '@prisma/client';
 import { createClient } from '@supabase/supabase-js';
 
 const prisma = new PrismaClient();
@@ -123,8 +123,8 @@ async function ensureSupabaseAuthUser(prismaUser: {
 async function seedUsers() {
   const classroom = await prisma.classroom.upsert({
     where: { name: 'デモ教室' },
-    update: { groups: ['月曜', '水曜'] },
-    create: { name: 'デモ教室', groups: ['月曜', '水曜'] },
+    update: { groups: ['月曜', '水曜'], plan: ClassroomPlan.STANDARD },
+    create: { name: 'デモ教室', groups: ['月曜', '水曜'], plan: ClassroomPlan.STANDARD },
   });
 
   const users: SeedUser[] = [
@@ -139,6 +139,12 @@ async function seedUsers() {
       loginId: 'T0001',
       name: 'Test Teacher',
       role: Role.TEACHER,
+      classroomId: classroom.id,
+    },
+    {
+      loginId: 'H0001',
+      name: 'Test Head Teacher',
+      role: Role.HEAD_TEACHER,
       classroomId: classroom.id,
     },
     {

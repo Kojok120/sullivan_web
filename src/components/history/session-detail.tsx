@@ -13,6 +13,8 @@ import { PhoneTutorButton } from "@/components/voice/phone-tutor-button";
 import { ChatTutorButton } from "@/components/voice/chat-tutor-button";
 import { checkSurveyEligibility } from "@/actions/survey";
 import { SurveyModal } from "@/components/survey/SurveyModal";
+import { prisma } from "@/lib/prisma";
+import { canUseAiTutor } from "@/lib/plan-entitlements";
 
 type SessionDetailProps = {
     groupId: string;
@@ -42,6 +44,18 @@ export async function SessionDetail({
     if (!isTeacherView) {
         showSurvey = await checkSurveyEligibility(userId);
     }
+
+    const targetStudent = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+            classroom: {
+                select: {
+                    plan: true,
+                },
+            },
+        },
+    });
+    const canUseAiTutorFeatures = canUseAiTutor(targetStudent?.classroom?.plan);
 
     const promptPath = path.join(process.cwd(), 'src/prompts/phone-tutor.md');
     const systemPrompt = fs.readFileSync(promptPath, 'utf-8');
@@ -99,26 +113,30 @@ export async function SessionDetail({
                                         {item.problem.question}
                                     </CardTitle>
                                 </div>
-                                <div className="flex items-center gap-1">
-                                    <ChatTutorButton
-                                        problemContext={{
-                                            question: item.problem.question,
-                                            answer: item.problem.answer || '',
-                                            userAnswer: item.userAnswer || '',
-                                            explanation: item.feedback || ''
-                                        }}
-                                        systemPrompt={chatSystemPrompt}
-                                    />
-                                    <PhoneTutorButton
-                                        problemContext={{
-                                            question: item.problem.question,
-                                            answer: item.problem.answer || '',
-                                            userAnswer: item.userAnswer || '',
-                                            explanation: item.feedback || ''
-                                        }}
-                                        systemPrompt={systemPrompt}
-                                    />
-                                </div>
+                                {canUseAiTutorFeatures && (
+                                    <div className="flex items-center gap-1">
+                                        <ChatTutorButton
+                                            targetStudentId={userId}
+                                            problemContext={{
+                                                question: item.problem.question,
+                                                answer: item.problem.answer || '',
+                                                userAnswer: item.userAnswer || '',
+                                                explanation: item.feedback || ''
+                                            }}
+                                            systemPrompt={chatSystemPrompt}
+                                        />
+                                        <PhoneTutorButton
+                                            targetStudentId={userId}
+                                            problemContext={{
+                                                question: item.problem.question,
+                                                answer: item.problem.answer || '',
+                                                userAnswer: item.userAnswer || '',
+                                                explanation: item.feedback || ''
+                                            }}
+                                            systemPrompt={systemPrompt}
+                                        />
+                                    </div>
+                                )}
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm bg-muted/30 p-4 rounded-md">

@@ -20,6 +20,7 @@ import { createClassroom, deleteClassroom } from './actions';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import type { ClassroomWithGroups } from '@/lib/types/classroom';
+import { Badge } from '@/components/ui/badge';
 
 type Classroom = ClassroomWithGroups & {
     createdAt: Date;
@@ -150,7 +151,12 @@ export function ClassroomList({ initialClassrooms, searchQuery }: ClassroomListP
                                         className="flex items-center justify-between p-4 bg-muted/50 rounded-md hover:bg-muted/80 transition-colors"
                                     >
                                         <Link href={`/admin/classrooms/${classroom.id}`} className="flex-1">
-                                            <div className="font-medium hover:underline">{classroom.name}</div>
+                                            <div className="font-medium hover:underline flex items-center gap-2">
+                                                {classroom.name}
+                                                <Badge variant={classroom.plan === 'PREMIUM' ? 'default' : 'secondary'}>
+                                                    {classroom.plan === 'PREMIUM' ? 'プレミアム' : 'スタンダード'}
+                                                </Badge>
+                                            </div>
                                             <div className="text-sm text-muted-foreground mt-1">
                                                 {(classroom.groups || []).length > 0 ? (
                                                     <div className="flex flex-wrap gap-1">

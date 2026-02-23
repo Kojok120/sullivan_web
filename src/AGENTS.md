@@ -42,4 +42,4 @@ src/
 - `src/lib/auth.ts` の `getCurrentUser()` でセッション取得
 - `src/middleware.ts` でルート保護とセッション更新
 - Supabase Auth (SSR) — `@supabase/ssr` を使用
-- ロール: STUDENT, TEACHER, PARENT, ADMIN
+- ロール: STUDENT, TEACHER, HEAD_TEACHER, PARENT, ADMIN

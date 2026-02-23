@@ -15,6 +15,7 @@ import { GuidanceList } from './guidance-list';
 import { PrintProblemCard } from './print-problem-card';
 import { DateDisplay } from '@/components/ui/date-display';
 import { SessionList } from '@/app/dashboard/components/session-list';
+import { canAccessUserWithinClassroomScope } from '@/lib/authorization';
 
 export default async function TeacherStudentDetailPage({
     params,
@@ -27,6 +28,16 @@ export default async function TeacherStudentDetailPage({
     if (!isTeacherOrAdmin(session)) redirect('/login');
 
     const { userId } = await params;
+    if (session.role !== 'ADMIN') {
+        const canAccess = await canAccessUserWithinClassroomScope({
+            actorUserId: session.userId,
+            actorRole: session.role,
+            targetUserId: userId,
+        });
+        if (!canAccess) {
+            redirect('/teacher');
+        }
+    }
     const query = await searchParams;
     const defaultTab = (typeof query.tab === 'string' && ['overview', 'history', 'profile'].includes(query.tab)) ? query.tab : 'overview';
 

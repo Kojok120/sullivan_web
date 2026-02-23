@@ -204,6 +204,7 @@ export function UserList({
                                 <SelectItem value="ALL">全ての役割</SelectItem>
                                 <SelectItem value="STUDENT">生徒</SelectItem>
                                 <SelectItem value="TEACHER">講師</SelectItem>
+                                <SelectItem value="HEAD_TEACHER">校舎長</SelectItem>
                                 <SelectItem value="PARENT">保護者</SelectItem>
                                 <SelectItem value="ADMIN">管理者</SelectItem>
                             </SelectContent>

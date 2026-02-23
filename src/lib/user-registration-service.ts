@@ -3,7 +3,8 @@ import { Role } from '@prisma/client';
 import { createOrUpdateSupabaseUser, deleteSupabaseUserByLookup } from '@/lib/auth-admin';
 import { createUser as createPrismaUser } from '@/lib/user-service';
 import { ensureInitialCoreProblemStates } from '@/lib/core-problem-entry-state';
-import crypto from 'crypto';
+
+export const DEFAULT_INITIAL_PASSWORD = 'password123';
 
 export interface RegisterUserParams {
     name: string;
@@ -45,8 +46,10 @@ export async function registerUser({
         }
     }
 
-    // 1. パスワードを決定（crypto.randomBytesを使用）
-    const finalPassword = password || crypto.randomBytes(8).toString('base64url').slice(0, 12);
+    // 1. 初期パスワードは運用要件に合わせて固定値を使用
+    // 引数 password が渡された場合も、初期値は統一する。
+    void password;
+    const finalPassword = DEFAULT_INITIAL_PASSWORD;
 
     // 2. Prismaにユーザーを作成
     let user;
