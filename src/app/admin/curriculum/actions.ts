@@ -8,19 +8,9 @@ import { requireAdmin, getSession } from '@/lib/auth';
 import type { LectureVideo } from '@/lib/lecture-videos';
 
 // --- Subjects ---
-export async function getSubjects(options?: { normalizeCoreProblemSequence?: boolean }) {
+export async function getSubjects() {
     await requireAdmin();
     try {
-        if (options?.normalizeCoreProblemSequence) {
-            const subjects = await prisma.subject.findMany({
-                select: { id: true },
-                orderBy: { order: 'asc' },
-            });
-            for (const subject of subjects) {
-                await resequenceCoreProblemsForSubject(subject.id);
-            }
-        }
-
         const { fetchSubjects } = await import('@/lib/curriculum-service');
         // Updated fetchSubjects should handle includeCoreProblems correctly without Units
         const subjects = await fetchSubjects({ includeCoreProblems: true });
@@ -408,7 +398,7 @@ export async function bulkCreateCoreProblems(subjectId: string, items: {
             maxOrder = Math.max(maxOrder, coreProblem.order);
         }
 
-        const operations: Prisma.PrismaPromise<unknown>[] = [];
+        const operations: Array<(tx: Prisma.TransactionClient) => Promise<unknown>> = [];
         const usedExistingIds = new Set<string>();
 
         for (const item of validItems) {
@@ -429,8 +419,8 @@ export async function bulkCreateCoreProblems(subjectId: string, items: {
 
             if (!target) {
                 maxOrder += 1;
-                operations.push(
-                    prisma.coreProblem.create({
+                operations.push((tx) =>
+                    tx.coreProblem.create({
                         data: {
                             subjectId,
                             name: item.name,
@@ -456,8 +446,8 @@ export async function bulkCreateCoreProblems(subjectId: string, items: {
                 continue;
             }
 
-            operations.push(
-                prisma.coreProblem.update({
+            operations.push((tx) =>
+                tx.coreProblem.update({
                     where: { id: target.id },
                     data: {
                         name: item.name,
@@ -473,8 +463,12 @@ export async function bulkCreateCoreProblems(subjectId: string, items: {
         }
 
         if (operations.length > 0) {
-            await prisma.$transaction(operations);
-            await resequenceCoreProblemsForSubject(subjectId);
+            await prisma.$transaction(async (tx) => {
+                for (const execute of operations) {
+                    await execute(tx);
+                }
+                await resequenceCoreProblemsInTransaction(subjectId, tx);
+            });
         }
 
         revalidatePath('/admin/curriculum');

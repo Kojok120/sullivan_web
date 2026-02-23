@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 import type { ClassroomWithGroups, GroupOption } from '@/lib/types/classroom';
+import { DEFAULT_INITIAL_PASSWORD } from '@/lib/auth-constants';
 
 interface RegisterFormProps {
     classrooms: ClassroomWithGroups[];
@@ -63,7 +64,7 @@ export function RegisterForm({ classrooms, allGroups }: RegisterFormProps) {
                             </div>
                             <p className="mb-6 text-sm text-gray-600">
                                 このIDをユーザーに伝えてください。<br />
-                                初期パスワードは <code>password123</code> です（初回ログイン時に変更）。
+                                初期パスワードは <code>{DEFAULT_INITIAL_PASSWORD}</code> です（初回ログイン時に変更）。
                             </p>
                             <div className="flex flex-col gap-3">
                                 <Button
@@ -92,7 +93,7 @@ export function RegisterForm({ classrooms, allGroups }: RegisterFormProps) {
                             </div>
                             <div>
                                 <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
-                                    初期パスワードは <code>password123</code> で固定です（初回ログイン時に変更必須）
+                                    初期パスワードは <code>{DEFAULT_INITIAL_PASSWORD}</code> で固定です（初回ログイン時に変更必須）
                                 </div>
                             </div>
                             <div>

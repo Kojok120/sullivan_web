@@ -90,8 +90,9 @@ async function resolveSubjectIdFromCoreProblems(
         return undefined;
     }
 
-    const coreProblemMap = await fetchCoreProblemMap(coreProblemIds, tx);
-    if (coreProblemMap.size !== coreProblemIds.length) {
+    const uniqueCoreProblemIds = Array.from(new Set(coreProblemIds));
+    const coreProblemMap = await fetchCoreProblemMap(uniqueCoreProblemIds, tx);
+    if (coreProblemMap.size !== uniqueCoreProblemIds.length) {
         throw new Error('存在しないCoreProblemが含まれています');
     }
 

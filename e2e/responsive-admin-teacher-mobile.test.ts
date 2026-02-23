@@ -5,7 +5,7 @@ async function loginAs(page: Page, loginId: string, password: string) {
   await page.locator('input[name="loginId"]').fill(loginId);
   await page.locator('input[name="password"]').fill(password);
   await page.locator('button[type="submit"]').click();
-  await page.waitForTimeout(800);
+  await page.waitForURL((url) => url.pathname !== '/login', { timeout: 3000 }).catch(() => undefined);
 }
 
 async function expectNoGlobalHorizontalScroll(page: Page) {

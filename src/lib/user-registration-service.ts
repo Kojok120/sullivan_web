@@ -3,8 +3,9 @@ import { Role } from '@prisma/client';
 import { createOrUpdateSupabaseUser, deleteSupabaseUserByLookup } from '@/lib/auth-admin';
 import { createUser as createPrismaUser } from '@/lib/user-service';
 import { ensureInitialCoreProblemStates } from '@/lib/core-problem-entry-state';
+import { DEFAULT_INITIAL_PASSWORD } from '@/lib/auth-constants';
 
-export const DEFAULT_INITIAL_PASSWORD = 'password123';
+export { DEFAULT_INITIAL_PASSWORD };
 
 export interface RegisterUserParams {
     name: string;
