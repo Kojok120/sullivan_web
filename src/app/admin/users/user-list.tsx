@@ -47,10 +47,14 @@ import { DateDisplay } from '@/components/ui/date-display';
 import { SortIcon } from '@/components/ui/sort-icon';
 import type { ClassroomOption, GroupOption } from '@/lib/types/classroom';
 
-type UserWithGroup = User; // Group is now just a string field on User
+type UserWithClassroom = User & {
+    classroom?: {
+        name: string;
+    } | null;
+};
 
 interface UserListProps {
-    initialUsers: UserWithGroup[];
+    initialUsers: UserWithClassroom[];
     total: number;
     currentPage: number;
     limit: number;
@@ -58,7 +62,7 @@ interface UserListProps {
     sortBy: string;
     sortOrder: 'asc' | 'desc';
     roleFilter?: Role;
-    groupIdFilter?: string;
+    classroomIdFilter?: string;
     groups: GroupOption[];
     classrooms: ClassroomOption[];
 }
@@ -72,7 +76,7 @@ export function UserList({
     sortBy,
     sortOrder,
     roleFilter,
-    groupIdFilter,
+    classroomIdFilter,
     groups,
     classrooms
 }: UserListProps) {
@@ -83,7 +87,7 @@ export function UserList({
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
     const [isPasswordResetOpen, setIsPasswordResetOpen] = useState(false);
-    const [selectedUser, setSelectedUser] = useState<UserWithGroup | null>(null);
+    const [selectedUser, setSelectedUser] = useState<UserWithClassroom | null>(null);
 
     // Search state
     const [search, setSearch] = useState(searchQuery);
@@ -95,7 +99,7 @@ export function UserList({
         if (sortBy) params.set('sortBy', sortBy);
         if (sortOrder) params.set('sortOrder', sortOrder);
         if (roleFilter) params.set('role', roleFilter);
-        if (groupIdFilter) params.set('groupId', groupIdFilter);
+        if (classroomIdFilter) params.set('classroomId', classroomIdFilter);
 
         Object.entries(updates).forEach(([key, value]) => {
             if (value === undefined || value === '') {
@@ -106,7 +110,7 @@ export function UserList({
         });
 
         // Reset page on filter/search change (except when page is explicitly updated)
-        if (!updates.page && (updates.q !== undefined || updates.role !== undefined || updates.groupId !== undefined)) {
+        if (!updates.page && (updates.q !== undefined || updates.role !== undefined || updates.classroomId !== undefined)) {
             params.set('page', '1');
         }
 
@@ -127,8 +131,8 @@ export function UserList({
         updateParams({ role: role === 'ALL' ? undefined : role });
     };
 
-    const handleGroupFilter = (groupId: string) => {
-        updateParams({ groupId: groupId === 'ALL' ? undefined : groupId });
+    const handleClassroomFilter = (classroomId: string) => {
+        updateParams({ classroomId: classroomId === 'ALL' ? undefined : classroomId });
     };
 
     const handlePageChange = (newPage: number) => {
@@ -149,17 +153,17 @@ export function UserList({
         });
     };
 
-    const openEdit = (user: UserWithGroup) => {
+    const openEdit = (user: UserWithClassroom) => {
         setSelectedUser(user);
         setIsEditOpen(true);
     };
 
-    const openDelete = (user: UserWithGroup) => {
+    const openDelete = (user: UserWithClassroom) => {
         setSelectedUser(user);
         setIsDeleteOpen(true);
     };
 
-    const openPasswordReset = (user: UserWithGroup) => {
+    const openPasswordReset = (user: UserWithClassroom) => {
         setSelectedUser(user);
         setIsPasswordResetOpen(true);
     };
@@ -211,17 +215,17 @@ export function UserList({
                         </Select>
 
                         <Select
-                            value={groupIdFilter || 'ALL'}
-                            onValueChange={handleGroupFilter}
+                            value={classroomIdFilter || 'ALL'}
+                            onValueChange={handleClassroomFilter}
                         >
                             <SelectTrigger className="w-[150px] bg-background">
-                                <SelectValue placeholder="グループ" />
+                                <SelectValue placeholder="教室" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="ALL">全てのグループ</SelectItem>
-                                {groups.map((group) => (
-                                    <SelectItem key={group.id} value={group.id}>
-                                        {group.name}
+                                <SelectItem value="ALL">全ての教室</SelectItem>
+                                {classrooms.map((classroom) => (
+                                    <SelectItem key={classroom.id} value={classroom.id}>
+                                        {classroom.name}
                                     </SelectItem>
                                 ))}
                             </SelectContent>
@@ -252,10 +256,10 @@ export function UserList({
                                     <SortIcon active={sortBy === 'role'} sortOrder={sortOrder} />
                                 </div>
                             </TableHead>
-                            <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('group')}>
+                            <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('classroom')}>
                                 <div className="flex items-center">
-                                    グループ
-                                    <SortIcon active={sortBy === 'group'} sortOrder={sortOrder} />
+                                    教室
+                                    <SortIcon active={sortBy === 'classroom'} sortOrder={sortOrder} />
                                 </div>
                             </TableHead>
                             <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('createdAt')}>
@@ -275,7 +279,7 @@ export function UserList({
                                 <TableCell>
                                     <RoleBadge role={user.role} />
                                 </TableCell>
-                                <TableCell>{user.group || '-'}</TableCell>
+                                <TableCell>{user.classroom?.name || '-'}</TableCell>
                                 <TableCell>
                                     <DateDisplay date={user.createdAt} />
                                 </TableCell>

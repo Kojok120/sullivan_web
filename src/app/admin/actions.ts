@@ -71,7 +71,7 @@ export async function getUsers(
     sortBy: string = 'createdAt',
     sortOrder: 'asc' | 'desc' = 'desc',
     roleFilter?: Role,
-    groupFilter?: string
+    classroomFilter?: string
 ) {
     await requireAdmin();
     try {
@@ -88,15 +88,15 @@ export async function getUsers(
             where.role = roleFilter;
         }
 
-        if (groupFilter && groupFilter !== 'ALL') {
-            where.group = groupFilter;
+        if (classroomFilter && classroomFilter !== 'ALL') {
+            where.classroomId = classroomFilter;
         }
 
         const skip = (page - 1) * limit;
 
         const orderBy: Prisma.UserOrderByWithRelationInput =
-            sortBy === 'group'
-                ? { group: sortOrder }
+            sortBy === 'classroom'
+                ? { classroom: { name: sortOrder } }
                 : sortBy === 'name'
                     ? { name: sortOrder }
                     : sortBy === 'loginId'
@@ -111,6 +111,13 @@ export async function getUsers(
                 orderBy,
                 skip,
                 take: limit,
+                include: {
+                    classroom: {
+                        select: {
+                            name: true,
+                        },
+                    },
+                },
             }),
             prisma.user.count({ where }),
         ]);

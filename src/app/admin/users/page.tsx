@@ -13,21 +13,23 @@ export default async function UsersPage({
         sortBy?: string;
         sortOrder?: 'asc' | 'desc';
         role?: string;
+        classroomId?: string;
         groupId?: string;
     }>;
 }) {
-    const { q, page, sortBy, sortOrder, role, groupId } = await searchParams;
+    const { q, page, sortBy, sortOrder, role, classroomId, groupId } = await searchParams;
     const currentPage = Number(page) || 1;
     const query = q || '';
     const limit = 50;
     const currentSortBy = sortBy || 'createdAt';
     const currentSortOrder = sortOrder || 'desc';
+    const classroomFilter = classroomId || groupId;
 
     // Validate role
     const roleEnum = (Object.values(Role) as Role[]).find((value) => value === role);
 
     const [usersData, metadataResult] = await Promise.all([
-        getUsers(currentPage, limit, query, currentSortBy, currentSortOrder, roleEnum, groupId),
+        getUsers(currentPage, limit, query, currentSortBy, currentSortOrder, roleEnum, classroomFilter),
         getUserManagementMeta(),
     ]);
 
@@ -66,7 +68,7 @@ export default async function UsersPage({
                         sortBy={currentSortBy}
                         sortOrder={currentSortOrder}
                         roleFilter={roleEnum}
-                        groupIdFilter={groupId}
+                        classroomIdFilter={classroomFilter}
                         groups={groups}
                         classrooms={classrooms}
                     />
