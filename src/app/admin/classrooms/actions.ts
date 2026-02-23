@@ -49,10 +49,13 @@ export async function createClassroom(formData: FormData) {
 
     const name = formData.get('name') as string;
     const groupsStr = formData.get('groups') as string; // Comma separated
+    const planRaw = formData.get('plan');
 
     if (!name || name.trim() === '') {
         return { error: '教室名は必須です' };
     }
+
+    const plan = planRaw === 'PREMIUM' ? ClassroomPlan.PREMIUM : ClassroomPlan.STANDARD;
 
     const groups = groupsStr
         ? groupsStr.split(',').map(g => g.trim()).filter(g => g !== '')
@@ -63,6 +66,7 @@ export async function createClassroom(formData: FormData) {
             data: {
                 name: name.trim(),
                 groups: groups,
+                plan,
             },
         });
         revalidatePath('/admin/classrooms');

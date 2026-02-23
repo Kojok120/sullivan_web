@@ -129,6 +129,28 @@ export function ClassroomList({ initialClassrooms, searchQuery }: ClassroomListP
                                             required
                                         />
                                     </div>
+                                    <div className="grid gap-2">
+                                        <Label>プラン</Label>
+                                        <div className="space-y-2 rounded-md border p-3">
+                                            <label className="flex items-center gap-2 text-sm">
+                                                <input
+                                                    type="radio"
+                                                    name="plan"
+                                                    value="STANDARD"
+                                                    defaultChecked
+                                                />
+                                                <span>スタンダード</span>
+                                            </label>
+                                            <label className="flex items-center gap-2 text-sm">
+                                                <input
+                                                    type="radio"
+                                                    name="plan"
+                                                    value="PREMIUM"
+                                                />
+                                                <span>プレミアム</span>
+                                            </label>
+                                        </div>
+                                    </div>
                                     <DialogFooter>
                                         <Button type="submit" disabled={isCreating}>
                                             {isCreating ? '追加中...' : '追加'}
