@@ -9,6 +9,7 @@ export default async function RegisterUserPage() {
         select: {
             id: true,
             name: true,
+            plan: true,
             groups: true,
         },
         orderBy: { name: 'asc' },
@@ -30,4 +31,3 @@ export default async function RegisterUserPage() {
         />
     );
 }
-

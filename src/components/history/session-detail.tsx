@@ -13,6 +13,8 @@ import { PhoneTutorButton } from "@/components/voice/phone-tutor-button";
 import { ChatTutorButton } from "@/components/voice/chat-tutor-button";
 import { checkSurveyEligibility } from "@/actions/survey";
 import { SurveyModal } from "@/components/survey/SurveyModal";
+import { prisma } from "@/lib/prisma";
+import { canUseAiTutor } from "@/lib/plan-entitlements";
 
 type SessionDetailProps = {
     groupId: string;
@@ -43,6 +45,18 @@ export async function SessionDetail({
         showSurvey = await checkSurveyEligibility(userId);
     }
 
+    const targetStudent = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+            classroom: {
+                select: {
+                    plan: true,
+                },
+            },
+        },
+    });
+    const canUseAiTutorFeatures = canUseAiTutor(targetStudent?.classroom?.plan);
+
     const promptPath = path.join(process.cwd(), 'src/prompts/phone-tutor.md');
     const systemPrompt = fs.readFileSync(promptPath, 'utf-8');
     const chatPromptPath = path.join(process.cwd(), 'src/prompts/chat-tutor.md');
@@ -60,9 +74,9 @@ export async function SessionDetail({
         }));
 
     return (
-        <div className="container mx-auto py-8 px-4 max-w-4xl">
+        <div className="container mx-auto max-w-4xl px-4 py-6 sm:py-8">
             {showSurvey && <SurveyModal userId={userId} />}
-            <div className="mb-6 flex items-center space-x-4">
+            <div className="mb-6 flex items-start gap-3 sm:items-center sm:space-x-4">
                 <Link href={backUrl}>
                     <Button variant="ghost" size="icon">
                         <ArrowLeft className="h-4 w-4" />
@@ -85,7 +99,7 @@ export async function SessionDetail({
 
                     return (
                         <Card key={item.id} className={!isCorrect ? "border-l-4 border-l-red-500" : ""}>
-                            <CardHeader className="flex flex-row items-start justify-between pb-2">
+                            <CardHeader className="flex flex-col gap-3 pb-2 sm:flex-row sm:items-start sm:justify-between">
                                 <div className="space-y-1">
                                     <div className="flex items-center space-x-2">
                                         <Badge variant={isCorrect ? "default" : "destructive"}>
@@ -99,26 +113,30 @@ export async function SessionDetail({
                                         {item.problem.question}
                                     </CardTitle>
                                 </div>
-                                <div className="flex items-center gap-1">
-                                    <ChatTutorButton
-                                        problemContext={{
-                                            question: item.problem.question,
-                                            answer: item.problem.answer || '',
-                                            userAnswer: item.userAnswer || '',
-                                            explanation: item.feedback || ''
-                                        }}
-                                        systemPrompt={chatSystemPrompt}
-                                    />
-                                    <PhoneTutorButton
-                                        problemContext={{
-                                            question: item.problem.question,
-                                            answer: item.problem.answer || '',
-                                            userAnswer: item.userAnswer || '',
-                                            explanation: item.feedback || ''
-                                        }}
-                                        systemPrompt={systemPrompt}
-                                    />
-                                </div>
+                                {canUseAiTutorFeatures && (
+                                    <div className="flex items-center gap-1 pl-2">
+                                        <ChatTutorButton
+                                            targetStudentId={userId}
+                                            problemContext={{
+                                                question: item.problem.question,
+                                                answer: item.problem.answer || '',
+                                                userAnswer: item.userAnswer || '',
+                                                explanation: item.feedback || ''
+                                            }}
+                                            systemPrompt={chatSystemPrompt}
+                                        />
+                                        <PhoneTutorButton
+                                            targetStudentId={userId}
+                                            problemContext={{
+                                                question: item.problem.question,
+                                                answer: item.problem.answer || '',
+                                                userAnswer: item.userAnswer || '',
+                                                explanation: item.feedback || ''
+                                            }}
+                                            systemPrompt={systemPrompt}
+                                        />
+                                    </div>
+                                )}
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm bg-muted/30 p-4 rounded-md">
@@ -147,7 +165,7 @@ export async function SessionDetail({
                                 </div>
 
                                 {/* Video Actions - 講義動画（左）と復習動画（右）*/}
-                                <div className="flex justify-between items-center pt-2">
+                                <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:items-center sm:justify-between">
                                     <div>
                                         {lectureVideos.length > 0 && (
                                             <LectureVideoButton

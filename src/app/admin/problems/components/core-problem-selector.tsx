@@ -15,6 +15,7 @@ type SubjectOption = {
 export type SelectedCoreProblem = {
     id: string;
     name?: string;
+    subjectId?: string;
     subject?: { name: string };
 };
 
@@ -55,7 +56,7 @@ export function CoreProblemSelector({
             if (found) {
                 onChange([
                     ...selected,
-                    { id: found.id, name: found.name, subject: { name: subject.name } }
+                    { id: found.id, name: found.name, subjectId: subject.id, subject: { name: subject.name } }
                 ]);
                 return;
             }

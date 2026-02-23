@@ -27,16 +27,16 @@ export default async function StudentAnalyticsPage({ params }: PageProps) {
 
 
     return (
-        <div className="container mx-auto py-8 px-4">
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold">{student.name || student.loginId} の学習状況</h1>
+        <div className="container mx-auto px-4 py-6 sm:py-8">
+            <div className="mb-6 sm:mb-8">
+                <h1 className="text-2xl font-bold sm:text-3xl">{student.name || student.loginId} の学習状況</h1>
                 <p className="text-muted-foreground">
                     {student.group || 'グループなし'} | {student.role}
                 </p>
             </div>
 
             {/* Stats Cards */}
-            <div className="grid gap-4 md:grid-cols-4 mb-8">
+            <div className="mb-6 grid gap-4 sm:grid-cols-2 md:grid-cols-4 sm:mb-8">
                 <Card>
                     <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">総回答数</CardTitle></CardHeader>
                     <CardContent><div className="text-2xl font-bold">{stats.totalProblemsSolved}</div></CardContent>
@@ -52,9 +52,9 @@ export default async function StudentAnalyticsPage({ params }: PageProps) {
 
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7 mb-8">
+            <div className="mb-6 grid gap-4 md:grid-cols-2 lg:grid-cols-7 sm:mb-8">
                 {/* Activity Chart */}
-                <Card className="col-span-4">
+                <Card className="lg:col-span-4">
                     <CardHeader>
                         <CardTitle>学習アクティビティ (過去30日)</CardTitle>
                     </CardHeader>
@@ -64,7 +64,7 @@ export default async function StudentAnalyticsPage({ params }: PageProps) {
                 </Card>
 
                 {/* Subject Progress */}
-                <Card className="col-span-3">
+                <Card className="lg:col-span-3">
                     <CardHeader>
                         <CardTitle>教科別進捗</CardTitle>
                     </CardHeader>
@@ -84,52 +84,75 @@ export default async function StudentAnalyticsPage({ params }: PageProps) {
                     <CardTitle>最近の学習履歴 (最新50件)</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>日時</TableHead>
-                                <TableHead>科目/単元</TableHead>
-                                <TableHead>問題</TableHead>
-                                <TableHead>評価</TableHead>
-                                <TableHead>AI採点</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {recentHistory.map((history) => (
-                                <TableRow key={history.id}>
-                                    <TableCell className="whitespace-nowrap">
-                                        {new Date(history.answeredAt).toLocaleString('ja-JP')}
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="text-sm font-medium">
-                                            {history.problem.coreProblems[0]?.subject.name || '-'}
-                                        </div>
-                                        <div className="text-xs text-muted-foreground">
-                                            {history.problem.coreProblems[0]?.name || '-'}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="max-w-[300px] truncate" title={history.problem.question}>
-                                        {history.problem.question}
-                                    </TableCell>
-                                    <TableCell>
-                                        <Badge variant={['A', 'B'].includes(history.evaluation) ? 'default' : 'destructive'}>
-                                            {history.evaluation}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex flex-col gap-1">
-                                            <span className="text-xs font-medium">回答: {history.userAnswer || '-'}</span>
-                                            {history.feedback && (
-                                                <span className="text-xs text-muted-foreground truncate max-w-[200px]" title={history.feedback}>
-                                                    FB: {history.feedback}
-                                                </span>
-                                            )}
-                                        </div>
-                                    </TableCell>
+                    <div className="space-y-3 md:hidden">
+                        {recentHistory.map((history) => (
+                            <div key={history.id} className="rounded-lg border bg-card p-4">
+                                <div className="mb-2 flex items-center justify-between gap-2">
+                                    <p className="text-xs text-muted-foreground">{new Date(history.answeredAt).toLocaleString('ja-JP')}</p>
+                                    <Badge variant={['A', 'B'].includes(history.evaluation) ? 'default' : 'destructive'}>
+                                        {history.evaluation}
+                                    </Badge>
+                                </div>
+                                <p className="text-sm font-medium">
+                                    {history.problem.coreProblems[0]?.subject.name || '-'} / {history.problem.coreProblems[0]?.name || '-'}
+                                </p>
+                                <p className="mt-1 whitespace-pre-wrap text-sm">{history.problem.question}</p>
+                                <div className="mt-2 space-y-1 text-xs">
+                                    <p className="font-medium">回答: {history.userAnswer || '-'}</p>
+                                    {history.feedback && <p className="text-muted-foreground">FB: {history.feedback}</p>}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="hidden md:block">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>日時</TableHead>
+                                    <TableHead>科目/単元</TableHead>
+                                    <TableHead>問題</TableHead>
+                                    <TableHead>評価</TableHead>
+                                    <TableHead>AI採点</TableHead>
                                 </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
+                            </TableHeader>
+                            <TableBody>
+                                {recentHistory.map((history) => (
+                                    <TableRow key={history.id}>
+                                        <TableCell className="whitespace-nowrap">
+                                            {new Date(history.answeredAt).toLocaleString('ja-JP')}
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="text-sm font-medium">
+                                                {history.problem.coreProblems[0]?.subject.name || '-'}
+                                            </div>
+                                            <div className="text-xs text-muted-foreground">
+                                                {history.problem.coreProblems[0]?.name || '-'}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="max-w-[300px] truncate" title={history.problem.question}>
+                                            {history.problem.question}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge variant={['A', 'B'].includes(history.evaluation) ? 'default' : 'destructive'}>
+                                                {history.evaluation}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-col gap-1">
+                                                <span className="text-xs font-medium">回答: {history.userAnswer || '-'}</span>
+                                                {history.feedback && (
+                                                    <span className="text-xs text-muted-foreground truncate max-w-[200px]" title={history.feedback}>
+                                                        FB: {history.feedback}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
                 </CardContent>
             </Card>
         </div>

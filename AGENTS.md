@@ -31,7 +31,7 @@ Sullivan は Next.js 16 (App Router) ベースの**学習管理システム（LM
 
 ### 認証とセキュリティ
 - 認証は `@supabase/ssr` の `createClient` を使用
-- ロール情報は `user.app_metadata.role` で管理（STUDENT, TEACHER, PARENT, ADMIN）
+- ロール情報は `user.app_metadata.role` で管理（STUDENT, TEACHER, HEAD_TEACHER, PARENT, ADMIN）
 - Server Actions では必ずセッション検証とロールチェックを行う
 
 ### コンポーネント設計

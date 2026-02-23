@@ -12,8 +12,8 @@ export default async function AdminAnalyticsPage() {
     const studentStats = await getStudentsWithStats();
 
     return (
-        <div className="container mx-auto py-8 px-4">
-            <h1 className="text-3xl font-bold mb-8">学習状況分析</h1>
+        <div className="container mx-auto px-4 py-6 sm:py-8">
+            <h1 className="mb-6 text-2xl font-bold sm:mb-8 sm:text-3xl">学習状況分析</h1>
 
             <Card>
                 <CardHeader>

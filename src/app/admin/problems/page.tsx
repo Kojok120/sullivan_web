@@ -49,8 +49,8 @@ export default async function ProblemsPage({
     const { problems, total } = result;
 
     return (
-        <div className="container mx-auto py-8">
-            <h1 className="text-2xl font-bold mb-6">問題管理</h1>
+        <div className="container mx-auto px-4 py-6 sm:py-8">
+            <h1 className="mb-6 text-2xl font-bold">問題管理</h1>
             <ProblemManager
                 initialProblems={problems}
                 totalCount={total || 0}

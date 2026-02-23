@@ -63,7 +63,7 @@ export function PasswordResetDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-[425px]">
                 <DialogHeader>
                     <DialogTitle>パスワードのリセット</DialogTitle>
                     <DialogDescription>
@@ -104,10 +104,10 @@ export function PasswordResetDialog({
                     {error && <p className="text-sm text-red-500 mb-4">{error}</p>}
                     {success && <p className="text-sm text-green-600 mb-4 font-bold">パスワードを変更しました</p>}
                     <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending} className="min-h-11 sm:min-h-10">
                             キャンセル
                         </Button>
-                        <Button type="submit" disabled={isPending || success}>
+                        <Button type="submit" disabled={isPending || success} className="min-h-11 sm:min-h-10">
                             {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             変更する
                         </Button>

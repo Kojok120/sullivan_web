@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react'
 import { SessionDetail } from '../session-detail'
 import * as analytics from '@/lib/analytics'
 import * as surveyActions from '@/actions/survey'
+import { prisma } from '@/lib/prisma'
 import fs from 'fs'
 import type { MouseEventHandler, ReactNode } from 'react'
 
@@ -78,6 +79,14 @@ vi.mock('@/actions/survey', () => ({
     checkSurveyEligibility: vi.fn(),
 }))
 
+vi.mock('@/lib/prisma', () => ({
+    prisma: {
+        user: {
+            findUnique: vi.fn(),
+        },
+    },
+}))
+
 vi.mock('fs', () => ({
     default: {
         readFileSync: vi.fn(),
@@ -141,6 +150,11 @@ describe('SessionDetail', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         vi.mocked(fs.readFileSync).mockReturnValue(mockSystemPrompt)
+        vi.mocked(prisma.user.findUnique).mockResolvedValue({
+            classroom: {
+                plan: 'PREMIUM',
+            },
+        } as never)
     })
 
     const createMockSessionDetail = (overrides: Partial<SessionDetailMock> = {}): SessionDetailMock => ({

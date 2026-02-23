@@ -47,10 +47,14 @@ import { DateDisplay } from '@/components/ui/date-display';
 import { SortIcon } from '@/components/ui/sort-icon';
 import type { ClassroomOption, GroupOption } from '@/lib/types/classroom';
 
-type UserWithGroup = User; // Group is now just a string field on User
+type UserWithClassroom = User & {
+    classroom?: {
+        name: string;
+    } | null;
+};
 
 interface UserListProps {
-    initialUsers: UserWithGroup[];
+    initialUsers: UserWithClassroom[];
     total: number;
     currentPage: number;
     limit: number;
@@ -58,7 +62,7 @@ interface UserListProps {
     sortBy: string;
     sortOrder: 'asc' | 'desc';
     roleFilter?: Role;
-    groupIdFilter?: string;
+    classroomIdFilter?: string;
     groups: GroupOption[];
     classrooms: ClassroomOption[];
 }
@@ -72,7 +76,7 @@ export function UserList({
     sortBy,
     sortOrder,
     roleFilter,
-    groupIdFilter,
+    classroomIdFilter,
     groups,
     classrooms
 }: UserListProps) {
@@ -83,7 +87,7 @@ export function UserList({
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
     const [isPasswordResetOpen, setIsPasswordResetOpen] = useState(false);
-    const [selectedUser, setSelectedUser] = useState<UserWithGroup | null>(null);
+    const [selectedUser, setSelectedUser] = useState<UserWithClassroom | null>(null);
 
     // Search state
     const [search, setSearch] = useState(searchQuery);
@@ -95,7 +99,7 @@ export function UserList({
         if (sortBy) params.set('sortBy', sortBy);
         if (sortOrder) params.set('sortOrder', sortOrder);
         if (roleFilter) params.set('role', roleFilter);
-        if (groupIdFilter) params.set('groupId', groupIdFilter);
+        if (classroomIdFilter) params.set('classroomId', classroomIdFilter);
 
         Object.entries(updates).forEach(([key, value]) => {
             if (value === undefined || value === '') {
@@ -106,7 +110,7 @@ export function UserList({
         });
 
         // Reset page on filter/search change (except when page is explicitly updated)
-        if (!updates.page && (updates.q !== undefined || updates.role !== undefined || updates.groupId !== undefined)) {
+        if (!updates.page && (updates.q !== undefined || updates.role !== undefined || updates.classroomId !== undefined)) {
             params.set('page', '1');
         }
 
@@ -127,8 +131,8 @@ export function UserList({
         updateParams({ role: role === 'ALL' ? undefined : role });
     };
 
-    const handleGroupFilter = (groupId: string) => {
-        updateParams({ groupId: groupId === 'ALL' ? undefined : groupId });
+    const handleClassroomFilter = (classroomId: string) => {
+        updateParams({ classroomId: classroomId === 'ALL' ? undefined : classroomId });
     };
 
     const handlePageChange = (newPage: number) => {
@@ -149,17 +153,17 @@ export function UserList({
         });
     };
 
-    const openEdit = (user: UserWithGroup) => {
+    const openEdit = (user: UserWithClassroom) => {
         setSelectedUser(user);
         setIsEditOpen(true);
     };
 
-    const openDelete = (user: UserWithGroup) => {
+    const openDelete = (user: UserWithClassroom) => {
         setSelectedUser(user);
         setIsDeleteOpen(true);
     };
 
-    const openPasswordReset = (user: UserWithGroup) => {
+    const openPasswordReset = (user: UserWithClassroom) => {
         setSelectedUser(user);
         setIsPasswordResetOpen(true);
     };
@@ -180,8 +184,8 @@ export function UserList({
                     </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-4 items-center bg-muted/30 p-4 rounded-lg">
-                    <form onSubmit={handleSearch} className="flex gap-2 w-full sm:w-auto">
+                <div className="flex flex-col gap-4 rounded-lg bg-muted/30 p-4 sm:flex-row sm:items-center">
+                    <form onSubmit={handleSearch} className="flex w-full gap-2 sm:w-auto">
                         <Input
                             placeholder="名前またはIDで検索"
                             value={search}
@@ -191,36 +195,37 @@ export function UserList({
                         <Button type="submit" variant="secondary">検索</Button>
                     </form>
 
-                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
                         <Filter className="h-4 w-4 text-muted-foreground" />
                         <Select
                             value={roleFilter || 'ALL'}
                             onValueChange={handleRoleFilter}
                         >
-                            <SelectTrigger className="w-[150px] bg-background">
+                            <SelectTrigger className="w-full bg-background sm:w-[150px]">
                                 <SelectValue placeholder="役割" />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="ALL">全ての役割</SelectItem>
                                 <SelectItem value="STUDENT">生徒</SelectItem>
                                 <SelectItem value="TEACHER">講師</SelectItem>
+                                <SelectItem value="HEAD_TEACHER">校舎長</SelectItem>
                                 <SelectItem value="PARENT">保護者</SelectItem>
                                 <SelectItem value="ADMIN">管理者</SelectItem>
                             </SelectContent>
                         </Select>
 
                         <Select
-                            value={groupIdFilter || 'ALL'}
-                            onValueChange={handleGroupFilter}
+                            value={classroomIdFilter || 'ALL'}
+                            onValueChange={handleClassroomFilter}
                         >
-                            <SelectTrigger className="w-[150px] bg-background">
-                                <SelectValue placeholder="グループ" />
+                            <SelectTrigger className="w-full bg-background sm:w-[150px]">
+                                <SelectValue placeholder="教室" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="ALL">全てのグループ</SelectItem>
-                                {groups.map((group) => (
-                                    <SelectItem key={group.id} value={group.id}>
-                                        {group.name}
+                                <SelectItem value="ALL">全ての教室</SelectItem>
+                                {classrooms.map((classroom) => (
+                                    <SelectItem key={classroom.id} value={classroom.id}>
+                                        {classroom.name}
                                     </SelectItem>
                                 ))}
                             </SelectContent>
@@ -229,7 +234,56 @@ export function UserList({
                 </div>
             </div>
 
-            <div className="rounded-md border bg-white">
+            <div className="space-y-3 md:hidden">
+                {initialUsers.length === 0 ? (
+                    <div className="rounded-lg border bg-white p-6 text-center text-sm text-muted-foreground">
+                        ユーザーが見つかりません
+                    </div>
+                ) : (
+                    initialUsers.map((user) => (
+                        <div key={user.id} className="rounded-lg border bg-white p-4">
+                            <div className="mb-3 flex items-start justify-between gap-3">
+                                <div>
+                                    <p className="text-base font-semibold">{user.name || '-'}</p>
+                                    <p className="text-xs text-muted-foreground">{user.loginId}</p>
+                                </div>
+                                <RoleBadge role={user.role} />
+                            </div>
+                            <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+                                <div>
+                                    <p className="text-xs text-muted-foreground">教室</p>
+                                    <p>{user.classroom?.name || '-'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-muted-foreground">作成日</p>
+                                    <p><DateDisplay date={user.createdAt} /></p>
+                                </div>
+                            </div>
+                            <div className="mt-3 grid grid-cols-2 gap-2">
+                                <Button variant="outline" size="sm" className="min-h-11" onClick={() => openEdit(user)}>
+                                    <Pencil className="mr-1 h-4 w-4" />
+                                    編集
+                                </Button>
+                                <Button variant="outline" size="sm" className="min-h-11" onClick={() => openPasswordReset(user)}>
+                                    <KeyRound className="mr-1 h-4 w-4" />
+                                    PW
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="col-span-2 min-h-11 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                    onClick={() => openDelete(user)}
+                                >
+                                    <Trash2 className="mr-1 h-4 w-4" />
+                                    削除
+                                </Button>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+
+            <div className="hidden rounded-md border bg-white md:block">
                 <Table>
                     <TableHeader>
                         <TableRow>
@@ -251,10 +305,10 @@ export function UserList({
                                     <SortIcon active={sortBy === 'role'} sortOrder={sortOrder} />
                                 </div>
                             </TableHead>
-                            <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('group')}>
+                            <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('classroom')}>
                                 <div className="flex items-center">
-                                    グループ
-                                    <SortIcon active={sortBy === 'group'} sortOrder={sortOrder} />
+                                    教室
+                                    <SortIcon active={sortBy === 'classroom'} sortOrder={sortOrder} />
                                 </div>
                             </TableHead>
                             <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('createdAt')}>
@@ -274,7 +328,7 @@ export function UserList({
                                 <TableCell>
                                     <RoleBadge role={user.role} />
                                 </TableCell>
-                                <TableCell>{user.group || '-'}</TableCell>
+                                <TableCell>{user.classroom?.name || '-'}</TableCell>
                                 <TableCell>
                                     <DateDisplay date={user.createdAt} />
                                 </TableCell>

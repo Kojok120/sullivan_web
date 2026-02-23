@@ -42,12 +42,12 @@ export default async function AdminDashboard() {
 
     return (
         <div className="min-h-screen bg-gray-50">
-            <div className="container mx-auto px-4 py-12">
-                <header className="mb-10">
-                    <h1 className="text-4xl font-extrabold text-gray-900">
+            <div className="container mx-auto px-4 py-6 sm:py-10">
+                <header className="mb-6 sm:mb-10">
+                    <h1 className="text-2xl font-extrabold text-gray-900 sm:text-4xl">
                         管理者ダッシュボード
                     </h1>
-                    <p className="mt-2 text-gray-600">
+                    <p className="mt-2 text-sm text-gray-600 sm:text-base">
                         ようこそ、{session.name}さん（管理者）
                     </p>
                 </header>
@@ -59,12 +59,12 @@ export default async function AdminDashboard() {
                             <Link href={card.href} key={card.title} className="block">
                                 <Card className="h-full transition-all hover:shadow-lg hover:border-gray-400 cursor-pointer group">
                                     <CardHeader>
-                                        <div className="flex items-center gap-4">
+                                        <div className="flex items-center gap-3 sm:gap-4">
                                             <div className={`p-3 rounded-lg bg-gray-100 ${card.color}`}>
-                                                <Icon className="h-8 w-8" />
+                                                <Icon className="h-6 w-6 sm:h-8 sm:w-8" />
                                             </div>
                                             <div>
-                                                <CardTitle className="text-2xl group-hover:text-blue-600 transition-colors">
+                                                <CardTitle className="text-lg transition-colors group-hover:text-blue-600 sm:text-2xl">
                                                     {card.title}
                                                 </CardTitle>
                                                 <CardDescription className="mt-2">

@@ -33,9 +33,9 @@ export async function proxy(request: NextRequest) {
         return supabaseResponse;
     }
 
-    // Teacher routes check - must be authenticated AND have TEACHER or ADMIN role
+    // Teacher routes check - must be authenticated AND have TEACHER/HEAD_TEACHER or ADMIN role
     if (request.nextUrl.pathname.startsWith('/teacher')) {
-        if (!user || (userRole !== 'TEACHER' && userRole !== 'ADMIN')) {
+        if (!user || (userRole !== 'TEACHER' && userRole !== 'HEAD_TEACHER' && userRole !== 'ADMIN')) {
             return NextResponse.redirect(new URL('/', request.url));
         }
         return supabaseResponse;
@@ -54,8 +54,8 @@ export async function proxy(request: NextRequest) {
         return NextResponse.redirect(new URL('/admin', request.url));
     }
 
-    // Redirect TEACHER users from root to /teacher
-    if (user && userRole === 'TEACHER' && request.nextUrl.pathname === '/') {
+    // Redirect TEACHER/HEAD_TEACHER users from root to /teacher
+    if (user && (userRole === 'TEACHER' || userRole === 'HEAD_TEACHER') && request.nextUrl.pathname === '/') {
         return NextResponse.redirect(new URL('/teacher', request.url));
     }
 

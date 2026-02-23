@@ -7,6 +7,8 @@ import {
     type GenerateContentResponse,
 } from '@google/genai';
 import { getSession } from '@/lib/auth';
+import { getStudentAccessContext } from '@/lib/authorization';
+import { canUseAiTutor } from '@/lib/plan-entitlements';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -16,6 +18,7 @@ type ChatMessage = {
 };
 
 type TutorChatRequest = {
+    targetStudentId?: string;
     problemContext: {
         question: string;
         answer?: string;
@@ -385,10 +388,37 @@ export async function POST(request: NextRequest) {
 
     try {
         const body = (await request.json()) as TutorChatRequest;
+        const targetStudentId = sanitizeText(body.targetStudentId);
         const question = sanitizeText(body.problemContext?.question);
         const answer = sanitizeText(body.problemContext?.answer, '（未設定）');
         const userAnswer = sanitizeText(body.problemContext?.userAnswer, '（未回答）');
         const explanation = sanitizeText(body.problemContext?.explanation, '（なし）');
+
+        if (!targetStudentId) {
+            return NextResponse.json(
+                { error: 'targetStudentId is required' },
+                { status: 400 },
+            );
+        }
+
+        const access = await getStudentAccessContext({
+            actorUserId: session.userId,
+            actorRole: session.role,
+            targetStudentId,
+        });
+        if (!access.allowed) {
+            return NextResponse.json(
+                { error: 'Forbidden' },
+                { status: 403 },
+            );
+        }
+
+        if (!canUseAiTutor(access.student?.classroomPlan)) {
+            return NextResponse.json(
+                { error: 'AI tutor is not available for this classroom plan' },
+                { status: 403 },
+            );
+        }
 
         if (!question) {
             return NextResponse.json(

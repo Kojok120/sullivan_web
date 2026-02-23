@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { processVideoWatch, toGamificationPayload } from "@/lib/gamification-service";
 import { emitRealtimeEvent } from "@/lib/realtime-events";
+import { canAccessUserWithinClassroomScope } from '@/lib/authorization';
 
 
 export async function logoutAction() {
@@ -59,6 +60,14 @@ export async function fetchUserSessions(offset: number, limit: number, filter?: 
     if (targetUserId && targetUserId !== session.userId) {
         if (!isTeacherOrAdmin(session)) {
             throw new Error("Unauthorized: 他ユーザーのセッションを閲覧する権限がありません");
+        }
+        const canAccess = await canAccessUserWithinClassroomScope({
+            actorUserId: session.userId,
+            actorRole: session.role,
+            targetUserId,
+        });
+        if (!canAccess) {
+            throw new Error("Unauthorized: 担当教室外のユーザーにはアクセスできません");
         }
         userId = targetUserId;
     }

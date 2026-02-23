@@ -16,6 +16,13 @@ type SupabaseUserLookup = {
     prismaUserId?: string;
 };
 
+export interface SyncSupabaseAppMetadataParams {
+    prismaUserId: string;
+    loginId: string;
+    role: Role;
+    name: string;
+}
+
 export async function createOrUpdateSupabaseUser({
     email,
     password,
@@ -152,4 +159,40 @@ export async function deleteSupabaseUserByLookup(
     }
 
     return { success: true, deleted: true };
+}
+
+/**
+ * Prisma 側のロール変更後に Supabase の app_metadata を同期する。
+ */
+export async function syncSupabaseAppMetadata({
+    prismaUserId,
+    loginId,
+    role,
+    name,
+}: SyncSupabaseAppMetadataParams): Promise<{ success: boolean; error?: string }> {
+    const supabaseAdmin = createAdminClient();
+    const email = `${loginId}@sullivan-internal.local`;
+    const targetUser = await findSupabaseUser({ email, prismaUserId });
+
+    if (!targetUser) {
+        return { success: false, error: 'Supabaseユーザーが見つかりません' };
+    }
+
+    const existingAppMetadata = (targetUser.app_metadata ?? {}) as Record<string, unknown>;
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(targetUser.id, {
+        app_metadata: {
+            ...existingAppMetadata,
+            role,
+            loginId,
+            name,
+            prismaUserId,
+        },
+    });
+
+    if (error) {
+        console.error('Supabase app_metadata sync failed:', error);
+        return { success: false, error: error.message };
+    }
+
+    return { success: true };
 }

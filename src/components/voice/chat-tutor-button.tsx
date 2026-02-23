@@ -19,6 +19,7 @@ type TutorMessage = {
 };
 
 type ChatTutorButtonProps = {
+    targetStudentId: string;
     problemContext: {
         question: string;
         answer?: string;
@@ -51,7 +52,7 @@ function toBase64Utf8(value: string) {
     return window.btoa(binary);
 }
 
-export function ChatTutorButton({ problemContext, systemPrompt }: ChatTutorButtonProps) {
+export function ChatTutorButton({ targetStudentId, problemContext, systemPrompt }: ChatTutorButtonProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -134,6 +135,7 @@ export function ChatTutorButton({ problemContext, systemPrompt }: ChatTutorButto
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     systemPrompt,
+                    targetStudentId,
                     problemContext,
                     messages: nextMessages,
                 }),

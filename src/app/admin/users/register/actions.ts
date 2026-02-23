@@ -6,16 +6,23 @@ import { z } from 'zod';
 
 const signupSchema = z.object({
     name: z.string().min(1, '名前を入力してください'),
-    password: z.string().min(8, 'パスワードは8文字以上で入力してください'),
     role: z.nativeEnum(Role),
     group: z.string().optional(),
     classroomId: z.string().optional(),
+}).superRefine((value, ctx) => {
+    const needsClassroom = value.role === 'STUDENT' || value.role === 'TEACHER' || value.role === 'HEAD_TEACHER';
+    if (needsClassroom && !value.classroomId) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'この役割では所属教室を選択してください',
+            path: ['classroomId'],
+        });
+    }
 });
 
 export async function signupAction(_prevState: unknown, formData: FormData) {
     const rawData = {
         name: formData.get('name') as string,
-        password: formData.get('password') as string,
         role: formData.get('role') as Role,
         group: formData.get('group') as string || undefined,
         classroomId: formData.get('classroomId') as string || undefined,
@@ -27,14 +34,13 @@ export async function signupAction(_prevState: unknown, formData: FormData) {
         return { error: result.error.errors[0].message };
     }
 
-    const { name, password, role, group, classroomId } = result.data;
+    const { name, role, group, classroomId } = result.data;
 
     // 3. Register user using shared service
     try {
         const { registerUser } = await import('@/lib/user-registration-service');
         const regResult = await registerUser({
             name,
-            password,
             role,
             group,
             classroomId

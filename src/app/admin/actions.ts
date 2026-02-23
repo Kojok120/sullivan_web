@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { Prisma, Role } from '@prisma/client';
 import { requireAdmin } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { roleRequiresClassroom } from '@/lib/authorization';
 
 export async function resetPassword(userId: string, password: string) {
     await requireAdmin();
@@ -70,7 +71,7 @@ export async function getUsers(
     sortBy: string = 'createdAt',
     sortOrder: 'asc' | 'desc' = 'desc',
     roleFilter?: Role,
-    groupFilter?: string
+    classroomFilter?: string
 ) {
     await requireAdmin();
     try {
@@ -87,15 +88,15 @@ export async function getUsers(
             where.role = roleFilter;
         }
 
-        if (groupFilter && groupFilter !== 'ALL') {
-            where.group = groupFilter;
+        if (classroomFilter && classroomFilter !== 'ALL') {
+            where.classroomId = classroomFilter;
         }
 
         const skip = (page - 1) * limit;
 
         const orderBy: Prisma.UserOrderByWithRelationInput =
-            sortBy === 'group'
-                ? { group: sortOrder }
+            sortBy === 'classroom'
+                ? { classroom: { name: sortOrder } }
                 : sortBy === 'name'
                     ? { name: sortOrder }
                     : sortBy === 'loginId'
@@ -110,6 +111,13 @@ export async function getUsers(
                 orderBy,
                 skip,
                 take: limit,
+                include: {
+                    classroom: {
+                        select: {
+                            name: true,
+                        },
+                    },
+                },
             }),
             prisma.user.count({ where }),
         ]);
@@ -129,6 +137,14 @@ const createUserSchema = z.object({
     password: z.string().optional(),
     group: z.string().optional(),
     classroomId: z.string().optional(),
+}).superRefine((value, ctx) => {
+    if (roleRequiresClassroom(value.role) && !value.classroomId) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'この役割では教室選択が必須です',
+            path: ['classroomId'],
+        });
+    }
 });
 
 
@@ -168,6 +184,26 @@ export async function updateUser(
 ) {
     await requireAdmin();
     try {
+        const currentUser = await prisma.user.findUnique({
+            where: { id },
+            select: {
+                id: true,
+                role: true,
+                classroomId: true,
+                loginId: true,
+                name: true,
+            },
+        });
+        if (!currentUser) {
+            return { error: 'ユーザーが見つかりません' };
+        }
+
+        const nextRole = data.role ?? currentUser.role;
+        const nextClassroomId = data.classroomId !== undefined ? data.classroomId : currentUser.classroomId;
+        if (roleRequiresClassroom(nextRole) && !nextClassroomId) {
+            return { error: 'この役割では教室選択が必須です' };
+        }
+
         const updateData: Prisma.UserUpdateInput = {};
         if (data.name !== undefined) updateData.name = data.name;
         if (data.role !== undefined) updateData.role = data.role;
@@ -182,6 +218,17 @@ export async function updateUser(
             where: { id },
             data: updateData,
         });
+
+        const { syncSupabaseAppMetadata } = await import('@/lib/auth-admin');
+        const syncResult = await syncSupabaseAppMetadata({
+            prismaUserId: user.id,
+            loginId: user.loginId,
+            role: user.role,
+            name: user.name || '',
+        });
+        if (!syncResult.success) {
+            console.error('Supabase app_metadata sync failed after updateUser:', syncResult.error);
+        }
 
         revalidatePath('/admin/users');
         return { success: true, user };
@@ -210,7 +257,7 @@ export async function getUserManagementMeta() {
     await requireAdmin();
     try {
         const classrooms = await prisma.classroom.findMany({
-            select: { id: true, name: true, groups: true },
+            select: { id: true, name: true, plan: true, groups: true },
             orderBy: { name: 'asc' },
         });
 
@@ -228,6 +275,7 @@ export async function getUserManagementMeta() {
         const classroomOptions = classrooms.map((classroom) => ({
             id: classroom.id,
             name: classroom.name,
+            plan: classroom.plan,
         }));
 
         return {

@@ -20,6 +20,7 @@ import { createClassroom, deleteClassroom } from './actions';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import type { ClassroomWithGroups } from '@/lib/types/classroom';
+import { Badge } from '@/components/ui/badge';
 
 type Classroom = ClassroomWithGroups & {
     createdAt: Date;
@@ -75,7 +76,7 @@ export function ClassroomList({ initialClassrooms, searchQuery }: ClassroomListP
     return (
         <div className="space-y-6">
             <div className="flex items-center gap-4">
-                <form onSubmit={handleSearch} className="flex-1 flex gap-2">
+                <form onSubmit={handleSearch} className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
                     <div className="relative flex-1">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
@@ -86,7 +87,7 @@ export function ClassroomList({ initialClassrooms, searchQuery }: ClassroomListP
                             onChange={(e) => setQuery(e.target.value)}
                         />
                     </div>
-                    <Button type="submit">検索</Button>
+                    <Button type="submit" className="min-h-11 sm:min-h-10">検索</Button>
                 </form>
             </div>
 
@@ -104,14 +105,14 @@ export function ClassroomList({ initialClassrooms, searchQuery }: ClassroomListP
                         </div>
                         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                             <DialogTrigger asChild>
-                                <Button size="sm" className="h-8 gap-1">
+                                <Button size="sm" className="h-11 gap-1 sm:h-8">
                                     <Plus className="h-3.5 w-3.5" />
                                     <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
                                         追加
                                     </span>
                                 </Button>
                             </DialogTrigger>
-                            <DialogContent>
+                            <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
                                 <DialogHeader>
                                     <DialogTitle>新規教室追加</DialogTitle>
                                     <DialogDescription>
@@ -128,8 +129,30 @@ export function ClassroomList({ initialClassrooms, searchQuery }: ClassroomListP
                                             required
                                         />
                                     </div>
+                                    <div className="grid gap-2">
+                                        <Label>プラン</Label>
+                                        <div className="space-y-2 rounded-md border p-3">
+                                            <label className="flex items-center gap-2 text-sm">
+                                                <input
+                                                    type="radio"
+                                                    name="plan"
+                                                    value="STANDARD"
+                                                    defaultChecked
+                                                />
+                                                <span>スタンダード</span>
+                                            </label>
+                                            <label className="flex items-center gap-2 text-sm">
+                                                <input
+                                                    type="radio"
+                                                    name="plan"
+                                                    value="PREMIUM"
+                                                />
+                                                <span>プレミアム</span>
+                                            </label>
+                                        </div>
+                                    </div>
                                     <DialogFooter>
-                                        <Button type="submit" disabled={isCreating}>
+                                        <Button type="submit" disabled={isCreating} className="min-h-11 sm:min-h-10">
                                             {isCreating ? '追加中...' : '追加'}
                                         </Button>
                                     </DialogFooter>
@@ -147,10 +170,15 @@ export function ClassroomList({ initialClassrooms, searchQuery }: ClassroomListP
                                 {initialClassrooms.map((classroom) => (
                                     <li
                                         key={classroom.id}
-                                        className="flex items-center justify-between p-4 bg-muted/50 rounded-md hover:bg-muted/80 transition-colors"
+                                        className="flex flex-col gap-3 rounded-md bg-muted/50 p-4 transition-colors hover:bg-muted/80 sm:flex-row sm:items-center sm:justify-between"
                                     >
                                         <Link href={`/admin/classrooms/${classroom.id}`} className="flex-1">
-                                            <div className="font-medium hover:underline">{classroom.name}</div>
+                                            <div className="font-medium hover:underline flex items-center gap-2">
+                                                {classroom.name}
+                                                <Badge variant={classroom.plan === 'PREMIUM' ? 'default' : 'secondary'}>
+                                                    {classroom.plan === 'PREMIUM' ? 'プレミアム' : 'スタンダード'}
+                                                </Badge>
+                                            </div>
                                             <div className="text-sm text-muted-foreground mt-1">
                                                 {(classroom.groups || []).length > 0 ? (
                                                     <div className="flex flex-wrap gap-1">
@@ -165,14 +193,15 @@ export function ClassroomList({ initialClassrooms, searchQuery }: ClassroomListP
                                                 )}
                                             </div>
                                         </Link>
-                                        <div className="flex items-center gap-2 ml-4">
+                                        <div className="flex items-center gap-2 sm:ml-4">
                                             <Button
                                                 variant="ghost"
-                                                size="icon"
+                                                size="sm"
                                                 className="text-destructive hover:text-destructive/90"
                                                 onClick={() => handleDelete(classroom.id)}
                                             >
                                                 <Trash2 className="h-4 w-4" />
+                                                <span className="ml-1 sm:ml-0 sm:sr-only">削除</span>
                                             </Button>
                                         </div>
                                     </li>
