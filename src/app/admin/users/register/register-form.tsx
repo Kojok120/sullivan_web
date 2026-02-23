@@ -3,7 +3,7 @@
 import { useActionState, useState, useMemo } from 'react';
 import { signupAction } from './actions';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, Eye, EyeOff } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 import type { ClassroomWithGroups, GroupOption } from '@/lib/types/classroom';
 
@@ -14,7 +14,6 @@ interface RegisterFormProps {
 
 export function RegisterForm({ classrooms, allGroups }: RegisterFormProps) {
     const [state, action, pending] = useActionState(signupAction, undefined);
-    const [showPassword, setShowPassword] = useState(false);
 
     // Form state for dependent dropdowns
     const [selectedClassroomId, setSelectedClassroomId] = useState<string>('');
@@ -50,7 +49,7 @@ export function RegisterForm({ classrooms, allGroups }: RegisterFormProps) {
                         新規ユーザー登録
                     </h2>
                     <p className="mt-2 text-center text-sm text-gray-600">
-                        生徒、講師、管理者アカウントを作成します
+                        生徒、講師、校舎長、管理者アカウントを作成します
                     </p>
                 </div>
 
@@ -64,7 +63,7 @@ export function RegisterForm({ classrooms, allGroups }: RegisterFormProps) {
                             </div>
                             <p className="mb-6 text-sm text-gray-600">
                                 このIDをユーザーに伝えてください。<br />
-                                ユーザーはIDと設定したパスワードでログインできます。
+                                初期パスワードは <code>password123</code> です（初回ログイン時に変更）。
                             </p>
                             <div className="flex flex-col gap-3">
                                 <Button
@@ -92,24 +91,8 @@ export function RegisterForm({ classrooms, allGroups }: RegisterFormProps) {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700">パスワード</label>
-                                <div className="relative mt-1">
-                                    <input
-                                        name="password"
-                                        type={showPassword ? 'text' : 'password'}
-                                        required
-                                        minLength={8}
-                                        className="block w-full rounded-md border border-gray-300 px-3 py-2 pr-10 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowPassword((prev) => !prev)}
-                                        aria-label={showPassword ? 'パスワードを非表示' : 'パスワードを表示'}
-                                        aria-pressed={showPassword}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md text-gray-500 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                                    >
-                                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                    </button>
+                                <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+                                    初期パスワードは <code>password123</code> で固定です（初回ログイン時に変更必須）
                                 </div>
                             </div>
                             <div>
@@ -122,24 +105,24 @@ export function RegisterForm({ classrooms, allGroups }: RegisterFormProps) {
                                 >
                                     <option value="STUDENT">生徒</option>
                                     <option value="TEACHER">講師</option>
+                                    <option value="HEAD_TEACHER">校舎長</option>
                                     <option value="PARENT">保護者</option>
                                     <option value="ADMIN">管理者</option>
                                 </select>
                             </div>
 
-                            {/* Show Classroom and Group selection only for Students (and maybe Teachers if needed?) */}
-                            {/* User User Request specifically mentioned "生徒登録をする際" (When registering students) */}
-                            {selectedRole === 'STUDENT' && (
+                            {(selectedRole === 'STUDENT' || selectedRole === 'TEACHER' || selectedRole === 'HEAD_TEACHER') && (
                                 <>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700">所属教室 (任意)</label>
+                                        <label className="block text-sm font-medium text-gray-700">所属教室 (必須)</label>
                                         <select
                                             name="classroomId"
                                             value={selectedClassroomId}
                                             onChange={(e) => setSelectedClassroomId(e.target.value)}
+                                            required
                                             className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
                                         >
-                                            <option value="">未選択</option>
+                                            <option value="">選択してください</option>
                                             {classrooms.map((c) => (
                                                 <option key={c.id} value={c.id}>
                                                     {c.name}
@@ -148,20 +131,22 @@ export function RegisterForm({ classrooms, allGroups }: RegisterFormProps) {
                                         </select>
                                     </div>
 
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">グループ (任意)</label>
-                                        <select
-                                            name="group"
-                                            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                                        >
-                                            <option value="">未選択</option>
-                                            {availableGroups.map((g) => (
-                                                <option key={g.id} value={g.name}>
-                                                    {g.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
+                                    {selectedRole === 'STUDENT' && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700">グループ (任意)</label>
+                                            <select
+                                                name="group"
+                                                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                                            >
+                                                <option value="">未選択</option>
+                                                {availableGroups.map((g) => (
+                                                    <option key={g.id} value={g.name}>
+                                                        {g.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
                                 </>
                             )}
 

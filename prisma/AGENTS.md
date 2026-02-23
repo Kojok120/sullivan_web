@@ -5,7 +5,7 @@
 Sullivan の DB は PostgreSQL で、Prisma ORM を使用。主要なエンティティ:
 
 - **Subject → CoreProblem → Problem**: 教材の3階層構造
-- **User**: ロール（STUDENT, TEACHER, PARENT, ADMIN）で権限分離
+- **User**: ロール（STUDENT, TEACHER, HEAD_TEACHER, PARENT, ADMIN）で権限分離
 - **LearningHistory**: 評価(A-D)とフィードバックを含む回答ログ
 - **UserProblemState / UserCoreProblemState**: 個人の進捗管理
 - **GradingJob**: 採点ジョブの状態管理

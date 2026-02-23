@@ -55,7 +55,7 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
                     </CardTitle>
                     <CardDescription>生徒との面談や指導の記録</CardDescription>
                 </div>
-                <Button size="sm" onClick={() => setIsAdding(!isAdding)}>
+                <Button size="sm" className="min-h-11 sm:min-h-10" onClick={() => setIsAdding(!isAdding)}>
                     <Plus className="h-4 w-4 mr-1" />
                     新規記録
                 </Button>
@@ -64,7 +64,7 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
                 {isAdding && (
                     <div className="bg-muted/30 p-4 rounded-lg border space-y-4">
                         <form action={handleAdd} className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium">日付</label>
                                     <Input
@@ -97,11 +97,11 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
                                     className="min-h-[100px]"
                                 />
                             </div>
-                            <div className="flex justify-end gap-2">
-                                <Button type="button" variant="ghost" size="sm" onClick={() => setIsAdding(false)}>
+                            <div className="flex flex-col-reverse justify-end gap-2 sm:flex-row">
+                                <Button type="button" variant="ghost" size="sm" className="min-h-11 sm:min-h-10" onClick={() => setIsAdding(false)}>
                                     キャンセル
                                 </Button>
-                                <Button type="submit" size="sm" disabled={isSaving}>
+                                <Button type="submit" size="sm" className="min-h-11 sm:min-h-10" disabled={isSaving}>
                                     {isSaving ? '保存中...' : '保存'}
                                 </Button>
                             </div>

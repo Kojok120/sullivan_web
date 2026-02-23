@@ -36,7 +36,7 @@ export async function updateStudentProfile(userId: string, formData: FormData) {
     }
 
     // SECURITY: Teachers can only edit students in their assigned classroom (IDOR protection)
-    if (session.role === 'TEACHER') {
+    if (session.role === 'TEACHER' || session.role === 'HEAD_TEACHER') {
         const accessError = await ensureTeacherCanAccessStudent(
             session.userId,
             userId,
@@ -100,7 +100,7 @@ export async function addGuidanceRecord(userId: string, formData: FormData) {
     }
 
     // SECURITY: Verify student is in teacher's classroom
-    if (session.role === 'TEACHER') {
+    if (session.role === 'TEACHER' || session.role === 'HEAD_TEACHER') {
         const accessError = await ensureTeacherCanAccessStudent(
             session.userId,
             userId,

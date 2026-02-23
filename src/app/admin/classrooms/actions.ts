@@ -3,14 +3,15 @@
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
+import { ClassroomPlan } from '@prisma/client';
 
 export async function getClassrooms(query?: string) {
     const session = await getSession();
     if (!session) {
         throw new Error('Unauthorized');
     }
-    // Teachers and Admins can view classrooms
-    if (session.role !== 'ADMIN' && session.role !== 'TEACHER') {
+    // Teachers, Head Teachers and Admins can view classrooms
+    if (session.role !== 'ADMIN' && session.role !== 'TEACHER' && session.role !== 'HEAD_TEACHER') {
         throw new Error('Forbidden');
     }
 
@@ -26,7 +27,9 @@ export async function getClassrooms(query?: string) {
 export async function getClassroom(id: string) {
     const session = await getSession();
     if (!session) throw new Error('Unauthorized');
-    if (session.role !== 'ADMIN' && session.role !== 'TEACHER') throw new Error('Forbidden');
+    if (session.role !== 'ADMIN' && session.role !== 'TEACHER' && session.role !== 'HEAD_TEACHER') {
+        throw new Error('Forbidden');
+    }
 
     return await prisma.classroom.findUnique({
         where: { id },
@@ -46,10 +49,13 @@ export async function createClassroom(formData: FormData) {
 
     const name = formData.get('name') as string;
     const groupsStr = formData.get('groups') as string; // Comma separated
+    const planRaw = formData.get('plan');
 
     if (!name || name.trim() === '') {
         return { error: '教室名は必須です' };
     }
+
+    const plan = planRaw === 'PREMIUM' ? ClassroomPlan.PREMIUM : ClassroomPlan.STANDARD;
 
     const groups = groupsStr
         ? groupsStr.split(',').map(g => g.trim()).filter(g => g !== '')
@@ -60,6 +66,7 @@ export async function createClassroom(formData: FormData) {
             data: {
                 name: name.trim(),
                 groups: groups,
+                plan,
             },
         });
         revalidatePath('/admin/classrooms');
@@ -115,5 +122,25 @@ export async function updateClassroomGroups(id: string, groups: string[]) {
     } catch (error) {
         console.error('Failed to update classroom groups:', error);
         return { error: 'グループの更新に失敗しました' };
+    }
+}
+
+export async function updateClassroomPlan(id: string, plan: ClassroomPlan) {
+    const session = await getSession();
+    if (!session || session.role !== 'ADMIN') {
+        return { error: 'Unauthorized' };
+    }
+
+    try {
+        await prisma.classroom.update({
+            where: { id },
+            data: { plan },
+        });
+        revalidatePath(`/admin/classrooms/${id}`);
+        revalidatePath('/admin/classrooms');
+        return { success: true };
+    } catch (error) {
+        console.error('Failed to update classroom plan:', error);
+        return { error: 'プランの更新に失敗しました' };
     }
 }

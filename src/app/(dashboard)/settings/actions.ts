@@ -24,7 +24,7 @@ export async function updatePassword(_prevState: unknown, formData: FormData) {
             return { error: 'ログインが必要です' };
         }
 
-        const allowedRoles = new Set(['STUDENT', 'TEACHER', 'PARENT', 'ADMIN']);
+        const allowedRoles = new Set(['STUDENT', 'TEACHER', 'HEAD_TEACHER', 'PARENT', 'ADMIN']);
         if (!allowedRoles.has(session.role)) {
             return { error: '権限がありません' };
         }

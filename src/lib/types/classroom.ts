@@ -1,3 +1,5 @@
+export type ClassroomPlan = 'STANDARD' | 'PREMIUM';
+
 export interface GroupOption {
     id: string;
     name: string;
@@ -6,6 +8,7 @@ export interface GroupOption {
 export interface ClassroomOption {
     id: string;
     name: string;
+    plan: ClassroomPlan;
 }
 
 export interface ClassroomWithGroups extends ClassroomOption {

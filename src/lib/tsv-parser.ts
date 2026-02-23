@@ -138,3 +138,52 @@ export function parseProblemTSV(input: string, skipHeader = true): ParsedProblem
         };
     });
 }
+
+export interface ParsedCoreProblemRow {
+    masterNumber?: number;
+    masterNumberRaw: string;
+    name: string;
+    lectureVideos: {
+        title: string;
+        url: string;
+    }[];
+}
+
+/**
+ * CoreProblem一括登録用のフォーマットでパース
+ * カラム: [マスタNo] [CoreProblem名] [動画タイトル1] [動画URL1] ...
+ */
+export function parseCoreProblemTSV(input: string, skipHeader = true): ParsedCoreProblemRow[] {
+    const rows = parseTSV(input);
+
+    const dataRows = skipHeader
+        ? rows.filter((cols) => {
+            const firstCol = cols[0] || '';
+            const secondCol = cols[1] || '';
+            return !firstCol.includes('マスタ') && !secondCol.includes('CoreProblem');
+        })
+        : rows;
+
+    return dataRows.map((cols) => {
+        const masterNumberRaw = (cols[0] || '').trim();
+        const masterNumberParsed = parseInt(masterNumberRaw, 10);
+        const masterNumber = Number.isInteger(masterNumberParsed) ? masterNumberParsed : undefined;
+        const name = (cols[1] || '').trim();
+
+        const lectureVideos: { title: string; url: string }[] = [];
+        for (let i = 2; i < cols.length; i += 2) {
+            const title = (cols[i] || '').trim();
+            const url = (cols[i + 1] || '').trim();
+            if (title && url) {
+                lectureVideos.push({ title, url });
+            }
+        }
+
+        return {
+            masterNumber,
+            masterNumberRaw,
+            name,
+            lectureVideos,
+        };
+    });
+}

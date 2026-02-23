@@ -63,9 +63,7 @@ function conditionsToPrismaWhere(conditions: FilterCondition[]): Prisma.ProblemW
                 where.grade = cond.value;
                 break;
             case 'subjectId':
-                andConditions.push({
-                    coreProblems: { some: { subjectId: cond.value } }
-                });
+                where.subjectId = cond.value;
                 break;
             case 'coreProblemId':
                 andConditions.push({
@@ -226,8 +224,26 @@ export async function updateStandaloneProblem(id: string, data: {
         };
 
         if (data.coreProblemIds) {
+            if (data.coreProblemIds.length === 0) {
+                return { error: 'CoreProblemは最低1件必要です' };
+            }
+            const coreProblems = await prisma.coreProblem.findMany({
+                where: { id: { in: data.coreProblemIds } },
+                select: { id: true, subjectId: true },
+            });
+            if (coreProblems.length !== data.coreProblemIds.length) {
+                return { error: '存在しないCoreProblemが含まれています' };
+            }
+            const subjectIds = new Set(coreProblems.map((coreProblem) => coreProblem.subjectId));
+            if (subjectIds.size > 1) {
+                return { error: '複数教科のCoreProblemは紐付けできません' };
+            }
+            const subjectId = Array.from(subjectIds)[0];
             updateData.coreProblems = {
                 set: data.coreProblemIds.map(cid => ({ id: cid }))
+            };
+            updateData.subject = {
+                connect: { id: subjectId }
             };
         }
 
@@ -361,12 +377,12 @@ export async function bulkUpsertStandaloneProblems(problems: {
     masterNumber?: number;
     videoUrl?: string;
     coreProblemIds: string[];
-}[]) {
+}[], options?: { subjectId?: string }) {
     await requireAdmin();
     try {
         const { createdCount, updatedCount, warnings } = await bulkUpsertProblemsCore(
             problems,
-            { batchSize: 50, assignOrder: false }
+            { batchSize: 50, assignOrder: false, subjectId: options?.subjectId }
         );
 
         revalidatePath('/admin/problems');
@@ -377,13 +393,24 @@ export async function bulkUpsertStandaloneProblems(problems: {
     }
 }
 
-export async function searchProblemsByMasterNumbers(masterNumbers: number[]) {
+export async function searchProblemsByMasterNumbers(targets: { masterNumber: number; subjectId: string }[]) {
     await requireAdmin();
     try {
-        if (masterNumbers.length === 0) return { success: true, problems: [] };
+        if (targets.length === 0) return { success: true, problems: [] };
+
+        const dedupedTargets = Array.from(
+            new Map(
+                targets.map((target) => [`${target.subjectId}:${target.masterNumber}`, target])
+            ).values()
+        );
 
         const problems = await prisma.problem.findMany({
-            where: { masterNumber: { in: masterNumbers } },
+            where: {
+                OR: dedupedTargets.map((target) => ({
+                    subjectId: target.subjectId,
+                    masterNumber: target.masterNumber,
+                }))
+            },
             include: {
                 coreProblems: {
                     include: { subject: true }

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { cache } from 'react';
+import { isTeacherOrAdminRole } from '@/lib/authorization';
 
 export type SessionPayload = {
     userId: string;
@@ -50,5 +51,5 @@ export async function requireAdmin() {
 }
 
 export function isTeacherOrAdmin(session: SessionPayload | null): session is SessionPayload {
-    return !!session && (session.role === 'TEACHER' || session.role === 'ADMIN');
+    return !!session && isTeacherOrAdminRole(session.role);
 }

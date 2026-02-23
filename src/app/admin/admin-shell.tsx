@@ -1,8 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { AdminNav } from '@/components/admin-nav';
+import Link from 'next/link';
+import Image from 'next/image';
+import SullivanLogo from '@/assets/Sullivan-Logo.jpg';
+import { LogOut } from 'lucide-react';
+import { AdminNav, AdminMobileNav } from '@/components/admin-nav';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { logoutAction } from '@/app/actions';
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
     const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -17,21 +23,55 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     };
 
     return (
-        <div className="flex min-h-screen flex-col md:flex-row">
-            <aside className={cn(
-                "hidden md:block flex-shrink-0 transition-all duration-300",
-                isCollapsed ? "w-16" : "w-64"
-            )}>
-                <div className={cn(
-                    "fixed inset-y-0 z-50 transition-all duration-300",
-                    isCollapsed ? "w-16" : "w-64"
-                )}>
-                    <AdminNav isCollapsed={isCollapsed} onToggle={toggleSidebar} />
+        <div className="min-h-dvh bg-gray-50">
+            <div className="sticky top-0 z-40 border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/75 md:hidden">
+                <div className="flex h-14 items-center justify-between px-3">
+                    <AdminMobileNav />
+                    <Link href="/admin" className="flex items-center">
+                        <div className="relative h-8 w-28">
+                            <Image
+                                src={SullivanLogo}
+                                alt="Sullivan Admin"
+                                fill
+                                className="object-contain object-center"
+                                priority
+                                placeholder="blur"
+                            />
+                        </div>
+                    </Link>
+                    <form action={logoutAction}>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-11 w-11 text-red-600 hover:bg-red-50 hover:text-red-700"
+                            data-testid="admin-mobile-top-logout-button"
+                        >
+                            <LogOut className="h-5 w-5" />
+                            <span className="sr-only">ログアウト</span>
+                        </Button>
+                    </form>
                 </div>
-            </aside>
-            <main className="flex-1 bg-gray-50 transition-all duration-300">
-                {children}
-            </main>
+            </div>
+            <div className="flex min-h-dvh flex-col md:flex-row">
+                <aside
+                    className={cn(
+                        'hidden md:block flex-shrink-0 transition-all duration-300',
+                        isCollapsed ? 'w-16' : 'w-64'
+                    )}
+                >
+                    <div
+                        className={cn(
+                            'fixed inset-y-0 z-50 transition-all duration-300',
+                            isCollapsed ? 'w-16' : 'w-64'
+                        )}
+                    >
+                        <AdminNav isCollapsed={isCollapsed} onToggle={toggleSidebar} />
+                    </div>
+                </aside>
+                <main className="min-w-0 flex-1 bg-gray-50 transition-all duration-300">
+                    {children}
+                </main>
+            </div>
         </div>
     );
 }
