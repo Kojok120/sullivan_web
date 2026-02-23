@@ -4,7 +4,7 @@ import { getSubjects } from './actions';
 import { CurriculumManager } from './curriculum-manager';
 
 export default async function CurriculumPage() {
-    const { subjects, error } = await getSubjects();
+    const { subjects, error } = await getSubjects({ normalizeCoreProblemSequence: true });
 
     if (error || !subjects) {
         return (

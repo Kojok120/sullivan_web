@@ -171,6 +171,7 @@ type SeedProblem = {
 
 type SeedCoreProblem = {
   name: string;
+  masterNumber: number;
   order: number;
   problems: SeedProblem[];
 };
@@ -183,37 +184,49 @@ type SeedSubject = {
 
 async function upsertCoreProblem(subjectId: string, coreProblem: SeedCoreProblem) {
   const existing = await prisma.coreProblem.findFirst({
-    where: { subjectId, name: coreProblem.name },
+    where: { subjectId, masterNumber: coreProblem.masterNumber },
   });
 
   if (existing) {
     return await prisma.coreProblem.update({
       where: { id: existing.id },
-      data: { order: coreProblem.order },
+      data: {
+        name: coreProblem.name,
+        masterNumber: coreProblem.masterNumber,
+        order: coreProblem.order,
+      },
     });
   }
 
   return await prisma.coreProblem.create({
     data: {
       name: coreProblem.name,
+      masterNumber: coreProblem.masterNumber,
       order: coreProblem.order,
       subjectId,
     },
   });
 }
 
-async function upsertProblem(coreProblemId: string, problem: SeedProblem) {
+async function upsertProblem(subjectId: string, coreProblemId: string, problem: SeedProblem) {
   return await prisma.problem.upsert({
-    where: { customId: problem.customId },
+    where: {
+      subjectId_customId: {
+        subjectId,
+        customId: problem.customId,
+      },
+    },
     update: {
       question: problem.question,
       answer: problem.answer,
       order: problem.order,
       videoUrl: problem.videoUrl,
       acceptedAnswers: problem.acceptedAnswers ?? [],
+      subjectId,
       coreProblems: { set: [{ id: coreProblemId }] },
     },
     create: {
+      subjectId,
       customId: problem.customId,
       question: problem.question,
       answer: problem.answer,
@@ -233,6 +246,7 @@ async function seedCurriculum() {
       coreProblems: [
         {
           name: 'be動詞の肯定文',
+          masterNumber: 1,
           order: 1,
           problems: [
             { customId: 'E-1', question: 'I ( ) a student.', answer: 'am', order: 1 },
@@ -242,6 +256,7 @@ async function seedCurriculum() {
         },
         {
           name: 'be動詞の否定文',
+          masterNumber: 2,
           order: 2,
           problems: [
             { customId: 'E-4', question: 'I ( ) not a doctor.', answer: 'am', order: 1 },
@@ -250,6 +265,7 @@ async function seedCurriculum() {
         },
         {
           name: '一般動詞の肯定文',
+          masterNumber: 3,
           order: 3,
           problems: [
             { customId: 'E-6', question: 'I ( ) tennis.', answer: 'play', order: 1 },
@@ -264,6 +280,7 @@ async function seedCurriculum() {
       coreProblems: [
         {
           name: '一次方程式',
+          masterNumber: 1,
           order: 1,
           problems: [
             { customId: 'M-1', question: 'x + 3 = 7 のとき x = ?', answer: '4', order: 1 },
@@ -278,6 +295,7 @@ async function seedCurriculum() {
       coreProblems: [
         {
           name: '漢字の読み',
+          masterNumber: 1,
           order: 1,
           problems: [
             { customId: 'J-1', question: '「挑戦」の読み方は？', answer: 'ちょうせん', order: 1 },
@@ -299,7 +317,7 @@ async function seedCurriculum() {
       const coreProblemRecord = await upsertCoreProblem(subjectRecord.id, coreProblem);
 
       for (const problem of coreProblem.problems) {
-        await upsertProblem(coreProblemRecord.id, problem);
+        await upsertProblem(subjectRecord.id, coreProblemRecord.id, problem);
       }
     }
   }

@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Check, AlertTriangle, Loader2 } from 'lucide-react';
@@ -17,8 +18,11 @@ import { CoreProblemSelector, SelectedCoreProblem } from './core-problem-selecto
 interface BulkImportDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    subjects: { id: string; name: string }[];
     onSuccess: () => void;
 }
+
+const RESOLVED_CORE_PROBLEM_PREVIEW_LIMIT = 24;
 
 type ExistingProblemSnapshot = {
     question: string;
@@ -31,10 +35,12 @@ type ExistingProblemSnapshot = {
 type ResolvedCoreProblem = {
     id: string;
     name: string;
+    subjectId: string;
     subject: { name: string };
 };
 
 type ParsedExistingProblem = {
+    subjectId: string;
     masterNumber: number | null;
     question: string;
     answer: string | null;
@@ -54,6 +60,7 @@ interface ParsedProblem {
     coreProblemNames?: string[];
     isValid: boolean;
     error?: string;
+    resolvedSubjectId?: string;
     existingProblem?: ExistingProblemSnapshot;
 }
 
@@ -65,6 +72,12 @@ type RowDiffResult = {
     isCpChanged: boolean;
     hasChanges: boolean;
 };
+
+const AUTO_SUBJECT_VALUE = '__AUTO_SUBJECT__';
+
+function makeSubjectMasterKey(subjectId: string, masterNumber: number): string {
+    return `${subjectId}:${masterNumber}`;
+}
 
 function collectNewCoreProblemIds(
     row: Pick<ParsedProblem, 'coreProblemNames' | 'coreProblemName'>,
@@ -135,16 +148,55 @@ function computeRowDiff(
     };
 }
 
-export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDialogProps) {
+function resolveRowSubjectId(
+    row: Pick<ParsedProblem, 'coreProblemNames' | 'coreProblemName'>,
+    selectedCoreProblems: SelectedCoreProblem[],
+    resolvedCoreProblems: Map<string, ResolvedCoreProblem>,
+    fallbackSubjectId?: string
+): string | undefined {
+    const subjectIds = new Set<string>();
+
+    for (const coreProblem of selectedCoreProblems) {
+        if (coreProblem.subjectId) {
+            subjectIds.add(coreProblem.subjectId);
+        }
+    }
+
+    if (row.coreProblemNames && row.coreProblemNames.length > 0) {
+        for (const name of row.coreProblemNames) {
+            const resolved = resolvedCoreProblems.get(name);
+            if (resolved?.subjectId) {
+                subjectIds.add(resolved.subjectId);
+            }
+        }
+    } else if (row.coreProblemName) {
+        const resolved = resolvedCoreProblems.get(row.coreProblemName);
+        if (resolved?.subjectId) {
+            subjectIds.add(resolved.subjectId);
+        }
+    }
+
+    if (subjectIds.size === 1) {
+        return Array.from(subjectIds)[0];
+    }
+    if (subjectIds.size === 0) {
+        return fallbackSubjectId;
+    }
+    return undefined;
+}
+
+export function BulkImportDialog({ open, onOpenChange, subjects, onSuccess }: BulkImportDialogProps) {
     const [step, setStep] = useState<'input' | 'preview'>('input');
     const [rawInput, setRawInput] = useState('');
     const [parsedData, setParsedData] = useState<ParsedProblem[]>([]);
     const [isPending, startTransition] = useTransition();
     const [lastWarnings, setLastWarnings] = useState<string[]>([]);
     const [showWarningsDialog, setShowWarningsDialog] = useState(false);
+    const [showAllResolvedCoreProblems, setShowAllResolvedCoreProblems] = useState(false);
 
     // Shared CoreProblem selection
     const [coreProblems, setCoreProblems] = useState<SelectedCoreProblem[]>([]);
+    const [selectedSubjectId, setSelectedSubjectId] = useState(AUTO_SUBJECT_VALUE);
 
     // Map of CoreProblem name -> CoreProblem data (auto-resolved)
     const [resolvedCoreProblems, setResolvedCoreProblems] = useState<Map<string, ResolvedCoreProblem>>(new Map());
@@ -158,8 +210,30 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
         });
     }, [parsedData, coreProblems, resolvedCoreProblems]);
 
-    const validItems = useMemo(() => visibleItems.filter(p => p.isValid), [visibleItems]);
+        const validItems = useMemo(() => visibleItems.filter(p => p.isValid), [visibleItems]);
     const validCount = validItems.length;
+    const hasSubjectFallback = selectedSubjectId !== AUTO_SUBJECT_VALUE;
+    const missingCoreProblemCount = useMemo(() => {
+        return validItems.filter((row) => {
+            const coreProblemIds = collectNewCoreProblemIds(row, coreProblems, resolvedCoreProblems);
+            return coreProblemIds.size === 0;
+        }).length;
+    }, [validItems, coreProblems, resolvedCoreProblems]);
+    const resolvedCoreProblemItems = useMemo(
+        () => Array.from(resolvedCoreProblems.values()),
+        [resolvedCoreProblems]
+    );
+    const visibleResolvedCoreProblemItems = useMemo(
+        () =>
+            showAllResolvedCoreProblems
+                ? resolvedCoreProblemItems
+                : resolvedCoreProblemItems.slice(0, RESOLVED_CORE_PROBLEM_PREVIEW_LIMIT),
+        [resolvedCoreProblemItems, showAllResolvedCoreProblems]
+    );
+    const hiddenResolvedCoreProblemCount = Math.max(
+        0,
+        resolvedCoreProblemItems.length - visibleResolvedCoreProblemItems.length
+    );
 
     // parseTSV is now imported from @/lib/tsv-parser
 
@@ -210,19 +284,38 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
         setResolvedCoreProblems(newResolvedMap);
 
         // [Upsert] Existing problems lookup
-        const masterNumbers = parsed.map(p => p.masterNumber).filter((n): n is number => n !== undefined && n !== null);
-        const uniqueMasterNumbers = Array.from(new Set(masterNumbers));
+        const fallbackSubjectId = hasSubjectFallback ? selectedSubjectId : undefined;
+        const lookupTargets = Array.from(
+            new Map(
+                parsed
+                    .map((row) => {
+                        if (typeof row.masterNumber !== 'number') {
+                            return null;
+                        }
+                        const subjectId = resolveRowSubjectId(row, coreProblems, newResolvedMap, fallbackSubjectId);
+                        if (!subjectId) {
+                            return null;
+                        }
+                        return {
+                            masterNumber: row.masterNumber,
+                            subjectId,
+                        };
+                    })
+                    .filter((target): target is { masterNumber: number; subjectId: string } => target !== null)
+                    .map((target) => [makeSubjectMasterKey(target.subjectId, target.masterNumber), target])
+            ).values()
+        );
 
-        const existingMap = new Map<number, ExistingProblemSnapshot>();
-        if (uniqueMasterNumbers.length > 0) {
-            const { problems } = await searchProblemsByMasterNumbers(uniqueMasterNumbers);
+        const existingMap = new Map<string, ExistingProblemSnapshot>();
+        if (lookupTargets.length > 0) {
+            const { problems } = await searchProblemsByMasterNumbers(lookupTargets);
             if (problems) {
                 const existingProblems = problems as ParsedExistingProblem[];
                 existingProblems.forEach((problem) => {
                     if (problem.masterNumber === null) {
                         return;
                     }
-                    existingMap.set(problem.masterNumber, {
+                    existingMap.set(makeSubjectMasterKey(problem.subjectId, problem.masterNumber), {
                         question: problem.question,
                         answer: problem.answer,
                         grade: problem.grade,
@@ -234,17 +327,28 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
         }
 
         // Attach existing data to parsed rows
-        const enhancedParsed = parsed.map(p => ({
-            ...p,
-            existingProblem: p.masterNumber ? existingMap.get(p.masterNumber) : undefined
-        }));
+        const enhancedParsed = parsed.map((row) => {
+            const resolvedSubjectId = typeof row.masterNumber === 'number'
+                ? resolveRowSubjectId(row, coreProblems, newResolvedMap, fallbackSubjectId)
+                : undefined;
+            return {
+                ...row,
+                resolvedSubjectId,
+                existingProblem: (typeof row.masterNumber === 'number' && resolvedSubjectId)
+                    ? existingMap.get(makeSubjectMasterKey(resolvedSubjectId, row.masterNumber))
+                    : undefined
+            };
+        });
 
         setParsedData(enhancedParsed);
+        setShowAllResolvedCoreProblems(false);
         setStep('preview');
     };
 
     const handleExecute = () => {
         if (validCount === 0) return;
+
+        const fallbackSubjectId = hasSubjectFallback ? selectedSubjectId : undefined;
 
         startTransition(async () => {
             const problems = validItems.map((p) => {
@@ -263,7 +367,7 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
                 };
             });
 
-            const result = await bulkUpsertStandaloneProblems(problems);
+            const result = await bulkUpsertStandaloneProblems(problems, { subjectId: fallbackSubjectId });
 
             if (result.success) {
                 toast.success(`${result.createdCount}件作成、${result.updatedCount}件更新しました`, {
@@ -284,6 +388,8 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
                 setParsedData([]);
                 setCoreProblems([]);
                 setResolvedCoreProblems(new Map());
+                setSelectedSubjectId(AUTO_SUBJECT_VALUE);
+                setShowAllResolvedCoreProblems(false);
             } else {
                 toast.error(result.error || '登録に失敗しました', {
                     style: { background: '#ef4444', color: 'white' }
@@ -295,8 +401,8 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
     return (
         <>
             <Dialog open={open} onOpenChange={onOpenChange}>
-                <DialogContent className="!max-w-none w-[95vw] h-[90vh] flex flex-col overflow-hidden">
-                    <DialogHeader>
+                <DialogContent className="!max-w-none w-[95vw] max-w-[95vw] h-[90dvh] max-h-[90dvh] grid grid-rows-[auto,minmax(0,1fr),auto] overflow-hidden p-0">
+                    <DialogHeader className="shrink-0 border-b px-6 pt-6 pb-3">
                         <DialogTitle>問題の一括登録・更新</DialogTitle>
                         <DialogDescription>
                             Excelやスプレッドシートからコピー＆ペーストで一括登録・更新できます。<br />
@@ -305,25 +411,73 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
                     </DialogHeader>
 
                     {step === 'input' && (
-                        <div className="flex-1 flex flex-col space-y-4 overflow-hidden">
+                        <div className="min-h-0 flex h-full flex-col gap-4 overflow-hidden px-6 py-4">
                             <Alert>
                                 <AlertTitle>フォーマット</AlertTitle>
                                 <AlertDescription>
                                     タブ区切り: [マスタ内問題番号(任意)] [学年] [CoreProblem名] [問題文] [正解] [別解(任意)] [動画URL(任意)]
                                 </AlertDescription>
                             </Alert>
+                            <div className="space-y-2">
+                                <Label htmlFor="bulk-import-subject">ID採番用の科目（任意）</Label>
+                                <Select value={selectedSubjectId} onValueChange={setSelectedSubjectId}>
+                                    <SelectTrigger id="bulk-import-subject" className="w-full sm:w-[320px]">
+                                        <SelectValue placeholder="科目を選択" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value={AUTO_SUBJECT_VALUE}>自動判定（CoreProblemから）</SelectItem>
+                                        {subjects.map((subject) => (
+                                            <SelectItem key={subject.id} value={subject.id}>
+                                                {subject.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-xs text-muted-foreground">
+                                    CoreProblemから科目が判定できない行にのみ、この科目をID採番のフォールバックとして使います。
+                                </p>
+                            </div>
                             <Textarea
                                 placeholder={`例:\n1001\t中1\tbe動詞の文_肯定文\t私は新入生です I (A) a new student.\tA: am\t\thttps://youtube.com/...`}
                                 value={rawInput}
                                 onChange={(e) => setRawInput(e.target.value)}
-                                className="font-mono text-sm flex-1 min-h-[300px]"
+                                spellCheck={false}
+                                className="field-sizing-fixed flex-1 min-h-0 w-full whitespace-pre overflow-auto font-mono text-sm leading-6 resize-none"
                             />
                         </div>
                     )}
 
                     {step === 'preview' && (
-                        <div className="flex-1 flex flex-col space-y-4 overflow-hidden">
-                            <div className="space-y-3 p-3 border rounded bg-muted/10">
+                        <div className="min-h-0 flex h-full flex-col gap-4 overflow-hidden px-6 py-4">
+                            <div className="space-y-3 p-3 border rounded bg-muted/10 shrink-0 max-h-[38dvh] overflow-y-auto">
+                                <div className="space-y-2">
+                                    <Label htmlFor="bulk-import-subject-preview">ID採番用の科目（任意）</Label>
+                                    <Select value={selectedSubjectId} onValueChange={setSelectedSubjectId}>
+                                        <SelectTrigger id="bulk-import-subject-preview" className="w-full sm:w-[320px] bg-background">
+                                            <SelectValue placeholder="科目を選択" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value={AUTO_SUBJECT_VALUE}>自動判定（CoreProblemから）</SelectItem>
+                                            {subjects.map((subject) => (
+                                                <SelectItem key={subject.id} value={subject.id}>
+                                                    {subject.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <p className="text-xs text-muted-foreground">
+                                        CoreProblemから科目が判定できない行にのみ、この科目をID採番のフォールバックとして使います。
+                                    </p>
+                                </div>
+                                {missingCoreProblemCount > 0 && (
+                                    <Alert className="border-yellow-300 bg-yellow-50">
+                                        <AlertTitle className="text-yellow-800">CoreProblem未設定の行があります</AlertTitle>
+                                        <AlertDescription className="text-yellow-800">
+                                            CoreProblem未解決の行が{missingCoreProblemCount}件あります。
+                                            これらの行は実行時に警告され、作成・更新対象から自動でスキップされます。
+                                        </AlertDescription>
+                                    </Alert>
+                                )}
                                 <Label>追加の紐付け設定 (一括)</Label>
                                 <div className="text-sm text-muted-foreground mb-2">
                                     ペーストしたデータのCoreProblem列から自動で紐付けされます。追加で紐付けしたい場合は下で選択してください。
@@ -332,9 +486,26 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
                                 {/* Auto-resolved CoreProblems */}
                                 {resolvedCoreProblems.size > 0 && (
                                     <div className="mb-2">
-                                        <span className="text-xs text-muted-foreground">自動検出されたコア問題:</span>
-                                        <div className="flex flex-wrap gap-1 mt-1">
-                                            {Array.from(resolvedCoreProblems.entries()).map(([, cp]) => (
+                                        <div className="flex items-center justify-between gap-2">
+                                            <span className="text-xs text-muted-foreground">
+                                                自動検出されたコア問題: {resolvedCoreProblemItems.length}件
+                                            </span>
+                                            {resolvedCoreProblemItems.length > RESOLVED_CORE_PROBLEM_PREVIEW_LIMIT && (
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-6 px-2 text-xs"
+                                                    onClick={() => setShowAllResolvedCoreProblems((prev) => !prev)}
+                                                >
+                                                    {showAllResolvedCoreProblems
+                                                        ? '折りたたむ'
+                                                        : `すべて表示 (+${hiddenResolvedCoreProblemCount})`}
+                                                </Button>
+                                            )}
+                                        </div>
+                                        <div className="flex flex-wrap gap-1 mt-1 max-h-[140px] overflow-y-auto rounded border bg-background p-2">
+                                            {visibleResolvedCoreProblemItems.map((cp) => (
                                                 <Badge key={cp.id} variant="outline" className="text-xs">
                                                     {cp.subject?.name} &gt; {cp.name}
                                                 </Badge>
@@ -352,7 +523,7 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
                                 />
                             </div>
 
-                            <div className="border rounded-md flex-1 overflow-auto">
+                            <div className="border rounded-md flex-1 min-h-[220px] overflow-auto">
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
@@ -371,9 +542,15 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
                                         {visibleItems.map((row, i) => {
                                             const isUpdate = !!row.existingProblem;
                                             const diff = computeRowDiff(row, coreProblems, resolvedCoreProblems);
+                                            const hasNoCoreProblem =
+                                                collectNewCoreProblemIds(row, coreProblems, resolvedCoreProblems).size === 0;
+                                            const shouldHighlightAsError = !row.isValid || hasNoCoreProblem;
 
                                             return (
-                                                <TableRow key={i} className={!row.isValid ? 'bg-destructive/10' : ''}>
+                                                <TableRow
+                                                    key={i}
+                                                    className={shouldHighlightAsError ? 'bg-red-50/80' : ''}
+                                                >
                                                     <TableCell>
                                                         {row.isValid ? (
                                                             <Check className="w-4 h-4 text-green-500" />
@@ -392,7 +569,7 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
                                                     </TableCell>
                                                     <TableCell className="font-mono">{row.masterNumber || '-'}</TableCell>
                                                     <TableCell className={diff.isGradeChanged ? 'bg-blue-50 text-blue-700 font-medium' : ''}>{row.grade}</TableCell>
-                                                    <TableCell className={`max-w-[150px] ${diff.isCpChanged ? 'bg-blue-50' : ''}`}>
+                                                    <TableCell className={`max-w-[150px] ${diff.isCpChanged ? 'bg-blue-50' : ''} ${hasNoCoreProblem ? 'text-red-700' : ''}`}>
                                                         {row.coreProblemNames && row.coreProblemNames.length > 0 ? (
                                                             <div className="flex flex-wrap gap-1">
                                                                 {row.coreProblemNames.map((name) => {
@@ -422,7 +599,7 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: BulkImportDi
                         </div>
                     )}
 
-                    <DialogFooter>
+                    <DialogFooter className="shrink-0 border-t bg-background px-6 py-3 z-10">
                         {step === 'input' ? (
                             <Button onClick={handleParse} disabled={!rawInput.trim()}>
                                 プレビュー

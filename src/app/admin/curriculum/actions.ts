@@ -5,13 +5,22 @@ import { revalidatePath } from 'next/cache';
 import { Prisma } from '@prisma/client';
 
 import { requireAdmin, getSession } from '@/lib/auth';
-import { dedupeByCoreProblemName } from '@/lib/core-problem-import';
 import type { LectureVideo } from '@/lib/lecture-videos';
 
 // --- Subjects ---
-export async function getSubjects() {
+export async function getSubjects(options?: { normalizeCoreProblemSequence?: boolean }) {
     await requireAdmin();
     try {
+        if (options?.normalizeCoreProblemSequence) {
+            const subjects = await prisma.subject.findMany({
+                select: { id: true },
+                orderBy: { order: 'asc' },
+            });
+            for (const subject of subjects) {
+                await resequenceCoreProblemsForSubject(subject.id);
+            }
+        }
+
         const { fetchSubjects } = await import('@/lib/curriculum-service');
         // Updated fetchSubjects should handle includeCoreProblems correctly without Units
         const subjects = await fetchSubjects({ includeCoreProblems: true });
@@ -31,6 +40,92 @@ function toLectureVideosJson(videos?: LectureVideo[]): Prisma.InputJsonValue | u
     return videos as unknown as Prisma.InputJsonValue;
 }
 
+function normalizeCoreProblemName(name: string): string {
+    return name.trim();
+}
+
+function normalizeLectureVideos(videos?: LectureVideo[]): LectureVideo[] {
+    if (!videos) return [];
+    return videos
+        .map((video) => ({
+            title: video.title.trim(),
+            url: video.url.trim(),
+        }))
+        .filter((video) => video.title.length > 0 && video.url.length > 0);
+}
+
+function areLectureVideosEqual(a: LectureVideo[], b: LectureVideo[]): boolean {
+    if (a.length !== b.length) {
+        return false;
+    }
+    return a.every((video, index) => {
+        const target = b[index];
+        return target && video.title === target.title && video.url === target.url;
+    });
+}
+
+function extractUniqueConstraintMessage(error: unknown): string | null {
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError)) {
+        return null;
+    }
+    if (error.code !== 'P2002') {
+        return null;
+    }
+    const target = Array.isArray(error.meta?.target) ? error.meta?.target.join(',') : String(error.meta?.target || '');
+    if (target.includes('subjectId') && target.includes('masterNumber')) {
+        return '同じ教科でマスタNoが重複しています';
+    }
+    return '一意制約に違反しています';
+}
+
+const CORE_PROBLEM_RESEQUENCE_OFFSET = 1_000_000;
+
+async function resequenceCoreProblemsInTransaction(subjectId: string, tx: Prisma.TransactionClient) {
+    const orderedCoreProblems = await tx.coreProblem.findMany({
+        where: { subjectId },
+        orderBy: [{ order: 'asc' }, { id: 'asc' }],
+        select: { id: true, order: true, masterNumber: true },
+    });
+
+    if (orderedCoreProblems.length === 0) {
+        return;
+    }
+
+    const needsResequence = orderedCoreProblems.some((coreProblem, index) => {
+        const expected = index + 1;
+        return coreProblem.order !== expected || coreProblem.masterNumber !== expected;
+    });
+    if (!needsResequence) {
+        return;
+    }
+
+    // 一意制約衝突を避けるため、先に十分大きな値へ退避してから再採番する
+    await tx.coreProblem.updateMany({
+        where: { subjectId },
+        data: {
+            order: { increment: CORE_PROBLEM_RESEQUENCE_OFFSET },
+            masterNumber: { increment: CORE_PROBLEM_RESEQUENCE_OFFSET },
+        },
+    });
+
+    for (const [index, coreProblem] of orderedCoreProblems.entries()) {
+        const resequencedNumber = index + 1;
+        await tx.coreProblem.update({
+            where: { id: coreProblem.id },
+            data: {
+                order: resequencedNumber,
+                masterNumber: resequencedNumber,
+            },
+        });
+    }
+}
+
+async function resequenceCoreProblemsForSubject(subjectId: string) {
+    await prisma.$transaction(async (tx) => {
+        await resequenceCoreProblemsInTransaction(subjectId, tx);
+    });
+}
+
 export async function getCoreProblemsForSubject(subjectId: string) {
     const session = await getSession();
     if (!session || (session.role !== 'TEACHER' && session.role !== 'HEAD_TEACHER' && session.role !== 'ADMIN')) {
@@ -41,7 +136,7 @@ export async function getCoreProblemsForSubject(subjectId: string) {
         const coreProblems = await prisma.coreProblem.findMany({
             where: { subjectId },
             orderBy: { order: 'asc' },
-            select: { id: true, name: true }
+            select: { id: true, name: true, masterNumber: true }
         });
         return { success: true, coreProblems };
     } catch (error) {
@@ -50,44 +145,152 @@ export async function getCoreProblemsForSubject(subjectId: string) {
     }
 }
 
-export async function createCoreProblem(data: { name: string; subjectId: string; order: number; lectureVideos?: LectureVideo[] }) {
+export async function createCoreProblem(data: {
+    name: string;
+    masterNumber?: number;
+    subjectId: string;
+    order?: number;
+    lectureVideos?: LectureVideo[];
+}) {
     await requireAdmin();
     try {
-        const coreProblem = await prisma.coreProblem.create({
-            data: {
-                name: data.name,
-                subjectId: data.subjectId,
-                order: data.order,
-                lectureVideos: toLectureVideosJson(data.lectureVideos),
-            },
+        const coreProblem = await prisma.$transaction(async (tx) => {
+            const lastCoreProblem = await tx.coreProblem.findFirst({
+                where: { subjectId: data.subjectId },
+                orderBy: { order: 'desc' },
+                select: { order: true, masterNumber: true },
+            });
+
+            const created = await tx.coreProblem.create({
+                data: {
+                    name: normalizeCoreProblemName(data.name),
+                    masterNumber: (lastCoreProblem?.masterNumber ?? 0) + 1,
+                    subjectId: data.subjectId,
+                    order: data.order ?? (lastCoreProblem?.order ?? 0) + 1,
+                    lectureVideos: toLectureVideosJson(normalizeLectureVideos(data.lectureVideos)),
+                },
+            });
+
+            await resequenceCoreProblemsInTransaction(data.subjectId, tx);
+            return created;
         });
+
         revalidatePath('/admin/curriculum');
         return { success: true, coreProblem };
     } catch (error) {
         console.error('Failed to create core problem:', error);
+        const uniqueMessage = extractUniqueConstraintMessage(error);
+        if (uniqueMessage) {
+            return { error: uniqueMessage };
+        }
         return { error: 'CoreProblemの作成に失敗しました' };
     }
 }
 
-export async function updateCoreProblem(id: string, data: { name?: string; order?: number; lectureVideos?: LectureVideo[] }) {
+export async function updateCoreProblem(id: string, data: { name?: string; masterNumber?: number; order?: number; lectureVideos?: LectureVideo[] }) {
     await requireAdmin();
     try {
-        const coreProblem = await prisma.coreProblem.update({
+        const existing = await prisma.coreProblem.findUnique({
             where: { id },
-            data,
+            select: { subjectId: true },
         });
+        if (!existing) {
+            return { error: 'CoreProblemが見つかりません' };
+        }
+
+        const updateData: Prisma.CoreProblemUpdateInput = {};
+        if (typeof data.name === 'string') {
+            updateData.name = normalizeCoreProblemName(data.name);
+        }
+        if (typeof data.order === 'number') {
+            updateData.order = data.order;
+        }
+        if (data.lectureVideos !== undefined) {
+            updateData.lectureVideos = toLectureVideosJson(normalizeLectureVideos(data.lectureVideos));
+        }
+
+        const coreProblem = await prisma.$transaction(async (tx) => {
+            const updated = await tx.coreProblem.update({
+                where: { id },
+                data: updateData,
+            });
+
+            if (typeof data.order === 'number') {
+                await resequenceCoreProblemsInTransaction(existing.subjectId, tx);
+            }
+
+            return updated;
+        });
+
         revalidatePath('/admin/curriculum');
         return { success: true, coreProblem };
     } catch (error) {
         console.error('Failed to update core problem:', error);
+        const uniqueMessage = extractUniqueConstraintMessage(error);
+        if (uniqueMessage) {
+            return { error: uniqueMessage };
+        }
         return { error: 'CoreProblemの更新に失敗しました' };
+    }
+}
+
+export async function searchCoreProblemsForBulkUpsert(
+    subjectId: string,
+    masterNumbers: number[],
+    names: string[]
+) {
+    await requireAdmin();
+    try {
+        if (masterNumbers.length === 0 && names.length === 0) {
+            return { success: true, coreProblems: [] };
+        }
+
+        const orConditions: Prisma.CoreProblemWhereInput[] = [];
+        if (masterNumbers.length > 0) {
+            orConditions.push({ masterNumber: { in: masterNumbers } });
+        }
+        if (names.length > 0) {
+            orConditions.push({ name: { in: names } });
+        }
+
+        const coreProblems = await prisma.coreProblem.findMany({
+            where: {
+                subjectId,
+                OR: orConditions,
+            },
+            select: {
+                id: true,
+                name: true,
+                masterNumber: true,
+                lectureVideos: true,
+                order: true,
+            },
+            orderBy: [{ order: 'asc' }, { id: 'asc' }],
+        });
+
+        return { success: true, coreProblems };
+    } catch (error) {
+        console.error('Failed to search core problems for bulk upsert:', error);
+        return { error: '既存CoreProblemの検索に失敗しました' };
     }
 }
 
 export async function deleteCoreProblem(id: string) {
     await requireAdmin();
     try {
-        await prisma.coreProblem.delete({ where: { id } });
+        const target = await prisma.coreProblem.findUnique({
+            where: { id },
+            select: { subjectId: true },
+        });
+        if (!target) {
+            return { error: 'CoreProblemが見つかりません' };
+        }
+
+        await prisma.$transaction(async (tx) => {
+            await tx.coreProblem.delete({ where: { id } });
+            await resequenceCoreProblemsInTransaction(target.subjectId, tx);
+        });
+
         revalidatePath('/admin/curriculum');
         return { success: true };
     } catch (error) {
@@ -101,9 +304,19 @@ export async function bulkDeleteCoreProblems(ids: string[]) {
     try {
         if (ids.length === 0) return { success: true, count: 0 };
 
+        const targets = await prisma.coreProblem.findMany({
+            where: { id: { in: ids } },
+            select: { subjectId: true },
+        });
+        const subjectIds = Array.from(new Set(targets.map((target) => target.subjectId)));
+
         const result = await prisma.coreProblem.deleteMany({
             where: { id: { in: ids } }
         });
+
+        for (const subjectId of subjectIds) {
+            await resequenceCoreProblemsForSubject(subjectId);
+        }
 
         revalidatePath('/admin/curriculum');
         return { success: true, count: result.count };
@@ -113,56 +326,172 @@ export async function bulkDeleteCoreProblems(ids: string[]) {
     }
 }
 
-export async function bulkCreateCoreProblems(subjectId: string, items: { name: string; lectureVideos?: LectureVideo[] }[]) {
+export async function bulkCreateCoreProblems(subjectId: string, items: {
+    masterNumber: number;
+    name: string;
+    lectureVideos?: LectureVideo[];
+}[]) {
     await requireAdmin();
     try {
-        const uniqueItems = dedupeByCoreProblemName(items);
+        const warnings: string[] = [];
+        let skippedCount = 0;
+        let unchangedCount = 0;
+        let createdCount = 0;
+        let updatedCount = 0;
 
-        // Find existing names in this subject
-        const existingProblems = await prisma.coreProblem.findMany({
-            where: {
-                subjectId,
-                name: { in: uniqueItems.map(i => i.name) }
-            },
-            select: { name: true }
+        const seenMasterNumbers = new Set<number>();
+        const normalizedItems = items.map((item, index) => {
+            const normalizedName = normalizeCoreProblemName(item.name);
+            const videos = normalizeLectureVideos(item.lectureVideos);
+            let skipReason: string | null = null;
+
+            if (!Number.isInteger(item.masterNumber) || item.masterNumber <= 0) {
+                skipReason = `行${index + 1}: マスタNoは1以上の整数で指定してください`;
+            } else if (!normalizedName) {
+                skipReason = `行${index + 1}: CoreProblem名は必須です`;
+            } else if (seenMasterNumbers.has(item.masterNumber)) {
+                skipReason = `行${index + 1}: 同一TSV内でマスタNo ${item.masterNumber} が重複しています`;
+            }
+
+            if (!skipReason) {
+                seenMasterNumbers.add(item.masterNumber);
+            }
+
+            return {
+                index,
+                masterNumber: item.masterNumber,
+                name: normalizedName,
+                lectureVideos: videos,
+                skipReason,
+            };
         });
-        const existingNameSet = new Set(existingProblems.map(p => p.name));
 
-        const newItems = uniqueItems.filter(item => !existingNameSet.has(item.name));
-
-        if (newItems.length === 0) {
-            return { success: true, count: 0, warnings: ['全てのCoreProblemは既に存在します'] };
+        for (const item of normalizedItems) {
+            if (item.skipReason) {
+                skippedCount += 1;
+                warnings.push(item.skipReason);
+            }
         }
 
-        // Determine start order
-        const lastProblem = await prisma.coreProblem.findFirst({
-            where: { subjectId },
-            orderBy: { order: 'desc' }
-        });
-        let order = (lastProblem?.order || 0) + 1;
+        const validItems = normalizedItems.filter((item) => !item.skipReason);
+        if (validItems.length === 0) {
+            return {
+                success: true,
+                createdCount,
+                updatedCount,
+                unchangedCount,
+                skippedCount,
+                warnings,
+            };
+        }
 
-        await prisma.$transaction(
-            newItems.map(item =>
-                prisma.coreProblem.create({
+        const existingCoreProblems = await prisma.coreProblem.findMany({
+            where: { subjectId },
+            select: {
+                id: true,
+                name: true,
+                masterNumber: true,
+                order: true,
+                lectureVideos: true,
+            },
+        });
+
+        const existingByMaster = new Map<number, (typeof existingCoreProblems)[number]>();
+        const existingByName = new Map<string, (typeof existingCoreProblems)[number][]>();
+        let maxOrder = 0;
+        for (const coreProblem of existingCoreProblems) {
+            existingByMaster.set(coreProblem.masterNumber, coreProblem);
+            const key = normalizeCoreProblemName(coreProblem.name);
+            const list = existingByName.get(key) || [];
+            list.push(coreProblem);
+            existingByName.set(key, list);
+            maxOrder = Math.max(maxOrder, coreProblem.order);
+        }
+
+        const operations: Prisma.PrismaPromise<unknown>[] = [];
+        const usedExistingIds = new Set<string>();
+
+        for (const item of validItems) {
+            const existingByMasterHit = existingByMaster.get(item.masterNumber);
+            let target = existingByMasterHit;
+
+            if (!target) {
+                const byNameCandidates = (existingByName.get(item.name) || []).filter((cp) => !usedExistingIds.has(cp.id));
+                if (byNameCandidates.length === 1) {
+                    target = byNameCandidates[0];
+                    warnings.push(`行${item.index + 1}: 同名既存CoreProblemにマスタNo ${item.masterNumber} を割り当てて更新しました`);
+                } else if (byNameCandidates.length > 1) {
+                    skippedCount += 1;
+                    warnings.push(`行${item.index + 1}: 同名候補が複数のため更新先を特定できずスキップしました`);
+                    continue;
+                }
+            }
+
+            if (!target) {
+                maxOrder += 1;
+                operations.push(
+                    prisma.coreProblem.create({
+                        data: {
+                            subjectId,
+                            name: item.name,
+                            masterNumber: item.masterNumber,
+                            order: maxOrder,
+                            lectureVideos: toLectureVideosJson(item.lectureVideos),
+                        },
+                    })
+                );
+                createdCount += 1;
+                continue;
+            }
+
+            usedExistingIds.add(target.id);
+            const currentVideos = normalizeLectureVideos((target.lectureVideos as LectureVideo[] | null) || []);
+            const isChanged =
+                target.name !== item.name
+                || target.masterNumber !== item.masterNumber
+                || !areLectureVideosEqual(currentVideos, item.lectureVideos);
+
+            if (!isChanged) {
+                unchangedCount += 1;
+                continue;
+            }
+
+            operations.push(
+                prisma.coreProblem.update({
+                    where: { id: target.id },
                     data: {
                         name: item.name,
-                        lectureVideos: toLectureVideosJson(item.lectureVideos),
-                        subjectId,
-                        order: order++
-                    }
+                        masterNumber: item.masterNumber,
+                        lectureVideos:
+                            item.lectureVideos.length > 0
+                                ? toLectureVideosJson(item.lectureVideos)
+                                : Prisma.DbNull,
+                    },
                 })
-            )
-        );
+            );
+            updatedCount += 1;
+        }
+
+        if (operations.length > 0) {
+            await prisma.$transaction(operations);
+            await resequenceCoreProblemsForSubject(subjectId);
+        }
 
         revalidatePath('/admin/curriculum');
-
-        const warnings = existingNameSet.size > 0
-            ? [`${existingNameSet.size}件のCoreProblemは既に存在するためスキップされました`]
-            : [];
-
-        return { success: true, count: newItems.length, warnings };
+        return {
+            success: true,
+            createdCount,
+            updatedCount,
+            unchangedCount,
+            skippedCount,
+            warnings,
+        };
     } catch (error) {
-        console.error('Failed to bulk create core problems:', error);
+        console.error('Failed to bulk upsert core problems:', error);
+        const uniqueMessage = extractUniqueConstraintMessage(error);
+        if (uniqueMessage) {
+            return { error: uniqueMessage };
+        }
         return { error: '一括登録に失敗しました' };
     }
 }
@@ -170,14 +499,31 @@ export async function bulkCreateCoreProblems(subjectId: string, items: { name: s
 export async function reorderCoreProblems(items: { id: string, order: number }[]) {
     await requireAdmin();
     try {
-        await prisma.$transaction(
-            items.map((item) =>
-                prisma.coreProblem.update({
+        if (items.length === 0) {
+            return { success: true };
+        }
+
+        const targets = await prisma.coreProblem.findMany({
+            where: { id: { in: items.map((item) => item.id) } },
+            select: { subjectId: true },
+        });
+        const subjectIds = Array.from(new Set(targets.map((target) => target.subjectId)));
+        if (subjectIds.length !== 1) {
+            return { error: '同一教科のCoreProblemのみ並び替えできます' };
+        }
+        const subjectId = subjectIds[0];
+
+        await prisma.$transaction(async (tx) => {
+            for (const item of items) {
+                await tx.coreProblem.update({
                     where: { id: item.id },
                     data: { order: item.order },
-                })
-            )
-        );
+                });
+            }
+
+            await resequenceCoreProblemsInTransaction(subjectId, tx);
+        });
+
         revalidatePath('/admin/curriculum');
         return { success: true };
     } catch (error) {

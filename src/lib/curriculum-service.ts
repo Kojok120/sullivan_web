@@ -18,6 +18,7 @@ export async function fetchSubjects(options?: { includeCoreProblems?: boolean })
                 select: {
                     id: true,
                     name: true,
+                    masterNumber: true,
                     order: true,
                     createdAt: true,
                     updatedAt: true,
@@ -32,6 +33,7 @@ export async function fetchSubjects(options?: { includeCoreProblems?: boolean })
 
 export async function getMaxCustomIdNumber(
     prefix: string,
+    subjectId: string,
     client: CurriculumServiceClient = prisma
 ): Promise<number> {
     const prefixDash = prefix + '-';
@@ -44,7 +46,8 @@ export async function getMaxCustomIdNumber(
         const result = await client.$queryRaw<Array<{ max_num: number | string | bigint | null }>>`
             SELECT MAX(CAST(SUBSTRING("customId", ${lengthPlusOne}::integer) AS INTEGER)) as max_num
             FROM "Problem"
-            WHERE "customId" LIKE ${prefixDash + '%'}
+            WHERE "subjectId" = ${subjectId}
+            AND "customId" LIKE ${prefixDash + '%'}
             -- Ensure we only pick ones that look like number at the end to avoid casting errors
             AND "customId" ~ ${'^' + prefixDash + '[0-9]+$'}
         `;
@@ -57,7 +60,10 @@ export async function getMaxCustomIdNumber(
         // Fallback: Fetch all and parse in JS (safe slow method)
         // This is necessary if someone manually inserted "E-NaN" or strict mode issues
         const all = await client.problem.findMany({
-            where: { customId: { startsWith: prefixDash } },
+            where: {
+                subjectId,
+                customId: { startsWith: prefixDash }
+            },
             select: { customId: true }
         });
 
@@ -82,7 +88,7 @@ export async function getNextCustomId(subjectId: string, tx?: CurriculumServiceC
     if (!subject) throw new Error('Subject not found');
 
     const prefix = getSubjectPrefix(subject.name);
-    const maxNum = await getMaxCustomIdNumber(prefix, client);
+    const maxNum = await getMaxCustomIdNumber(prefix, subjectId, client);
 
     return `${prefix}-${maxNum + 1}`;
 }
@@ -100,7 +106,7 @@ export async function getNextCustomIds(
     if (!subject) throw new Error('Subject not found');
 
     const prefix = getSubjectPrefix(subject.name);
-    const maxNum = await getMaxCustomIdNumber(prefix, client);
+    const maxNum = await getMaxCustomIdNumber(prefix, subjectId, client);
 
     return Array.from({ length: count }, (_, i) => `${prefix}-${maxNum + i + 1}`);
 }

@@ -212,6 +212,7 @@ export function ProblemManager({
             <BulkImportDialog
                 open={isBulkDialogOpen}
                 onOpenChange={setIsBulkDialogOpen}
+                subjects={subjects}
                 onSuccess={() => {
                     setIsBulkDialogOpen(false);
                     router.refresh();

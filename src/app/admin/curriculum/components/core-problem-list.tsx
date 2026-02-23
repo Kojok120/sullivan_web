@@ -205,7 +205,10 @@ function SortableCoreProblemItem({ coreProblem, isSelected, isChecked, onSelect,
                             </form>
                         ) : (
                             <div>
-                                <div className="font-medium text-sm truncate">{coreProblem.name}</div>
+                                <div className="font-medium text-sm truncate flex items-center gap-2">
+                                    <span className="font-mono text-xs text-muted-foreground">#{coreProblem.masterNumber}</span>
+                                    <span className="truncate">{coreProblem.name}</span>
+                                </div>
                                 {lectureVideos.length > 0 && (
                                     <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
                                         {lectureVideos.map((v, i) => (
@@ -294,7 +297,12 @@ export function CoreProblemList({ subjectId, coreProblems, selectedId, onSelect 
             const oldIndex = items.findIndex((i) => i.id === active.id);
             const newIndex = items.findIndex((i) => i.id === over.id);
 
-            const newItems = arrayMove(items, oldIndex, newIndex);
+            const reordered = arrayMove(items, oldIndex, newIndex);
+            const newItems = reordered.map((item, index) => ({
+                ...item,
+                order: index + 1,
+                masterNumber: index + 1,
+            }));
             setItems(newItems);
 
             const updates = newItems.map((item, index) => ({
@@ -322,7 +330,6 @@ export function CoreProblemList({ subjectId, coreProblems, selectedId, onSelect 
         const result = await createCoreProblem({
             name: newName,
             subjectId,
-            order: items.length + 1,
             lectureVideos: validVideos.length > 0 ? validVideos : undefined,
         });
 
