@@ -166,7 +166,8 @@ export function parseCoreProblemTSV(input: string, skipHeader = true): ParsedCor
 
     return dataRows.map((cols) => {
         const masterNumberRaw = (cols[0] || '').trim();
-        const masterNumberParsed = parseInt(masterNumberRaw, 10);
+        const normalizedMasterNumber = masterNumberRaw.replace(/[^\d]/g, '');
+        const masterNumberParsed = parseInt(normalizedMasterNumber, 10);
         const masterNumber = Number.isInteger(masterNumberParsed) ? masterNumberParsed : undefined;
         const name = (cols[1] || '').trim();
 

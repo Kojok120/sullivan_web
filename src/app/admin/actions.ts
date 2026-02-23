@@ -228,6 +228,12 @@ export async function updateUser(
         });
         if (!syncResult.success) {
             console.error('Supabase app_metadata sync failed after updateUser:', syncResult.error);
+            revalidatePath('/admin/users');
+            return {
+                success: true,
+                user,
+                warning: 'ユーザーは更新しましたが、Supabaseの権限同期に失敗しました。再実行してください。',
+            };
         }
 
         revalidatePath('/admin/users');

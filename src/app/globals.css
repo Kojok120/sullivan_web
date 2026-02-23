@@ -136,12 +136,4 @@
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
-
-  .h-dvh {
-    height: 100dvh;
-  }
-
-  .min-h-dvh {
-    min-height: 100dvh;
-  }
 }

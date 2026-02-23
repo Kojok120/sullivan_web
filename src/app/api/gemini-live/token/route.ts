@@ -40,7 +40,7 @@ export async function POST(request: Request) {
     }
 
     try {
-        const issued = issueGeminiLiveSessionToken(session.userId);
+        const issued = issueGeminiLiveSessionToken(targetStudentId);
         return NextResponse.json({
             token: issued.token,
             expiresAt: issued.expiresAt,

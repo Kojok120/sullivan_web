@@ -1,22 +1,23 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
+import { getCurrentUser } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 import { ClassroomPlan } from '@prisma/client';
+import { isTeacherOrAdminRole } from '@/lib/authorization';
 
 export async function getClassrooms(query?: string) {
-    const session = await getSession();
+    const session = await getCurrentUser();
     if (!session) {
         throw new Error('Unauthorized');
     }
-    // Teachers, Head Teachers and Admins can view classrooms
-    if (session.role !== 'ADMIN' && session.role !== 'TEACHER' && session.role !== 'HEAD_TEACHER') {
+    // 講師系ユーザーと管理者は教室一覧を閲覧可能
+    if (!isTeacherOrAdminRole(session.role)) {
         throw new Error('Forbidden');
     }
 
     const { fetchClassrooms } = await import('@/lib/classroom-service');
-    // Unifying sort order to Name ASC for consistency across the app
+    // アプリ内の教室一覧は名前昇順に統一
     return await fetchClassrooms({
         query,
         orderBy: 'name',
@@ -25,9 +26,9 @@ export async function getClassrooms(query?: string) {
 }
 
 export async function getClassroom(id: string) {
-    const session = await getSession();
+    const session = await getCurrentUser();
     if (!session) throw new Error('Unauthorized');
-    if (session.role !== 'ADMIN' && session.role !== 'TEACHER' && session.role !== 'HEAD_TEACHER') {
+    if (!isTeacherOrAdminRole(session.role)) {
         throw new Error('Forbidden');
     }
 
@@ -35,14 +36,14 @@ export async function getClassroom(id: string) {
         where: { id },
         include: {
             users: {
-                orderBy: { name: 'asc' }, // Or loginId
+                orderBy: { name: 'asc' }, // loginIdではなく名前順で表示
             }
         }
     });
 }
 
 export async function createClassroom(formData: FormData) {
-    const session = await getSession();
+    const session = await getCurrentUser();
     if (!session || session.role !== 'ADMIN') {
         return { error: 'Unauthorized' };
     }
@@ -77,10 +78,10 @@ export async function createClassroom(formData: FormData) {
     }
 }
 
-// updateClassroom was removed as it was unused - updateClassroomGroups is used instead
+// 未使用だった updateClassroom は削除済み（updateClassroomGroups を利用）
 
 export async function deleteClassroom(classroomId: string) {
-    const session = await getSession();
+    const session = await getCurrentUser();
     if (!session || session.role !== 'ADMIN') {
         return { error: 'Unauthorized' };
     }
@@ -107,7 +108,7 @@ export async function deleteClassroom(classroomId: string) {
 }
 
 export async function updateClassroomGroups(id: string, groups: string[]) {
-    const session = await getSession();
+    const session = await getCurrentUser();
     if (!session || session.role !== 'ADMIN') {
         return { error: 'Unauthorized' };
     }
@@ -126,7 +127,7 @@ export async function updateClassroomGroups(id: string, groups: string[]) {
 }
 
 export async function updateClassroomPlan(id: string, plan: ClassroomPlan) {
-    const session = await getSession();
+    const session = await getCurrentUser();
     if (!session || session.role !== 'ADMIN') {
         return { error: 'Unauthorized' };
     }

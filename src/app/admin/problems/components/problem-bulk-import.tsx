@@ -210,7 +210,7 @@ export function BulkImportDialog({ open, onOpenChange, subjects, onSuccess }: Bu
         });
     }, [parsedData, coreProblems, resolvedCoreProblems]);
 
-        const validItems = useMemo(() => visibleItems.filter(p => p.isValid), [visibleItems]);
+    const validItems = useMemo(() => visibleItems.filter(p => p.isValid), [visibleItems]);
     const validCount = validItems.length;
     const hasSubjectFallback = selectedSubjectId !== AUTO_SUBJECT_VALUE;
     const missingCoreProblemCount = useMemo(() => {
