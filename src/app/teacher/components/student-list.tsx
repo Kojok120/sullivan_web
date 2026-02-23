@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { DateDisplay } from '@/components/ui/date-display';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import type { KeyboardEvent } from 'react';
 import { StudentStats } from '@/lib/analytics';
 import { User } from '@prisma/client';
 
@@ -27,6 +28,16 @@ export function StudentList({
     showDetailButton = false,
 }: StudentListProps) {
     const router = useRouter();
+    const handleNavigateToStudent = (studentId: string) => {
+        router.push(`${linkPrefix}${studentId}`);
+    };
+
+    const handleInteractiveKeyDown = (event: KeyboardEvent<HTMLElement>, studentId: string) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            handleNavigateToStudent(studentId);
+        }
+    };
 
     const renderEmpty = () => (
         <div className="rounded-md border py-8 text-center text-sm text-muted-foreground">
@@ -44,7 +55,10 @@ export function StudentList({
                         <div
                             key={student.id}
                             className={`rounded-lg border bg-card p-4 ${showDetailButton ? '' : 'cursor-pointer'}`}
-                            onClick={showDetailButton ? undefined : () => router.push(`${linkPrefix}${student.id}`)}
+                            role={showDetailButton ? undefined : 'link'}
+                            tabIndex={showDetailButton ? undefined : 0}
+                            onClick={showDetailButton ? undefined : () => handleNavigateToStudent(student.id)}
+                            onKeyDown={showDetailButton ? undefined : (event) => handleInteractiveKeyDown(event, student.id)}
                         >
                             <div className="mb-3">
                                 <p className="text-base font-semibold">{student.name || '未設定'}</p>
@@ -109,7 +123,10 @@ export function StudentList({
                             <TableRow
                                 key={student.id}
                                 className={showDetailButton ? '' : 'cursor-pointer hover:bg-muted/50 transition-colors'}
-                                onClick={showDetailButton ? undefined : () => router.push(`${linkPrefix}${student.id}`)}
+                                role={showDetailButton ? undefined : 'link'}
+                                tabIndex={showDetailButton ? undefined : 0}
+                                onClick={showDetailButton ? undefined : () => handleNavigateToStudent(student.id)}
+                                onKeyDown={showDetailButton ? undefined : (event) => handleInteractiveKeyDown(event, student.id)}
                             >
                                 <TableCell className="font-medium">
                                     <div>{student.name || '未設定'}</div>

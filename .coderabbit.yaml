@@ -24,6 +24,9 @@ reviews:
     - path: "src/**"
       instructions: |
         このプロジェクトは Next.js 16 (App Router) + TypeScript + Tailwind CSS v4 の学習管理システムです。
+        ロールは `STUDENT, TEACHER, HEAD_TEACHER, PARENT, ADMIN` が正式定義です。
+        `HEAD_TEACHER` を削除する提案は行わないでください。
+        `getCurrentUser` は `getSession` のエイリアスとして扱っています。
         以下の観点でレビューしてください:
         - Server Actions / API Routes の適切な使い分け
         - Prisma クエリのN+1問題やパフォーマンス
@@ -37,6 +40,10 @@ reviews:
         - インデックスの適切な設定
         - リレーションの整合性
         - マイグレーションへの影響
+    - path: "prisma/seed.ts"
+      instructions: |
+        seedスクリプトは `ts-node` 実行のため、Next.jsの実行時制約とは切り離してレビューしてください。
+        `PrismaClient` を直接生成する実装は許容します。
     - path: "**/*.sh"
       instructions: |
         デプロイスクリプトの変更時は、環境変数の漏洩やセキュリティリスクがないか注意深く確認してください。

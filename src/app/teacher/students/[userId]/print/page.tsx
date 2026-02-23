@@ -1,4 +1,4 @@
-import { getSession } from '@/lib/auth';
+import { getSession, isTeacherOrAdmin } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { SharedStudentPrintPage } from '@/components/print/shared-student-print-page';
 import { canAccessUserWithinClassroomScope } from '@/lib/authorization';
@@ -11,7 +11,7 @@ export default async function PrintPage({
     searchParams: Promise<{ subjectId?: string; coreProblemId?: string; sets?: string }>;
 }) {
     const session = await getSession();
-    if (!session || (session.role !== 'TEACHER' && session.role !== 'HEAD_TEACHER' && session.role !== 'ADMIN')) {
+    if (!isTeacherOrAdmin(session)) {
         redirect('/login');
     }
 

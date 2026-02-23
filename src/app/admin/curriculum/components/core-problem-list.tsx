@@ -206,7 +206,7 @@ function SortableCoreProblemItem({ coreProblem, isSelected, isChecked, onSelect,
                         ) : (
                             <div>
                                 <div className="font-medium text-sm truncate flex items-center gap-2">
-                                    <span className="font-mono text-xs text-muted-foreground">#{coreProblem.masterNumber}</span>
+                                    <span className="font-mono text-xs text-muted-foreground">#{coreProblem.masterNumber ?? '-'}</span>
                                     <span className="truncate">{coreProblem.name}</span>
                                 </div>
                                 {lectureVideos.length > 0 && (

@@ -24,6 +24,8 @@ import {
 import { Loader2 } from 'lucide-react';
 import { NONE_SELECTION_VALUE, normalizeOptionalSelection } from '@/lib/form-selection';
 import type { ClassroomOption, GroupOption } from '@/lib/types/classroom';
+import { DEFAULT_INITIAL_PASSWORD } from '@/lib/auth-constants';
+import { toast } from 'sonner';
 
 type UserWithGroup = User;
 
@@ -85,7 +87,7 @@ function UserFormDialogContent({
             const classroomRequired = requiresClassroom(formData.role);
 
             if (classroomRequired && !normalizedClassroom) {
-                alert('この役割では教室選択が必須です');
+                toast.error('この役割では教室選択が必須です');
                 return;
             }
 
@@ -111,8 +113,11 @@ function UserFormDialogContent({
             if (result.success) {
                 onOpenChange(false);
                 onSuccess();
+                if ('warning' in result && typeof result.warning === 'string' && result.warning.length > 0) {
+                    toast.warning(result.warning);
+                }
             } else {
-                alert(result.error);
+                toast.error(result.error || 'ユーザー操作に失敗しました');
             }
         });
     };
@@ -161,7 +166,7 @@ function UserFormDialogContent({
                     <Label className="text-left sm:text-right">初期パスワード</Label>
                     <div className="text-sm text-muted-foreground sm:col-span-3">
                         {isEdit ? 'パスワード変更は「パスワード変更」メニューから実行してください。' : (
-                            <>新規作成時の初期パスワードは <code>password123</code> です（初回変更必須）。</>
+                            <>新規作成時の初期パスワードは <code>{DEFAULT_INITIAL_PASSWORD}</code> です（初回変更必須）。</>
                         )}
                     </div>
                 </div>
