@@ -45,7 +45,7 @@ export default async function TeacherStudentDetailPage({
 
     if (!dashboardData || !dashboardData.student) {
         return (
-            <div className="container mx-auto py-8 px-4 text-center">
+            <div className="container mx-auto px-4 py-6 text-center sm:py-8">
                 <h1 className="text-2xl font-bold">生徒が見つかりません</h1>
                 <Button asChild className="mt-4">
                     <Link href="/teacher">一覧に戻る</Link>
@@ -59,15 +59,15 @@ export default async function TeacherStudentDetailPage({
 
 
     return (
-        <div className="container mx-auto py-8 px-4 space-y-8">
-            <div className="flex items-center gap-4">
+        <div className="container mx-auto space-y-6 px-4 py-6 sm:space-y-8 sm:py-8">
+            <div className="flex items-start gap-3 sm:items-center sm:gap-4">
                 <Button variant="ghost" size="icon" asChild>
                     <Link href="/teacher">
                         <ArrowLeft className="h-5 w-5" />
                     </Link>
                 </Button>
-                <div>
-                    <h1 className="text-3xl font-bold flex items-center gap-3">
+                <div className="min-w-0">
+                    <h1 className="flex flex-wrap items-center gap-2 text-2xl font-bold sm:text-3xl">
                         {student.name || student.loginId}
                         {student.group && <Badge variant="outline">{student.group}</Badge>}
                     </h1>
@@ -76,15 +76,17 @@ export default async function TeacherStudentDetailPage({
             </div>
 
             <Tabs defaultValue={defaultTab} className="space-y-4">
-                <TabsList>
-                    <TabsTrigger value="overview">学習状況</TabsTrigger>
-                    <TabsTrigger value="history">学習履歴ログ</TabsTrigger>
-                    <TabsTrigger value="profile">生徒情報</TabsTrigger>
-                </TabsList>
+                <div className="overflow-x-auto pb-1">
+                    <TabsList className="w-max min-w-full sm:min-w-0">
+                        <TabsTrigger value="overview">学習状況</TabsTrigger>
+                        <TabsTrigger value="history">学習履歴ログ</TabsTrigger>
+                        <TabsTrigger value="profile">生徒情報</TabsTrigger>
+                    </TabsList>
+                </div>
 
                 <TabsContent value="overview" className="space-y-4">
                     {/* Overview Stats */}
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                         <PrintProblemCard userId={student.id} subjects={subjects} />
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -144,7 +146,7 @@ export default async function TeacherStudentDetailPage({
                                 <div className="space-y-4">
                                     {weaknesses.length > 0 ? (
                                         weaknesses.map((w) => (
-                                            <div key={w.coreProblemId} className="flex items-center justify-between border-b pb-2 last:border-0">
+                                            <div key={w.coreProblemId} className="flex flex-col gap-1 border-b pb-2 last:border-0 sm:flex-row sm:items-center sm:justify-between">
                                                 <div className="space-y-1">
                                                     <p className="font-medium text-sm">{w.coreProblemName}</p>
                                                     <p className="text-xs text-muted-foreground">{w.subjectName}</p>
@@ -183,7 +185,7 @@ export default async function TeacherStudentDetailPage({
                         <CardContent className="space-y-8">
                             {subjectProgress.map((subject) => (
                                 <div key={subject.subjectId} className="space-y-2">
-                                    <div className="flex items-center justify-between">
+                                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                                         <div className="space-y-0.5">
                                             <div className="font-medium">{subject.subjectName}</div>
                                         </div>
@@ -203,7 +205,7 @@ export default async function TeacherStudentDetailPage({
                 </TabsContent>
 
                 <TabsContent value="profile" className="space-y-4">
-                    <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-4 lg:grid-cols-2">
                         <ProfileCard
                             userId={student.id}
                             initialBio={student.bio}

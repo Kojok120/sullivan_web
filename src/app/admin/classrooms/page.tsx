@@ -11,10 +11,10 @@ export default async function ClassroomsPage({
     const classrooms = await getClassrooms(query);
 
     return (
-        <div className="container mx-auto py-10 space-y-8">
+        <div className="container mx-auto space-y-6 px-4 py-6 sm:space-y-8 sm:py-10">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">教室管理</h1>
+                    <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">教室管理</h1>
                     <p className="text-muted-foreground">
                         教室とグループ（曜日など）の管理を行います。
                     </p>
@@ -25,4 +25,3 @@ export default async function ClassroomsPage({
         </div>
     );
 }
-

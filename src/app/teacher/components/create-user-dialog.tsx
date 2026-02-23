@@ -77,12 +77,12 @@ export function CreateUserDialog({ canCreateTeacher, groups, onCreated }: Create
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="gap-2">
+        <Button className="min-h-11 gap-2 sm:min-h-10">
           <Plus className="h-4 w-4" />
           ユーザー追加
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>教室ユーザー追加</DialogTitle>
           <DialogDescription>
@@ -143,10 +143,10 @@ export function CreateUserDialog({ canCreateTeacher, groups, onCreated }: Create
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)} disabled={isPending}>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={isPending} className="min-h-11 sm:min-h-10">
             キャンセル
           </Button>
-          <Button onClick={handleSubmit} disabled={isPending}>
+          <Button onClick={handleSubmit} disabled={isPending} className="min-h-11 sm:min-h-10">
             {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             作成
           </Button>

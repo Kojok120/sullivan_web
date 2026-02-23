@@ -184,8 +184,8 @@ export function UserList({
                     </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-4 items-center bg-muted/30 p-4 rounded-lg">
-                    <form onSubmit={handleSearch} className="flex gap-2 w-full sm:w-auto">
+                <div className="flex flex-col gap-4 rounded-lg bg-muted/30 p-4 sm:flex-row sm:items-center">
+                    <form onSubmit={handleSearch} className="flex w-full gap-2 sm:w-auto">
                         <Input
                             placeholder="名前またはIDで検索"
                             value={search}
@@ -195,13 +195,13 @@ export function UserList({
                         <Button type="submit" variant="secondary">検索</Button>
                     </form>
 
-                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
                         <Filter className="h-4 w-4 text-muted-foreground" />
                         <Select
                             value={roleFilter || 'ALL'}
                             onValueChange={handleRoleFilter}
                         >
-                            <SelectTrigger className="w-[150px] bg-background">
+                            <SelectTrigger className="w-full bg-background sm:w-[150px]">
                                 <SelectValue placeholder="役割" />
                             </SelectTrigger>
                             <SelectContent>
@@ -218,7 +218,7 @@ export function UserList({
                             value={classroomIdFilter || 'ALL'}
                             onValueChange={handleClassroomFilter}
                         >
-                            <SelectTrigger className="w-[150px] bg-background">
+                            <SelectTrigger className="w-full bg-background sm:w-[150px]">
                                 <SelectValue placeholder="教室" />
                             </SelectTrigger>
                             <SelectContent>
@@ -234,7 +234,56 @@ export function UserList({
                 </div>
             </div>
 
-            <div className="rounded-md border bg-white">
+            <div className="space-y-3 md:hidden">
+                {initialUsers.length === 0 ? (
+                    <div className="rounded-lg border bg-white p-6 text-center text-sm text-muted-foreground">
+                        ユーザーが見つかりません
+                    </div>
+                ) : (
+                    initialUsers.map((user) => (
+                        <div key={user.id} className="rounded-lg border bg-white p-4">
+                            <div className="mb-3 flex items-start justify-between gap-3">
+                                <div>
+                                    <p className="text-base font-semibold">{user.name || '-'}</p>
+                                    <p className="text-xs text-muted-foreground">{user.loginId}</p>
+                                </div>
+                                <RoleBadge role={user.role} />
+                            </div>
+                            <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+                                <div>
+                                    <p className="text-xs text-muted-foreground">教室</p>
+                                    <p>{user.classroom?.name || '-'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-muted-foreground">作成日</p>
+                                    <p><DateDisplay date={user.createdAt} /></p>
+                                </div>
+                            </div>
+                            <div className="mt-3 grid grid-cols-2 gap-2">
+                                <Button variant="outline" size="sm" className="min-h-11" onClick={() => openEdit(user)}>
+                                    <Pencil className="mr-1 h-4 w-4" />
+                                    編集
+                                </Button>
+                                <Button variant="outline" size="sm" className="min-h-11" onClick={() => openPasswordReset(user)}>
+                                    <KeyRound className="mr-1 h-4 w-4" />
+                                    PW
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="col-span-2 min-h-11 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                    onClick={() => openDelete(user)}
+                                >
+                                    <Trash2 className="mr-1 h-4 w-4" />
+                                    削除
+                                </Button>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+
+            <div className="hidden rounded-md border bg-white md:block">
                 <Table>
                     <TableHeader>
                         <TableRow>

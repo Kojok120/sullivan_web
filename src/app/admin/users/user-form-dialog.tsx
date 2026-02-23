@@ -124,28 +124,28 @@ function UserFormDialogContent({
         : '新しいユーザーアカウントを作成します。ログインIDは自動生成されます。';
 
     return (
-        <DialogContent>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
             <DialogHeader>
                 <DialogTitle>{title}</DialogTitle>
                 <DialogDescription>{description}</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="name" className="text-right">名前</Label>
+                <div className="grid grid-cols-1 items-center gap-2 sm:grid-cols-4 sm:gap-4">
+                    <Label htmlFor="name" className="text-left sm:text-right">名前</Label>
                     <Input
                         id="name"
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        className="col-span-3"
+                        className="sm:col-span-3"
                     />
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="role" className="text-right">役割</Label>
+                <div className="grid grid-cols-1 items-center gap-2 sm:grid-cols-4 sm:gap-4">
+                    <Label htmlFor="role" className="text-left sm:text-right">役割</Label>
                     <Select
                         value={formData.role}
                         onValueChange={(value: Role) => setFormData({ ...formData, role: value })}
                     >
-                        <SelectTrigger className="col-span-3">
+                        <SelectTrigger className="sm:col-span-3">
                             <SelectValue placeholder="役割を選択" />
                         </SelectTrigger>
                         <SelectContent>
@@ -157,21 +157,21 @@ function UserFormDialogContent({
                         </SelectContent>
                     </Select>
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                    <Label className="text-right">初期パスワード</Label>
-                    <div className="col-span-3 text-sm text-muted-foreground">
+                <div className="grid grid-cols-1 items-center gap-2 sm:grid-cols-4 sm:gap-4">
+                    <Label className="text-left sm:text-right">初期パスワード</Label>
+                    <div className="text-sm text-muted-foreground sm:col-span-3">
                         {isEdit ? 'パスワード変更は「パスワード変更」メニューから実行してください。' : (
                             <>新規作成時の初期パスワードは <code>password123</code> です（初回変更必須）。</>
                         )}
                     </div>
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="classroomId" className="text-right">教室</Label>
+                <div className="grid grid-cols-1 items-center gap-2 sm:grid-cols-4 sm:gap-4">
+                    <Label htmlFor="classroomId" className="text-left sm:text-right">教室</Label>
                     <Select
                         value={formData.classroomId}
                         onValueChange={(value) => setFormData({ ...formData, classroomId: value })}
                     >
-                        <SelectTrigger className="col-span-3">
+                        <SelectTrigger className="sm:col-span-3">
                             <SelectValue placeholder={requiresClassroom(formData.role) ? "教室を選択 (必須)" : "教室を選択 (任意)"} />
                         </SelectTrigger>
                         <SelectContent>
@@ -182,13 +182,13 @@ function UserFormDialogContent({
                         </SelectContent>
                     </Select>
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="groupId" className="text-right">グループ</Label>
+                <div className="grid grid-cols-1 items-center gap-2 sm:grid-cols-4 sm:gap-4">
+                    <Label htmlFor="groupId" className="text-left sm:text-right">グループ</Label>
                     <Select
                         value={formData.groupId}
                         onValueChange={(value) => setFormData({ ...formData, groupId: value })}
                     >
-                        <SelectTrigger className="col-span-3">
+                        <SelectTrigger className="sm:col-span-3">
                             <SelectValue placeholder="グループを選択 (任意)" />
                         </SelectTrigger>
                         <SelectContent>
@@ -201,8 +201,8 @@ function UserFormDialogContent({
                 </div>
             </div>
             <DialogFooter>
-                <Button variant="outline" onClick={() => onOpenChange(false)}>キャンセル</Button>
-                <Button onClick={handleSubmit} disabled={isPending}>
+                <Button variant="outline" onClick={() => onOpenChange(false)} className="min-h-11 sm:min-h-10">キャンセル</Button>
+                <Button onClick={handleSubmit} disabled={isPending} className="min-h-11 sm:min-h-10">
                     {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     {isEdit ? '更新' : '作成'}
                 </Button>

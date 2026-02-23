@@ -73,7 +73,7 @@ function ProblemDialogForm({
     };
 
     return (
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
             <DialogHeader>
                 <DialogTitle>{problem ? '問題の編集' : '新規問題作成'}</DialogTitle>
                 <DialogDescription>
@@ -82,8 +82,8 @@ function ProblemDialogForm({
             </DialogHeader>
 
             <form onSubmit={handleSubmit} className="space-y-6 py-4">
-                <div className="flex space-x-4">
-                    <div className="flex-1 space-y-2">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+                    <div className="space-y-2 sm:col-span-1">
                         <Label>マスタ内問題番号 (任意)</Label>
                         <Input
                             type="number"
@@ -95,7 +95,7 @@ function ProblemDialogForm({
                             placeholder="例: 1001"
                         />
                     </div>
-                    <div className="flex-[3] space-y-2">
+                    <div className="space-y-2 sm:col-span-3">
                         <Label>問題文</Label>
                         <Textarea
                             required
@@ -107,7 +107,7 @@ function ProblemDialogForm({
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
                         <Label>解答 (任意)</Label>
                         <Input
@@ -145,8 +145,8 @@ function ProblemDialogForm({
                 </div>
 
                 <DialogFooter>
-                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>キャンセル</Button>
-                    <Button type="submit" disabled={isPending}>
+                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="min-h-11 sm:min-h-10">キャンセル</Button>
+                    <Button type="submit" disabled={isPending} className="min-h-11 sm:min-h-10">
                         {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                         保存
                     </Button>

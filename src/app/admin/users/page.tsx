@@ -48,17 +48,17 @@ export default async function UsersPage({
 
     return (
         <div className="min-h-screen bg-gray-50">
-            <div className="container mx-auto px-4 py-8">
-                <div className="flex justify-between items-center mb-6">
+            <div className="container mx-auto px-4 py-6 sm:py-8">
+                <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <h1 className="text-2xl font-bold text-gray-800">ユーザー管理</h1>
                     <Link href="/admin/users/register">
-                        <Button className="bg-blue-600 hover:bg-blue-700">
+                        <Button className="min-h-11 w-full bg-blue-600 hover:bg-blue-700 sm:min-h-10 sm:w-auto">
                             + 新規ユーザー登録
                         </Button>
                     </Link>
                 </div>
 
-                <div className="bg-white rounded-lg shadow p-6">
+                <div className="rounded-lg bg-white p-4 shadow sm:p-6">
                     <UserList
                         initialUsers={users}
                         total={total || 0}

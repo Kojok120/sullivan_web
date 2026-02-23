@@ -18,17 +18,17 @@ function ProblemItem({ problem }: { problem: Problem }) {
             {/* Inputs Grid */}
             <div className="flex-1 grid gap-2">
                 {/* Row 1: Question & Answer */}
-                <div className="flex gap-2 items-stretch">
+                <div className="flex flex-col items-stretch gap-2 sm:flex-row">
                     <div className="flex-1 p-2 text-sm font-medium whitespace-pre-wrap border rounded-md bg-transparent">
                         {problem.question}
                     </div>
-                    <div className="w-1/3 p-2 text-sm whitespace-pre-wrap border rounded-md bg-transparent">
+                    <div className="w-full p-2 text-sm whitespace-pre-wrap border rounded-md bg-transparent sm:w-1/3">
                         {problem.answer}
                     </div>
                 </div>
 
                 {/* Row 2: Secondary Info */}
-                <div className="flex gap-2 items-center">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                     {problem.videoUrl && (
                         <div className="relative flex-1">
                             <LinkIcon className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
@@ -72,9 +72,9 @@ export function ProblemEditor({ coreProblemId }: ProblemEditorProps) {
     return (
         <div className="flex flex-col h-full bg-slate-50/50">
             {/* Header */}
-            <div className="p-2 px-4 border-b bg-white flex justify-between items-center sticky top-0 z-10 shadow-sm gap-2">
-                <h3 className="font-semibold text-sm">問題一覧 ({problems.length})</h3>
-                <div className="text-xs text-muted-foreground bg-yellow-50 text-yellow-700 px-2 py-1 rounded border border-yellow-200">
+            <div className="sticky top-0 z-10 flex flex-col items-start justify-between gap-2 border-b bg-white p-2 px-4 shadow-sm sm:flex-row sm:items-center">
+                <h3 className="text-sm font-semibold">問題一覧 ({problems.length})</h3>
+                <div className="rounded border border-yellow-200 bg-yellow-50 px-2 py-1 text-xs text-muted-foreground text-yellow-700">
                     ※ここでの編集はできません。「問題管理」を使用してください
                 </div>
             </div>

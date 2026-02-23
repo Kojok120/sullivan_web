@@ -17,7 +17,7 @@ export default async function ClassroomDetailPage({
     }
 
     return (
-        <div className="container mx-auto py-10 space-y-8">
+        <div className="container mx-auto space-y-6 px-4 py-6 sm:space-y-8 sm:py-10">
             <ClassroomDetail classroom={classroom} canEditPlan={session?.role === 'ADMIN'} />
         </div>
     );

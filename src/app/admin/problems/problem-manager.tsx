@@ -115,15 +115,15 @@ export function ProblemManager({
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-1">
-                    <form onSubmit={handleSearch} className="flex gap-2 w-full sm:max-w-sm">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col gap-2 sm:flex-1 sm:flex-row sm:items-center">
+                    <form onSubmit={handleSearch} className="flex w-full gap-2 sm:max-w-sm">
                         <Input
                             placeholder="問題文、解答、ID、マスタNo、単元名で検索..."
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
                         />
-                        <Button type="submit" disabled={isPending}>
+                        <Button type="submit" disabled={isPending} className="min-h-11 sm:min-h-10">
                             検索
                         </Button>
                     </form>
@@ -153,10 +153,10 @@ export function ProblemManager({
                 </div>
 
                 <div className="flex gap-2">
-                    <Button onClick={() => setIsBulkDialogOpen(true)} variant="outline">
+                    <Button onClick={() => setIsBulkDialogOpen(true)} variant="outline" className="min-h-11 flex-1 sm:min-h-10 sm:flex-none">
                         一括登録
                     </Button>
-                    <Button onClick={handleCreate}>
+                    <Button onClick={handleCreate} className="min-h-11 flex-1 sm:min-h-10 sm:flex-none">
                         <Plus className="w-4 h-4 mr-2" />
                         新規作成
                     </Button>
@@ -171,7 +171,7 @@ export function ProblemManager({
                 onSort={handleSort}
             />
 
-            <div className="flex justify-between items-center text-sm text-muted-foreground">
+            <div className="flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
                 <div>全 {totalCount} 件</div>
                 <div className="flex gap-2 items-center">
                     {currentPage > 1 ? (

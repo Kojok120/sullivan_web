@@ -75,7 +75,7 @@ export function ProfileCard({
                 </CardHeader>
                 <CardContent>
                     <form action={handleSubmit} className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">生年月日</label>
                                 <Input
@@ -140,7 +140,7 @@ export function ProfileCard({
                                     placeholder="例: 090-1234-5678"
                                 />
                             </div>
-                            <div className="space-y-2 col-span-2">
+                            <div className="space-y-2 sm:col-span-2">
                                 <label className="text-sm font-medium">メールアドレス</label>
                                 <Input
                                     name="email"
@@ -169,11 +169,11 @@ export function ProfileCard({
                                 className="min-h-[100px]"
                             />
                         </div>
-                        <div className="flex justify-end gap-2">
-                            <Button type="button" variant="outline" onClick={() => setIsEditing(false)} disabled={isSaving}>
+                        <div className="flex flex-col-reverse justify-end gap-2 sm:flex-row">
+                            <Button type="button" variant="outline" onClick={() => setIsEditing(false)} disabled={isSaving} className="min-h-11 sm:min-h-10">
                                 キャンセル
                             </Button>
-                            <Button type="submit" disabled={isSaving}>
+                            <Button type="submit" disabled={isSaving} className="min-h-11 sm:min-h-10">
                                 {isSaving ? '保存中...' : '保存'}
                             </Button>
                         </div>
@@ -198,7 +198,7 @@ export function ProfileCard({
                 </Button>
             </CardHeader>
             <CardContent className="space-y-6 pt-4">
-                <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 sm:gap-4">
                     <div className="flex items-center gap-2">
                         <Calendar className="h-4 w-4 text-muted-foreground" />
                         <span className="text-muted-foreground">生年月日:</span>
@@ -224,7 +224,7 @@ export function ProfileCard({
                         <span className="text-muted-foreground">電話:</span>
                         <span>{initialPhoneNumber || '未設定'}</span>
                     </div>
-                    <div className="flex items-center gap-2 col-span-2">
+                    <div className="flex items-center gap-2 sm:col-span-2">
                         <Mail className="h-4 w-4 text-muted-foreground" />
                         <span className="text-muted-foreground">Email:</span>
                         <span>{initialEmail || '未設定'}</span>

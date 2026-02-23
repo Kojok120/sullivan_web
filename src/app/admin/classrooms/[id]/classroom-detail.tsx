@@ -84,14 +84,14 @@ export function ClassroomDetail({
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center gap-4">
+            <div className="flex items-start gap-3 sm:items-center sm:gap-4">
                 <Link href="/admin/classrooms">
                     <Button variant="ghost" size="icon">
                         <ArrowLeft className="h-4 w-4" />
                     </Button>
                 </Link>
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">{classroom.name}</h1>
+                    <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{classroom.name}</h1>
                     <p className="text-muted-foreground">教室の詳細情報と所属生徒の管理</p>
                 </div>
             </div>
@@ -131,7 +131,7 @@ export function ClassroomDetail({
                                     onClick={handleSavePlan}
                                     disabled={isPlanSaving}
                                     variant="secondary"
-                                    className="w-full"
+                                    className="min-h-11 w-full sm:min-h-10"
                                 >
                                     <Save className="mr-2 h-4 w-4" />
                                     プランを保存
@@ -151,7 +151,7 @@ export function ClassroomDetail({
                                     }
                                 }}
                             />
-                            <Button onClick={addGroup} size="icon" variant="secondary">
+                            <Button onClick={addGroup} size="icon" variant="secondary" className="h-11 w-11 sm:h-10 sm:w-10">
                                 <Plus className="h-4 w-4" />
                             </Button>
                         </div>
@@ -179,7 +179,7 @@ export function ClassroomDetail({
                         <Button
                             onClick={handleSaveGroups}
                             disabled={isSaving}
-                            className="w-full"
+                            className="min-h-11 w-full sm:min-h-10"
                         >
                             <Save className="mr-2 h-4 w-4" />
                             変更を保存
@@ -204,44 +204,77 @@ export function ClassroomDetail({
                                 所属している生徒はいません
                             </div>
                         ) : (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>ログインID</TableHead>
-                                        <TableHead>名前</TableHead>
-                                        <TableHead>役割</TableHead>
-                                        <TableHead>グループ</TableHead>
-                                        <TableHead className="text-right">操作</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
+                            <>
+                                <div className="space-y-3 md:hidden">
                                     {classroom.users.map((user) => (
-                                        <TableRow key={user.id}>
-                                            <TableCell className="font-medium">{user.loginId}</TableCell>
-                                            <TableCell>{user.name || '-'}</TableCell>
-                                            <TableCell>
+                                        <div key={user.id} className="rounded-lg border bg-card p-4">
+                                            <div className="mb-2 flex items-start justify-between gap-3">
+                                                <div>
+                                                    <p className="font-semibold">{user.name || '-'}</p>
+                                                    <p className="text-xs text-muted-foreground">{user.loginId}</p>
+                                                </div>
                                                 <RoleBadge role={user.role} />
-                                            </TableCell>
-                                            <TableCell>
+                                            </div>
+                                            <div className="mb-3 text-sm">
+                                                <p className="text-xs text-muted-foreground">グループ</p>
                                                 {user.group ? (
-                                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">
+                                                    <span className="mt-1 inline-flex items-center rounded bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                                                         {user.group}
                                                     </span>
                                                 ) : (
                                                     <span className="text-muted-foreground">-</span>
                                                 )}
-                                            </TableCell>
-                                            <TableCell className="text-right">
+                                            </div>
+                                            <Button asChild variant="outline" size="sm" className="min-h-11 w-full">
                                                 <Link href={`/teacher/students/${user.id}`}>
-                                                    <Button variant="ghost" size="sm">
-                                                        詳細
-                                                    </Button>
+                                                    詳細
                                                 </Link>
-                                            </TableCell>
-                                        </TableRow>
+                                            </Button>
+                                        </div>
                                     ))}
-                                </TableBody>
-                            </Table>
+                                </div>
+
+                                <div className="hidden md:block">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>ログインID</TableHead>
+                                                <TableHead>名前</TableHead>
+                                                <TableHead>役割</TableHead>
+                                                <TableHead>グループ</TableHead>
+                                                <TableHead className="text-right">操作</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {classroom.users.map((user) => (
+                                                <TableRow key={user.id}>
+                                                    <TableCell className="font-medium">{user.loginId}</TableCell>
+                                                    <TableCell>{user.name || '-'}</TableCell>
+                                                    <TableCell>
+                                                        <RoleBadge role={user.role} />
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {user.group ? (
+                                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">
+                                                                {user.group}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-muted-foreground">-</span>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell className="text-right">
+                                                        <Link href={`/teacher/students/${user.id}`}>
+                                                            <Button variant="ghost" size="sm">
+                                                                詳細
+                                                            </Button>
+                                                        </Link>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </>
                         )}
                     </CardContent>
                 </Card>
