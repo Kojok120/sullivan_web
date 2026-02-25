@@ -9,13 +9,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Link from 'next/link';
 import { ArrowLeft, AlertTriangle, Clock, Target, Trophy } from 'lucide-react';
 import { getStudentDashboardData } from '@/lib/analytics'; // Removed individual functions
-import { ActivityChart } from '@/app/dashboard/activity-chart';
 import { ProfileCard } from './profile-card';
 import { GuidanceList } from './guidance-list';
 import { PrintProblemCard } from './print-problem-card';
 import { DateDisplay } from '@/components/ui/date-display';
 import { SessionList } from '@/app/dashboard/components/session-list';
 import { canAccessUserWithinClassroomScope } from '@/lib/authorization';
+import { getGoalDailyViewPayload } from '@/lib/student-goal-service';
+import { TeacherGoalManagementCard } from '@/components/goals/teacher-goal-management-card';
 
 export default async function TeacherStudentDetailPage({
     params,
@@ -54,7 +55,8 @@ export default async function TeacherStudentDetailPage({
         );
     }
 
-    const { student, stats, subjectProgress, dailyActivity, weaknesses, subjects } = dashboardData;
+    const { student, stats, subjectProgress, weaknesses, subjects } = dashboardData;
+    const goalData = await getGoalDailyViewPayload({ studentId: student.id });
     const classrooms = await prisma.classroom.findMany({ orderBy: { createdAt: 'asc' } });
 
 
@@ -85,6 +87,12 @@ export default async function TeacherStudentDetailPage({
                 </div>
 
                 <TabsContent value="overview" className="space-y-4">
+                    <TeacherGoalManagementCard
+                        studentId={student.id}
+                        subjects={subjects}
+                        initialData={goalData}
+                    />
+
                     {/* Overview Stats */}
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                         <PrintProblemCard userId={student.id} subjects={subjects} />
@@ -166,15 +174,6 @@ export default async function TeacherStudentDetailPage({
                             </CardContent>
                         </Card>
 
-                        {/* Activity Chart */}
-                        <Card className="md:col-span-4">
-                            <CardHeader>
-                                <CardTitle>学習活動 (過去30日)</CardTitle>
-                            </CardHeader>
-                            <CardContent className="pl-2">
-                                <ActivityChart data={dailyActivity} />
-                            </CardContent>
-                        </Card>
                     </div>
 
                     {/* Subject Progress */}

@@ -4,7 +4,6 @@ import { getStudentStats, getSubjectProgress, getDailyActivity, getUnwatchedCoun
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Activity, Target, AlertTriangle, Zap, PlayCircle } from 'lucide-react';
-import { ActivityChart } from './activity-chart';
 import Link from 'next/link';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -12,17 +11,20 @@ import { Heatmap } from '@/components/gamification/heatmap';
 import { Badge } from '@/components/ui/badge';
 import { PrintSelector } from '@/components/print/print-selector';
 import { SubjectProgressList } from '@/components/subject-progress-list';
+import { getGoalDailyViewPayload } from '@/lib/student-goal-service';
+import { GoalReadonlyPanel } from '@/components/goals/goal-readonly-panel';
 
 export default async function DashboardPage() {
     const session = await getSession();
     if (!session) redirect('/login');
 
-    const [stats, subjectProgress, dailyActivity, unwatchedCount, unwatchedLectures] = await Promise.all([
+    const [stats, subjectProgress, dailyActivity, unwatchedCount, unwatchedLectures, goalData] = await Promise.all([
         getStudentStats(session.userId),
         getSubjectProgress(session.userId),
         getDailyActivity(session.userId, 365), // Fetch 1 year for heatmap
         getUnwatchedCount(session.userId),
-        getUnwatchedLectures(session.userId)
+        getUnwatchedLectures(session.userId),
+        getGoalDailyViewPayload({ studentId: session.userId }),
     ]);
 
     // Calculate XP Progress
@@ -102,6 +104,14 @@ export default async function DashboardPage() {
             )}
 
             {/* Stats Overview */}
+            <div className="mb-8">
+                <GoalReadonlyPanel
+                    studentId={session.userId}
+                    initialData={goalData}
+                    showTimeline
+                />
+            </div>
+
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -139,14 +149,6 @@ export default async function DashboardPage() {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
                 {/* Activity Heatmap */}
                 <div className="col-span-4 space-y-4">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>学習アクティビティ (直近)</CardTitle>
-                        </CardHeader>
-                        <CardContent className="pl-2">
-                            <ActivityChart data={dailyActivity.slice(-30)} />
-                        </CardContent>
-                    </Card>
                     <Heatmap data={dailyActivity} />
                 </div>
 

@@ -2,15 +2,17 @@ interface DateDisplayProps {
     date: Date | string | number | null | undefined;
     showTime?: boolean;
     className?: string;
+    timeZone?: string;
 }
 
-export function DateDisplay({ date, showTime = false, className }: DateDisplayProps) {
+export function DateDisplay({ date, showTime = false, className, timeZone }: DateDisplayProps) {
     if (!date) return <span className={className}>-</span>;
 
     const d = new Date(date);
     if (isNaN(d.getTime())) return <span className={className}>-</span>;
 
-    const dateStr = d.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
+    const resolvedTimeZone = timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Tokyo';
+    const dateStr = d.toLocaleDateString('ja-JP', { timeZone: resolvedTimeZone });
 
     if (!showTime) {
         return <span className={className}>{dateStr}</span>;
@@ -19,7 +21,7 @@ export function DateDisplay({ date, showTime = false, className }: DateDisplayPr
     const timeStr = d.toLocaleTimeString('ja-JP', {
         hour: '2-digit',
         minute: '2-digit',
-        timeZone: 'Asia/Tokyo'
+        timeZone: resolvedTimeZone
     });
 
     return (
