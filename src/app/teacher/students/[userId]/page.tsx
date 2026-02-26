@@ -40,7 +40,10 @@ export default async function TeacherStudentDetailPage({
         }
     }
     const query = await searchParams;
-    const defaultTab = (typeof query.tab === 'string' && ['overview', 'history', 'profile'].includes(query.tab)) ? query.tab : 'overview';
+    const defaultTab = (typeof query.tab === 'string'
+        && ['overview', 'goals', 'history', 'guidance', 'profile'].includes(query.tab))
+        ? query.tab
+        : 'overview';
 
     const dashboardData = await getStudentDashboardData(userId);
 
@@ -81,18 +84,14 @@ export default async function TeacherStudentDetailPage({
                 <div className="overflow-x-auto pb-1">
                     <TabsList className="w-max min-w-full sm:min-w-0">
                         <TabsTrigger value="overview">学習状況</TabsTrigger>
+                        <TabsTrigger value="goals">目標設定</TabsTrigger>
                         <TabsTrigger value="history">学習履歴ログ</TabsTrigger>
+                        <TabsTrigger value="guidance">面談記録</TabsTrigger>
                         <TabsTrigger value="profile">生徒情報</TabsTrigger>
                     </TabsList>
                 </div>
 
                 <TabsContent value="overview" className="space-y-4">
-                    <TeacherGoalManagementCard
-                        studentId={student.id}
-                        subjects={subjects}
-                        initialData={goalData}
-                    />
-
                     {/* Overview Stats */}
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                         <PrintProblemCard userId={student.id} subjects={subjects} />
@@ -199,29 +198,38 @@ export default async function TeacherStudentDetailPage({
                     </Card>
                 </TabsContent>
 
+                <TabsContent value="goals" className="space-y-4">
+                    <TeacherGoalManagementCard
+                        studentId={student.id}
+                        subjects={subjects}
+                        initialData={goalData}
+                    />
+                </TabsContent>
+
                 <TabsContent value="history">
                     <SessionList userId={student.id} basePath={`/teacher/students/${student.id}/history`} />
                 </TabsContent>
 
+                <TabsContent value="guidance" className="space-y-4">
+                    <GuidanceList
+                        userId={student.id}
+                        records={student.guidanceRecords}
+                    />
+                </TabsContent>
+
                 <TabsContent value="profile" className="space-y-4">
-                    <div className="grid gap-4 lg:grid-cols-2">
-                        <ProfileCard
-                            userId={student.id}
-                            initialBio={student.bio}
-                            initialNotes={student.notes}
-                            initialBirthday={student.birthday}
-                            initialClassroomId={student.classroomId}
-                            initialGroupId={student.group}
-                            initialSchool={student.school}
-                            initialPhoneNumber={student.phoneNumber}
-                            initialEmail={student.email}
-                            classrooms={classrooms}
-                        />
-                        <GuidanceList
-                            userId={student.id}
-                            records={student.guidanceRecords}
-                        />
-                    </div>
+                    <ProfileCard
+                        userId={student.id}
+                        initialBio={student.bio}
+                        initialNotes={student.notes}
+                        initialBirthday={student.birthday}
+                        initialClassroomId={student.classroomId}
+                        initialGroupId={student.group}
+                        initialSchool={student.school}
+                        initialPhoneNumber={student.phoneNumber}
+                        initialEmail={student.email}
+                        classrooms={classrooms}
+                    />
                 </TabsContent>
             </Tabs>
         </div >

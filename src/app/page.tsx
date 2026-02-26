@@ -23,12 +23,6 @@ export default async function Home() {
             <header className="mb-10">
                 <StampOverlay />
                 <AchievementOverlay />
-                <h1 className="text-3xl font-bold text-foreground tracking-tight mb-2">
-                    ホーム
-                </h1>
-                <p className="text-muted-foreground">
-                    {session.name}さん、こんにちは
-                </p>
             </header>
 
             <section className="mb-8">
@@ -51,9 +45,6 @@ export default async function Home() {
                         <History className="h-6 w-6" />
                         学習履歴
                     </h2>
-                    <p className="text-muted-foreground">
-                        これまでの学習記録です
-                    </p>
                 </div>
                 <SessionList userId={session.userId} />
             </section>

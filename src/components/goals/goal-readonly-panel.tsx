@@ -1,12 +1,15 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import type { ReactNode } from 'react';
+import { CalendarDays, CalendarRange, Target } from 'lucide-react';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { getGoalDailyViewAction } from '@/app/actions/student-goals';
-import { getBrowserTimeZoneSafe, normalizeTimeZone } from '@/lib/date-key';
-import type { DailyGoalEntry, GoalDailyViewPayload } from '@/lib/types/student-goal';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { getBrowserTimeZoneSafe, normalizeTimeZone, parseDateKeyAsUTC } from '@/lib/date-key';
+import { cn } from '@/lib/utils';
+import type { DailyGoalEntry, GoalDailyViewPayload, StudentGoalView } from '@/lib/types/student-goal';
 
 type GoalReadonlyPanelProps = {
     studentId: string;
@@ -27,40 +30,103 @@ function formatDateKeyLabel(dateKey: string, timeZone: string) {
     }).format(date);
 }
 
-function GoalEntryText({ entry }: { entry: DailyGoalEntry }) {
+function formatMonthLabel(dateKey: string, timeZone: string) {
+    const [year, month] = dateKey.split('-').map(Number);
+    const date = new Date(Date.UTC(year, month - 1, 1));
+    return new Intl.DateTimeFormat('ja-JP', {
+        timeZone: normalizeTimeZone(timeZone),
+        year: 'numeric',
+        month: 'long',
+    }).format(date);
+}
+
+function toGoalValueLabel(entry: DailyGoalEntry): string {
     if (entry.goalType === 'PROBLEM_COUNT') {
         const countLabel = entry.targetCount !== null ? `${entry.targetCount}問` : '未設定';
-        return (
-            <div className="text-sm">
-                <span className="font-medium">{entry.subjectName || entry.goalName}</span>
-                <span className="ml-2 text-muted-foreground">{countLabel}</span>
-                {entry.targetText ? <span className="ml-2 text-muted-foreground">{entry.targetText}</span> : null}
-            </div>
-        );
+        return entry.targetText ? `${countLabel} / ${entry.targetText}` : countLabel;
     }
 
+    const pieces: string[] = [];
+    if (entry.targetText) pieces.push(entry.targetText);
+    if (entry.targetCount !== null) pieces.push(String(entry.targetCount));
+    return pieces.length > 0 ? pieces.join(' / ') : '未設定';
+}
+
+function getRelativeDateLabel(dateKey: string, todayKey: string, tomorrowKey: string): string | null {
+    if (dateKey === todayKey) return '今日';
+    if (dateKey === tomorrowKey) return '明日';
+    return null;
+}
+
+function getDaysDiff(baseDateKey: string, targetDateKey: string): number {
+    const base = parseDateKeyAsUTC(baseDateKey).getTime();
+    const target = parseDateKeyAsUTC(targetDateKey).getTime();
+    return Math.floor((target - base) / (24 * 60 * 60 * 1000));
+}
+
+function resolveGoalValueForDate(goal: StudentGoalView, dateKey: string): { targetCount: number | null; targetText: string | null } {
+    let targetCount: number | null = null;
+    let targetText: string | null = null;
+
+    for (const milestone of goal.milestones) {
+        if (milestone.dateKey > dateKey) break;
+        if (milestone.targetCount !== null || (milestone.targetText && milestone.targetText.trim().length > 0)) {
+            targetCount = milestone.targetCount;
+            targetText = milestone.targetText;
+        }
+    }
+
+    return {
+        targetCount,
+        targetText,
+    };
+}
+
+function GoalEntryItem({ entry }: { entry: DailyGoalEntry }) {
     return (
-        <div className="text-sm">
-            <span className="font-medium">{entry.goalName}</span>
-            {entry.targetText ? <span className="ml-2 text-muted-foreground">{entry.targetText}</span> : null}
-            {entry.targetCount !== null ? <span className="ml-2 text-muted-foreground">{entry.targetCount}</span> : null}
+        <div className="rounded-lg border border-border/70 bg-background px-3 py-2">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="font-semibold">{entry.subjectName || entry.goalName}</span>
+                <Badge variant="outline" className="text-[11px]">
+                    {entry.goalType === 'PROBLEM_COUNT' ? '問題数目標' : '任意目標'}
+                </Badge>
+                <span className="text-muted-foreground">{toGoalValueLabel(entry)}</span>
+            </div>
         </div>
     );
 }
 
-function DayGoalList({ title, entries }: { title: string; entries: DailyGoalEntry[] }) {
+function PriorityDayCard(props: {
+    title: string;
+    dateKey: string;
+    icon: ReactNode;
+    entries: DailyGoalEntry[];
+    timeZone: string;
+    emptyText: string;
+    emphasis?: 'strong' | 'normal';
+}) {
     return (
-        <Card>
-            <CardHeader className="pb-2">
-                <CardTitle className="text-base">{title}</CardTitle>
+        <Card className={cn(props.emphasis === 'strong' && 'border-primary/30 bg-primary/[0.04]')}>
+            <CardHeader className="pb-3">
+                <div className="flex items-start justify-between gap-2">
+                    <div>
+                        <CardTitle className="text-base">{props.title}</CardTitle>
+                        <p className="mt-1 text-xs text-muted-foreground">{formatDateKeyLabel(props.dateKey, props.timeZone)}</p>
+                    </div>
+                    <div className="rounded-md border border-border/60 bg-background/80 p-2 text-muted-foreground">
+                        {props.icon}
+                    </div>
+                </div>
             </CardHeader>
             <CardContent className="space-y-2">
-                {entries.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">目標はありません</p>
+                {props.entries.length === 0 ? (
+                    <p className="rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">{props.emptyText}</p>
                 ) : (
-                    entries.map((entry) => (
-                        <GoalEntryText key={`${entry.goalId}-${entry.dueDateKey}`} entry={entry} />
-                    ))
+                    <div className="space-y-2">
+                        {props.entries.map((entry) => (
+                            <GoalEntryItem key={`${entry.goalId}-${props.dateKey}`} entry={entry} />
+                        ))}
+                    </div>
                 )}
             </CardContent>
         </Card>
@@ -75,9 +141,10 @@ export function GoalReadonlyPanel({
     className,
 }: GoalReadonlyPanelProps) {
     const [data, setData] = useState<GoalDailyViewPayload>(initialData);
+    const [selectedDateKey, setSelectedDateKey] = useState(initialData.todayKey);
     const [isPending, startTransition] = useTransition();
-    const todayRowRef = useRef<HTMLDivElement | null>(null);
     const timelineRef = useRef<HTMLDivElement | null>(null);
+    const todayRowRef = useRef<HTMLButtonElement | null>(null);
 
     useEffect(() => {
         const browserTimeZone = getBrowserTimeZoneSafe();
@@ -88,8 +155,10 @@ export function GoalReadonlyPanel({
                     studentId,
                     timeZone: browserTimeZone,
                 });
+
                 if (result.success && result.data) {
                     setData(result.data);
+                    setSelectedDateKey(result.data.todayKey);
                 }
             })();
         });
@@ -100,85 +169,225 @@ export function GoalReadonlyPanel({
         if (!timelineRef.current || !todayRowRef.current) return;
 
         const container = timelineRef.current;
-        const row = todayRowRef.current;
+        const todayRow = todayRowRef.current;
+        const nextTop = todayRow.offsetTop - container.clientHeight / 2 + todayRow.clientHeight / 2;
 
-        const top = row.offsetTop - container.clientHeight / 2 + row.clientHeight / 2;
-        container.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+        container.scrollTo({
+            top: Math.max(0, nextTop),
+            behavior: 'smooth',
+        });
     }, [data, showTimeline]);
+
+    const effectiveSelectedDateKey =
+        selectedDateKey < data.fromDateKey || selectedDateKey > data.toDateKey
+            ? data.todayKey
+            : selectedDateKey;
 
     const todayEntries = useMemo(
         () => data.rows.find((row) => row.dateKey === data.todayKey)?.entries ?? [],
         [data]
     );
+
     const tomorrowEntries = useMemo(
         () => data.rows.find((row) => row.dateKey === data.tomorrowKey)?.entries ?? [],
         [data]
     );
 
+    const selectedEntries = useMemo(
+        () => data.rows.find((row) => row.dateKey === effectiveSelectedDateKey)?.entries ?? [],
+        [data, effectiveSelectedDateKey]
+    );
+
+    const selectedTotals = useMemo(() => {
+        let problemCount = 0;
+        let customCount = 0;
+
+        for (const entry of selectedEntries) {
+            if (entry.goalType === 'PROBLEM_COUNT') {
+                problemCount += entry.targetCount ?? 0;
+            } else {
+                customCount += 1;
+            }
+        }
+
+        return {
+            entryCount: selectedEntries.length,
+            problemCount,
+            customCount,
+        };
+    }, [selectedEntries]);
+
+    const selectedRelativeLabel = getRelativeDateLabel(effectiveSelectedDateKey, data.todayKey, data.tomorrowKey);
+
     return (
-        <div className={className}>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                <DayGoalList title="今日の目標" entries={todayEntries} />
-                {showTomorrow ? <DayGoalList title="明日の目標" entries={tomorrowEntries} /> : null}
+        <div className={cn('space-y-4', className)}>
+            <div className={cn('grid gap-4', showTomorrow ? 'md:grid-cols-2 xl:grid-cols-3' : 'lg:grid-cols-2')}>
+                <PriorityDayCard
+                    title="今日の目標"
+                    dateKey={data.todayKey}
+                    timeZone={data.timeZone}
+                    entries={todayEntries}
+                    emptyText="今日は設定された目標がありません"
+                    icon={<Target className="h-4 w-4" />}
+                    emphasis="strong"
+                />
+
+                {showTomorrow ? (
+                    <PriorityDayCard
+                        title="明日の目標"
+                        dateKey={data.tomorrowKey}
+                        timeZone={data.timeZone}
+                        entries={tomorrowEntries}
+                        emptyText="明日の目標は未設定です"
+                        icon={<CalendarDays className="h-4 w-4" />}
+                    />
+                ) : null}
+
                 <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-base">〇〇日までの目標</CardTitle>
+                    <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between gap-2">
+                            <div>
+                                <CardTitle className="text-base">期限付き目標一覧</CardTitle>
+                                <p className="mt-1 text-xs text-muted-foreground">有効目標 {data.activeGoals.length}件</p>
+                            </div>
+                            <div className="rounded-md border border-border/60 bg-background/80 p-2 text-muted-foreground">
+                                <CalendarRange className="h-4 w-4" />
+                            </div>
+                        </div>
                     </CardHeader>
                     <CardContent className="space-y-2">
                         {data.activeGoals.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">有効な目標はありません</p>
+                            <p className="rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">有効な目標はありません</p>
                         ) : (
-                            data.activeGoals.map((goal) => (
-                                <div key={goal.id} className="rounded-md border p-2">
-                                    <div className="flex items-center justify-between gap-2">
-                                        <div className="text-sm font-medium">{goal.name}</div>
-                                        <Badge variant="outline">{formatDateKeyLabel(goal.dueDateKey, data.timeZone)}まで</Badge>
+                            data.activeGoals.map((goal) => {
+                                const remainingDays = getDaysDiff(data.todayKey, goal.dueDateKey);
+                                const dueValue = resolveGoalValueForDate(goal, goal.dueDateKey);
+                                const valueLabel = goal.type === 'PROBLEM_COUNT'
+                                    ? dueValue.targetCount !== null
+                                        ? `${dueValue.targetCount}問`
+                                        : '未設定'
+                                    : dueValue.targetText || (dueValue.targetCount !== null ? String(dueValue.targetCount) : '未設定');
+
+                                return (
+                                    <div key={goal.id} className="rounded-lg border border-border/70 bg-background px-3 py-2.5">
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <div className="text-sm font-semibold">{goal.name}</div>
+                                            <Badge variant="outline">{formatDateKeyLabel(goal.dueDateKey, data.timeZone)}まで</Badge>
+                                        </div>
+                                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                            {goal.subjectName ? <span>科目: {goal.subjectName}</span> : null}
+                                            <span>期限値: {valueLabel}</span>
+                                            <span>残り{Math.max(0, remainingDays)}日</span>
+                                        </div>
                                     </div>
-                                    {goal.subjectName ? (
-                                        <p className="text-xs text-muted-foreground">科目: {goal.subjectName}</p>
-                                    ) : null}
-                                </div>
-                            ))
+                                );
+                            })
                         )}
                     </CardContent>
                 </Card>
             </div>
 
             {showTimeline ? (
-                <Card className="mt-4">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-base">日付別目標（過去半年〜未来半年）</CardTitle>
-                        {isPending ? <p className="text-xs text-muted-foreground">読み込み中...</p> : null}
-                    </CardHeader>
-                    <CardContent>
-                        <div ref={timelineRef} className="max-h-[520px] overflow-y-auto rounded-md border">
-                            {data.rows.map((row) => {
-                                const isToday = row.dateKey === data.todayKey;
-                                return (
-                                    <div
-                                        key={row.dateKey}
-                                        ref={isToday ? todayRowRef : null}
-                                        className={`border-b p-3 last:border-0 ${isToday ? 'bg-accent/40' : ''}`}
-                                    >
-                                        <div className="mb-2 text-sm font-medium">
-                                            {formatDateKeyLabel(row.dateKey, data.timeZone)}
-                                            {isToday ? <span className="ml-2 text-xs text-primary">今日</span> : null}
+                <div className="grid gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
+                    <Card>
+                        <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between gap-2">
+                                <div>
+                                    <CardTitle className="text-base">日付タイムライン</CardTitle>
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        過去半年〜未来半年を日付で確認
+                                    </p>
+                                </div>
+                                {isPending ? <span className="text-xs text-muted-foreground">同期中...</span> : null}
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <div ref={timelineRef} className="max-h-[560px] overflow-y-auto rounded-lg border border-border/70">
+                                {data.rows.map((row, index) => {
+                                    const prevMonth = data.rows[index - 1]?.dateKey.slice(0, 7);
+                                    const monthChanged = prevMonth !== row.dateKey.slice(0, 7);
+                                    const isToday = row.dateKey === data.todayKey;
+                                    const isSelected = row.dateKey === effectiveSelectedDateKey;
+                                    const relativeLabel = getRelativeDateLabel(row.dateKey, data.todayKey, data.tomorrowKey);
+
+                                    return (
+                                        <div key={row.dateKey}>
+                                            {monthChanged ? (
+                                                <div className="sticky top-0 z-10 border-y bg-background/95 px-3 py-1.5 text-xs font-medium text-muted-foreground backdrop-blur">
+                                                    {formatMonthLabel(row.dateKey, data.timeZone)}
+                                                </div>
+                                            ) : null}
+                                            <button
+                                                type="button"
+                                                ref={isToday ? todayRowRef : null}
+                                                onClick={() => setSelectedDateKey(row.dateKey)}
+                                                className={cn(
+                                                    'w-full border-b px-3 py-2 text-left transition-colors last:border-b-0 hover:bg-muted/50',
+                                                    isSelected && 'bg-primary/[0.08] ring-1 ring-primary/30',
+                                                    isToday && !isSelected && 'bg-accent/45'
+                                                )}
+                                            >
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <p className="text-sm font-medium">{formatDateKeyLabel(row.dateKey, data.timeZone)}</p>
+                                                    <div className="flex items-center gap-1">
+                                                        {relativeLabel ? (
+                                                            <Badge variant="secondary" className="text-[10px]">{relativeLabel}</Badge>
+                                                        ) : null}
+                                                        <Badge variant="outline" className="text-[10px]">{row.entries.length}件</Badge>
+                                                    </div>
+                                                </div>
+                                            </button>
                                         </div>
-                                        {row.entries.length === 0 ? (
-                                            <div className="text-sm text-muted-foreground">未設定</div>
-                                        ) : (
-                                            <div className="space-y-1">
-                                                {row.entries.map((entry) => (
-                                                    <GoalEntryText key={`${row.dateKey}-${entry.goalId}`} entry={entry} />
-                                                ))}
+                                    );
+                                })}
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader className="pb-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div>
+                                    <CardTitle className="text-base">{formatDateKeyLabel(effectiveSelectedDateKey, data.timeZone)} の目標</CardTitle>
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        {selectedRelativeLabel ? `${selectedRelativeLabel}の表示` : '選択した日付の表示'}
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-2 text-xs">
+                                    <Badge variant="outline">合計 {selectedTotals.entryCount}件</Badge>
+                                    <Badge variant="outline">問題数 {selectedTotals.problemCount}問</Badge>
+                                    <Badge variant="outline">任意目標 {selectedTotals.customCount}件</Badge>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            {selectedEntries.length === 0 ? (
+                                <p className="rounded-lg border border-dashed px-3 py-6 text-sm text-muted-foreground">
+                                    この日は目標が設定されていません
+                                </p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {selectedEntries.map((entry) => (
+                                        <div key={`${effectiveSelectedDateKey}-${entry.goalId}`} className="rounded-lg border border-border/70 bg-background px-3 py-2.5">
+                                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-semibold">{entry.subjectName || entry.goalName}</span>
+                                                    <Badge variant="outline" className="text-[11px]">
+                                                        {entry.goalType === 'PROBLEM_COUNT' ? '問題数目標' : '任意目標'}
+                                                    </Badge>
+                                                </div>
+                                                <Badge variant="secondary" className="text-[11px]">
+                                                    {formatDateKeyLabel(entry.dueDateKey, data.timeZone)}まで
+                                                </Badge>
                                             </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </CardContent>
-                </Card>
+                                            <p className="mt-1 text-sm text-muted-foreground">{toGoalValueLabel(entry)}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
             ) : null}
         </div>
     );
