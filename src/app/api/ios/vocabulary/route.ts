@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSessionForMobile } from '@/lib/auth-mobile';
 import vocabularyDataJson from '@/lib/vocabulary-data.json';
 
+const ALLOWED_ROLES = new Set(['STUDENT']);
 type VocabularyLevel = 'beginner' | 'intermediate' | 'advanced';
 
 type VocabularyEntry = {
@@ -22,6 +23,9 @@ export async function GET(request: NextRequest) {
     const session = await getSessionForMobile(request);
     if (!session) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    if (!ALLOWED_ROLES.has(session.role)) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     try {

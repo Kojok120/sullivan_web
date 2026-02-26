@@ -1,8 +1,19 @@
 // iOS用JWT認証ヘルパー
 // Authorization: Bearer <token> からユーザー情報を取得
 
-import { createAdminClient } from '@/lib/supabase/admin';
+import { getSupabaseUserByAccessToken } from '@/lib/auth-admin';
 import type { SessionPayload } from '@/lib/auth';
+
+const ALLOWED_ROLES = ['STUDENT', 'TEACHER', 'HEAD_TEACHER', 'PARENT', 'ADMIN'] as const;
+type AllowedRole = (typeof ALLOWED_ROLES)[number];
+
+function isAllowedRole(value: unknown): value is AllowedRole {
+    return typeof value === 'string' && ALLOWED_ROLES.includes(value as AllowedRole);
+}
+
+function normalizeRole(value: unknown): AllowedRole {
+    return isAllowedRole(value) ? value : 'STUDENT';
+}
 
 /**
  * iOSアプリからのリクエストに含まれるJWTトークンを検証し、セッション情報を返す
@@ -23,23 +34,28 @@ export async function getSessionFromBearer(
     }
 
     try {
-        const supabaseAdmin = createAdminClient();
-        const {
-            data: { user },
-            error,
-        } = await supabaseAdmin.auth.getUser(token);
+        const { user, error } = await getSupabaseUserByAccessToken(token);
 
         if (error || !user) {
             return null;
         }
 
-        const appMeta = user.app_metadata || {};
-        const userMeta = user.user_metadata || {};
+        const appMeta = (user.app_metadata ?? {}) as Record<string, unknown>;
+        const userMeta = (user.user_metadata ?? {}) as Record<string, unknown>;
+        const role = normalizeRole(appMeta.role);
+        const userId =
+            typeof appMeta.prismaUserId === 'string' && appMeta.prismaUserId.length > 0
+                ? appMeta.prismaUserId
+                : user.id;
+        const name =
+            typeof appMeta.name === 'string'
+                ? appMeta.name
+                : (typeof userMeta.name === 'string' ? userMeta.name : '');
 
         return {
-            userId: appMeta.prismaUserId || user.id,
-            role: appMeta.role || 'STUDENT',
-            name: appMeta.name || userMeta.name || '',
+            userId,
+            role,
+            name,
         };
     } catch {
         return null;

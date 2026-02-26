@@ -6,10 +6,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSessionForMobile } from '@/lib/auth-mobile';
 import { getGoalDailyViewPayload } from '@/lib/student-goal-service';
 
+const ALLOWED_ROLES = new Set(['STUDENT']);
+
 export async function GET(request: NextRequest) {
     const session = await getSessionForMobile(request);
     if (!session) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    if (!ALLOWED_ROLES.has(session.role)) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     try {

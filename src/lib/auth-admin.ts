@@ -16,11 +16,71 @@ type SupabaseUserLookup = {
     prismaUserId?: string;
 };
 
+const AUTH_RETRY_MAX_ATTEMPTS = 4;
+const AUTH_RETRY_BASE_DELAY_MS = 200;
+
 export interface SyncSupabaseAppMetadataParams {
     prismaUserId: string;
     loginId: string;
     role: Role;
     name: string;
+}
+
+function getRetryStatus(error: { status?: number } | null): number | null {
+    if (!error) return null;
+    return typeof error.status === 'number' ? error.status : null;
+}
+
+function isRetryableAuthStatus(status: number | null): boolean {
+    if (status === null) return false;
+    return status === 429 || (status >= 500 && status <= 599);
+}
+
+function delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * iOS向けBearerトークンからSupabaseユーザーを取得する。
+ * 429/5xx は指数バックオフで再試行する。
+ */
+export async function getSupabaseUserByAccessToken(token: string): Promise<{
+    user: SupabaseUser | null;
+    error: { message: string; status?: number } | null;
+}> {
+    const supabaseAdmin = createAdminClient();
+
+    for (let attempt = 0; attempt < AUTH_RETRY_MAX_ATTEMPTS; attempt++) {
+        const {
+            data: { user },
+            error,
+        } = await supabaseAdmin.auth.getUser(token);
+
+        if (!error) {
+            return { user, error: null };
+        }
+
+        const status = getRetryStatus(error);
+        const shouldRetry = isRetryableAuthStatus(status) && attempt < AUTH_RETRY_MAX_ATTEMPTS - 1;
+        if (!shouldRetry) {
+            console.error('[Supabase Admin getUser] failed', {
+                attempt: attempt + 1,
+                status,
+                message: error.message,
+            });
+            return { user: null, error };
+        }
+
+        const backoff = AUTH_RETRY_BASE_DELAY_MS * (2 ** attempt);
+        await delay(backoff);
+    }
+
+    return {
+        user: null,
+        error: {
+            message: 'Supabase user lookup retry exhausted',
+        },
+    };
 }
 
 export async function createOrUpdateSupabaseUser({
