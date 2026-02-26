@@ -8,6 +8,7 @@ import vocabularyDataJson from '@/lib/vocabulary-data.json';
 
 const ALLOWED_ROLES = new Set(['STUDENT']);
 type VocabularyLevel = 'beginner' | 'intermediate' | 'advanced';
+const VOCABULARY_LEVELS: readonly VocabularyLevel[] = ['beginner', 'intermediate', 'advanced'];
 
 type VocabularyEntry = {
     id: string;
@@ -18,6 +19,10 @@ type VocabularyEntry = {
 
 // 英単語データ（iOSアプリ同梱JSONと同一内容）
 const vocabularyData = vocabularyDataJson as VocabularyEntry[];
+
+function isVocabularyLevel(value: string): value is VocabularyLevel {
+    return VOCABULARY_LEVELS.includes(value as VocabularyLevel);
+}
 
 export async function GET(request: NextRequest) {
     const session = await getSessionForMobile(request);
@@ -31,8 +36,15 @@ export async function GET(request: NextRequest) {
     try {
         const level = request.nextUrl.searchParams.get('level');
 
+        if (level !== null && !isVocabularyLevel(level)) {
+            return NextResponse.json(
+                { error: 'level は beginner/intermediate/advanced のいずれかを指定してください' },
+                { status: 400 }
+            );
+        }
+
         let filteredData = vocabularyData;
-        if (level && ['beginner', 'intermediate', 'advanced'].includes(level)) {
+        if (level) {
             filteredData = vocabularyData.filter((w) => w.level === level);
         }
 
