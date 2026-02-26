@@ -115,6 +115,7 @@ model User {
   studentGoals    StudentGoal[]    @relation("StudentGoals")
   createdGoals    StudentGoal[]    @relation("CreatedStudentGoals")
   updatedGoals    StudentGoal[]    @relation("UpdatedStudentGoals")
+  vocabularyGameScores VocabularyGameScore[]
 }
 
 model StudentGoal {
@@ -196,6 +197,25 @@ model LearningHistory {
   groupId           String? // UUID for batch grouping
   isVideoWatched    Boolean @default(false)
   isStudentReviewed Boolean @default(false) // New: Has the student reviewed this history?
+}
+
+model VocabularyGameScore {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionId    String
+  score        Int
+  correctCount Int
+  totalCount   Int
+  maxCombo     Int
+  level        String
+  playedAt     DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, sessionId])
+  @@index([playedAt])
+  @@index([userId, playedAt])
 }
 
 model UserProblemState {
