@@ -1,4 +1,5 @@
 const DATE_KEY_REGEX = /^(\d{4})-(\d{2})-(\d{2})$/;
+const MAX_DATE_RANGE_DAYS = 3660;
 
 export const FALLBACK_TIME_ZONE = 'Asia/Tokyo';
 
@@ -84,6 +85,10 @@ export function formatDateKeyFromUTC(date: Date): string {
 }
 
 export function addDaysToDateKey(dateKey: string, offsetDays: number): string {
+    if (!Number.isFinite(offsetDays) || !Number.isInteger(offsetDays)) {
+        throw new RangeError(`Invalid offsetDays: ${offsetDays}`);
+    }
+
     const date = parseDateKeyAsUTC(dateKey);
     date.setUTCDate(date.getUTCDate() + offsetDays);
     return formatDateKeyFromUTC(date);
@@ -95,6 +100,13 @@ export function listDateKeysBetween(startDateKey: string, endDateKey: string): s
     }
 
     if (startDateKey > endDateKey) {
+        return [];
+    }
+
+    const startDate = parseDateKeyAsUTC(startDateKey);
+    const endDate = parseDateKeyAsUTC(endDateKey);
+    const diffDays = Math.floor((endDate.getTime() - startDate.getTime()) / 86_400_000);
+    if (diffDays > MAX_DATE_RANGE_DAYS) {
         return [];
     }
 
