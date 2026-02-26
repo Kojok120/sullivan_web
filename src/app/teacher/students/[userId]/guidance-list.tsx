@@ -1,25 +1,100 @@
 'use client';
 
-import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { GuidanceRecord } from '@prisma/client';
+import {
+    Calendar,
+    Loader2,
+    MessageSquare,
+    Mic,
+    Pause,
+    Play,
+    Plus,
+    SquarePen,
+    Trash2,
+} from 'lucide-react';
+import { toast } from 'sonner';
+
+import { addGuidanceRecord, deleteGuidanceRecord } from './actions';
+import { DateDisplay } from '@/components/ui/date-display';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MessageSquare, Plus, Trash2, Calendar } from 'lucide-react';
-import { addGuidanceRecord, deleteGuidanceRecord } from './actions';
-import { toast } from 'sonner';
-import { GuidanceRecord } from '@prisma/client';
-import { DateDisplay } from '@/components/ui/date-display';
+import { Textarea } from '@/components/ui/textarea';
 
 interface GuidanceListProps {
     userId: string;
     records: (GuidanceRecord & { teacher: { name: string | null } })[];
 }
 
+const RECORDING_MIME_TYPE = 'audio/ogg;codecs=opus';
+const RECORDING_UPLOAD_MIME_TYPE = 'audio/ogg';
+const MAX_RECORDING_MS = 60 * 60 * 1000;
+
+type RecordingSessionState = {
+    startedAtMs: number;
+    accumulatedPausedMs: number;
+    pausedAtMs: number | null;
+};
+
+function formatElapsedTime(ms: number): string {
+    const totalSec = Math.max(0, Math.floor(ms / 1000));
+    const hours = String(Math.floor(totalSec / 3600)).padStart(2, '0');
+    const minutes = String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0');
+    const seconds = String(totalSec % 60).padStart(2, '0');
+    return `${hours}:${minutes}:${seconds}`;
+}
+
 export function GuidanceList({ userId, records }: GuidanceListProps) {
+    const router = useRouter();
+
     const [isAdding, setIsAdding] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [recordingStatus, setRecordingStatus] = useState<'idle' | 'recording' | 'paused' | 'summarizing'>('idle');
+    const [elapsedMs, setElapsedMs] = useState(0);
+
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const streamRef = useRef<MediaStream | null>(null);
+    const chunksRef = useRef<Blob[]>([]);
+    const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const sessionRef = useRef<RecordingSessionState | null>(null);
+
+    const canRecordInChrome = useMemo(() => {
+        if (typeof window === 'undefined') return false;
+        if (typeof MediaRecorder === 'undefined') return false;
+        if (typeof MediaRecorder.isTypeSupported !== 'function') return false;
+        return MediaRecorder.isTypeSupported(RECORDING_MIME_TYPE);
+    }, []);
+
+    function getCurrentElapsedMs(): number {
+        if (!sessionRef.current) return 0;
+
+        const now = Date.now();
+        const baseElapsed = now - sessionRef.current.startedAtMs - sessionRef.current.accumulatedPausedMs;
+        if (sessionRef.current.pausedAtMs) {
+            return Math.max(0, baseElapsed - (now - sessionRef.current.pausedAtMs));
+        }
+        return Math.max(0, baseElapsed);
+    }
+
+    function clearTimer() {
+        if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+        }
+    }
+
+    function cleanupMediaResources() {
+        if (streamRef.current) {
+            streamRef.current.getTracks().forEach((track) => track.stop());
+            streamRef.current = null;
+        }
+        mediaRecorderRef.current = null;
+        sessionRef.current = null;
+        chunksRef.current = [];
+    }
 
     async function handleAdd(formData: FormData) {
         setIsSaving(true);
@@ -31,6 +106,7 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
         } else {
             toast.success('記録を追加しました');
             setIsAdding(false);
+            router.refresh();
         }
     }
 
@@ -42,8 +118,213 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
             toast.error(result.error);
         } else {
             toast.success('記録を削除しました');
+            router.refresh();
         }
     }
+
+    async function startRecording() {
+        if (!canRecordInChrome) {
+            toast.error('このChrome環境では audio/ogg 録音に対応していません');
+            return;
+        }
+
+        if (recordingStatus !== 'idle') {
+            return;
+        }
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    channelCount: 1,
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                },
+            });
+
+            const recorder = new MediaRecorder(stream, { mimeType: RECORDING_MIME_TYPE });
+            chunksRef.current = [];
+            recorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    chunksRef.current.push(event.data);
+                }
+            };
+
+            recorder.start(1000);
+            mediaRecorderRef.current = recorder;
+            streamRef.current = stream;
+            sessionRef.current = {
+                startedAtMs: Date.now(),
+                accumulatedPausedMs: 0,
+                pausedAtMs: null,
+            };
+            setElapsedMs(0);
+            setRecordingStatus('recording');
+        } catch (error) {
+            console.error('[guidance-list] startRecording failed:', error);
+            cleanupMediaResources();
+            setRecordingStatus('idle');
+            toast.error('マイクの利用に失敗しました。権限設定をご確認ください。');
+        }
+    }
+
+    function togglePauseResumeRecording() {
+        const recorder = mediaRecorderRef.current;
+        if (!recorder || !sessionRef.current) {
+            return;
+        }
+
+        if (recordingStatus === 'recording') {
+            try {
+                recorder.pause();
+                sessionRef.current.pausedAtMs = Date.now();
+                setRecordingStatus('paused');
+            } catch (error) {
+                console.error('[guidance-list] pause failed:', error);
+                toast.error('録音の一時停止に失敗しました');
+            }
+            return;
+        }
+
+        if (recordingStatus === 'paused') {
+            try {
+                if (sessionRef.current.pausedAtMs) {
+                    sessionRef.current.accumulatedPausedMs += Date.now() - sessionRef.current.pausedAtMs;
+                    sessionRef.current.pausedAtMs = null;
+                }
+                recorder.resume();
+                setRecordingStatus('recording');
+            } catch (error) {
+                console.error('[guidance-list] resume failed:', error);
+                toast.error('録音の再開に失敗しました');
+            }
+        }
+    }
+
+    async function stopRecorderAndCollectBlob(): Promise<Blob> {
+        const recorder = mediaRecorderRef.current;
+        if (!recorder) {
+            throw new Error('recorder not found');
+        }
+
+        return new Promise<Blob>((resolve, reject) => {
+            recorder.onerror = () => {
+                reject(new Error('recording error'));
+            };
+
+            recorder.onstop = () => {
+                const blob = new Blob(chunksRef.current, { type: RECORDING_UPLOAD_MIME_TYPE });
+                resolve(blob);
+            };
+
+            if (recorder.state !== 'inactive') {
+                recorder.requestData();
+                recorder.stop();
+            } else {
+                const blob = new Blob(chunksRef.current, { type: RECORDING_UPLOAD_MIME_TYPE });
+                resolve(blob);
+            }
+        });
+    }
+
+    async function stopAndSummarize(forceByLimit = false) {
+        if (recordingStatus === 'idle' || recordingStatus === 'summarizing') {
+            return;
+        }
+
+        const session = sessionRef.current;
+        if (!session) {
+            toast.error('録音状態の取得に失敗しました');
+            cleanupMediaResources();
+            setRecordingStatus('idle');
+            return;
+        }
+
+        const endedAtMs = Date.now();
+
+        // 一時停止中に終了した場合も、停止時間を計測に反映する。
+        if (session.pausedAtMs) {
+            session.accumulatedPausedMs += endedAtMs - session.pausedAtMs;
+            session.pausedAtMs = null;
+        }
+
+        setRecordingStatus('summarizing');
+        clearTimer();
+
+        try {
+            const blob = await stopRecorderAndCollectBlob();
+            if (blob.size === 0) {
+                throw new Error('empty audio blob');
+            }
+
+            const file = new File([blob], `guidance-${Date.now()}.ogg`, { type: RECORDING_UPLOAD_MIME_TYPE });
+            const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Tokyo';
+
+            const formData = new FormData();
+            formData.append('audio', file);
+            formData.append('startedAtIso', new Date(session.startedAtMs).toISOString());
+            formData.append('endedAtIso', new Date(endedAtMs).toISOString());
+            formData.append('timeZone', timeZone);
+
+            const response = await fetch(`/api/teacher/students/${userId}/guidance-summary`, {
+                method: 'POST',
+                body: formData,
+            });
+            const payload = (await response.json()) as { success?: boolean; error?: string };
+
+            if (!response.ok || !payload.success) {
+                throw new Error(payload.error || 'AI要約に失敗しました');
+            }
+
+            toast.success(forceByLimit ? '録音上限に到達したため要約を保存しました' : 'AI要約を保存しました');
+            router.refresh();
+            setIsAdding(false);
+            setElapsedMs(0);
+            setRecordingStatus('idle');
+        } catch (error) {
+            console.error('[guidance-list] summarize failed:', error);
+            toast.error('AI要約に失敗しました。手動入力フォームを開きます。');
+            setIsAdding(true);
+            setRecordingStatus('idle');
+        } finally {
+            cleanupMediaResources();
+        }
+    }
+
+    useEffect(() => {
+        clearTimer();
+
+        if (recordingStatus === 'recording' || recordingStatus === 'paused') {
+            timerRef.current = setInterval(() => {
+                const nextElapsed = getCurrentElapsedMs();
+                setElapsedMs(nextElapsed);
+
+                if (nextElapsed >= MAX_RECORDING_MS) {
+                    clearTimer();
+                    void stopAndSummarize(true);
+                }
+            }, 500);
+        }
+
+        return () => {
+            clearTimer();
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [recordingStatus]);
+
+    useEffect(() => {
+        return () => {
+            clearTimer();
+            try {
+                if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+                    mediaRecorderRef.current.stop();
+                }
+            } catch {
+                // no-op
+            }
+            cleanupMediaResources();
+        };
+    }, []);
 
     return (
         <Card className="h-full">
@@ -55,14 +336,81 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
                     </CardTitle>
                     <CardDescription>生徒との面談や指導の記録</CardDescription>
                 </div>
-                <Button size="sm" className="min-h-11 sm:min-h-10" onClick={() => setIsAdding(!isAdding)}>
-                    <Plus className="h-4 w-4 mr-1" />
-                    新規記録
-                </Button>
+
+                <div className="flex items-center gap-2">
+                    <Button
+                        size="icon"
+                        variant="outline"
+                        aria-label="新規記録"
+                        title="新規記録"
+                        onClick={() => setIsAdding((prev) => !prev)}
+                        disabled={recordingStatus === 'summarizing'}
+                    >
+                        <span className="relative block h-4 w-4">
+                            <Plus className="h-4 w-4" />
+                            <SquarePen className="absolute -right-1 -bottom-1 h-3 w-3" />
+                        </span>
+                    </Button>
+
+                    <Button
+                        size="icon"
+                        variant={recordingStatus === 'idle' ? 'outline' : 'default'}
+                        aria-label="録音開始"
+                        title="録音開始"
+                        onClick={() => void startRecording()}
+                        disabled={recordingStatus !== 'idle' || !canRecordInChrome}
+                    >
+                        <Mic className="h-4 w-4" />
+                    </Button>
+                </div>
             </CardHeader>
+
             <CardContent className="space-y-6 pt-4">
+                {recordingStatus !== 'idle' ? (
+                    <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="text-sm font-medium">
+                                {recordingStatus === 'summarizing'
+                                    ? 'AI要約を生成中...'
+                                    : recordingStatus === 'paused'
+                                        ? '録音一時停止中'
+                                        : '録音中'}
+                            </div>
+                            <div className="font-mono text-sm">{formatElapsedTime(elapsedMs)}</div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                            {recordingStatus === 'recording' || recordingStatus === 'paused' ? (
+                                <Button
+                                    type="button"
+                                    size="icon"
+                                    variant="outline"
+                                    aria-label={recordingStatus === 'recording' ? '一時停止' : '再開'}
+                                    title={recordingStatus === 'recording' ? '一時停止' : '再開'}
+                                    onClick={togglePauseResumeRecording}
+                                >
+                                    {recordingStatus === 'recording' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                                </Button>
+                            ) : null}
+
+                            <Button
+                                type="button"
+                                onClick={() => void stopAndSummarize(false)}
+                                disabled={recordingStatus === 'summarizing'}
+                            >
+                                {recordingStatus === 'summarizing' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                終了→AI要約
+                            </Button>
+                        </div>
+
+                        <p className="text-xs text-muted-foreground">
+                            録音上限は60分です。上限到達時は自動で録音を終了して要約します。
+                        </p>
+                    </div>
+                ) : null}
+
                 {isAdding && (
-                    <div className="bg-muted/30 p-4 rounded-lg border space-y-4">
+                    <div className="space-y-4 rounded-lg border bg-muted/30 p-4">
                         <form action={handleAdd} className="space-y-4">
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div className="space-y-2">
@@ -135,19 +483,19 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
                                             variant="ghost"
                                             size="icon"
                                             className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                                            onClick={() => handleDelete(record.id)}
+                                            onClick={() => void handleDelete(record.id)}
                                         >
                                             <Trash2 className="h-3 w-3" />
                                         </Button>
                                     </div>
                                 </div>
-                                <div className="text-sm whitespace-pre-wrap pl-1">
+                                <div className="whitespace-pre-wrap pl-1 text-sm">
                                     {record.content}
                                 </div>
                             </div>
                         ))
                     ) : (
-                        <div className="text-center py-8 text-muted-foreground text-sm">
+                        <div className="py-8 text-center text-sm text-muted-foreground">
                             記録はまだありません
                         </div>
                     )}

@@ -1,78 +1,154 @@
-# Sullivan Learning App
+# Sullivan
 
-**チームへようこそ！**
-このドキュメントでは、Sullivanアプリケーションの概要と主要機能について解説します。
-開発環境の構築については、[環境構築.md](./環境構築.md) を参照してください。
+Sullivan は、**AI伴走 × 人の支援**で「伸び悩み層」の学習を支える学習支援プラットフォームです。  
+プリント学習を基盤に、AIによる自動採点・復習最適化と、講師による情意面サポートを両立し、
+**低価格でも高密度な個別最適学習**を成立させることを目指しています。
 
-## System Requirements (New)
+## プロダクト意図
 
-- Node.js 18+ (Next.js 16, React 19)
-- PostgreSQL (Local or Supabase)
-- **Supabase Auth** (Login/Role management)
-- **Python 3** (Required for QR Code processing)
-  - `pip3 install opencv-python`
-- **Google Drive API** (Scan ingestion) + Service Account
-- **Upstash QStash** (For background job processing)
-- **Upstash Redis** (Drive webhook watch state)
+Sullivan が解こうとしている中心課題は、次のループです。
 
-## アプリケーション概要
+- 基礎未定着で授業がわからない
+- 恥・恐怖・比較で自己効力感が低下する
+- 「明日しのぎ」の行動に最適化される
+- さらに基礎未定着が進む
 
-Sullivanは、小学4年生〜中高生を対象とした**「基礎学習定着化プラットフォーム」**です。
-「つまずきの早期発見」と「忘却曲線に基づいた確実な定着」をミッションとしています。
+このループを断ち切るために、以下の分業を採用しています。
 
-既存のeラーニングと異なり、**紙のプリント学習**と**デジタル(AI)による分析・採点**を融合させたハイブリッドな学習サイクルを提供します。
+- AI: 出題最適化、採点、誤答分析、次の学習提案
+- 人: 見守り、声かけ、習慣化支援、面談記録に基づく伴走
 
-## 主要機能
+## 実装済みの主要機能
 
-### 1. プリント学習サイクル (Print & Scan)
-生徒はシステムから自分専用の問題セットを印刷し、手書きで解答します。
-- **個別最適化**: 生徒の過去の成績や忘却度合いに基づき、今解くべき問題を自動選出します。
-- **プリント出力**: 講師/生徒が科目を選択し、印刷レイアウトを生成できます。
-- **AIスキャン採点**: 解答済みのプリントをGoogle Driveにアップロードすると、Webhookで検知し、QStash経由で採点ジョブを実行します。
+### 1. プリント学習サイクル
 
-### 2. AI採点とフィードバック
-Google Gemini APIを活用し、単なる正誤判定だけでなく、記述式回答の評価や、生徒へのアドバイス生成を行います。
-- **QR読み取り**: 画像の場合はPython + OpenCVでQRコードを読み取り、失敗時はGeminiでフォールバックします。
-- **部分点・評価**: A〜Dの4段階評価に加え、具体的な改善点をフィードバック。
-- **弱点特定**: 間違いの原因となった「基礎概念(CoreProblem)」を推測し、カリキュラムを遡って復習を促します。
+- 生徒ごとの状態に応じた問題を自動選出して印刷
+- QRコードで「生徒ID × 問題セット」を埋め込み
+- 解答後は Google Drive 連携で採点キューへ投入
 
-### 3. 優先度アルゴリズム (Spaced Repetition)
-学習効果を最大化するため、独自アルゴリズムで出題優先度を決定しています。
-- **忘却曲線**: 最後の学習からの経過時間に応じて優先度が上昇。
-- **理解度**: AI評価が低い問題は高頻度で、高い問題は低頻度で出題。
-- **依存関係**: 基礎問題でつまずくと、関連する応用問題もロックされるなどの制御機能。
+### 2. AI採点・復習最適化
 
-### 4. ダッシュボード
-- **生徒用**: 総学習数、正答率、連続学習日数、直近30日のアクティビティ、教科別進捗、未視聴解説の通知を表示。
-- **講師用**: 生徒検索、学習進捗の確認、指導記録、プリント作成を一元管理。
-- **管理者用**: ユーザー/教室/カリキュラム/問題の管理。
+- Gemini による A/B/C/D 評価と日本語フィードバック
+- `UserProblemState` / `UserCoreProblemState` の優先度を更新
+- 忘却曲線と単元進捗に基づく再出題
+- 条件達成で次単元をアンロック
 
-### 5. ゲーミフィケーション
-- **XP/レベル**: 回答・正解に応じてXPを獲得し、レベルが上昇。
-- **連続学習/ヒートマップ**: 日次学習量を集計して継続状況を可視化。
-- **実績 (Achievements)**: 条件達成で実績を解除し、一覧で確認。
-- **スタンプ**: 提出時にスタンプを付与して学習の達成感を強化。
+### 3. 学習ゲート制御
 
-### 6. アカウント設定
-- **パスワード変更**: `/settings` から変更可能。
+- 単元に講義動画がある場合、未視聴状態では印刷を制御（Print Gate）
+- 単元フォーカス画面へ誘導し、学習順序を担保
 
-## システムアーキテクチャ
+### 4. 人の支援を支える機能
 
-モダンなWeb技術とGoogle Cloud/AIサービスを組み合わせて構築されています。
+- 指導記録（面談・指導メモ）の登録/参照
+- 教室単位の生徒一覧・検索・学習状況確認
 
-- **Frontend/Backend**: Next.js 16 (App Router)
-    - サーバーアクションを活用したフルスタック構成。
-- **Database**: PostgreSQL (Prisma ORM)
-    - ユーザー、カリキュラム、学習履歴のリレーショナルデータ管理。
-- **Auth**: Supabase Auth (SSR)
-- **AI & Storage**:
-    - **Google Gemini API**: 手書き文字認識、採点、フィードバック生成。
-    - **Google Drive API**: スキャン画像の取り込みとアーカイブ (Webhook連携)。
-    - **Upstash QStash / Redis**: 採点ジョブのキューイングとWebhook Watch状態の保存。
+### 5. AI家庭教師（PREMIUMプラン）
 
-## クイックリンク
-- [環境構築ガイド](./環境構築.md)
-- [データベーススキーマ (Prisma)](./prisma/schema.prisma)
+- チャット相談: `/api/tutor-chat`
+- 音声通話相談: Gemini Live を `/ws` 経由で中継
+- 教室プランが `PREMIUM` の生徒のみ利用可能
 
-開発を始める前に、まずは環境構築を行い、実際にローカルサーバーを立ち上げてみてください。
-Good Luck!
+### 6. 非認知アンケート
+
+- 90日ごとの定期アンケート
+- カテゴリ: `GRIT`, `SELF_EFFICACY`, `SELF_REGULATION`, `GROWTH_MINDSET`, `EMOTIONAL_REGULATION`
+- 学習行動の背景を可視化するための基盤データを保存
+
+### 7. ゲーミフィケーション
+
+- XP/レベル/連続学習日数
+- 実績（Achievements）
+- Realtime 通知でレベルアップや採点完了を反映
+
+## ロール
+
+- `STUDENT`: 学習・履歴・印刷・AIフィードバック閲覧
+- `TEACHER`: 担当教室の生徒管理、指導記録、印刷支援
+- `HEAD_TEACHER`: `TEACHER` 権限 + 教師ユーザー作成
+- `ADMIN`: 全体管理（ユーザー/教室/カリキュラム/問題）
+- `PARENT`: スキーマ上定義あり（現時点で専用UIは限定的）
+
+## 技術スタック
+
+- フロント/アプリ: Next.js 16 (App Router), React 19, TypeScript
+- UI: Tailwind CSS v4, shadcn/ui (Radix UI), Recharts
+- DB: PostgreSQL + Prisma
+- 認証: Supabase Auth (`@supabase/ssr`)
+- AI: Google Gemini (`@google/genai`)
+- 外部連携: Google Drive API, Upstash QStash, Upstash Redis, Supabase Realtime
+- デプロイ: Google Cloud Run (Webサービス + Workerサービス)
+
+## システム構成（実運用）
+
+- `web` サービス
+  - Next.js UI/API
+  - Drive Webhook受信
+  - QStash へのジョブ発行
+  - `/ws` で Gemini Live 音声中継
+- `worker` サービス
+  - `/api/queue/grading`, `/api/queue/drive-check` を処理
+  - 重い採点処理を分離
+
+## クイックスタート
+
+詳細は [環境構築.md](./環境構築.md) を参照してください。
+
+```bash
+npm install
+npx prisma generate
+npx prisma migrate dev
+npm run dev
+```
+
+Worker もローカルで検証する場合:
+
+```bash
+npm run dev:worker
+```
+
+## 主要コマンド
+
+```bash
+npm run dev             # Web 開発サーバー
+npm run dev:worker      # Worker 開発サーバー
+npm run build           # 本番ビルド
+npm run start           # Web 本番起動
+npm run start:worker    # Worker 本番起動
+npm run lint            # ESLint
+npm run type-check      # TypeScript 型チェック
+npm run test            # Vitest
+npm run test:e2e        # Playwright
+```
+
+## 主要な環境変数
+
+### 基本（必須）
+
+- `DATABASE_URL`, `DIRECT_URL`
+- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `GEMINI_API_KEY`
+
+### 採点/キュー/Drive（運用時）
+
+- `DRIVE_FOLDER_ID`
+- `QSTASH_TOKEN`, `QSTASH_CURRENT_SIGNING_KEY`, `QSTASH_NEXT_SIGNING_KEY`
+- `GRADING_WORKER_URL`
+- `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`
+- `APP_URL`, `INTERNAL_API_SECRET`, `DRIVE_WEBHOOK_TOKEN`
+
+### AI音声チューター（任意）
+
+- `GEMINI_LIVE_SESSION_SECRET`
+- `GEMINI_LIVE_MODEL`, `GEMINI_LIVE_API_VERSION`, `GEMINI_LIVE_VOICE`
+- `NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS`, `NEXT_PUBLIC_GEMINI_MAX_TURN_MS`
+
+## ドキュメント
+
+- [機能一覧.md](./機能一覧.md)
+- [Architecture.md](./Architecture.md)
+- [環境構築.md](./環境構築.md)
+- [デプロイ手順](./docs/deploy_runbook.md)
+- [問題出力ロジック](./docs/problem-output-logic.md)
+
