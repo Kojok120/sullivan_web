@@ -17,7 +17,7 @@ function normalizeRole(value: unknown): AllowedRole {
 
 /**
  * iOSアプリからのリクエストに含まれるJWTトークンを検証し、セッション情報を返す
- * @param request NextRequest
+ * @param request Request
  * @returns セッション情報（null の場合は認証失敗）
  */
 export async function getSessionFromBearer(
