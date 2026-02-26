@@ -23,13 +23,13 @@ function normalizeRole(value: unknown): AllowedRole {
 export async function getSessionFromBearer(
     request: Request
 ): Promise<SessionPayload | null> {
-    const authHeader = request.headers.get('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader) {
         return null;
     }
 
-    const token = authHeader.slice(7);
-    if (!token) {
+    const [scheme, token] = authHeader.trim().split(/\s+/, 2);
+    if (scheme?.toLowerCase() !== 'bearer' || !token) {
         return null;
     }
 
@@ -69,10 +69,16 @@ export async function getSessionFromBearer(
 export async function getSessionForMobile(
     request: Request
 ): Promise<SessionPayload | null> {
+    const hasAuthorizationHeader = request.headers.has('authorization');
+
     // Bearerトークンを優先
     const bearerSession = await getSessionFromBearer(request);
     if (bearerSession) {
         return bearerSession;
+    }
+
+    if (hasAuthorizationHeader) {
+        return null;
     }
 
     // フォールバック: 通常のcookieベースセッション
