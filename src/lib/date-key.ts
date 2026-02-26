@@ -109,12 +109,23 @@ export function listDateKeysBetween(startDateKey: string, endDateKey: string): s
     return keys;
 }
 
+function sanitizeDayOffset(value: number): number {
+    if (!Number.isFinite(value)) {
+        return 0;
+    }
+
+    return Math.max(0, Math.trunc(value));
+}
+
 export function getDateRangeAroundToday(timeZone: string, daysBefore: number, daysAfter: number) {
     const today = getTodayDateKey(timeZone);
+    const safeDaysBefore = sanitizeDayOffset(daysBefore);
+    const safeDaysAfter = sanitizeDayOffset(daysAfter);
+
     return {
         today,
-        fromDateKey: addDaysToDateKey(today, -Math.max(0, daysBefore)),
-        toDateKey: addDaysToDateKey(today, Math.max(0, daysAfter)),
+        fromDateKey: addDaysToDateKey(today, -safeDaysBefore),
+        toDateKey: addDaysToDateKey(today, safeDaysAfter),
     };
 }
 
