@@ -9,12 +9,16 @@ export default async function StudentRankingPage() {
         redirect('/login');
     }
 
-    if (session.role === 'TEACHER' || session.role === 'HEAD_TEACHER' || session.role === 'ADMIN') {
-        redirect('/teacher/ranking');
-    }
-
-    if (session.role !== 'STUDENT') {
-        redirect('/login');
+    const role = session.role;
+    switch (role) {
+        case 'TEACHER':
+        case 'HEAD_TEACHER':
+        case 'ADMIN':
+            redirect('/teacher/ranking');
+        case 'STUDENT':
+            break;
+        default:
+            redirect('/login');
     }
 
     return (

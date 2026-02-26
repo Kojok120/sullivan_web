@@ -1,36 +1,43 @@
-export type RankingPeriodKey = 'week' | 'month';
+import { z } from 'zod';
 
-export type RankingCategoryKey = 'problemCount' | 'vocabularyScore';
+export const RANKING_PERIOD_KEYS = ['week', 'month'] as const;
+export type RankingPeriodKey = (typeof RANKING_PERIOD_KEYS)[number];
 
-export type RankingEntry = {
-    rank: number;
-    userId: string;
-    name: string;
-    loginId: string;
-    group: string | null;
-    value: number;
-};
+export const RANKING_CATEGORY_KEYS = ['problemCount', 'vocabularyScore'] as const;
+export type RankingCategoryKey = (typeof RANKING_CATEGORY_KEYS)[number];
 
-export type RankingPeriodMeta = {
-    label: string;
-};
+export const rankingEntrySchema = z.object({
+    rank: z.number().int().positive(),
+    userId: z.string().min(1),
+    name: z.string(),
+    loginId: z.string().min(1),
+    group: z.string().nullable(),
+    value: z.number().int().nonnegative(),
+});
+export type RankingEntry = z.infer<typeof rankingEntrySchema>;
 
-export type RankingResponse = {
-    classroom: {
-        id: string;
-        name: string;
-    };
-    timeZone: string;
-    periods: {
-        week: RankingPeriodMeta;
-        month: RankingPeriodMeta;
-    };
-    problemCount: {
-        week: RankingEntry[];
-        month: RankingEntry[];
-    };
-    vocabularyScore: {
-        week: RankingEntry[];
-        month: RankingEntry[];
-    };
-};
+export const rankingPeriodMetaSchema = z.object({
+    label: z.string().min(1),
+});
+export type RankingPeriodMeta = z.infer<typeof rankingPeriodMetaSchema>;
+
+export const rankingResponseSchema = z.object({
+    classroom: z.object({
+        id: z.string().min(1),
+        name: z.string().min(1),
+    }),
+    timeZone: z.string().min(1),
+    periods: z.object({
+        week: rankingPeriodMetaSchema,
+        month: rankingPeriodMetaSchema,
+    }),
+    problemCount: z.object({
+        week: z.array(rankingEntrySchema),
+        month: z.array(rankingEntrySchema),
+    }),
+    vocabularyScore: z.object({
+        week: z.array(rankingEntrySchema),
+        month: z.array(rankingEntrySchema),
+    }),
+});
+export type RankingResponse = z.infer<typeof rankingResponseSchema>;

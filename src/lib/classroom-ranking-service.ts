@@ -175,8 +175,8 @@ async function getProblemCountRanking(params: {
         INNER JOIN "User" u ON u.id = lh."userId"
         WHERE u.role = 'STUDENT'
           AND u."classroomId" = ${params.classroomId}
-          AND (lh."answeredAt" AT TIME ZONE ${params.timeZone}) >= ${params.startDateKey}::date
-          AND (lh."answeredAt" AT TIME ZONE ${params.timeZone}) < ${params.endExclusiveDateKey}::date
+          AND lh."answeredAt" >= ((${params.startDateKey}::timestamp AT TIME ZONE ${params.timeZone}) AT TIME ZONE 'UTC')
+          AND lh."answeredAt" < ((${params.endExclusiveDateKey}::timestamp AT TIME ZONE ${params.timeZone}) AT TIME ZONE 'UTC')
         GROUP BY u.id, u.name, u."loginId", u."group"
         ORDER BY "value" DESC,
                  COALESCE(NULLIF(u.name, ''), u."loginId") ASC,
@@ -204,8 +204,8 @@ async function getVocabularyScoreRanking(params: {
         INNER JOIN "User" u ON u.id = vgs."userId"
         WHERE u.role = 'STUDENT'
           AND u."classroomId" = ${params.classroomId}
-          AND (vgs."playedAt" AT TIME ZONE ${params.timeZone}) >= ${params.startDateKey}::date
-          AND (vgs."playedAt" AT TIME ZONE ${params.timeZone}) < ${params.endExclusiveDateKey}::date
+          AND vgs."playedAt" >= ((${params.startDateKey}::timestamp AT TIME ZONE ${params.timeZone}) AT TIME ZONE 'UTC')
+          AND vgs."playedAt" < ((${params.endExclusiveDateKey}::timestamp AT TIME ZONE ${params.timeZone}) AT TIME ZONE 'UTC')
         GROUP BY u.id, u.name, u."loginId", u."group"
         HAVING SUM(vgs.score) > 0
         ORDER BY "value" DESC,

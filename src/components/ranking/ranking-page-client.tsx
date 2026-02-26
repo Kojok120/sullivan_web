@@ -6,25 +6,52 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import type { RankingCategoryKey, RankingEntry, RankingPeriodKey, RankingResponse } from '@/lib/types/ranking';
-
-type ClassroomOption = {
-    id: string;
-    name: string;
-};
+import type { ClassroomOption } from '@/lib/types/classroom';
+import {
+    RANKING_CATEGORY_KEYS,
+    RANKING_PERIOD_KEYS,
+    rankingResponseSchema,
+    type RankingCategoryKey,
+    type RankingEntry,
+    type RankingPeriodKey,
+    type RankingResponse,
+} from '@/lib/types/ranking';
 
 type RankingPageClientProps = {
     apiPath: string;
     heading: string;
     description: string;
     showClassroomSelector?: boolean;
-    classrooms?: ClassroomOption[];
+    classrooms?: Pick<ClassroomOption, 'id' | 'name'>[];
 };
 
 const DEFAULT_TIME_ZONE = 'Asia/Tokyo';
+const RANKING_CATEGORY_KEY_SET = new Set<string>(RANKING_CATEGORY_KEYS);
+const RANKING_PERIOD_KEY_SET = new Set<string>(RANKING_PERIOD_KEYS);
 
 function getValueLabel(category: RankingCategoryKey): string {
     return category === 'problemCount' ? '問題数' : 'スコア';
+}
+
+function isRankingCategoryKey(value: string): value is RankingCategoryKey {
+    return RANKING_CATEGORY_KEY_SET.has(value);
+}
+
+function isRankingPeriodKey(value: string): value is RankingPeriodKey {
+    return RANKING_PERIOD_KEY_SET.has(value);
+}
+
+function getApiErrorMessage(payload: unknown): string | null {
+    if (
+        payload &&
+        typeof payload === 'object' &&
+        'error' in payload &&
+        typeof (payload as { error?: unknown }).error === 'string'
+    ) {
+        return (payload as { error: string }).error;
+    }
+
+    return null;
 }
 
 export function RankingPageClient({
@@ -77,13 +104,18 @@ export function RankingPageClient({
                     cache: 'no-store',
                 });
 
-                const payload = await response.json();
+                const payload: unknown = await response.json();
                 if (!response.ok) {
-                    throw new Error(typeof payload?.error === 'string' ? payload.error : 'ランキングの取得に失敗しました');
+                    throw new Error(getApiErrorMessage(payload) ?? 'ランキングの取得に失敗しました');
+                }
+
+                const parsedPayload = rankingResponseSchema.safeParse(payload);
+                if (!parsedPayload.success) {
+                    throw new Error('ランキングデータの形式が不正です');
                 }
 
                 if (!cancelled) {
-                    setData(payload as RankingResponse);
+                    setData(parsedPayload.data);
                 }
             } catch (error) {
                 if (!cancelled) {
@@ -143,7 +175,11 @@ export function RankingPageClient({
                     <div className="space-y-4">
                         <Tabs
                             value={category}
-                            onValueChange={(value) => setCategory(value as RankingCategoryKey)}
+                            onValueChange={(value) => {
+                                if (isRankingCategoryKey(value)) {
+                                    setCategory(value);
+                                }
+                            }}
                             className="space-y-0"
                         >
                             <TabsList className="grid w-full max-w-md grid-cols-2">
@@ -154,7 +190,11 @@ export function RankingPageClient({
 
                         <Tabs
                             value={period}
-                            onValueChange={(value) => setPeriod(value as RankingPeriodKey)}
+                            onValueChange={(value) => {
+                                if (isRankingPeriodKey(value)) {
+                                    setPeriod(value);
+                                }
+                            }}
                             className="space-y-0"
                         >
                             <TabsList className="grid w-full max-w-xs grid-cols-2">

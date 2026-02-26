@@ -39,9 +39,6 @@ export async function POST(request: NextRequest) {
     }
 
     const endedAt = new Date(parsed.data.endedAt);
-    if (Number.isNaN(endedAt.getTime())) {
-        return NextResponse.json({ error: 'endedAt must be a valid datetime' }, { status: 400 });
-    }
 
     try {
         await prisma.vocabularyGameScore.upsert({
