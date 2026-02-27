@@ -148,14 +148,27 @@ async function resolveClassroomForActor(params: {
 }
 
 function toRankingEntries(rows: RankingQueryRow[]): RankingEntry[] {
-    return rows.map((row, index) => ({
-        rank: index + 1,
-        userId: row.userId,
-        name: row.name,
-        loginId: row.loginId,
-        group: row.group,
-        value: Number(row.value),
-    }));
+    let currentRank = 1;
+    let previousValue: number | null = null;
+
+    return rows.map((row, index) => {
+        const value = Number(row.value);
+
+        // 先頭、またはスコアが前のエントリより小さい場合のみランクを更新
+        if (previousValue === null || value < previousValue) {
+            currentRank = index + 1;
+        }
+        previousValue = value;
+
+        return {
+            rank: currentRank,
+            userId: row.userId,
+            name: row.name,
+            loginId: row.loginId,
+            group: row.group,
+            value,
+        };
+    });
 }
 
 async function getProblemCountRanking(params: {

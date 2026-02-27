@@ -15,6 +15,8 @@ export default async function StudentRankingPage() {
         case 'HEAD_TEACHER':
         case 'ADMIN':
             redirect('/teacher/ranking');
+        // redirect()は例外を投げるためここには到達しない（意図的なフォールスルー）
+        // falls through
         case 'STUDENT':
             break;
         default:
