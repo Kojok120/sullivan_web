@@ -12,6 +12,9 @@ const bodySchema = z.object({
     maxCombo: z.number().int().min(0),
     level: z.enum(['beginner', 'intermediate', 'advanced']),
     endedAt: z.string().datetime(),
+}).refine((data) => data.correctCount <= data.totalCount, {
+    message: 'correctCount must be <= totalCount',
+    path: ['correctCount'],
 });
 
 const ALLOWED_ROLES = new Set(['STUDENT']);
