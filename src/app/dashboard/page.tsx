@@ -1,118 +1,123 @@
-import { getSession } from '@/lib/auth';
-import { redirect } from 'next/navigation';
-import { getStudentStats, getSubjectProgress, getDailyActivity, getUnwatchedCount, getUnwatchedLectures } from '@/lib/analytics';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import { Activity, Target, AlertTriangle, Zap, PlayCircle } from 'lucide-react';
-import { ActivityChart } from './activity-chart';
 import Link from 'next/link';
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { redirect } from 'next/navigation';
+import { AlertTriangle, PlayCircle, Sparkles, Target, Trophy, Zap } from 'lucide-react';
 
+import { getSession } from '@/lib/auth';
+import { getDailyActivity, getStudentStats, getSubjectProgress, getUnwatchedCount, getUnwatchedLectures } from '@/lib/analytics';
+import { getGoalDailyViewPayload } from '@/lib/student-goal-service';
+import { GoalReadonlyPanel } from '@/components/goals/goal-readonly-panel';
 import { Heatmap } from '@/components/gamification/heatmap';
-import { Badge } from '@/components/ui/badge';
 import { PrintSelector } from '@/components/print/print-selector';
 import { SubjectProgressList } from '@/components/subject-progress-list';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 
 export default async function DashboardPage() {
     const session = await getSession();
     if (!session) redirect('/login');
 
-    const [stats, subjectProgress, dailyActivity, unwatchedCount, unwatchedLectures] = await Promise.all([
+    const [stats, subjectProgress, dailyActivity, unwatchedCount, unwatchedLectures, goalData] = await Promise.all([
         getStudentStats(session.userId),
         getSubjectProgress(session.userId),
-        getDailyActivity(session.userId, 365), // Fetch 1 year for heatmap
+        getDailyActivity(session.userId, 365),
         getUnwatchedCount(session.userId),
-        getUnwatchedLectures(session.userId)
+        getUnwatchedLectures(session.userId),
+        getGoalDailyViewPayload({ studentId: session.userId }),
     ]);
 
-    // Calculate XP Progress
     const level = stats.level || 1;
     const currentXp = stats.xp || 0;
     const prevLevelXp = 100 * Math.pow(level, 2);
     const nextLevelXp = 100 * Math.pow(level + 1, 2);
     const progressPercent = Math.min(100, Math.max(0, ((currentXp - prevLevelXp) / (nextLevelXp - prevLevelXp)) * 100));
 
+    const todayGoalCount = goalData.rows.find((row) => row.dateKey === goalData.todayKey)?.entries.length ?? 0;
+
     return (
-        <div className="container mx-auto py-8 px-4">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-                <div>
-                    <h1 className="text-3xl font-bold">学習ダッシュボード</h1>
-                    <div className="flex items-center gap-2 mt-2">
-                        <Badge variant="outline" className="text-lg py-1 px-3 border-yellow-500 text-yellow-700 bg-yellow-50">
+        <div className="container mx-auto space-y-6 px-4 py-6 sm:space-y-8 sm:py-8">
+            <section className="rounded-2xl border border-primary/25 bg-gradient-to-r from-primary/[0.10] to-background p-5 sm:p-6">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold sm:text-3xl">学習ダッシュボード</h1>
+                        <p className="mt-1 text-sm text-muted-foreground">今日やることを先に確認してから学習を始めましょう</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline" className="bg-background text-base">
                             Lv.{level}
                         </Badge>
-                        <div className="flex flex-col w-48 gap-1">
-                            <div className="flex justify-between text-xs text-muted-foreground">
-                                <span>XP {currentXp}</span>
-                                <span>Next {nextLevelXp}</span>
-                            </div>
-                            <Progress value={progressPercent} className="h-2" />
-                        </div>
+                        <Badge variant="secondary">今日の目標 {todayGoalCount}件</Badge>
                     </div>
                 </div>
-                {/* Achievements link removed as per request to separate them */}
-            </div>
-
-            {/* Unwatched Video Alert */}
-            {unwatchedCount > 0 && (
-                <div className="mb-8">
-                    <Alert variant="destructive" className="bg-red-50 border-red-200 text-red-800">
-                        <AlertTriangle className="h-4 w-4" />
-                        <AlertTitle>未視聴の動画があります</AlertTitle>
-                        <AlertDescription className="mt-2 flex items-center justify-between">
-                            <span>
-                                不正解の問題で、まだ解説動画を見ていないものが {unwatchedCount} 件あります。
-                                <br />学習履歴から確認して、復習を行いましょう。
-                            </span>
-                            <Link href="/">
-                                <span className="underline font-bold cursor-pointer">
-                                    ホームへ移動する
-                                </span>
-                            </Link>
-                        </AlertDescription>
-                    </Alert>
+                <div className="mt-4 w-full max-w-xl space-y-1">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>XP {currentXp}</span>
+                        <span>Next {nextLevelXp}</span>
+                    </div>
+                    <Progress value={progressPercent} className="h-2" />
                 </div>
-            )}
+            </section>
 
-            {/* Unwatched Lecture Alert */}
-            {unwatchedLectures.length > 0 && (
-                <div className="mb-8">
-                    <Alert className="bg-amber-50 border-amber-200 text-amber-800">
-                        <PlayCircle className="h-4 w-4" />
-                        <AlertTitle>講義動画を視聴してください</AlertTitle>
-                        <AlertDescription className="mt-2">
-                            <span>
-                                以下の単元の講義動画が未視聴です。講義動画を視聴するまで、その単元の問題は出題されません。
-                            </span>
-                            <ul className="mt-2 space-y-1">
-                                {unwatchedLectures.map((lecture) => (
-                                    <li key={lecture.coreProblemId}>
-                                        <Link href={`/unit-focus/${lecture.coreProblemId}`} className="flex items-center gap-2 hover:underline">
-                                            <span className="font-bold">{lecture.subjectName}</span>
-                                            <span>-</span>
-                                            <span>{lecture.coreProblemName}</span>
-                                            <span className="text-amber-600">→</span>
-                                        </Link>
-                                    </li>
-                                ))}
-                            </ul>
-                        </AlertDescription>
-                    </Alert>
-                </div>
-            )}
+            <section className="space-y-4">
+                <GoalReadonlyPanel
+                    studentId={session.userId}
+                    initialData={goalData}
+                    showTimeline
+                />
+            </section>
 
-            {/* Stats Overview */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
+            {unwatchedCount > 0 || unwatchedLectures.length > 0 ? (
+                <section className="grid gap-4 lg:grid-cols-2">
+                    {unwatchedCount > 0 ? (
+                        <Alert variant="destructive" className="border-red-200 bg-red-50 text-red-800">
+                            <AlertTriangle className="h-4 w-4" />
+                            <AlertTitle>未視聴の解説動画があります</AlertTitle>
+                            <AlertDescription className="mt-2 space-y-2">
+                                <p>
+                                    不正解問題のうち、まだ見ていない解説動画が <strong>{unwatchedCount}件</strong> あります。
+                                </p>
+                                <Link href="/" className="inline-flex items-center gap-1 text-sm font-semibold underline">
+                                    ホームで復習を開始する
+                                </Link>
+                            </AlertDescription>
+                        </Alert>
+                    ) : null}
+
+                    {unwatchedLectures.length > 0 ? (
+                        <Alert className="border-amber-200 bg-amber-50 text-amber-900">
+                            <PlayCircle className="h-4 w-4" />
+                            <AlertTitle>先に講義動画の視聴が必要です</AlertTitle>
+                            <AlertDescription className="mt-2">
+                                <ul className="space-y-1">
+                                    {unwatchedLectures.map((lecture) => (
+                                        <li key={lecture.coreProblemId}>
+                                            <Link href={`/unit-focus/${lecture.coreProblemId}`} className="inline-flex items-center gap-1 text-sm hover:underline">
+                                                <span className="font-semibold">{lecture.subjectName}</span>
+                                                <span>{lecture.coreProblemName}</span>
+                                                <span>→</span>
+                                            </Link>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </AlertDescription>
+                        </Alert>
+                    ) : null}
+                </section>
+            ) : null}
+
+            <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">総学習数</CardTitle>
-                        <Activity className="h-4 w-4 text-muted-foreground" />
+                        <Sparkles className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{stats.totalProblemsSolved}問</div>
-                        <p className="text-xs text-muted-foreground">これまでの合計</p>
+                        <p className="text-xs text-muted-foreground">これまでの累計</p>
                     </CardContent>
                 </Card>
+
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">正答率</CardTitle>
@@ -123,35 +128,41 @@ export default async function DashboardPage() {
                         <p className="text-xs text-muted-foreground">平均正答率</p>
                     </CardContent>
                 </Card>
-                <Card className="border-blue-200 bg-blue-50/50">
+
+                <Card className="border-blue-200 bg-blue-50/70">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">連続学習</CardTitle>
-                        <Zap className="h-4 w-4 text-blue-500 fill-blue-500" />
+                        <CardTitle className="text-sm font-medium text-blue-800">連続学習</CardTitle>
+                        <Zap className="h-4 w-4 fill-blue-500 text-blue-500" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-blue-700">{stats.currentStreak}日</div>
-                        <p className="text-xs text-blue-600 font-medium">毎日続けて偉い！</p>
+                        <p className="text-xs text-blue-700">連続達成中</p>
                     </CardContent>
                 </Card>
-            </div>
 
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">レベル</CardTitle>
+                        <Trophy className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">Lv.{level}</div>
+                        <p className="text-xs text-muted-foreground">次レベルまで {Math.max(0, nextLevelXp - currentXp)} XP</p>
+                    </CardContent>
+                </Card>
+            </section>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-                {/* Activity Heatmap */}
-                <div className="col-span-4 space-y-4">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>学習アクティビティ (直近)</CardTitle>
-                        </CardHeader>
-                        <CardContent className="pl-2">
-                            <ActivityChart data={dailyActivity.slice(-30)} />
-                        </CardContent>
-                    </Card>
-                    <Heatmap data={dailyActivity} />
-                </div>
+            <section className="grid gap-4 lg:grid-cols-12">
+                <Card className="lg:col-span-8">
+                    <CardHeader>
+                        <CardTitle>学習ヒートマップ</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <Heatmap data={dailyActivity} />
+                    </CardContent>
+                </Card>
 
-                {/* Subject Progress & Printing */}
-                <div className="col-span-3 space-y-4">
+                <div className="space-y-4 lg:col-span-4">
                     <Card>
                         <CardHeader>
                             <CardTitle>学習プリント印刷</CardTitle>
@@ -170,7 +181,7 @@ export default async function DashboardPage() {
                         </CardContent>
                     </Card>
                 </div>
-            </div>
+            </section>
         </div>
     );
 }

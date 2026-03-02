@@ -11,6 +11,7 @@ import { incrementStampCount } from '@/lib/stamp-service';
 import { processGamificationUpdates, toGamificationPayload } from '@/lib/gamification-service';
 import { acquireGradingFileLock, isGradingFileLocked, releaseGradingFileLock } from '@/lib/grading-lock';
 import { claimGradingJob, markGradingJobCompleted, markGradingJobFailed, publishGradingJob } from '@/lib/grading-job';
+import { loadInstructionPrompt as loadPrompt } from '@/lib/instruction-prompt';
 
 // Priority adjustment logic (inlined from removed priority-algo.ts)
 type Evaluation = "A" | "B" | "C" | "D";
@@ -52,19 +53,6 @@ import { QRData, compressProblemIds, expandProblemIds } from '@/lib/qr-utils';
 // Deprecated local getDrive removed in favor of shared getDriveClient
 function getDrive() {
     return getDriveClient();
-}
-
-/**
- * Loads a prompt from a markdown file in the instructions directory.
- * Replaces {{key}} placeholders with values from the variables object.
- */
-function loadPrompt(filename: string, variables: Record<string, unknown> = {}): string {
-    const filePath = path.join(process.cwd(), 'instructions', filename);
-    let content = fs.readFileSync(filePath, 'utf-8');
-    for (const [key, value] of Object.entries(variables)) {
-        content = content.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
-    }
-    return content;
 }
 
 function getStudentIdFromQr(qrData: QRData | null): string | null {

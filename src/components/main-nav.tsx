@@ -21,6 +21,8 @@ export function MainNav({ role }: { role?: string }) {
     const pathname = usePathname();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const isTeacherRole = role === 'TEACHER' || role === 'HEAD_TEACHER';
+    const isAdmin = role === 'ADMIN';
+    const isTeacherDashboardActive = pathname === '/teacher' || pathname.startsWith('/teacher/students');
 
     // Do not render on admin pages or login/signup pages
     if (pathname.startsWith("/admin") || pathname.startsWith("/login") || pathname.startsWith("/signup")) {
@@ -32,10 +34,19 @@ export function MainNav({ role }: { role?: string }) {
             { href: "/", label: "ホーム", active: pathname === "/" },
             { href: "/unit-focus", label: "単元集中", active: pathname.startsWith("/unit-focus") },
             { href: "/dashboard", label: "ダッシュボード", active: pathname === "/dashboard" },
+            ...(role === 'STUDENT' ? [{ href: "/ranking", label: "ランキング", active: pathname.startsWith("/ranking") }] : []),
             { href: "/achievements", label: "実績", active: pathname === "/achievements" },
-            ...(role === 'ADMIN' ? [{ href: "/teacher", label: "講師用", active: pathname.startsWith("/teacher") }] : []),
+            ...(isAdmin
+                ? [
+                    { href: "/teacher", label: "講師用", active: isTeacherDashboardActive },
+                    { href: "/teacher/ranking", label: "ランキング", active: pathname.startsWith("/teacher/ranking") },
+                ]
+                : []),
         ]
-        : [{ href: "/teacher", label: "講師用", active: pathname.startsWith("/teacher") }];
+        : [
+            { href: "/teacher", label: "講師用", active: isTeacherDashboardActive },
+            { href: "/teacher/ranking", label: "ランキング", active: pathname.startsWith("/teacher/ranking") },
+        ];
 
     const linkClass = (isActive: boolean) =>
         isActive

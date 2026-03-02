@@ -9,13 +9,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Link from 'next/link';
 import { ArrowLeft, AlertTriangle, Clock, Target, Trophy } from 'lucide-react';
 import { getStudentDashboardData } from '@/lib/analytics'; // Removed individual functions
-import { ActivityChart } from '@/app/dashboard/activity-chart';
 import { ProfileCard } from './profile-card';
 import { GuidanceList } from './guidance-list';
 import { PrintProblemCard } from './print-problem-card';
 import { DateDisplay } from '@/components/ui/date-display';
 import { SessionList } from '@/app/dashboard/components/session-list';
 import { canAccessUserWithinClassroomScope } from '@/lib/authorization';
+import { getGoalDailyViewPayload } from '@/lib/student-goal-service';
+import { TeacherGoalManagementCard } from '@/components/goals/teacher-goal-management-card';
 
 export default async function TeacherStudentDetailPage({
     params,
@@ -39,7 +40,10 @@ export default async function TeacherStudentDetailPage({
         }
     }
     const query = await searchParams;
-    const defaultTab = (typeof query.tab === 'string' && ['overview', 'history', 'profile'].includes(query.tab)) ? query.tab : 'overview';
+    const defaultTab = (typeof query.tab === 'string'
+        && ['overview', 'goals', 'history', 'guidance', 'profile'].includes(query.tab))
+        ? query.tab
+        : 'overview';
 
     const dashboardData = await getStudentDashboardData(userId);
 
@@ -54,7 +58,8 @@ export default async function TeacherStudentDetailPage({
         );
     }
 
-    const { student, stats, subjectProgress, dailyActivity, weaknesses, subjects } = dashboardData;
+    const { student, stats, subjectProgress, weaknesses, subjects } = dashboardData;
+    const goalData = await getGoalDailyViewPayload({ studentId: student.id });
     const classrooms = await prisma.classroom.findMany({ orderBy: { createdAt: 'asc' } });
 
 
@@ -79,7 +84,9 @@ export default async function TeacherStudentDetailPage({
                 <div className="overflow-x-auto pb-1">
                     <TabsList className="w-max min-w-full sm:min-w-0">
                         <TabsTrigger value="overview">学習状況</TabsTrigger>
+                        <TabsTrigger value="goals">目標設定</TabsTrigger>
                         <TabsTrigger value="history">学習履歴ログ</TabsTrigger>
+                        <TabsTrigger value="guidance">面談記録</TabsTrigger>
                         <TabsTrigger value="profile">生徒情報</TabsTrigger>
                     </TabsList>
                 </div>
@@ -166,15 +173,6 @@ export default async function TeacherStudentDetailPage({
                             </CardContent>
                         </Card>
 
-                        {/* Activity Chart */}
-                        <Card className="md:col-span-4">
-                            <CardHeader>
-                                <CardTitle>学習活動 (過去30日)</CardTitle>
-                            </CardHeader>
-                            <CardContent className="pl-2">
-                                <ActivityChart data={dailyActivity} />
-                            </CardContent>
-                        </Card>
                     </div>
 
                     {/* Subject Progress */}
@@ -200,29 +198,38 @@ export default async function TeacherStudentDetailPage({
                     </Card>
                 </TabsContent>
 
+                <TabsContent value="goals" className="space-y-4">
+                    <TeacherGoalManagementCard
+                        studentId={student.id}
+                        subjects={subjects}
+                        initialData={goalData}
+                    />
+                </TabsContent>
+
                 <TabsContent value="history">
                     <SessionList userId={student.id} basePath={`/teacher/students/${student.id}/history`} />
                 </TabsContent>
 
+                <TabsContent value="guidance" className="space-y-4">
+                    <GuidanceList
+                        userId={student.id}
+                        records={student.guidanceRecords}
+                    />
+                </TabsContent>
+
                 <TabsContent value="profile" className="space-y-4">
-                    <div className="grid gap-4 lg:grid-cols-2">
-                        <ProfileCard
-                            userId={student.id}
-                            initialBio={student.bio}
-                            initialNotes={student.notes}
-                            initialBirthday={student.birthday}
-                            initialClassroomId={student.classroomId}
-                            initialGroupId={student.group}
-                            initialSchool={student.school}
-                            initialPhoneNumber={student.phoneNumber}
-                            initialEmail={student.email}
-                            classrooms={classrooms}
-                        />
-                        <GuidanceList
-                            userId={student.id}
-                            records={student.guidanceRecords}
-                        />
-                    </div>
+                    <ProfileCard
+                        userId={student.id}
+                        initialBio={student.bio}
+                        initialNotes={student.notes}
+                        initialBirthday={student.birthday}
+                        initialClassroomId={student.classroomId}
+                        initialGroupId={student.group}
+                        initialSchool={student.school}
+                        initialPhoneNumber={student.phoneNumber}
+                        initialEmail={student.email}
+                        classrooms={classrooms}
+                    />
                 </TabsContent>
             </Tabs>
         </div >
