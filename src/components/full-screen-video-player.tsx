@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import YouTube, { YouTubeEvent } from "react-youtube";
-import { Loader2, RotateCcw, SkipForward, X } from "lucide-react";
+import { ArrowLeft, Loader2, RotateCcw, SkipForward, X } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
@@ -121,7 +121,17 @@ function FullScreenVideoPlayerContent({
 
     return (
         <DialogContent showCloseButton={false} className="!max-w-none w-screen h-screen p-0 m-0 gap-0 bg-black border-none flex flex-col justify-center items-center duration-0">
-            <DialogHeader className="absolute top-4 left-4 right-4 z-10 bg-black/50 p-2 rounded text-white overflow-hidden flex flex-row justify-between items-start pointer-events-none">
+            <Button
+                type="button"
+                onClick={closePlayer}
+                aria-label="戻る"
+                title="戻る"
+                className="absolute top-4 left-4 z-[7] h-10 px-3 bg-black/60 text-white hover:bg-black/75 border border-white/20"
+            >
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                戻る
+            </Button>
+            <DialogHeader className="absolute top-4 left-20 right-4 z-10 bg-black/50 p-2 rounded text-white overflow-hidden flex flex-row justify-between items-start pointer-events-none">
                 <div className="flex flex-col overflow-hidden mr-2">
                     <DialogTitle className="text-white truncate text-left">{currentVideo.title}</DialogTitle>
                     <DialogDescription className="text-gray-300 text-left">
@@ -164,6 +174,9 @@ function FullScreenVideoPlayerContent({
                         allowFullScreen
                     />
                 )}
+                {/* YouTubeタイトルリンクなど上部クリック領域をブロック */}
+                <div aria-hidden="true" className="absolute top-0 inset-x-0 h-24 z-[4]" style={{ pointerEvents: "auto" }} />
+                <div className="absolute inset-y-0 right-0 w-1/2 z-[4]" style={{ pointerEvents: "auto" }} />
                 <div className="absolute bottom-0 right-0 w-40 h-16 z-[5]" style={{ pointerEvents: "auto" }} />
                 {videoEnded && (
                     <div className="absolute inset-0 z-[6] bg-black">
