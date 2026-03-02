@@ -33,7 +33,7 @@ export function VideoPlayerDialog({
     const [watched, setWatched] = useState(initialIsWatched);
     const router = useRouter();
 
-    // Sync watched state when prop changes
+    // 親からの視聴状態変更をローカル表示に同期
     useEffect(() => {
         setWatched(initialIsWatched);
     }, [initialIsWatched]);
@@ -46,8 +46,7 @@ export function VideoPlayerDialog({
         }
     };
 
-    // Prepare playlist for FullScreenVideoPlayer
-    // Either from the playlist prop or a single item
+    // FullScreenVideoPlayer用の再生リストを作成
     const playerPlaylist: VideoData[] = playlist.length > 0
         ? playlist.map(p => ({
             title: p.question,
@@ -66,14 +65,15 @@ export function VideoPlayerDialog({
 
     const handleVideoEnd = (video: VideoData) => {
         if (video.id) {
-            handleMarkWatched(video.id);
+            void handleMarkWatched(video.id);
+            if (video.id === initialHistoryId) {
+                setWatched(true);
+            }
         }
     };
 
     const handleClose = () => {
         setOpen(false);
-        // Optimistically update
-        setWatched(true);
         router.refresh();
     };
 
