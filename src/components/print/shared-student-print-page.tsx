@@ -23,6 +23,7 @@ export async function SharedStudentPrintPage({ userId, searchParams, redirectPat
             problems={data.problems}
             problemSets={data.problemSets}
             studentLoginId={data.studentLoginId}
+            unitToken={data.unitToken}
         />
     );
 }

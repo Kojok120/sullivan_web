@@ -15,12 +15,13 @@ interface PrintLayoutProps {
     problems: (Problem & { customId?: string | null })[];
     studentLoginId: string;
     problemSets?: (Problem & { customId?: string | null })[][];
+    unitToken?: string;
 }
 
 // A4は縦297mm。ヘッダー・フッター・余白を除いた安全な描画領域を使う。
 const MAX_PAGE_HEIGHT_PX = 900; // 96DPI換算の概算値（A4高さ297mm相当から余白を除いた安全域）
 
-export function PrintLayout({ studentName, subjectName, problems, studentLoginId, problemSets }: PrintLayoutProps) {
+export function PrintLayout({ studentName, subjectName, problems, studentLoginId, problemSets, unitToken }: PrintLayoutProps) {
     const router = useRouter();
     const targetSets = useMemo(
         () => (problemSets && problemSets.length > 0 ? problemSets : [problems]),
@@ -55,7 +56,8 @@ export function PrintLayout({ studentName, subjectName, problems, studentLoginId
             const compressed = compressProblemIds(problemIds);
             const qrData = {
                 s: studentLoginId,
-                ...compressed
+                ...compressed,
+                ...(unitToken ? { u: unitToken } : {}),
             };
             const json = JSON.stringify(qrData);
             try {
@@ -146,7 +148,7 @@ export function PrintLayout({ studentName, subjectName, problems, studentLoginId
 
         processSets();
 
-    }, [flatProblems, studentLoginId, targetSets]);
+    }, [flatProblems, studentLoginId, targetSets, unitToken]);
 
     const handlePrint = () => {
         window.print();
