@@ -122,8 +122,17 @@ Sullivan は次の分業を前提に設計されています。
 src/
 ├── app/                    # App Router ページ/API
 ├── components/             # UIコンポーネント
+│   └── goals/              # 目標管理UI（container / hook / tab / dialog）
 ├── lib/                    # ドメインロジック
-│   ├── grading-service.ts  # 採点本体
+│   ├── grading-service.ts  # 採点公開エントリ（互換レイヤ）
+│   ├── grading/            # 採点パイプライン分割実装
+│   │   ├── pipeline.ts     # 処理オーケストレーション
+│   │   ├── drive.ts        # Drive監視・ジョブ投入
+│   │   ├── drive-ops.ts    # Driveメタ操作（rename/archive等）
+│   │   ├── qr.ts           # QR解析・ファイル準備
+│   │   ├── gemini-grader.ts# Gemini採点
+│   │   ├── results.ts      # 採点結果保存・進行更新
+│   │   └── watchdog.ts     # タイムアウト監視・失敗通知
 │   ├── print-algo.ts       # 出題選定
 │   ├── progression.ts      # 単元解放判定
 │   ├── survey-service.ts   # 非認知アンケート
@@ -143,4 +152,3 @@ prisma/schema.prisma        # DBスキーマ
 - Drive Watch は定期更新運用（7日失効対策）
 
 実運用手順は [docs/deploy_runbook.md](./docs/deploy_runbook.md) を参照してください。
-
