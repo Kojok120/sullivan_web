@@ -7,9 +7,17 @@ import { CalendarDays, CalendarRange, Target } from 'lucide-react';
 import { getGoalDailyViewAction } from '@/app/actions/student-goals';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { getBrowserTimeZoneSafe, normalizeTimeZone, parseDateKeyAsUTC } from '@/lib/date-key';
+import { getBrowserTimeZoneSafe } from '@/lib/date-key';
 import { cn } from '@/lib/utils';
-import type { DailyGoalEntry, GoalDailyViewPayload, StudentGoalView } from '@/lib/types/student-goal';
+import type { DailyGoalEntry, GoalDailyViewPayload } from '@/lib/types/student-goal';
+import {
+    formatDateKeyLabel,
+    formatMonthLabel,
+    getRelativeDateLabel,
+    getRemainingDays,
+    resolveStudentGoalValueForDate,
+    toGoalValueLabel,
+} from './goal-view-utils';
 
 type GoalReadonlyPanelProps = {
     studentId: string;
@@ -18,69 +26,6 @@ type GoalReadonlyPanelProps = {
     showTimeline?: boolean;
     className?: string;
 };
-
-function formatDateKeyLabel(dateKey: string, timeZone: string) {
-    const [year, month, day] = dateKey.split('-').map(Number);
-    const date = new Date(Date.UTC(year, month - 1, day));
-    return new Intl.DateTimeFormat('ja-JP', {
-        timeZone: normalizeTimeZone(timeZone),
-        month: 'numeric',
-        day: 'numeric',
-        weekday: 'short',
-    }).format(date);
-}
-
-function formatMonthLabel(dateKey: string, timeZone: string) {
-    const [year, month] = dateKey.split('-').map(Number);
-    const date = new Date(Date.UTC(year, month - 1, 1));
-    return new Intl.DateTimeFormat('ja-JP', {
-        timeZone: normalizeTimeZone(timeZone),
-        year: 'numeric',
-        month: 'long',
-    }).format(date);
-}
-
-function toGoalValueLabel(entry: DailyGoalEntry): string {
-    if (entry.goalType === 'PROBLEM_COUNT') {
-        const countLabel = entry.targetCount !== null ? `${entry.targetCount}問` : '未設定';
-        return entry.targetText ? `${countLabel} / ${entry.targetText}` : countLabel;
-    }
-
-    const pieces: string[] = [];
-    if (entry.targetText) pieces.push(entry.targetText);
-    if (entry.targetCount !== null) pieces.push(String(entry.targetCount));
-    return pieces.length > 0 ? pieces.join(' / ') : '未設定';
-}
-
-function getRelativeDateLabel(dateKey: string, todayKey: string, tomorrowKey: string): string | null {
-    if (dateKey === todayKey) return '今日';
-    if (dateKey === tomorrowKey) return '明日';
-    return null;
-}
-
-function getDaysDiff(baseDateKey: string, targetDateKey: string): number {
-    const base = parseDateKeyAsUTC(baseDateKey).getTime();
-    const target = parseDateKeyAsUTC(targetDateKey).getTime();
-    return Math.floor((target - base) / (24 * 60 * 60 * 1000));
-}
-
-function resolveGoalValueForDate(goal: StudentGoalView, dateKey: string): { targetCount: number | null; targetText: string | null } {
-    let targetCount: number | null = null;
-    let targetText: string | null = null;
-
-    for (const milestone of goal.milestones) {
-        if (milestone.dateKey > dateKey) break;
-        if (milestone.targetCount !== null || (milestone.targetText && milestone.targetText.trim().length > 0)) {
-            targetCount = milestone.targetCount;
-            targetText = milestone.targetText;
-        }
-    }
-
-    return {
-        targetCount,
-        targetText,
-    };
-}
 
 function GoalEntryItem({ entry }: { entry: DailyGoalEntry }) {
     return (
@@ -260,8 +205,8 @@ export function GoalReadonlyPanel({
                             <p className="rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">有効な目標はありません</p>
                         ) : (
                             data.activeGoals.map((goal) => {
-                                const remainingDays = getDaysDiff(data.todayKey, goal.dueDateKey);
-                                const dueValue = resolveGoalValueForDate(goal, goal.dueDateKey);
+                                const remainingDays = getRemainingDays(data.todayKey, goal.dueDateKey);
+                                const dueValue = resolveStudentGoalValueForDate(goal, goal.dueDateKey);
                                 const valueLabel = goal.type === 'PROBLEM_COUNT'
                                     ? dueValue.targetCount !== null
                                         ? `${dueValue.targetCount}問`

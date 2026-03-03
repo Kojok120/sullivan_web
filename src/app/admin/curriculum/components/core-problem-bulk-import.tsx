@@ -18,6 +18,7 @@ import { Check, AlertTriangle, Loader2, Video } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { bulkCreateCoreProblems, searchCoreProblemsForBulkUpsert, type LectureVideo } from '../actions';
 import { parseCoreProblemTSV } from '@/lib/tsv-parser';
+import { areLectureVideosEqual, normalizeLectureVideos, parseLectureVideosFromJson } from '@/lib/lecture-video-utils';
 import { toast } from 'sonner';
 
 interface CoreProblemBulkImportProps {
@@ -44,49 +45,6 @@ type ParsedItem = {
     warning?: string;
     existing?: ExistingCoreProblem;
 };
-
-function normalizeLectureVideos(videos: LectureVideo[]): LectureVideo[] {
-    return videos
-        .map((video) => ({
-            title: video.title.trim(),
-            url: video.url.trim(),
-        }))
-        .filter((video) => video.title.length > 0 && video.url.length > 0);
-}
-
-function parseLectureVideosFromJson(value: unknown): LectureVideo[] {
-    if (!Array.isArray(value)) {
-        return [];
-    }
-
-    const videos: LectureVideo[] = [];
-    for (const entry of value) {
-        if (!entry || typeof entry !== 'object') {
-            continue;
-        }
-        const title = typeof (entry as { title?: unknown }).title === 'string'
-            ? (entry as { title: string }).title.trim()
-            : '';
-        const url = typeof (entry as { url?: unknown }).url === 'string'
-            ? (entry as { url: string }).url.trim()
-            : '';
-        if (title && url) {
-            videos.push({ title, url });
-        }
-    }
-
-    return videos;
-}
-
-function areLectureVideosEqual(a: LectureVideo[], b: LectureVideo[]): boolean {
-    if (a.length !== b.length) {
-        return false;
-    }
-    return a.every((video, index) => {
-        const target = b[index];
-        return target && video.title === target.title && video.url === target.url;
-    });
-}
 
 function getStatusBadge(status: BulkRowStatus) {
     if (status === 'CREATE') {

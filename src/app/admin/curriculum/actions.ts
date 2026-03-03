@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { Prisma } from '@prisma/client';
+import { areLectureVideosEqual, normalizeLectureVideos } from '@/lib/lecture-video-utils';
 
 import { requireAdmin, getSession } from '@/lib/auth';
 import type { LectureVideo } from '@/lib/lecture-videos';
@@ -32,26 +33,6 @@ function toLectureVideosJson(videos?: LectureVideo[]): Prisma.InputJsonValue | u
 
 function normalizeCoreProblemName(name: string): string {
     return name.trim();
-}
-
-function normalizeLectureVideos(videos?: LectureVideo[]): LectureVideo[] {
-    if (!videos) return [];
-    return videos
-        .map((video) => ({
-            title: video.title.trim(),
-            url: video.url.trim(),
-        }))
-        .filter((video) => video.title.length > 0 && video.url.length > 0);
-}
-
-function areLectureVideosEqual(a: LectureVideo[], b: LectureVideo[]): boolean {
-    if (a.length !== b.length) {
-        return false;
-    }
-    return a.every((video, index) => {
-        const target = b[index];
-        return target && video.title === target.title && video.url === target.url;
-    });
 }
 
 function extractUniqueConstraintMessage(error: unknown): string | null {
