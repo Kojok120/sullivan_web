@@ -10,6 +10,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
     libzbar0 \
+    chromium \
+    fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/* \
     && pip3 install --break-system-packages opencv-python-headless pyzbar Pillow
 
@@ -43,6 +45,7 @@ FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 ARG NODE_OPTIONS_DEFAULT="--max-old-space-size=3584"
 ENV NODE_OPTIONS=$NODE_OPTIONS_DEFAULT
 

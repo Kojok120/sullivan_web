@@ -8,7 +8,7 @@ export default async function PrintPage({
     searchParams,
 }: {
     params: Promise<{ userId: string }>;
-    searchParams: Promise<{ subjectId?: string; coreProblemId?: string; sets?: string }>;
+    searchParams: Promise<{ subjectId?: string; coreProblemId?: string; sets?: string; autoprint?: string }>;
 }) {
     const session = await getSession();
     if (!isTeacherOrAdmin(session)) {
@@ -29,9 +29,9 @@ export default async function PrintPage({
 
     return (
         <SharedStudentPrintPage
-            userId={userId}
             searchParams={await searchParams}
             redirectPathIfMissing={`/teacher/students/${userId}`}
+            targetUserIdForApi={userId}
         />
     );
 }

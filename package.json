@@ -59,6 +59,7 @@
     "opus-media-recorder": "^0.8.0",
     "papaparse": "^5.5.3",
     "pg": "^8.18.0",
+    "puppeteer-core": "^24.36.0",
     "qrcode": "^1.5.4",
     "react": "19.2.0",
     "react-dom": "19.2.0",
