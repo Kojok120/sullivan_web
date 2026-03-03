@@ -44,7 +44,8 @@ gcloud run deploy sullivan-app-production \
   --region asia-northeast1 \
   --memory 4Gi \
   --cpu 2 \
-  --concurrency 20 \
+  --concurrency 4 \
+  --timeout 120s \
   --allow-unauthenticated \
   --set-env-vars "BIND_HOST=0.0.0.0" \
   --set-build-env-vars "NODE_ENV=production" \

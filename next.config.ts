@@ -57,7 +57,18 @@ const nextConfig: NextConfig = {
   // SECURITY: Add recommended security headers
   headers: async () => [
     {
-      source: '/(.*)',
+      // 印刷プレビューは同一オリジン iframe で表示するため、ここだけは埋め込みを許可する。
+      source: '/api/print/pdf',
+      headers: [
+        { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+        { key: 'X-Content-Type-Options', value: 'nosniff' },
+        { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+        { key: 'X-XSS-Protection', value: '1; mode=block' },
+      ],
+    },
+    {
+      // それ以外のルートは従来どおり埋め込みを拒否する。
+      source: '/((?!api/print/pdf).*)',
       headers: [
         { key: 'X-Frame-Options', value: 'DENY' },
         { key: 'X-Content-Type-Options', value: 'nosniff' },

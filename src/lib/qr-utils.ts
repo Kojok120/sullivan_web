@@ -3,6 +3,7 @@ export type QRData = {
     s?: string; // Student ID (LoginID)
     p?: string | string[]; // Comma-separated full IDs or array of IDs
     c?: string; // Compressed format: "<prefix>|<ranges>"
+    u?: string; // Unit token (base36 of CoreProblem.masterNumber)
 };
 
 // Compression Helpers
@@ -56,6 +57,29 @@ export function expandProblemIds(data: QRData): string[] {
         return expandNumberRanges(prefix, ranges);
     }
     return [];
+}
+
+/**
+ * CoreProblem.masterNumber を QR 用短縮トークンに変換する。
+ * 無効な値の場合は null を返す。
+ */
+export function encodeUnitToken(masterNumber: number): string | null {
+    if (!Number.isInteger(masterNumber) || masterNumber <= 0) return null;
+    return masterNumber.toString(36);
+}
+
+/**
+ * QR の単元トークン（base36）を masterNumber に復元する。
+ * 無効な値の場合は null を返す。
+ */
+export function decodeUnitToken(unitToken: string): number | null {
+    const normalized = unitToken.trim().toLowerCase();
+    if (!normalized) return null;
+    if (!/^[0-9a-z]+$/.test(normalized)) return null;
+
+    const decoded = Number.parseInt(normalized, 36);
+    if (!Number.isInteger(decoded) || decoded <= 0) return null;
+    return decoded;
 }
 
 function compressNumberRanges(numbers: number[]): string {

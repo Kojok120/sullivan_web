@@ -18,11 +18,20 @@ describe('印刷セレクター', () => {
     }
 
     const mockFetch = vi.fn()
+    const mockPopupClose = vi.fn()
+    const mockPopup = {
+        location: { href: '' },
+        closed: false,
+        close: mockPopupClose,
+    } as unknown as Window
 
     beforeEach(() => {
         vi.clearAllMocks()
         vi.mocked(useRouter).mockReturnValue(mockRouter)
         vi.stubGlobal('fetch', mockFetch)
+        vi.stubGlobal('open', vi.fn(() => mockPopup))
+        mockPopup.location.href = ''
+        mockPopupClose.mockClear()
     })
 
     afterEach(() => {
@@ -49,7 +58,8 @@ describe('印刷セレクター', () => {
                 method: 'GET',
                 cache: 'no-store',
             })
-            expect(mockRouter.push).toHaveBeenCalledWith('/dashboard/print?subjectId=subject-1&sets=1')
+            expect(window.open).toHaveBeenCalledWith('', '_blank')
+            expect(mockPopup.location.href).toBe('/dashboard/print?subjectId=subject-1&sets=1')
         })
     })
 
@@ -75,6 +85,7 @@ describe('印刷セレクター', () => {
         await waitFor(() => {
             expect(screen.getByText('「主語と動詞」がアンロックされました')).toBeInTheDocument()
             expect(screen.getByText('印刷するには「主語と動詞」の講義動画を視聴してください。')).toBeInTheDocument()
+            expect(mockPopupClose).toHaveBeenCalledTimes(1)
         })
 
         fireEvent.click(screen.getByRole('button', { name: '講義動画ページへ移動' }))
