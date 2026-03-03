@@ -60,7 +60,11 @@ export function PrintProblemCard({ userId, subjects }: PrintProblemCardProps) {
         if (selectedCoreProblemId && selectedCoreProblemId !== 'all') {
             url += `&coreProblemId=${selectedCoreProblemId}`;
         }
-        router.push(url);
+        const opened = window.open(url, '_blank', 'noopener,noreferrer');
+        if (!opened) {
+            router.push(url);
+        }
+        setLoading(false);
     };
 
     return (

@@ -73,6 +73,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
         if (!selectedSubjectId || isCheckingGate) return;
 
         const printUrl = `/dashboard/print?subjectId=${selectedSubjectId}&sets=${sets}`;
+        const previewTab = window.open('', '_blank');
         setIsCheckingGate(true);
         setGateErrorMessage(null);
         try {
@@ -82,6 +83,9 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
             });
 
             if (!response.ok) {
+                if (previewTab && !previewTab.closed) {
+                    previewTab.close();
+                }
                 console.error(`印刷ゲート判定に失敗しました: ${response.status}`);
                 setGateErrorMessage('印刷可否の確認に失敗しました。通信状態を確認して、もう一度お試しください。');
                 return;
@@ -89,6 +93,9 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
 
             const gate = (await response.json()) as PrintGateResponse;
             if (gate.blocked) {
+                if (previewTab && !previewTab.closed) {
+                    previewTab.close();
+                }
                 setGateModal({
                     coreProblemId: gate.coreProblemId,
                     coreProblemName: gate.coreProblemName,
@@ -98,8 +105,15 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                 return;
             }
 
-            router.push(printUrl);
+            if (previewTab && !previewTab.closed) {
+                previewTab.location.href = printUrl;
+            } else {
+                window.open(printUrl, '_blank');
+            }
         } catch (error) {
+            if (previewTab && !previewTab.closed) {
+                previewTab.close();
+            }
             console.error('印刷ゲート判定中に例外が発生しました:', error);
             setGateErrorMessage('印刷可否の確認中にエラーが発生しました。時間をおいて再試行してください。');
         } finally {

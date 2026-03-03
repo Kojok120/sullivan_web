@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { selectProblemsForPrint } from '@/lib/print-algo';
 import { Problem } from '@prisma/client';
+import { encodeUnitToken } from '@/lib/qr-utils';
 
 type PrintData = {
     studentName: string;
@@ -8,6 +9,7 @@ type PrintData = {
     subjectName: string;
     problems: Problem[];
     problemSets: Problem[][];
+    unitToken?: string;
 };
 
 export async function getPrintData(
@@ -31,7 +33,7 @@ export async function getPrintData(
     const coreProblemPromise = coreProblemId
         ? prisma.coreProblem.findUnique({
             where: { id: coreProblemId },
-            select: { name: true }
+            select: { name: true, masterNumber: true }
         })
         : Promise.resolve(null);
 
@@ -47,8 +49,10 @@ export async function getPrintData(
     }
 
     let subjectName = subject.name;
+    let unitToken: string | undefined;
     if (coreProblem) {
         subjectName = `${subject.name} - ${coreProblem.name}`;
+        unitToken = encodeUnitToken(coreProblem.masterNumber) ?? undefined;
     }
 
     // Chunking problems into sets
@@ -67,7 +71,8 @@ export async function getPrintData(
         studentLoginId: student.loginId,
         subjectName: subjectName,
         problems, // Flattened list for backward compatibility
-        problemSets // Chunked sets
+        problemSets, // Chunked sets
+        unitToken,
     };
 }
 

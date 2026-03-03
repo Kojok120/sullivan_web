@@ -48,7 +48,12 @@ function getGenAI() {
     return genAI;
 }
 
-import { QRData, compressProblemIds, expandProblemIds } from '@/lib/qr-utils';
+import { QRData, compressProblemIds, decodeUnitToken, expandProblemIds } from '@/lib/qr-utils';
+import {
+    buildProgressionUpdateScope,
+    filterCoreProblemIdsByScope,
+    filterCoreProblemsByScope,
+} from '@/lib/grading-progression-scope';
 
 // Deprecated local getDrive removed in favor of shared getDriveClient
 function getDrive() {
@@ -61,13 +66,14 @@ function getStudentIdFromQr(qrData: QRData | null): string | null {
 }
 
 // 1. Generate QR Code
-export async function generateQRCode(studentId: string, problemIds: string[]): Promise<string> {
+export async function generateQRCode(studentId: string, problemIds: string[], unitToken?: string): Promise<string> {
     // Attempt compression
     const compressed = compressProblemIds(problemIds);
 
     const data: QRData = {
         s: studentId,
-        ...compressed
+        ...compressed,
+        ...(unitToken ? { u: unitToken } : {}),
     };
 
     const json = JSON.stringify(data);
@@ -310,7 +316,7 @@ export async function processFile(fileId: string, fileName: string) {
 
         // Update DB
         if (results && results.length > 0) {
-            const gradingSummary = await recordGradingResults(results);
+            const gradingSummary = await recordGradingResults(results, qrData);
 
             // [GAMIFICATION] Process XP, Streaks, Achievements
             try {
@@ -817,6 +823,37 @@ async function gradeWithGemini(
         include: { coreProblems: true }
     });
 
+    // 単元指定印刷の短縮トークン(u)を検証してログに残す。
+    // 実際の進行更新制御は recordGradingResults 側で行う。
+    if (qrData.u) {
+        const decodedUnitMasterNumber = decodeUnitToken(qrData.u);
+        if (decodedUnitMasterNumber === null) {
+            console.warn(`[QR] Invalid unit token detected: "${qrData.u}". Fallback to normal progression mode.`);
+        } else {
+            const subjectIds = new Set(problems.map((problem) => problem.subjectId));
+            if (subjectIds.size !== 1) {
+                console.warn(`[QR] Unit token "${qrData.u}" ignored: problems span multiple subjects.`);
+            } else {
+                const [subjectId] = Array.from(subjectIds);
+                const targetCoreProblem = await prisma.coreProblem.findFirst({
+                    where: {
+                        subjectId,
+                        masterNumber: decodedUnitMasterNumber,
+                    },
+                    select: { id: true, name: true }
+                });
+
+                if (!targetCoreProblem) {
+                    console.warn(
+                        `[QR] Unit token "${qrData.u}" resolved to masterNumber=${decodedUnitMasterNumber}, but CoreProblem was not found.`
+                    );
+                } else {
+                    console.log(`[QR] Unit token resolved: ${targetCoreProblem.name} (${targetCoreProblem.id})`);
+                }
+            }
+        }
+    }
+
     // Sort problems to match the order in uniquePids (QR order)
     // Optimization: Create a Map for O(1) lookup
     const idToIndexMap = new Map<string, number>();
@@ -991,6 +1028,13 @@ function normalizeQrData(raw: unknown): QRData | null {
         normalized.c = String(raw.c).trim();
     }
 
+    if (raw.u !== undefined && raw.u !== null) {
+        const unitToken = String(raw.u).trim();
+        if (unitToken) {
+            normalized.u = unitToken;
+        }
+    }
+
     if (raw.p !== undefined && raw.p !== null) {
         if (Array.isArray(raw.p)) {
             const list = raw.p.map((id) => String(id).trim()).filter(Boolean);
@@ -1020,7 +1064,7 @@ function normalizeQrData(raw: unknown): QRData | null {
         }
     }
 
-    if (!normalized.s && !normalized.p && !normalized.c) return null;
+    if (!normalized.s && !normalized.p && !normalized.c && !normalized.u) return null;
     return normalized;
 }
 
@@ -1046,7 +1090,7 @@ type GradingBatchSummary = {
     sessionIsPerfect: boolean;
 };
 
-export async function recordGradingResults(results: GradingResult[]): Promise<GradingBatchSummary | null> {
+export async function recordGradingResults(results: GradingResult[], qrData: QRData): Promise<GradingBatchSummary | null> {
     if (results.length === 0) return null;
 
     const userId = results[0].studentId; // Assumes all results are for same student
@@ -1131,58 +1175,109 @@ export async function recordGradingResults(results: GradingResult[]): Promise<Gr
             where: { id: { in: problemIds } },
             include: { coreProblems: true }
         });
-        const problemMap = new Map(problems.map(p => [p.id, p]));
+        const problemMap = new Map(problems.map((problem) => [problem.id, problem]));
+        const allCoreProblemIdsInBatch = Array.from(
+            new Set(problems.flatMap((problem) => problem.coreProblems.map((coreProblem) => coreProblem.id)))
+        );
+
+        // 単元指定印刷(u)が有効な場合のみ、進行更新対象を
+        // 「現在アンロック済み + 指定単元」に制限する。
+        let progressionScope: Set<string> | null = null;
+        const decodedUnitMasterNumber = qrData.u ? decodeUnitToken(qrData.u) : null;
+        if (qrData.u && decodedUnitMasterNumber !== null) {
+            const subjectIds = new Set(problems.map((problem) => problem.subjectId));
+            if (subjectIds.size === 1) {
+                const [subjectId] = Array.from(subjectIds);
+                const targetCoreProblem = await tx.coreProblem.findFirst({
+                    where: {
+                        subjectId,
+                        masterNumber: decodedUnitMasterNumber,
+                    },
+                    select: { id: true, name: true },
+                });
+
+                if (!targetCoreProblem) {
+                    console.warn(
+                        `[ProgressionScope] Unit token "${qrData.u}" was ignored because target CoreProblem was not found.`
+                    );
+                } else {
+                    const unlockedStates = await tx.userCoreProblemState.findMany({
+                        where: {
+                            userId,
+                            coreProblemId: { in: allCoreProblemIdsInBatch },
+                            isUnlocked: true,
+                        },
+                        select: { coreProblemId: true },
+                    });
+
+                    progressionScope = buildProgressionUpdateScope(
+                        unlockedStates.map((state) => state.coreProblemId),
+                        targetCoreProblem.id
+                    );
+                    console.log(
+                        `[ProgressionScope] Unit mode enabled: target=${targetCoreProblem.name}, scopeSize=${progressionScope?.size ?? 0}`
+                    );
+                }
+            } else {
+                console.warn(
+                    `[ProgressionScope] Unit token "${qrData.u}" was ignored because graded problems span multiple subjects.`
+                );
+            }
+        } else if (qrData.u) {
+            console.warn(`[ProgressionScope] Invalid unit token "${qrData.u}". Fallback to normal progression mode.`);
+        }
 
         const cpDeltas = new Map<string, number>();
         const involvedCpIdsInTransaction = new Set<string>();
 
-        for (const r of results) {
-            const problem = problemMap.get(r.problemId);
+        for (const result of results) {
+            const problem = problemMap.get(result.problemId);
             if (!problem) continue;
 
-            if (r.isCorrect) {
-                // Correct: -5 for ALL CoreProblems
-                for (const cp of problem.coreProblems) {
-                    const current = cpDeltas.get(cp.id) || 0;
-                    cpDeltas.set(cp.id, current - 5);
-                    involvedCpIdsInTransaction.add(cp.id);
+            const targetCoreProblems = filterCoreProblemsByScope(problem.coreProblems, progressionScope);
+
+            if (result.isCorrect) {
+                // 正解時: 対象CoreProblemの優先度を下げる
+                for (const coreProblem of targetCoreProblems) {
+                    const current = cpDeltas.get(coreProblem.id) || 0;
+                    cpDeltas.set(coreProblem.id, current - 5);
+                    involvedCpIdsInTransaction.add(coreProblem.id);
                 }
-            } else {
-                // Incorrect: +5 for BAD CoreProblems
-                if (r.badCoreProblemIds && r.badCoreProblemIds.length > 0) {
-                    for (const cpId of r.badCoreProblemIds) {
-                        if (problem.coreProblems.some(cp => cp.id === cpId)) {
-                            const current = cpDeltas.get(cpId) || 0;
-                            cpDeltas.set(cpId, current + 5);
-                            involvedCpIdsInTransaction.add(cpId);
-                        }
-                    }
-                }
+                continue;
+            }
+
+            // 不正解時: badCoreProblemIds が指定されている場合のみ対象を上げる
+            if (!result.badCoreProblemIds || result.badCoreProblemIds.length === 0) {
+                continue;
+            }
+
+            const coreProblemIdsOnProblem = new Set(targetCoreProblems.map((coreProblem) => coreProblem.id));
+            const scopedBadCoreProblemIds = filterCoreProblemIdsByScope(result.badCoreProblemIds, progressionScope);
+            for (const coreProblemId of scopedBadCoreProblemIds) {
+                if (!coreProblemIdsOnProblem.has(coreProblemId)) continue;
+                const current = cpDeltas.get(coreProblemId) || 0;
+                cpDeltas.set(coreProblemId, current + 5);
+                involvedCpIdsInTransaction.add(coreProblemId);
             }
         }
 
         await Promise.all(
-            Array.from(cpDeltas.entries()).map(([cpId, delta]) =>
+            Array.from(cpDeltas.entries()).map(([coreProblemId, delta]) =>
                 tx.userCoreProblemState.upsert({
-                    where: { userId_coreProblemId: { userId, coreProblemId: cpId } },
+                    where: { userId_coreProblemId: { userId, coreProblemId } },
                     create: {
                         userId,
-                        coreProblemId: cpId,
+                        coreProblemId,
                         priority: delta,
-                        isUnlocked: true // Assume unlocked if graded
+                        isUnlocked: false,
+                        isLectureWatched: false,
+                        lectureWatchedAt: null,
                     },
                     update: { priority: { increment: delta } }
                 })
             )
         );
 
-        // Pass involved CpIds out or call check function?
-        // We can't easily call checkProgressAndUnlock inside here if it uses `prisma` global.
-        // We should move the check LOGIC to use `tx` or call it AFTER transaction.
-        // But if check fails (crash), transaction is committed. That's actually OK.
-        // Unlock failure is less critical than Data Consistency.
-        // However, we need to export the involved IPs to run the check AFTER.
-        // But interactive transaction returns result.
         return involvedCpIdsInTransaction;
     });
 
