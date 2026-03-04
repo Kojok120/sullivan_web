@@ -48,6 +48,9 @@ export function UnitFocusDetailClient({
 
         // 最後の動画を視聴したら視聴完了を記録
         if (newCount >= totalVideos && !isWatched && !isSubmitting) {
+            if (!isUnlocked) {
+                return;
+            }
             setIsSubmitting(true);
             try {
                 const success = await markLectureAsWatched({ coreProblemId: coreProblem.id });
@@ -68,7 +71,6 @@ export function UnitFocusDetailClient({
 
     const hasVideos = lectureVideos.length > 0;
     const needsWatching = hasVideos && !isWatched;
-    const isPrintLocked = !isUnlocked || needsWatching;
 
     return (
         <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -94,8 +96,8 @@ export function UnitFocusDetailClient({
                     <AlertCircle className="h-4 w-4" />
                     <AlertTitle>講義動画を視聴してください</AlertTitle>
                     <AlertDescription>
-                        講義動画を視聴するまで、この単元の問題は「おまかせ」モードで出題されません。
-                        下の「講義動画を見る」ボタンから動画を最後まで視聴してください。
+                        単元集中では未解放でも講義動画を視聴できます。
+                        ただし、ここでの視聴はアンロック判定や視聴済み状態には反映されません。
                     </AlertDescription>
                 </Alert>
             )}
@@ -104,9 +106,10 @@ export function UnitFocusDetailClient({
             {!isUnlocked && (
                 <Alert className="mb-6 bg-red-50 border-red-200 text-red-800">
                     <Lock className="h-4 w-4" />
-                    <AlertTitle>この単元はまだロック中です</AlertTitle>
+                    <AlertTitle>通常演習ではこの単元はロック中です</AlertTitle>
                     <AlertDescription>
-                        前の単元の採点基準を満たすと、この単元がアンロックされます。
+                        単元集中では印刷と講義視聴ができますが、進行状態は更新されません。
+                        アンロックは通常演習（coreProblemId なし）の採点結果でのみ判定されます。
                     </AlertDescription>
                 </Alert>
             )}
@@ -115,20 +118,14 @@ export function UnitFocusDetailClient({
             {fromPrint && returnToPrintUrl && (
                 <Alert className="mb-6 bg-blue-50 border-blue-200 text-blue-800">
                     <Printer className="h-4 w-4" />
-                    <AlertTitle>印刷前に講義動画の確認が必要です</AlertTitle>
+                    <AlertTitle>単元集中の問題はいつでも印刷できます</AlertTitle>
                     <AlertDescription className="space-y-3">
                         <p>
-                            講義動画の視聴後に、印刷画面へ戻ってください。
+                            必要に応じて講義動画を確認したうえで、印刷画面へ戻ってください。
                         </p>
-                        {needsWatching ? (
-                            <Button type="button" variant="outline" disabled className="w-full sm:w-auto">
-                                動画視聴後に印刷画面へ戻れます
-                            </Button>
-                        ) : (
-                            <Button type="button" variant="outline" asChild className="w-full sm:w-auto">
-                                <Link href={returnToPrintUrl}>印刷画面へ戻る</Link>
-                            </Button>
-                        )}
+                        <Button type="button" variant="outline" asChild className="w-full sm:w-auto">
+                            <Link href={returnToPrintUrl}>印刷画面へ戻る</Link>
+                        </Button>
                     </AlertDescription>
                 </Alert>
             )}
@@ -152,11 +149,15 @@ export function UnitFocusDetailClient({
                             <CardTitle className="flex items-center gap-2">
                                 <PlayCircle className={`w-5 h-5 ${needsWatching ? 'text-amber-600' : 'text-blue-600'}`} />
                                 講義動画を視聴
-                                {needsWatching && <span className="text-xs bg-amber-500 text-white px-2 py-0.5 rounded-full ml-2">必須</span>}
+                                {needsWatching && isUnlocked && (
+                                    <span className="text-xs bg-amber-500 text-white px-2 py-0.5 rounded-full ml-2">通常演習に必要</span>
+                                )}
                             </CardTitle>
                             <CardDescription>
-                                {needsWatching
-                                    ? '最後まで視聴すると問題が解禁されます'
+                                {!isUnlocked && needsWatching
+                                    ? '単元集中では視聴できますが、進行状態は更新されません'
+                                    : isUnlocked && needsWatching
+                                    ? '通常演習で出題するには講義動画の視聴が必要です'
                                     : 'ポイントを動画で確認して理解を深めましょう'}
                             </CardDescription>
                         </CardHeader>
@@ -246,23 +247,14 @@ export function UnitFocusDetailClient({
 
                 {/* 2. 印刷セクション */}
                 <section>
-                    <Card className={`border-2 shadow-md ${isPrintLocked ? 'border-gray-200 bg-gray-50 opacity-60' : 'border-primary/20 bg-primary/5'}`}>
+                    <Card className="border-2 shadow-md border-primary/20 bg-primary/5">
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
-                                {isPrintLocked ? (
-                                    <Lock className="w-6 h-6 text-gray-400" />
-                                ) : (
-                                    <Printer className="w-6 h-6 text-primary" />
-                                )}
+                                <Printer className="w-6 h-6 text-primary" />
                                 問題を印刷する
-                                {isPrintLocked && <span className="text-xs bg-gray-400 text-white px-2 py-0.5 rounded-full ml-2">条件達成後</span>}
                             </CardTitle>
                             <CardDescription>
-                                {!isUnlocked
-                                    ? 'この単元はまだアンロックされていません'
-                                    : needsWatching
-                                    ? '講義動画を視聴すると印刷できるようになります'
-                                    : 'この単元の問題を出題します'}
+                                単元集中はいつでも印刷できます。アンロック判定は通常演習の採点結果で行われます。
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -270,23 +262,12 @@ export function UnitFocusDetailClient({
                                 size="lg"
                                 className="w-full sm:w-auto text-lg py-6 gap-3 shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5"
                                 asChild
-                                disabled={isPrintLocked}
                             >
                                 <Link
-                                    href={isPrintLocked ? '#' : `/dashboard/print?subjectId=${coreProblem.subjectId}&coreProblemId=${coreProblem.id}`}
-                                    onClick={(e) => isPrintLocked && e.preventDefault()}
-                                    className={isPrintLocked ? 'pointer-events-none' : ''}
+                                    href={`/dashboard/print?subjectId=${coreProblem.subjectId}&coreProblemId=${coreProblem.id}`}
                                 >
-                                    {isPrintLocked ? (
-                                        <Lock className="w-5 h-5" />
-                                    ) : (
-                                        <Printer className="w-5 h-5" />
-                                    )}
-                                    {!isUnlocked
-                                        ? '前の単元をクリアしてください'
-                                        : needsWatching
-                                            ? '講義動画を視聴してください'
-                                            : '今すぐ問題を印刷する'}
+                                    <Printer className="w-5 h-5" />
+                                    この単元を印刷する
                                 </Link>
                             </Button>
                         </CardContent>

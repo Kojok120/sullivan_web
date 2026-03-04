@@ -13,7 +13,7 @@ export default async function StudentPrintPage({
     if (session.role !== 'STUDENT') redirect('/dashboard');
 
     const params = await searchParams;
-    if (params.subjectId && params.gateChecked !== '1') {
+    if (params.subjectId && !params.coreProblemId && params.gateChecked !== '1') {
         const gate = await getPrintGate(session.userId, params.subjectId);
         if (gate.blocked) {
             const safeSets = Math.min(Math.max(Number.parseInt(params.sets ?? '1', 10) || 1, 1), 10);

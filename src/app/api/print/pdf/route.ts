@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: targetUserId.errorMessage }, { status: targetUserId.statusCode });
         }
 
-        if (session.role === 'STUDENT') {
+        if (session.role === 'STUDENT' && !coreProblemId) {
             const gateStartedAt = Date.now();
             const gate = await getPrintGate(session.userId, subjectId);
             timings.gateMs = Date.now() - gateStartedAt;
