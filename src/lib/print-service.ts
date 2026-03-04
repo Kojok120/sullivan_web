@@ -1,14 +1,14 @@
 import { prisma } from '@/lib/prisma';
 import { selectProblemsForPrint } from '@/lib/print-algo';
-import { Problem } from '@prisma/client';
 import { encodeUnitToken } from '@/lib/qr-utils';
+import type { PrintableProblem } from '@/lib/print-types';
 
 type PrintData = {
     studentName: string;
     studentLoginId: string;
     subjectName: string;
-    problems: Problem[];
-    problemSets: Problem[][];
+    problems: PrintableProblem[];
+    problemSets: PrintableProblem[][];
     unitToken?: string;
 };
 
@@ -56,7 +56,7 @@ export async function getPrintData(
     }
 
     // Chunking problems into sets
-    const problemSets: Problem[][] = [];
+    const problemSets: PrintableProblem[][] = [];
     for (let i = 0; i < sets; i++) {
         const start = i * PROBLEMS_PER_SET;
         const end = start + PROBLEMS_PER_SET;

@@ -2,6 +2,11 @@ import fs from 'node:fs';
 import puppeteer, { Browser } from 'puppeteer-core';
 
 let browserPromise: Promise<Browser> | null = null;
+let warmupPromise: Promise<void> | null = null;
+
+function buildChromiumDirPath(baseName: string): string {
+    return `/tmp/${baseName}-${process.pid}`;
+}
 
 const CHROMIUM_CANDIDATE_PATHS = [
     process.env.PUPPETEER_EXECUTABLE_PATH,
@@ -32,11 +37,11 @@ async function resolveExecutablePath(): Promise<string> {
 
 async function launchBrowser(): Promise<Browser> {
     const executablePath = await resolveExecutablePath();
-    const chromiumConfigDir = '/tmp/.chromium-config';
-    const chromiumCacheDir = '/tmp/.chromium-cache';
-    const chromiumDataDir = '/tmp/.chromium-data';
-    const chromiumUserDataDir = '/tmp/.chromium-user-data';
-    const chromiumCrashpadDir = '/tmp/.chromium-crashpad';
+    const chromiumConfigDir = buildChromiumDirPath('.chromium-config');
+    const chromiumCacheDir = buildChromiumDirPath('.chromium-cache');
+    const chromiumDataDir = buildChromiumDirPath('.chromium-data');
+    const chromiumUserDataDir = buildChromiumDirPath('.chromium-user-data');
+    const chromiumCrashpadDir = buildChromiumDirPath('.chromium-crashpad');
 
     for (const dirPath of [
         chromiumConfigDir,
@@ -100,4 +105,18 @@ export async function getPdfBrowser(): Promise<Browser> {
     }
 
     return await browserPromise;
+}
+
+export async function warmupPdfBrowser(): Promise<void> {
+    if (!warmupPromise) {
+        warmupPromise = getPdfBrowser()
+            .then(() => {
+                // 先行起動のみが目的のため、戻り値は不要。
+            })
+            .finally(() => {
+                warmupPromise = null;
+            });
+    }
+
+    await warmupPromise;
 }
