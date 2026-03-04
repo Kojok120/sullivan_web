@@ -38,7 +38,7 @@ export default async function UnitFocusDetailPage({
     const isUnlocked = unlockedCoreProblemIds.has(coreProblem.id);
     const lectureVideos = normalizeLectureVideos(coreProblem.lectureVideos);
     const hasVideos = lectureVideos.length > 0;
-    // 初回単元でも印刷前に講義視聴が必要なため、state未作成時は未視聴として扱う
+    // 講義動画がある単元は、state未作成時は未視聴として扱う
     const isLectureWatched = !hasVideos ? true : (state?.isLectureWatched ?? false);
 
     const fromPrint = query.from === 'print';

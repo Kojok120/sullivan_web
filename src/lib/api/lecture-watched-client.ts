@@ -19,7 +19,12 @@ export async function markLectureAsWatched({
                 videoDurationSeconds,
             }),
         });
-        return response.ok;
+        if (!response.ok) {
+            return false;
+        }
+
+        const payload = await response.json().catch(() => null) as { updated?: boolean } | null;
+        return payload?.updated === true;
     } catch {
         console.error('Failed to mark lecture as watched');
         return false;

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
-import { Problem, Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { getReadyCoreProblemIds } from "@/lib/progression";
+import type { PrintableProblem } from "@/lib/print-types";
 
 export const PRINT_CONFIG = {
     // Weights for scoring
@@ -14,7 +15,7 @@ export const PRINT_CONFIG = {
 };
 
 type ScoredProblem = {
-    problem: Problem;
+    problem: PrintableProblem;
     score: number;
 };
 
@@ -24,16 +25,14 @@ export async function selectProblemsForPrint(
     subjectId: string,
     coreProblemId?: string,
     count: number = 30
-): Promise<Problem[]> {
-
-    // 1. Determine Ready CoreProblems (unlocked + lecture watched)
-    // Unified Logic via progression.ts
-    const readyCoreProblemIds = await getReadyCoreProblemIds(userId, subjectId);
+): Promise<PrintableProblem[]> {
 
     // 2. Fetch Candidate Problems with Integrated Filtering & User State
     // DB側で厳密にフィルタリングを行う
 
-    const whereCondition: Prisma.ProblemWhereInput = {};
+    const whereCondition: Prisma.ProblemWhereInput = {
+        subjectId,
+    };
 
     if (coreProblemId) {
         // 特定のUnitが指定された場合:
@@ -42,6 +41,10 @@ export async function selectProblemsForPrint(
             some: { id: coreProblemId }
         };
     } else {
+        // 1. Determine Ready CoreProblems (unlocked + lecture watched)
+        // Unified Logic via progression.ts
+        const readyCoreProblemIds = await getReadyCoreProblemIds(userId, subjectId);
+
         // 通常印刷（おまかせ）の場合:
         // 紐づく「全ての」CoreProblemがReadyでなければならない
         // （アンロック済み かつ 講義動画視聴済みまたは講義動画なし）
@@ -58,15 +61,26 @@ export async function selectProblemsForPrint(
 
     const candidateProblems = await prisma.problem.findMany({
         where: whereCondition,
-        include: {
+        select: {
+            id: true,
+            customId: true,
+            question: true,
+            order: true,
             coreProblems: {
-                include: { userStates: { where: { userId } } }
+                select: {
+                    userStates: {
+                        where: { userId },
+                        select: { priority: true },
+                        take: 1,
+                    },
+                },
             },
             // UserProblemStateを一緒に取得 (1:N relation name is 'userStates')
             userStates: {
                 where: { userId },
-                take: 1
-            }
+                select: { lastAnsweredAt: true },
+                take: 1,
+            },
         }
     });
 
@@ -77,6 +91,7 @@ export async function selectProblemsForPrint(
     if (candidateProblems.length === 0) return [];
 
     // 4. Calculate Score
+    const now = Date.now();
     const scoredProblems: ScoredProblem[] = candidateProblems.map(problem => {
         // Integrated userState
         const state = problem.userStates[0];
@@ -99,16 +114,23 @@ export async function selectProblemsForPrint(
             score -= problem.order * 0.1; // Slight preference for order
         } else {
             // Answered
-            const now = new Date();
             const lastAnswered = state.lastAnsweredAt || new Date(0);
-            const diffMs = now.getTime() - lastAnswered.getTime();
+            const diffMs = now - lastAnswered.getTime();
             const diffDays = diffMs / (1000 * 60 * 60 * 24);
 
             const timeScore = diffDays * PRINT_CONFIG.FORGETTING_RATE * PRINT_CONFIG.WEIGHT_TIME;
             score += timeScore;
         }
 
-        return { problem, score };
+        return {
+            problem: {
+                id: problem.id,
+                customId: problem.customId,
+                question: problem.question,
+                order: problem.order,
+            },
+            score,
+        };
     });
 
     // 5. Sort by score descending

@@ -9,6 +9,7 @@ import next from 'next';
 import { WebSocketServer } from 'ws';
 import { setupGeminiSocket } from './src/lib/gemini-socket-proxy';
 import { verifyGeminiLiveSessionToken } from './src/lib/gemini-live-session-token';
+import { warmupPdfBrowser } from './src/lib/print-pdf/browser';
 
 type GeminiSocketContext = {
     userId: string;
@@ -153,6 +154,14 @@ app.prepare().then(() => {
     isPrepared = true;
     console.log('[Server] Next app prepared');
     console.log(`> Ready on http://${hostname}:${port}`);
+
+    void warmupPdfBrowser()
+        .then(() => {
+            console.log('[Server] PDF browser warmup completed');
+        })
+        .catch((error) => {
+            console.warn('[Server] PDF browser warmup failed:', error);
+        });
 }).catch((err) => {
     preparationError = err instanceof Error ? err.message : 'Unknown startup error';
     console.error('[Server] Failed to prepare Next app:', err);
