@@ -44,6 +44,7 @@ export async function SharedStudentPrintPage({
         <PdfPreviewClient
             pdfUrl={`/api/print/pdf?${query.toString()}`}
             autoPrint={autoPrint}
+            backFallbackPath={redirectPathIfMissing}
         />
     );
 }
