@@ -46,11 +46,17 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+ENV HOME=/home/nextjs
+ENV XDG_CONFIG_HOME=/tmp/.chromium-config
+ENV XDG_CACHE_HOME=/tmp/.chromium-cache
+ENV XDG_DATA_HOME=/tmp/.chromium-data
 ARG NODE_OPTIONS_DEFAULT="--max-old-space-size=3584"
 ENV NODE_OPTIONS=$NODE_OPTIONS_DEFAULT
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
+RUN mkdir -p /home/nextjs /tmp/.chromium-config /tmp/.chromium-cache /tmp/.chromium-data /tmp/.chromium-user-data /tmp/.chromium-crashpad \
+    && chown -R nextjs:nodejs /home/nextjs /tmp/.chromium-config /tmp/.chromium-cache /tmp/.chromium-data /tmp/.chromium-user-data /tmp/.chromium-crashpad
 
 COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json

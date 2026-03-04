@@ -32,16 +32,44 @@ async function resolveExecutablePath(): Promise<string> {
 
 async function launchBrowser(): Promise<Browser> {
     const executablePath = await resolveExecutablePath();
+    const chromiumConfigDir = '/tmp/.chromium-config';
+    const chromiumCacheDir = '/tmp/.chromium-cache';
+    const chromiumDataDir = '/tmp/.chromium-data';
+    const chromiumUserDataDir = '/tmp/.chromium-user-data';
+    const chromiumCrashpadDir = '/tmp/.chromium-crashpad';
+
+    for (const dirPath of [
+        chromiumConfigDir,
+        chromiumCacheDir,
+        chromiumDataDir,
+        chromiumUserDataDir,
+        chromiumCrashpadDir,
+    ]) {
+        fs.mkdirSync(dirPath, { recursive: true });
+    }
 
     return await puppeteer.launch({
         executablePath,
         headless: true,
+        env: {
+            ...process.env,
+            HOME: process.env.HOME || '/tmp',
+            XDG_CONFIG_HOME: chromiumConfigDir,
+            XDG_CACHE_HOME: chromiumCacheDir,
+            XDG_DATA_HOME: chromiumDataDir,
+            CHROME_CRASHPAD_DATABASE: chromiumCrashpadDir,
+        },
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
             '--disable-gpu',
             '--no-zygote',
+            '--disable-crash-reporter',
+            '--disable-breakpad',
+            '--disable-features=Crashpad',
+            `--user-data-dir=${chromiumUserDataDir}`,
+            `--crash-dumps-dir=${chromiumCrashpadDir}`,
             '--font-render-hinting=none',
         ],
         // Cloud Run での安定稼働を優先し、既定のシグナルハンドリングを維持する。
