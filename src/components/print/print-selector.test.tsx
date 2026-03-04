@@ -115,4 +115,38 @@ describe('印刷セレクター', () => {
             expect(screen.getByText('印刷可否の確認に失敗しました。通信状態を確認して、もう一度お試しください。')).toBeInTheDocument()
         })
     })
+
+    it('科目選択後のモーダル外をタップするとモーダルが閉じる', async () => {
+        render(
+            <PrintSelector
+                subjects={[{ subjectId: 'subject-1', subjectName: '英語' }]}
+            />
+        )
+
+        fireEvent.click(screen.getByText('English'))
+        expect(screen.getByRole('button', { name: '印刷する' })).toBeInTheDocument()
+
+        fireEvent.pointerDown(document.body)
+
+        await waitFor(() => {
+            expect(screen.queryByRole('button', { name: '印刷する' })).not.toBeInTheDocument()
+        })
+    })
+
+    it('同じ科目を再タップするとセット数が増える', async () => {
+        render(
+            <PrintSelector
+                subjects={[{ subjectId: 'subject-1', subjectName: '英語' }]}
+            />
+        )
+
+        fireEvent.click(screen.getByText('English'))
+        expect(screen.getByText('10問 / 1セット')).toBeInTheDocument()
+
+        fireEvent.click(screen.getByText('English'))
+
+        await waitFor(() => {
+            expect(screen.getByText('20問 / 2セット')).toBeInTheDocument()
+        })
+    })
 })

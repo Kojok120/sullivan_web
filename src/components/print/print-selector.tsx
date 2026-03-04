@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Printer, Minus, Plus, PlayCircle } from 'lucide-react';
@@ -48,6 +48,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
     const [isCheckingGate, setIsCheckingGate] = useState(false);
     const [gateModal, setGateModal] = useState<GateModalState | null>(null);
     const [gateErrorMessage, setGateErrorMessage] = useState<string | null>(null);
+    const printControlRef = useRef<HTMLDivElement | null>(null);
 
     const getSubjectStyle = (name: string) => {
         const config = getSubjectConfig(name);
@@ -138,6 +139,26 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
         setGateModal(null);
     };
 
+    useEffect(() => {
+        if (!selectedSubjectId) return;
+
+        const handlePointerDownOutside = (event: PointerEvent) => {
+            const target = event.target;
+            if (!(target instanceof Element)) return;
+
+            if (printControlRef.current?.contains(target)) return;
+            if (target.closest('[data-print-subject-card="true"]')) return;
+
+            setSelectedSubjectId(null);
+            setGateErrorMessage(null);
+        };
+
+        document.addEventListener('pointerdown', handlePointerDownOutside);
+        return () => {
+            document.removeEventListener('pointerdown', handlePointerDownOutside);
+        };
+    }, [selectedSubjectId]);
+
     return (
         <>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -153,6 +174,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                             className="relative"
                         >
                             <Card
+                                data-print-subject-card="true"
                                 className={cn(
                                     "cursor-pointer transition-all duration-300 border-none overflow-hidden h-full shadow-md",
                                     isSelected ? "shadow-xl scale-105 ring-2 ring-offset-2 ring-gray-800" : "hover:scale-105 hover:shadow-lg"
@@ -173,6 +195,8 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                             <AnimatePresence>
                                 {isSelected && (
                                     <motion.div
+                                        ref={printControlRef}
+                                        data-print-selector-controls="true"
                                         initial={{ opacity: 0, y: -20, height: 0 }}
                                         animate={{ opacity: 1, y: 0, height: 'auto' }}
                                         exit={{ opacity: 0, y: -20, height: 0 }}
