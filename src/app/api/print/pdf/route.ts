@@ -24,9 +24,18 @@ const API_TIMEOUT_MS = 60_000;
 export async function GET(request: NextRequest) {
     const startedAt = Date.now();
     const deadlineAt = startedAt + API_TIMEOUT_MS;
+    const timings = {
+        authMs: 0,
+        targetResolveMs: 0,
+        gateMs: 0,
+        dataMs: 0,
+        renderStepMs: 0,
+    };
 
     try {
+        const authStartedAt = Date.now();
         const session = await getCurrentUser();
+        timings.authMs = Date.now() - authStartedAt;
         if (!session) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
@@ -42,18 +51,22 @@ export async function GET(request: NextRequest) {
         // クライアントの挙動用フラグ。API側では入力互換のため受け付けるだけにする。
         void request.nextUrl.searchParams.get('autoprint');
 
+        const targetResolveStartedAt = Date.now();
         const targetUserId = await resolveTargetUserId({
             actorUserId: session.userId,
             actorRole: session.role,
             requestedTargetUserId: targetUserIdParam,
         });
+        timings.targetResolveMs = Date.now() - targetResolveStartedAt;
 
         if (!targetUserId.allowed) {
             return NextResponse.json({ error: targetUserId.errorMessage }, { status: targetUserId.statusCode });
         }
 
-        if (session.role === 'STUDENT') {
+        if (session.role === 'STUDENT' && !coreProblemId) {
+            const gateStartedAt = Date.now();
             const gate = await getPrintGate(session.userId, subjectId);
+            timings.gateMs = Date.now() - gateStartedAt;
             if (gate.blocked) {
                 return NextResponse.json(
                     {
@@ -67,11 +80,13 @@ export async function GET(request: NextRequest) {
             }
         }
 
+        const dataStartedAt = Date.now();
         const data = await withDeadline(
             getPrintData(targetUserId.userId, subjectId, coreProblemId, sets),
             deadlineAt,
             'print data load timeout',
         );
+        timings.dataMs = Date.now() - dataStartedAt;
 
         if (!data) {
             return NextResponse.json({ error: 'Print data not found' }, { status: 404 });
@@ -86,6 +101,7 @@ export async function GET(request: NextRequest) {
             problemIdsHash,
         });
 
+        const renderStepStartedAt = Date.now();
         const pdf = await withDeadline(
             getOrCreatePrintPdf({
                 cacheKey,
@@ -98,6 +114,8 @@ export async function GET(request: NextRequest) {
             deadlineAt,
             'pdf render timeout',
         );
+        timings.renderStepMs = Date.now() - renderStepStartedAt;
+        const totalMs = Date.now() - startedAt;
 
         const ifNoneMatch = request.headers.get('if-none-match');
         if (ifNoneMatch && ifNoneMatch === pdf.etag) {
@@ -106,6 +124,12 @@ export async function GET(request: NextRequest) {
                 headers: {
                     ETag: pdf.etag,
                     'Cache-Control': 'private, max-age=300',
+                    'X-Auth-Ms': String(timings.authMs),
+                    'X-Target-Resolve-Ms': String(timings.targetResolveMs),
+                    'X-Gate-Ms': String(timings.gateMs),
+                    'X-Data-Ms': String(timings.dataMs),
+                    'X-Render-Ms': String(pdf.renderMs),
+                    'X-Total-Ms': String(totalMs),
                 },
             });
         }
@@ -126,8 +150,13 @@ export async function GET(request: NextRequest) {
             cacheStatus: pdf.cacheStatus,
             pageCount: pdf.pageCount,
             pdfSizeBytes: pdf.buffer.length,
+            authMs: timings.authMs,
+            targetResolveMs: timings.targetResolveMs,
+            gateMs: timings.gateMs,
+            dataMs: timings.dataMs,
+            renderStepMs: timings.renderStepMs,
             renderMs: pdf.renderMs,
-            totalMs: Date.now() - startedAt,
+            totalMs,
             errorType: null,
         }));
 
@@ -138,13 +167,23 @@ export async function GET(request: NextRequest) {
                 'Content-Disposition': `inline; filename="${filename}"`,
                 'Cache-Control': 'private, max-age=300',
                 ETag: pdf.etag,
+                'X-Auth-Ms': String(timings.authMs),
+                'X-Target-Resolve-Ms': String(timings.targetResolveMs),
+                'X-Gate-Ms': String(timings.gateMs),
+                'X-Data-Ms': String(timings.dataMs),
                 'X-Render-Ms': String(pdf.renderMs),
+                'X-Total-Ms': String(totalMs),
                 'X-Page-Count': String(pdf.pageCount),
             },
         });
     } catch (error) {
         console.error('[PrintPDF]', JSON.stringify({
             totalMs: Date.now() - startedAt,
+            authMs: timings.authMs,
+            targetResolveMs: timings.targetResolveMs,
+            gateMs: timings.gateMs,
+            dataMs: timings.dataMs,
+            renderStepMs: timings.renderStepMs,
             errorType: error instanceof Error ? error.name : 'UnknownError',
             message: error instanceof Error ? error.message : String(error),
         }));

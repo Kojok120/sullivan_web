@@ -1101,7 +1101,7 @@ export async function recordGradingResults(results: GradingResult[], qrData: QRD
     const groupId = crypto.randomUUID();
 
     // WRAP EVERYTHING IN A SINGLE TRANSACTION
-    const involvedCpIds = await prisma.$transaction(async (tx) => {
+    const { involvedCpIds, isUnitMode } = await prisma.$transaction(async (tx) => {
         // 1. Record History (Batch)
         // Note: createMany is not supported in interactive transactions for SQLite/some adapters if using executeRaw,
         // but typically supported in modern Prisma client (tx.learningHistory.createMany).
@@ -1118,59 +1118,7 @@ export async function recordGradingResults(results: GradingResult[], qrData: QRD
             }))
         });
 
-        // 2. Update UserProblemState (Batch Optimized)
-        // Fetch current states using TX
-        const currentStates = await tx.userProblemState.findMany({
-            where: { userId, problemId: { in: problemIds } }
-        });
-        const stateMap = new Map(currentStates.map(s => [s.problemId, s]));
-
-        const newStates: Prisma.UserProblemStateCreateManyInput[] = [];
-        const updatePromises: Prisma.PrismaPromise<unknown>[] = [];
-
-        for (const r of results) {
-            const currentState = stateMap.get(r.problemId);
-
-            if (!currentState) {
-                // New State -> Add to batch create list
-                const newPriority = calculateNewPriority(0, r.evaluation);
-                newStates.push({
-                    userId,
-                    problemId: r.problemId,
-                    isCleared: r.isCorrect,
-                    lastAnsweredAt: new Date(),
-                    priority: newPriority
-                });
-            } else {
-                // Existing State -> Add to update promise list
-                const currentPriority = currentState.priority || 0;
-                const newPriority = calculateNewPriority(currentPriority, r.evaluation);
-                updatePromises.push(
-                    tx.userProblemState.update({
-                        where: { userId_problemId: { userId, problemId: r.problemId } },
-                        data: {
-                            isCleared: r.isCorrect,
-                            lastAnsweredAt: new Date(),
-                            priority: newPriority
-                        }
-                    })
-                );
-            }
-        }
-
-        // Execute Batch Create
-        if (newStates.length > 0) {
-            await tx.userProblemState.createMany({
-                data: newStates
-            });
-        }
-
-        // Execute Updates
-        if (updatePromises.length > 0) {
-            await Promise.all(updatePromises);
-        }
-
-        // 3. Update UserCoreProblemState (Batch / Aggregated)
+        // 2. 問題と紐づく CoreProblem を取得して、単元集中モードを判定
         const problems = await tx.problem.findMany({
             where: { id: { in: problemIds } },
             include: { coreProblems: true }
@@ -1180,6 +1128,7 @@ export async function recordGradingResults(results: GradingResult[], qrData: QRD
             new Set(problems.flatMap((problem) => problem.coreProblems.map((coreProblem) => coreProblem.id)))
         );
 
+        let isUnitMode = false;
         // 単元指定印刷(u)が有効な場合のみ、進行更新対象を
         // 「現在アンロック済み + 指定単元」に制限する。
         let progressionScope: Set<string> | null = null;
@@ -1214,6 +1163,7 @@ export async function recordGradingResults(results: GradingResult[], qrData: QRD
                         unlockedStates.map((state) => state.coreProblemId),
                         targetCoreProblem.id
                     );
+                    isUnitMode = true;
                     console.log(
                         `[ProgressionScope] Unit mode enabled: target=${targetCoreProblem.name}, scopeSize=${progressionScope?.size ?? 0}`
                     );
@@ -1227,6 +1177,70 @@ export async function recordGradingResults(results: GradingResult[], qrData: QRD
             console.warn(`[ProgressionScope] Invalid unit token "${qrData.u}". Fallback to normal progression mode.`);
         }
 
+        // 3. Update UserProblemState (Batch Optimized)
+        // unit mode では unlock 判定専用フィールドは更新しない
+        const currentStates = await tx.userProblemState.findMany({
+            where: { userId, problemId: { in: problemIds } }
+        });
+        const stateMap = new Map(currentStates.map(s => [s.problemId, s]));
+
+        const newStates: Prisma.UserProblemStateCreateManyInput[] = [];
+        const updatePromises: Prisma.PrismaPromise<unknown>[] = [];
+
+        for (const r of results) {
+            const currentState = stateMap.get(r.problemId);
+            const answeredAt = new Date();
+
+            if (!currentState) {
+                const newPriority = calculateNewPriority(0, r.evaluation);
+                const newState: Prisma.UserProblemStateCreateManyInput = {
+                    userId,
+                    problemId: r.problemId,
+                    isCleared: r.isCorrect,
+                    lastAnsweredAt: answeredAt,
+                    priority: newPriority
+                };
+
+                if (!isUnitMode) {
+                    newState.unlockLastAnsweredAt = answeredAt;
+                    newState.unlockIsCleared = r.isCorrect;
+                }
+
+                newStates.push(newState);
+            } else {
+                const currentPriority = currentState.priority || 0;
+                const newPriority = calculateNewPriority(currentPriority, r.evaluation);
+                const updateData: Prisma.UserProblemStateUpdateInput = {
+                    isCleared: r.isCorrect,
+                    lastAnsweredAt: answeredAt,
+                    priority: newPriority
+                };
+
+                if (!isUnitMode) {
+                    updateData.unlockLastAnsweredAt = answeredAt;
+                    updateData.unlockIsCleared = r.isCorrect;
+                }
+
+                updatePromises.push(
+                    tx.userProblemState.update({
+                        where: { userId_problemId: { userId, problemId: r.problemId } },
+                        data: updateData
+                    })
+                );
+            }
+        }
+
+        if (newStates.length > 0) {
+            await tx.userProblemState.createMany({
+                data: newStates
+            });
+        }
+
+        if (updatePromises.length > 0) {
+            await Promise.all(updatePromises);
+        }
+
+        // 4. Update UserCoreProblemState (Batch / Aggregated)
         const cpDeltas = new Map<string, number>();
         const involvedCpIdsInTransaction = new Set<string>();
 
@@ -1278,13 +1292,19 @@ export async function recordGradingResults(results: GradingResult[], qrData: QRD
             )
         );
 
-        return involvedCpIdsInTransaction;
+        return {
+            involvedCpIds: Array.from(involvedCpIdsInTransaction),
+            isUnitMode
+        };
     });
 
-    // 4. Batch Unlock Check (Outside Transaction)
-    await checkProgressAndUnlock(userId, Array.from(involvedCpIds));
+    // 5. Batch Unlock Check (Outside Transaction)
+    // 単元集中(coreProblemId指定)では解放判定を走らせない
+    if (!isUnitMode) {
+        await checkProgressAndUnlock(userId, involvedCpIds);
+    }
 
-    // 5. Emit Event for SSE
+    // 6. Emit Event for SSE
     try {
         await emitRealtimeEvent({
             userId,
@@ -1411,8 +1431,8 @@ export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: strin
             .map(pid => userProblemStateMap.get(pid))
             .filter((s): s is NonNullable<typeof s> => s !== undefined);
 
-        const answeredCount = userStatesForCp.length;
-        const correctCount = userStatesForCp.filter(s => s.isCleared).length;
+        const answeredCount = userStatesForCp.filter((state) => state.unlockLastAnsweredAt !== null).length;
+        const correctCount = userStatesForCp.filter((state) => state.unlockIsCleared).length;
 
         console.log(`Checking CP ${cp.name}: Valid/Total=${validProblems.length}/${cp.problems.length}, Answered=${answeredCount}`);
 

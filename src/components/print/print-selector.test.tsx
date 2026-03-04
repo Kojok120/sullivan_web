@@ -59,7 +59,7 @@ describe('印刷セレクター', () => {
                 cache: 'no-store',
             })
             expect(window.open).toHaveBeenCalledWith('', '_blank')
-            expect(mockPopup.location.href).toBe('/dashboard/print?subjectId=subject-1&sets=1')
+            expect(mockPopup.location.href).toBe('/dashboard/print?subjectId=subject-1&sets=1&gateChecked=1')
         })
     })
 

@@ -1,17 +1,16 @@
 import crypto from 'node:crypto';
 
-import type { Problem } from '@prisma/client';
 import QRCode from 'qrcode';
 
+import type { PrintableProblem } from '@/lib/print-types';
 import { compressProblemIds } from '@/lib/qr-utils';
 import { getPdfBrowser } from '@/lib/print-pdf/browser';
 
 const PDF_CACHE_TTL_MS = 5 * 60 * 1000;
 const RENDER_TIMEOUT_MS = 45_000;
+const FONT_READY_TIMEOUT_MS = 1_500;
 const MAX_CACHE_ENTRIES = 20;
 const MAX_CACHE_BYTES = 80 * 1024 * 1024;
-
-export type PrintableProblem = Problem & { customId?: string | null };
 
 export type PrintPdfInput = {
     cacheKey: string;
@@ -145,7 +144,7 @@ async function renderPdfEntry(input: PrintPdfInput): Promise<PdfCacheEntry> {
         page.setDefaultTimeout(RENDER_TIMEOUT_MS);
         await withTimeout(
             page.setContent(html, {
-                waitUntil: 'networkidle0',
+                waitUntil: 'domcontentloaded',
                 timeout: RENDER_TIMEOUT_MS,
             }),
             RENDER_TIMEOUT_MS,
@@ -162,9 +161,11 @@ async function renderPdfEntry(input: PrintPdfInput): Promise<PdfCacheEntry> {
             page.evaluate(async () => {
                 await document.fonts.ready;
             }),
-            RENDER_TIMEOUT_MS,
+            FONT_READY_TIMEOUT_MS,
             'フォント読み込みがタイムアウトしました',
-        );
+        ).catch(() => {
+            // フォント待機が長引く場合でも、PDF生成は継続する。
+        });
 
         const pdfBuffer = await withTimeout(
             page.pdf({

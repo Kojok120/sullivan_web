@@ -72,7 +72,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
     const handlePrint = async () => {
         if (!selectedSubjectId || isCheckingGate) return;
 
-        const printUrl = `/dashboard/print?subjectId=${selectedSubjectId}&sets=${sets}`;
+        const printUrl = `/dashboard/print?subjectId=${selectedSubjectId}&sets=${sets}&gateChecked=1`;
         const previewTab = window.open('', '_blank');
         setIsCheckingGate(true);
         setGateErrorMessage(null);

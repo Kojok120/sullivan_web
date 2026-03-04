@@ -227,6 +227,8 @@ model UserProblemState {
   priority       Int       @default(0)
   lastAnsweredAt DateTime?
   isCleared      Boolean   @default(false)
+  unlockLastAnsweredAt DateTime?
+  unlockIsCleared      Boolean   @default(false)
 
   @@unique([userId, problemId])
 }
