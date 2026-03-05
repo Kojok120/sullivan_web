@@ -6,21 +6,41 @@ function getDrive() {
     return getDriveClient();
 }
 
-export async function watchDriveFolder(webhookUrl: string): Promise<{ resourceId: string; channelId: string; expiration: string; token?: string }> {
-    if (!DRIVE_FOLDER_ID) throw new Error("DRIVE_FOLDER_ID is not set");
+const CHANNEL_ID_MAX_LENGTH = 64;
 
-    const DRIVE_WEBHOOK_CHANNEL_ID = process.env.DRIVE_WEBHOOK_CHANNEL_ID || '';
-    const DRIVE_WEBHOOK_TOKEN = process.env.DRIVE_WEBHOOK_TOKEN || '';
+function shouldUseFixedChannelId(): boolean {
+    const value = (process.env.DRIVE_WEBHOOK_CHANNEL_ID_FIXED || '').toLowerCase();
+    return value === '1' || value === 'true';
+}
 
-    const drive = getDrive();
-    const channelId = DRIVE_WEBHOOK_CHANNEL_ID || crypto.randomUUID();
-    const token = DRIVE_WEBHOOK_TOKEN || undefined;
-    if (!token) {
-        console.warn('DRIVE_WEBHOOK_TOKEN is not set; webhook token verification will be skipped.');
+function buildChannelId(): string {
+    const configured = (process.env.DRIVE_WEBHOOK_CHANNEL_ID || '').trim();
+    if (!configured) {
+        return crypto.randomUUID();
     }
 
-    console.log(`Setting up watch for folder ${DRIVE_FOLDER_ID} pointed to ${webhookUrl}`);
+    if (shouldUseFixedChannelId()) {
+        return configured.slice(0, CHANNEL_ID_MAX_LENGTH);
+    }
 
+    // 既定では固定IDの衝突を避けるため、環境ごとのprefix + ランダムsuffixで発行する。
+    const suffix = crypto.randomUUID().replace(/-/g, '').slice(0, 8);
+    const base = configured.replace(/-+$/, '');
+    const candidate = `${base}-${suffix}`;
+    if (candidate.length <= CHANNEL_ID_MAX_LENGTH) {
+        return candidate;
+    }
+    const available = CHANNEL_ID_MAX_LENGTH - suffix.length - 1;
+    return `${base.slice(0, Math.max(1, available))}-${suffix}`;
+}
+
+function isChannelIdNotUniqueError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error);
+    return /not unique/i.test(message);
+}
+
+async function registerWatch(channelId: string, webhookUrl: string, token?: string) {
+    const drive = getDrive();
     const res = await drive.files.watch({
         fileId: DRIVE_FOLDER_ID,
         requestBody: {
@@ -32,14 +52,39 @@ export async function watchDriveFolder(webhookUrl: string): Promise<{ resourceId
         }
     });
 
-    console.log("Watch response:", res.data);
+    console.log('Watch response:', res.data);
 
     return {
         resourceId: res.data.resourceId!,
-        channelId: channelId,
+        channelId,
         expiration: res.data.expiration!,
         token,
     };
+}
+
+export async function watchDriveFolder(webhookUrl: string): Promise<{ resourceId: string; channelId: string; expiration: string; token?: string }> {
+    if (!DRIVE_FOLDER_ID) throw new Error("DRIVE_FOLDER_ID is not set");
+
+    const DRIVE_WEBHOOK_TOKEN = process.env.DRIVE_WEBHOOK_TOKEN || '';
+
+    const token = DRIVE_WEBHOOK_TOKEN || undefined;
+    if (!token) {
+        console.warn('DRIVE_WEBHOOK_TOKEN is not set; webhook token verification will be skipped.');
+    }
+
+    console.log(`Setting up watch for folder ${DRIVE_FOLDER_ID} pointed to ${webhookUrl}`);
+
+    const primaryChannelId = buildChannelId();
+    try {
+        return await registerWatch(primaryChannelId, webhookUrl, token);
+    } catch (error) {
+        if (isChannelIdNotUniqueError(error)) {
+            const fallbackChannelId = crypto.randomUUID();
+            console.warn(`Primary channel ID (${primaryChannelId}) is not unique. Retrying with random channel ID (${fallbackChannelId}).`);
+            return registerWatch(fallbackChannelId, webhookUrl, token);
+        }
+        throw error;
+    }
 }
 
 // stopWatching is used by the renewal flow to clean up existing channels.

@@ -75,8 +75,11 @@ https://upstash.com/docs/redis/features/restapi
 - `APP_URL`（WebサービスのURL）
 - `GRADING_WORKER_URL`（WorkerのURL、**WebサービスとWorkerサービスの両方に設定**）
 - `INTERNAL_API_SECRET`（内部API保護、Secret Managerに保存）
-- `DRIVE_WEBHOOK_CHANNEL_ID`（任意: 固定channelIdにする場合）
+- `DRIVE_WEBHOOK_CHANNEL_ID`（任意: channelId prefix。既定ではランダムsuffixが付与される）
+- `DRIVE_WEBHOOK_CHANNEL_ID_FIXED`（任意: `true` の場合のみ固定channelId運用）
 - `DRIVE_WEBHOOK_TOKEN`（Webhook検証用トークン、Secret Managerに保存）
+- `DRIVE_WATCH_STATE_KEY`（任意: RedisのWatch状態キー。環境ごとに分離推奨）
+- `DRIVE_WATCH_RENEW_THRESHOLD_HOURS`（任意: renew開始閾値。既定18時間）
 
 `GRADING_WORKER_URL` の取得例:
 ```bash
@@ -130,6 +133,9 @@ gcloud run deploy sullivan-web \
   --set-env-vars "UPSTASH_REDIS_REST_URL=<...>" \
   --set-env-vars "UPSTASH_REDIS_REST_TOKEN=<...>" \
   --set-env-vars "DRIVE_WEBHOOK_CHANNEL_ID=<optional>" \
+  --set-env-vars "DRIVE_WEBHOOK_CHANNEL_ID_FIXED=false" \
+  --set-env-vars "DRIVE_WATCH_RENEW_THRESHOLD_HOURS=18" \
+  --set-env-vars "DRIVE_WATCH_STATE_KEY=sullivan:drive:watch:state:<env>" \
   --update-secrets "INTERNAL_API_SECRET=internal-api-secret:latest" \
   --update-secrets "DRIVE_WEBHOOK_TOKEN=drive-webhook-token:latest"
 ```
@@ -282,6 +288,23 @@ curl -X POST <WEB_URL>/api/drive/watch/setup \
 `check=1` は Drive の取りこぼし対策として定期的に `checkDriveForNewFiles` を実行します。  
 `DRIVE_WEBHOOK_TOKEN` を変更した場合は再度 `/api/drive/watch/setup` を実行してください。
 Supabase Realtime は通知用途のみで、採点トリガーには使われません（Drive Webhook または **Workerサービスの** `/api/grading/check` が入口）。
+
+推奨設定（再発防止）:
+- Scheduler間隔は1時間（`0 * * * *`）
+- retryを有効化（例: `--max-retry-attempts=5 --min-backoff=30s --max-backoff=600s`）
+- `DRIVE_WATCH_RENEW_THRESHOLD_HOURS=18` を維持（6時間間隔運用でも猶予を確保）
+
+更新例:
+```bash
+gcloud scheduler jobs update http sullivan-drive-watch-renew \
+  --project "<PROJECT_ID>" \
+  --location asia-northeast1 \
+  --schedule "0 * * * *" \
+  --time-zone "Asia/Tokyo" \
+  --max-retry-attempts 5 \
+  --min-backoff 30s \
+  --max-backoff 600s
+```
 
 ---
 

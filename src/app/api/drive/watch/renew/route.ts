@@ -5,13 +5,23 @@ import { getDriveWebhookUrlOrError, getShouldCheckFromRequest, queueDriveCheck, 
 
 export const dynamic = 'force-dynamic';
 
-// Renew watch if it expires within this time (6 hours before expiration)
-const RENEW_THRESHOLD_MS = 6 * 60 * 60 * 1000;
+const DEFAULT_RENEW_THRESHOLD_HOURS = 18;
+
+function getRenewThresholdHours() {
+    const parsed = Number.parseInt(process.env.DRIVE_WATCH_RENEW_THRESHOLD_HOURS || '', 10);
+    if (!Number.isFinite(parsed)) return DEFAULT_RENEW_THRESHOLD_HOURS;
+    return Math.min(72, Math.max(1, parsed));
+}
+
+// Renew watch if it expires within this time.
+const RENEW_THRESHOLD_HOURS = getRenewThresholdHours();
+const RENEW_THRESHOLD_MS = RENEW_THRESHOLD_HOURS * 60 * 60 * 1000;
 
 /**
  * POST /api/drive/watch/renew
  * Called by Cloud Scheduler every 6 hours to renew the Drive watch.
  * Google Drive watches expire within ~24 hours, so we renew proactively.
+ * 閾値は DRIVE_WATCH_RENEW_THRESHOLD_HOURS（既定18時間）で調整可能。
  */
 export async function POST(request: Request) {
     try {
@@ -31,6 +41,10 @@ export async function POST(request: Request) {
         // Check if renewal is needed
         if (currentState) {
             const timeUntilExpiry = currentState.expiration - Date.now();
+            console.log(
+                `[DriveWatchRenew] expiresAt=${new Date(currentState.expiration).toISOString()} `
+                + `remainingMs=${timeUntilExpiry} thresholdHours=${RENEW_THRESHOLD_HOURS}`
+            );
 
             if (timeUntilExpiry > RENEW_THRESHOLD_MS) {
                 const hoursRemaining = Math.round(timeUntilExpiry / 1000 / 60 / 60);
