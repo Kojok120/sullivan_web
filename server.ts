@@ -56,24 +56,43 @@ let handleUpgrade: ReturnType<typeof app.getUpgradeHandler> | null = null;
 let isPrepared = false;
 let preparationError: string | null = null;
 
-function replyNotReady(res: ServerResponse) {
+function isHealthzRequest(req: IncomingMessage) {
+    const pathname = parse(req.url || '', true).pathname || '/';
+    return pathname === '/healthz';
+}
+
+function replyNotReady(req: IncomingMessage, res: ServerResponse) {
+    if (isHealthzRequest(req)) {
+        res.statusCode = 200;
+        res.end('starting');
+        return;
+    }
+
     if (preparationError) {
         res.statusCode = 500;
         res.end('Server startup failed');
         return;
     }
-    // Cloud Run の起動判定を妨げないよう、準備中でも即時に応答する。
-    res.statusCode = 200;
+    const method = req.method || 'GET';
+    const pathname = parse(req.url || '', true).pathname || '/';
+    console.warn(`[Server] Request received before app is ready: ${method} ${pathname}`);
+    res.statusCode = 503;
+    res.setHeader('Retry-After', '10');
     res.end('Server is starting');
 }
 
 const server = createServer(async (req, res) => {
     try {
         if (!isPrepared || !handle) {
-            replyNotReady(res);
+            replyNotReady(req, res);
             return;
         }
         const parsedUrl = parse(req.url!, true);
+        if (parsedUrl.pathname === '/healthz') {
+            res.statusCode = 200;
+            res.end('ok');
+            return;
+        }
         await handle(req, res, parsedUrl);
     } catch (err) {
         console.error('Error occurred handling', req.url, err);

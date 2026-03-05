@@ -74,4 +74,7 @@ gcloud run deploy sullivan-app-production \
   --update-secrets "INTERNAL_API_SECRET=internal-api-secret:latest" \
   --update-secrets "DRIVE_WEBHOOK_TOKEN=drive-webhook-token:latest" \
   --set-env-vars "DRIVE_WEBHOOK_CHANNEL_ID=$DRIVE_WEBHOOK_CHANNEL_ID" \
+  --set-env-vars "DRIVE_WEBHOOK_CHANNEL_ID_FIXED=${DRIVE_WEBHOOK_CHANNEL_ID_FIXED:-false}" \
+  --set-env-vars "DRIVE_WATCH_RENEW_THRESHOLD_HOURS=${DRIVE_WATCH_RENEW_THRESHOLD_HOURS:-18}" \
+  --set-env-vars "DRIVE_WATCH_STATE_KEY=${DRIVE_WATCH_STATE_KEY}" \
   --set-env-vars "GRADING_WORKER_URL=$GRADING_WORKER_URL"

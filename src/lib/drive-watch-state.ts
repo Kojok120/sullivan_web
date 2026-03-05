@@ -1,6 +1,6 @@
 import { redis } from '@/lib/redis';
 
-const WATCH_STATE_KEY = 'sullivan:drive:watch:state';
+const WATCH_STATE_KEY = (process.env.DRIVE_WATCH_STATE_KEY || 'sullivan:drive:watch:state').trim() || 'sullivan:drive:watch:state';
 
 export interface WatchState {
     channelId: string;
@@ -14,7 +14,7 @@ export interface WatchState {
  */
 export async function saveWatchState(state: WatchState): Promise<void> {
     await redis.set(WATCH_STATE_KEY, JSON.stringify(state));
-    console.log('Watch state saved:', state);
+    console.log(`Watch state saved (key=${WATCH_STATE_KEY}):`, state);
 }
 
 /**
@@ -37,5 +37,5 @@ export async function getWatchState(): Promise<WatchState | null> {
  */
 export async function clearWatchState(): Promise<void> {
     await redis.del(WATCH_STATE_KEY);
-    console.log('Watch state cleared');
+    console.log(`Watch state cleared (key=${WATCH_STATE_KEY})`);
 }
