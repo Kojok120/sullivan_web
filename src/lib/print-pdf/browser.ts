@@ -36,12 +36,20 @@ async function resolveExecutablePath(): Promise<string> {
     throw new Error('Chromium executable not found. Set PUPPETEER_EXECUTABLE_PATH or install chromium.');
 }
 
-function cleanupSingletonLock(chromiumUserDataDir: string): void {
-    const lockFile = path.join(chromiumUserDataDir, 'SingletonLock');
-    try {
-        fs.unlinkSync(lockFile);
-    } catch {
-        // ロックファイルが存在しない場合は何もしない
+function cleanupUserDataDir(chromiumUserDataDir: string): void {
+    // Chromiumが残留させるロック・ポートファイルをすべて削除して次回起動を可能にする
+    const filesToRemove = [
+        'SingletonLock',
+        'SingletonSocket',
+        'SingletonCookie',
+        'DevToolsActivePort',
+    ];
+    for (const fileName of filesToRemove) {
+        try {
+            fs.rmSync(path.join(chromiumUserDataDir, fileName), { force: true });
+        } catch {
+            // ファイルが存在しない場合は何もしない
+        }
     }
 }
 
@@ -63,8 +71,8 @@ async function launchBrowser(): Promise<Browser> {
         fs.mkdirSync(dirPath, { recursive: true });
     }
 
-    // クラッシュ後に残留した SingletonLock を削除して再起動を可能にする
-    cleanupSingletonLock(chromiumUserDataDir);
+    // クラッシュ後に残留したロックファイルを削除して再起動を可能にする
+    cleanupUserDataDir(chromiumUserDataDir);
 
     return await puppeteer.launch({
         executablePath,
@@ -113,15 +121,23 @@ export async function getPdfBrowser(): Promise<Browser> {
                 // 「browser is already running」エラーの場合、ロックファイルを削除して1回リトライする
                 const message = error instanceof Error ? error.message : String(error);
                 if (message.includes('browser is already running') || message.includes('SingletonLock')) {
-                    cleanupSingletonLock(buildChromiumDirPath('.chromium-user-data'));
+                    cleanupUserDataDir(buildChromiumDirPath('.chromium-user-data'));
                     return await launchBrowser();
                 }
                 throw error;
             }
         })().then((browser) => {
             browser.on('disconnected', () => {
-                // 切断時に残留するロックファイルをクリーンアップする
-                cleanupSingletonLock(buildChromiumDirPath('.chromium-user-data'));
+                // 切断時にChromiumプロセスが残留している場合は強制終了してロックを解放する
+                try {
+                    const proc = browser.process();
+                    if (proc && !proc.killed) {
+                        proc.kill('SIGKILL');
+                    }
+                } catch {
+                    // プロセス終了に失敗してもクリーンアップは継続する
+                }
+                cleanupUserDataDir(buildChromiumDirPath('.chromium-user-data'));
                 browserPromise = null;
             });
             return browser;
