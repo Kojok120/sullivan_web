@@ -39,12 +39,14 @@ jobs:
 
       - name: 必須シークレット検証 (Web)
         env:
+          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
+          GEMINI_CHAT_MODEL: ${{ secrets.GEMINI_CHAT_MODEL }}
           GRADING_WORKER_URL: ${{ secrets.GRADING_WORKER_URL }}
           QSTASH_TOKEN: ${{ secrets.QSTASH_TOKEN }}
           QSTASH_CURRENT_SIGNING_KEY: ${{ secrets.QSTASH_CURRENT_SIGNING_KEY }}
           QSTASH_NEXT_SIGNING_KEY: ${{ secrets.QSTASH_NEXT_SIGNING_KEY }}
         run: |
-          for var in GRADING_WORKER_URL QSTASH_TOKEN QSTASH_CURRENT_SIGNING_KEY QSTASH_NEXT_SIGNING_KEY; do
+          for var in GEMINI_MODEL GEMINI_CHAT_MODEL GRADING_WORKER_URL QSTASH_TOKEN QSTASH_CURRENT_SIGNING_KEY QSTASH_NEXT_SIGNING_KEY; do
             if [ -z "${!var}" ]; then
               echo "Missing required secret: ${var}"
               exit 1
@@ -91,6 +93,8 @@ jobs:
             --set-env-vars "UPSTASH_REDIS_REST_TOKEN=${{ secrets.UPSTASH_REDIS_REST_TOKEN }}" \
             --set-env-vars "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" \
             --set-env-vars "GEMINI_MODEL=${{ secrets.GEMINI_MODEL }}" \
+            --set-env-vars "GEMINI_CHAT_MODEL=${{ secrets.GEMINI_CHAT_MODEL }}" \
+            --set-env-vars "GEMINI_CHAT_FALLBACK_MODEL=${{ secrets.GEMINI_CHAT_FALLBACK_MODEL }}" \
             --set-env-vars "GEMINI_LIVE_MODEL=${{ secrets.GEMINI_LIVE_MODEL }}" \
             --set-env-vars "GEMINI_LIVE_API_VERSION=${{ secrets.GEMINI_LIVE_API_VERSION }}" \
             --set-env-vars "GEMINI_LIVE_VOICE=${{ secrets.GEMINI_LIVE_VOICE }}" \
@@ -136,6 +140,7 @@ jobs:
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
+          GEMINI_CHAT_MODEL: ${{ secrets.GEMINI_CHAT_MODEL }}
           GEMINI_LIVE_MODEL: ${{ secrets.GEMINI_LIVE_MODEL }}
           GEMINI_LIVE_API_VERSION: ${{ secrets.GEMINI_LIVE_API_VERSION }}
           GEMINI_LIVE_VOICE: ${{ secrets.GEMINI_LIVE_VOICE }}
@@ -152,6 +157,7 @@ jobs:
             UPSTASH_REDIS_REST_TOKEN \
             GEMINI_API_KEY \
             GEMINI_MODEL \
+            GEMINI_CHAT_MODEL \
             GEMINI_LIVE_MODEL \
             GEMINI_LIVE_API_VERSION \
             GEMINI_LIVE_VOICE \
@@ -201,6 +207,8 @@ jobs:
             --set-env-vars "UPSTASH_REDIS_REST_TOKEN=${{ secrets.UPSTASH_REDIS_REST_TOKEN }}" \
             --set-env-vars "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" \
             --set-env-vars "GEMINI_MODEL=${{ secrets.GEMINI_MODEL }}" \
+            --set-env-vars "GEMINI_CHAT_MODEL=${{ secrets.GEMINI_CHAT_MODEL }}" \
+            --set-env-vars "GEMINI_CHAT_FALLBACK_MODEL=${{ secrets.GEMINI_CHAT_FALLBACK_MODEL }}" \
             --set-env-vars "GEMINI_LIVE_MODEL=${{ secrets.GEMINI_LIVE_MODEL }}" \
             --set-env-vars "GEMINI_LIVE_API_VERSION=${{ secrets.GEMINI_LIVE_API_VERSION }}" \
             --set-env-vars "GEMINI_LIVE_VOICE=${{ secrets.GEMINI_LIVE_VOICE }}" \
