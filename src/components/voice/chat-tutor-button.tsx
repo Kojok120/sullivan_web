@@ -5,6 +5,11 @@ import { MessageCircle, Send, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import {
+    sanitizeTutorChatMessages,
+    type TutorChatMessage,
+    type TutorChatResponseBody,
+} from '@/lib/tutor-chat';
+import {
     Dialog,
     DialogContent,
     DialogDescription,
@@ -12,11 +17,6 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-
-type TutorMessage = {
-    role: 'user' | 'assistant';
-    content: string;
-};
 
 type ChatTutorButtonProps = {
     targetStudentId: string;
@@ -33,16 +33,6 @@ const INITIAL_ASSISTANT_MESSAGE = 'あなたのわからないところを教え
 const STORAGE_NAMESPACE = 'chat-tutor:messages';
 const MAX_STORED_MESSAGES = 40;
 
-function isValidTutorMessage(value: unknown): value is TutorMessage {
-    if (!value || typeof value !== 'object') return false;
-    const record = value as { role?: unknown; content?: unknown };
-    return (
-        (record.role === 'user' || record.role === 'assistant')
-        && typeof record.content === 'string'
-        && record.content.trim().length > 0
-    );
-}
-
 function toBase64Utf8(value: string) {
     const bytes = new TextEncoder().encode(value);
     let binary = '';
@@ -56,7 +46,7 @@ export function ChatTutorButton({ targetStudentId, problemContext, systemPrompt 
     const [isOpen, setIsOpen] = useState(false);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [messages, setMessages] = useState<TutorMessage[]>([
+    const [messages, setMessages] = useState<TutorChatMessage[]>([
         { role: 'assistant', content: INITIAL_ASSISTANT_MESSAGE },
     ]);
     const messagesViewportRef = useRef<HTMLDivElement | null>(null);
@@ -103,7 +93,10 @@ export function ChatTutorButton({ targetStudentId, problemContext, systemPrompt 
                 return;
             }
 
-            const sanitized = parsed.filter(isValidTutorMessage).slice(-MAX_STORED_MESSAGES);
+            const sanitized = sanitizeTutorChatMessages(parsed, {
+                maxHistoryMessages: MAX_STORED_MESSAGES,
+                maxMessageChars: 1000,
+            });
             if (sanitized.length === 0) {
                 setMessages([{ role: 'assistant', content: INITIAL_ASSISTANT_MESSAGE }]);
                 return;
@@ -124,7 +117,7 @@ export function ChatTutorButton({ targetStudentId, problemContext, systemPrompt 
         const userText = input.trim();
         if (!userText || isLoading) return;
 
-        const nextMessages: TutorMessage[] = [...messages, { role: 'user', content: userText }];
+        const nextMessages: TutorChatMessage[] = [...messages, { role: 'user', content: userText }];
         setMessages(nextMessages);
         setInput('');
         setIsLoading(true);
@@ -145,13 +138,17 @@ export function ChatTutorButton({ targetStudentId, problemContext, systemPrompt 
                 throw new Error(`HTTP ${res.status}`);
             }
 
-            const data = (await res.json()) as { reply?: string };
+            const data = (await res.json()) as TutorChatResponseBody;
             const reply = data.reply?.trim();
             if (!reply) {
                 throw new Error('Empty reply');
             }
 
-            setMessages((prev) => [...prev, { role: 'assistant', content: reply }]);
+            setMessages((prev) => [...prev, {
+                role: 'assistant',
+                content: reply,
+                modelContent: data.modelContent,
+            }]);
         } catch (error) {
             console.error('[ChatTutor] Failed to send message:', error);
             setMessages((prev) => [

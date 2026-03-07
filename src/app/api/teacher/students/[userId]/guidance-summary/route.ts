@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
-import { GoogleGenAI, Type, createPartFromUri } from '@google/genai';
+import { GoogleGenAI, createPartFromUri } from '@google/genai';
 import { z } from 'zod';
 
 import { getSession } from '@/lib/auth';
@@ -105,22 +105,23 @@ async function generateInterviewSummary(params: {
     }
 
     const ai = new GoogleGenAI({ apiKey });
-    const modelName = process.env.GEMINI_CHAT_MODEL || 'gemini-2.5-flash-lite';
+    const modelName = process.env.GEMINI_CHAT_MODEL || 'gemini-3.1-pro-preview';
 
     const responseSchema = {
-        type: Type.OBJECT,
+        type: 'object',
         properties: {
-            summary: { type: Type.STRING },
+            summary: { type: 'string' },
             decisions: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
+                type: 'array',
+                items: { type: 'string' },
             },
             nextActions: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
+                type: 'array',
+                items: { type: 'string' },
             },
         },
         required: ['summary', 'decisions', 'nextActions'],
+        additionalProperties: false,
     };
 
     let uploadedFileName: string | null = null;
@@ -165,8 +166,7 @@ async function generateInterviewSummary(params: {
             contents: [{ role: 'user', parts }],
             config: {
                 responseMimeType: 'application/json',
-                responseSchema,
-                temperature: 0.2,
+                responseJsonSchema: responseSchema,
                 maxOutputTokens: 2048,
             },
         });

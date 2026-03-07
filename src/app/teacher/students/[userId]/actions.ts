@@ -169,10 +169,10 @@ async function buildDraftWithGemini(params: {
     }
 
     try {
-        const { GoogleGenAI, Type } = await import('@google/genai');
+        const { GoogleGenAI } = await import('@google/genai');
         const ai = new GoogleGenAI({ apiKey });
 
-        const modelName = process.env.GEMINI_CHAT_MODEL || 'gemini-2.5-flash-lite';
+        const modelName = process.env.GEMINI_CHAT_MODEL || 'gemini-3.1-pro-preview';
         const dateKeysText = params.milestoneKeys.join(', ');
         const goalSummary = params.goal.type === 'PROBLEM_COUNT'
             ? `目標名: ${params.goal.name}, 科目: ${params.goal.subjectName || '未指定'}, 合計問題数: ${params.goal.targetCount ?? 0}`
@@ -192,19 +192,23 @@ async function buildDraftWithGemini(params: {
             contents: [{ role: 'user', parts: [{ text: prompt }] }],
             config: {
                 responseMimeType: 'application/json',
-                responseSchema: {
-                    type: Type.ARRAY,
+                responseJsonSchema: {
+                    type: 'array',
                     items: {
-                        type: Type.OBJECT,
+                        type: 'object',
                         properties: {
-                            dateKey: { type: Type.STRING },
-                            targetCount: { type: Type.NUMBER, nullable: true },
-                            targetText: { type: Type.STRING, nullable: true },
+                            dateKey: { type: 'string' },
+                            targetCount: {
+                                anyOf: [{ type: 'integer' }, { type: 'null' }],
+                            },
+                            targetText: {
+                                anyOf: [{ type: 'string' }, { type: 'null' }],
+                            },
                         },
                         required: ['dateKey'],
+                        additionalProperties: false,
                     },
                 },
-                temperature: 0.5,
                 maxOutputTokens: 2048,
             },
         });

@@ -129,6 +129,7 @@ npm run test:e2e        # Playwright
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `GEMINI_API_KEY`
+- `GEMINI_MODEL`, `GEMINI_CHAT_MODEL`
 
 ### 採点/キュー/Drive（運用時）
 
@@ -141,6 +142,7 @@ npm run test:e2e        # Playwright
 ### AI音声チューター（任意）
 
 - `GEMINI_LIVE_SESSION_SECRET`
+- `GEMINI_CHAT_FALLBACK_MODEL`
 - `GEMINI_LIVE_MODEL`, `GEMINI_LIVE_API_VERSION`, `GEMINI_LIVE_VOICE`
 - `NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS`, `NEXT_PUBLIC_GEMINI_MAX_TURN_MS`
 
@@ -151,4 +153,3 @@ npm run test:e2e        # Playwright
 - [環境構築.md](./環境構築.md)
 - [デプロイ手順](./docs/deploy_runbook.md)
 - [問題出力ロジック](./docs/problem-output-logic.md)
-
