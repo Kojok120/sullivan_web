@@ -1,5 +1,5 @@
 import QRCode from 'qrcode';
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 import { prisma } from '@/lib/prisma';
 import type { Prisma, User } from '@prisma/client';
 import fs from 'fs';
@@ -12,6 +12,7 @@ import { processGamificationUpdates, toGamificationPayload } from '@/lib/gamific
 import { acquireGradingFileLock, isGradingFileLocked, releaseGradingFileLock } from '@/lib/grading-lock';
 import { claimGradingJob, markGradingJobCompleted, markGradingJobFailed, publishGradingJob } from '@/lib/grading-job';
 import { loadInstructionPrompt as loadPrompt } from '@/lib/instruction-prompt';
+import { getGeminiMediaResolutionForMimeType } from '@/lib/gemini-media-resolution';
 
 // Priority adjustment logic (inlined from removed priority-algo.ts)
 type Evaluation = "A" | "B" | "C" | "D";
@@ -781,7 +782,7 @@ async function getQrDataWithFallback(filePath: string, prepared: PreparedFile): 
     // 2. Fallback to Gemini
     if (!hasStudentId || !hasProblems) {
         console.log("Local QR read failed/skipped or incomplete. Attempting to scan QR with Gemini...");
-        const modelName = process.env.GEMINI_MODEL || "gemini-2.5-pro";
+        const modelName = process.env.GEMINI_MODEL || "gemini-3.1-pro-preview";
         qrData = await scanQRWithGemini(modelName, prepared.base64Data, prepared.mimeType);
     }
 
@@ -805,7 +806,7 @@ async function gradeWithGemini(
     userId: string,
     maxRetries: number = 2
 ): Promise<GradingResult[] | null> {
-    const modelName = process.env.GEMINI_MODEL || "gemini-2.5-pro";
+    const modelName = process.env.GEMINI_MODEL || "gemini-3.1-pro-preview";
     console.log("Using Gemini Model:", modelName);
 
     // 1. Fetch Full Problem Context from DB
@@ -895,29 +896,30 @@ async function gradeWithGemini(
 
     // 3. Define responseSchema for structured output
     const gradingResponseSchema = {
-        type: Type.ARRAY,
+        type: 'array',
         items: {
-            type: Type.OBJECT,
+            type: 'object',
             properties: {
                 problemIndex: {
-                    type: Type.INTEGER,
+                    type: 'integer',
                     description: "問題のインデックス（0始まり、問題リストの順序に対応）"
                 },
                 studentAnswer: {
-                    type: Type.STRING,
+                    type: 'string',
                     description: "生徒の解答をそのまま転記"
                 },
                 evaluation: {
-                    type: Type.STRING,
+                    type: 'string',
                     enum: ["A", "B", "C", "D"],
                     description: "A=完璧, B=ほぼ正解, C=部分的に正解, D=不正解"
                 },
                 feedback: {
-                    type: Type.STRING,
+                    type: 'string',
                     description: "日本語でのフィードバック"
                 }
             },
-            required: ["problemIndex", "studentAnswer", "evaluation", "feedback"]
+            required: ["problemIndex", "studentAnswer", "evaluation", "feedback"],
+            additionalProperties: false,
         }
     };
 
@@ -931,6 +933,7 @@ async function gradeWithGemini(
 
     // 6. Retry loop
     let lastErrors: string[] = [];
+    const mediaResolution = getGeminiMediaResolutionForMimeType(prepared.mimeType);
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
@@ -954,7 +957,8 @@ async function gradeWithGemini(
                 ],
                 config: {
                     responseMimeType: "application/json",
-                    responseSchema: gradingResponseSchema
+                    responseJsonSchema: gradingResponseSchema,
+                    ...(mediaResolution ? { mediaResolution } : {}),
                 }
             });
 
@@ -990,6 +994,7 @@ async function gradeWithGemini(
 async function scanQRWithGemini(modelName: string, base64Data: string, mimeType: string): Promise<QRData | null> {
     try {
         const prompt = loadPrompt('qr-scan-prompt.md');
+        const mediaResolution = getGeminiMediaResolutionForMimeType(mimeType);
         // ...
 
         const result = await getGenAI().models.generateContent({
@@ -1002,7 +1007,10 @@ async function scanQRWithGemini(modelName: string, base64Data: string, mimeType:
                         mimeType: mimeType
                     }
                 }
-            ]
+            ],
+            config: {
+                ...(mediaResolution ? { mediaResolution } : {}),
+            }
         });
         const text = result.text || '';
         console.log("Gemini QR Scan Response:", text);

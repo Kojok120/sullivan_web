@@ -3,19 +3,23 @@ import {
     GoogleGenAI,
     HarmBlockThreshold,
     HarmCategory,
-    Type,
+    ThinkingLevel,
+    type Content,
     type GenerateContentResponse,
 } from '@google/genai';
 import { getSession } from '@/lib/auth';
 import { getStudentAccessContext } from '@/lib/authorization';
 import { canUseAiTutor } from '@/lib/plan-entitlements';
+import {
+    buildTutorChatHistory,
+    extractTutorChatModelContent,
+    normalizeTutorChatModelContentForHistory,
+    sanitizeTutorChatMessages,
+    type TutorChatModelContent,
+    type TutorChatMessage,
+} from '@/lib/tutor-chat';
 import fs from 'node:fs';
 import path from 'node:path';
-
-type ChatMessage = {
-    role: 'user' | 'assistant';
-    content: string;
-};
 
 type TutorChatRequest = {
     targetStudentId?: string;
@@ -25,21 +29,16 @@ type TutorChatRequest = {
         userAnswer?: string;
         explanation?: string;
     };
-    messages: ChatMessage[];
+    messages: TutorChatMessage[];
 };
 
 type TutorReplySchema = {
     reply?: unknown;
 };
 
-type GeminiChatContent = {
-    role: 'user' | 'model';
-    parts: Array<{ text: string }>;
-};
-
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
-const CHAT_MODEL = process.env.GEMINI_CHAT_MODEL || 'gemini-2.5-flash';
-const CHAT_FALLBACK_MODEL = process.env.GEMINI_CHAT_FALLBACK_MODEL || 'gemini-2.5-flash-lite';
+const CHAT_MODEL = process.env.GEMINI_CHAT_MODEL || 'gemini-3.1-pro-preview';
+const CHAT_FALLBACK_MODEL = process.env.GEMINI_CHAT_FALLBACK_MODEL || CHAT_MODEL;
 const CHAT_TIMEOUT_MS = Math.max(2_000, Number.parseInt(process.env.GEMINI_CHAT_TIMEOUT_MS || '12000', 10) || 12_000);
 const MAX_MESSAGE_CHARS = 1000;
 const MAX_TRANSCRIPT_CHARS = 8000;
@@ -80,14 +79,15 @@ const SAFETY_SETTINGS = [
 ];
 
 const REPLY_SCHEMA = {
-    type: Type.OBJECT,
+    type: 'object',
     properties: {
         reply: {
-            type: Type.STRING,
+            type: 'string',
             description: '生徒に返す日本語の返答（2〜4文）',
         },
     },
     required: ['reply'],
+    additionalProperties: false,
 };
 
 export const dynamic = 'force-dynamic';
@@ -108,26 +108,8 @@ function sanitizeText(value: unknown, fallback = '') {
     return value.trim();
 }
 
-function sanitizeMessages(rawMessages: unknown) {
-    if (!Array.isArray(rawMessages)) return [] as ChatMessage[];
-
-    return rawMessages
-        .filter((message): message is ChatMessage => {
-            if (!message || typeof message !== 'object') return false;
-            const record = message as { role?: unknown; content?: unknown };
-            const roleIsValid = record.role === 'user' || record.role === 'assistant';
-            return roleIsValid && typeof record.content === 'string';
-        })
-        .map((message) => ({
-            role: message.role,
-            content: message.content.trim().slice(0, MAX_MESSAGE_CHARS),
-        }))
-        .filter((message) => message.content.length > 0)
-        .slice(-MAX_HISTORY_MESSAGES);
-}
-
-function formatTranscript(messages: ChatMessage[]) {
-    const selected: ChatMessage[] = [];
+function formatTranscript(messages: TutorChatMessage[]) {
+    const selected: TutorChatMessage[] = [];
     let totalChars = 0;
 
     for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -150,13 +132,6 @@ function formatTranscript(messages: ChatMessage[]) {
             return `${speaker}: ${message.content}`;
         })
         .join('\n');
-}
-
-function toGeminiContents(messages: ChatMessage[]): GeminiChatContent[] {
-    return messages.map((message) => ({
-        role: message.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: message.content }],
-    }));
 }
 
 function normalizeTutorReply(text: string) {
@@ -269,25 +244,28 @@ async function wait(ms: number) {
 async function callGeminiWithTimeout(
     ai: GoogleGenAI,
     model: string,
-    contents: GeminiChatContent[],
+    history: Content[],
+    latestUserMessage: string,
     systemInstruction: string,
 ): Promise<GenerateContentResponse> {
     const abortController = new AbortController();
     const timeoutId = setTimeout(() => abortController.abort(), CHAT_TIMEOUT_MS);
+    const chat = ai.chats.create({ model, history });
 
     try {
-        return await ai.models.generateContent({
-            model,
-            contents,
+        return await chat.sendMessage({
+            message: latestUserMessage,
             config: {
                 abortSignal: abortController.signal,
                 systemInstruction,
-                temperature: 0.3,
                 topP: 0.9,
                 maxOutputTokens: 512,
                 responseMimeType: 'application/json',
-                responseSchema: REPLY_SCHEMA,
+                responseJsonSchema: REPLY_SCHEMA,
                 safetySettings: SAFETY_SETTINGS,
+                thinkingConfig: {
+                    thinkingLevel: ThinkingLevel.LOW,
+                },
             },
         });
     } finally {
@@ -333,11 +311,13 @@ function buildTutorSystemInstruction({
 
 async function generateTutorReply({
     ai,
-    contents,
+    history,
+    latestUserMessage,
     systemInstruction,
 }: {
     ai: GoogleGenAI;
-    contents: GeminiChatContent[];
+    history: Content[];
+    latestUserMessage: string;
     systemInstruction: string;
 }) {
     const models = Array.from(new Set([CHAT_MODEL, CHAT_FALLBACK_MODEL].filter(Boolean)));
@@ -346,12 +326,18 @@ async function generateTutorReply({
     for (const model of models) {
         for (let attempt = 0; attempt <= MAX_API_RETRIES; attempt += 1) {
             try {
-                const response = await callGeminiWithTimeout(ai, model, contents, systemInstruction);
+                const response = await callGeminiWithTimeout(ai, model, history, latestUserMessage, systemInstruction);
                 const candidateText = extractResponseText(response);
                 const parsedReply = parseReplyFromJsonText(candidateText);
 
                 if (parsedReply) {
-                    return parsedReply;
+                    return {
+                        reply: parsedReply,
+                        modelContent: normalizeTutorChatModelContentForHistory(
+                            extractTutorChatModelContent(response),
+                            parsedReply,
+                        ),
+                    };
                 }
 
                 throw new Error('Reply payload is empty');
@@ -427,12 +413,23 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const messages = sanitizeMessages(body.messages);
+        const messages = sanitizeTutorChatMessages(body.messages, {
+            maxHistoryMessages: MAX_HISTORY_MESSAGES,
+            maxMessageChars: MAX_MESSAGE_CHARS,
+        });
         if (messages.length === 0) {
             return NextResponse.json({ error: 'messages is required' }, { status: 400 });
         }
 
-        const latestUserMessage = [...messages].reverse().find((message) => message.role === 'user')?.content || '';
+        let latestUserIndex = -1;
+        for (let index = messages.length - 1; index >= 0; index -= 1) {
+            if (messages[index]?.role === 'user') {
+                latestUserIndex = index;
+                break;
+            }
+        }
+
+        const latestUserMessage = latestUserIndex >= 0 ? messages[latestUserIndex].content : '';
         if (!latestUserMessage) {
             return NextResponse.json({ error: 'latest user message is required' }, { status: 400 });
         }
@@ -452,16 +449,19 @@ export async function POST(request: NextRequest) {
             explanation,
             translationMode,
         });
-        const contents = toGeminiContents(messages);
+        const history = buildTutorChatHistory(messages.slice(0, latestUserIndex));
         const transcript = formatTranscript(messages);
         console.info(
-            `[TutorChat] turns=${contents.length} transcriptChars=${transcript.length} latestChars=${latestUserMessage.length}`,
+            `[TutorChat] turns=${messages.length} historyTurns=${history.length} transcriptChars=${transcript.length} latestChars=${latestUserMessage.length}`,
         );
 
         const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
         let reply = '';
+        let modelContent: TutorChatModelContent | undefined;
         try {
-            reply = await generateTutorReply({ ai, contents, systemInstruction });
+            const result = await generateTutorReply({ ai, history, latestUserMessage, systemInstruction });
+            reply = result.reply;
+            modelContent = result.modelContent;
         } catch (error) {
             console.error('[TutorChat] Generation failed. Returning fallback reply.', error);
             reply = buildFallbackReply(latestUserMessage, translationMode);
@@ -474,7 +474,10 @@ export async function POST(request: NextRequest) {
             reply = buildFallbackReply(latestUserMessage, translationMode);
         }
 
-        return NextResponse.json({ reply: normalizeTutorReply(reply) });
+        return NextResponse.json({
+            reply: normalizeTutorReply(reply),
+            ...(modelContent ? { modelContent } : {}),
+        });
     } catch (error) {
         console.error('[TutorChat] Failed:', error);
         return NextResponse.json({ error: 'Failed to generate tutor response' }, { status: 500 });

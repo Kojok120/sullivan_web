@@ -1,0 +1,67 @@
+name: Deploy Discord Alert Relay (PRODUCTION)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ops/discord-alert-relay/**'
+      - '.github/workflows/deploy-discord-alert-relay-production.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-discord-alert-relay-production
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "20"
+  GCP_REGION: asia-northeast1
+  RELAY_SERVICE_NAME: discord-alert-relay-production
+  RELAY_RUNTIME_SERVICE_ACCOUNT: discord-alert-relay-sa
+  DISCORD_ALERT_SECRET_NAME: discord-alert-webhook-url-production
+
+jobs:
+  deploy:
+    name: Deploy Discord Alert Relay (PRODUCTION)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: チェックアウト
+        uses: actions/checkout@v4
+
+      - name: Node.js セットアップ
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: 依存関係インストール
+        run: npm ci
+
+      - name: relay テスト
+        run: npx vitest run tests/discord-alert-relay.test.ts
+
+      - name: GCP 認証 (Workload Identity Federation)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: gcloud CLI セットアップ
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Cloud Run function デプロイ
+        run: |
+          gcloud run deploy "${{ env.RELAY_SERVICE_NAME }}" \
+            --project "${{ secrets.GCP_PROJECT_ID }}" \
+            --region "${{ env.GCP_REGION }}" \
+            --source ops/discord-alert-relay \
+            --function monitoringAlertToDiscord \
+            --base-image nodejs20 \
+            --service-account "${{ env.RELAY_RUNTIME_SERVICE_ACCOUNT }}@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com" \
+            --no-allow-unauthenticated \
+            --update-secrets "DISCORD_ALERT_WEBHOOK_URL=${{ env.DISCORD_ALERT_SECRET_NAME }}:latest"
