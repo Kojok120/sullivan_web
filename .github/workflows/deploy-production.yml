@@ -268,20 +268,27 @@ jobs:
         if: steps.webhook.outputs.enabled == 'true'
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_ERROR_MENTION: ${{ secrets.DISCORD_ERROR_MENTION }}
           MIGRATE_RESULT: ${{ needs.migrate-db.result }}
           WORKER_RESULT: ${{ needs.deploy-grading-worker.result }}
           WEB_RESULT: ${{ needs.deploy-web.result }}
         run: |
           STATUS="成功"
+          MENTION_PREFIX=""
+          ALLOWED_MENTIONS='{"parse":[]}'
           if [ "$MIGRATE_RESULT" != "success" ] || [ "$WORKER_RESULT" != "success" ] || [ "$WEB_RESULT" != "success" ]; then
             STATUS="失敗"
+            if [ -n "$DISCORD_ERROR_MENTION" ]; then
+              MENTION_PREFIX="$(printf '%s\n' "$DISCORD_ERROR_MENTION")"
+              ALLOWED_MENTIONS='{"parse":["users","roles"]}'
+            fi
           fi
 
           SHORT_SHA="$(printf '%s' "$GITHUB_SHA" | cut -c1-7)"
           RUN_URL="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           COMMIT_URL="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}"
 
-          MESSAGE="$(printf '%s\n' \
+          MESSAGE_BODY="$(printf '%s\n' \
             "[Sullivan] production デプロイ${STATUS}" \
             "repo: ${GITHUB_REPOSITORY}" \
             "branch: ${GITHUB_REF_NAME}" \
@@ -292,5 +299,14 @@ jobs:
             "db: ${MIGRATE_RESULT}" \
             "run: ${RUN_URL}")"
 
-          PAYLOAD="$(jq -nc --arg content "$MESSAGE" '{content: $content}')"
+          if [ -n "$MENTION_PREFIX" ]; then
+            MESSAGE="$(printf '%s\n%s' "$MENTION_PREFIX" "$MESSAGE_BODY")"
+          else
+            MESSAGE="$MESSAGE_BODY"
+          fi
+
+          PAYLOAD="$(jq -nc \
+            --arg content "$MESSAGE" \
+            --argjson allowedMentions "$ALLOWED_MENTIONS" \
+            '{content: $content, allowed_mentions: $allowedMentions}')"
           curl -fsS -H "Content-Type: application/json" -d "$PAYLOAD" "$DISCORD_WEBHOOK_URL"

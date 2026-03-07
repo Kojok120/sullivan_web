@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+    buildDiscordPayload,
     buildDiscordMessage,
     MAX_DISCORD_CONTENT_LENGTH,
     monitoringAlertToDiscord,
@@ -49,6 +50,7 @@ describe('discord-alert-relay', () => {
             {
                 fetchImpl,
                 webhookUrl: 'https://discord.example/webhook',
+                mention: '<@&1234567890>',
                 logger,
             },
         );
@@ -64,7 +66,8 @@ describe('discord-alert-relay', () => {
         );
 
         const body = JSON.parse(fetchImpl.mock.calls[0][1].body);
-        expect(body.allowed_mentions).toEqual({ parse: [] });
+        expect(body.allowed_mentions).toEqual({ parse: ['users', 'roles'] });
+        expect(body.content).toContain('<@&1234567890>');
         expect(body.content).toContain('[Sullivan Alert][OPEN] Sullivan Web Production Error Logs');
         expect(body.content).toContain('service: sullivan-app-production');
         expect(body.content).toContain('summary: Web request failed');
@@ -82,6 +85,23 @@ describe('discord-alert-relay', () => {
 
         expect(content).toContain('[Sullivan Alert][CLOSED] Sullivan Web Production Error Logs');
         expect(content).toContain('summary: Service recovered');
+    });
+
+    it('CLOSED incident はメンションしない payload にする', () => {
+        const payload = buildDiscordPayload(
+            buildDiscordMessage(
+                createIncident({
+                    state: 'closed',
+                }),
+            ),
+            {
+                mention: '<@&1234567890>',
+                enableMention: false,
+            },
+        );
+
+        expect(payload.allowed_mentions).toEqual({ parse: [] });
+        expect(payload.content).not.toContain('<@&1234567890>');
     });
 
     it('service_name がない場合は fallback を使う', () => {
@@ -130,5 +150,24 @@ describe('discord-alert-relay', () => {
         expect(result).toEqual({ skipped: true });
         expect(fetchImpl).not.toHaveBeenCalled();
         expect(logger.error).toHaveBeenCalledTimes(1);
+    });
+
+    it('メンション設定が空なら OPEN incident でもメンションしない', async () => {
+        const fetchImpl = vi.fn().mockResolvedValue(new Response('', { status: 200 }));
+        const logger = createLogger();
+
+        await monitoringAlertToDiscord(
+            createCloudEvent({ incident: createIncident() }),
+            {
+                fetchImpl,
+                webhookUrl: 'https://discord.example/webhook',
+                mention: '',
+                logger,
+            },
+        );
+
+        const body = JSON.parse(fetchImpl.mock.calls[0][1].body);
+        expect(body.allowed_mentions).toEqual({ parse: [] });
+        expect(body.content).not.toContain('<@&');
     });
 });

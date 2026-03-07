@@ -64,4 +64,5 @@ jobs:
             --base-image nodejs20 \
             --service-account "${{ env.RELAY_RUNTIME_SERVICE_ACCOUNT }}@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com" \
             --no-allow-unauthenticated \
+            --set-env-vars "DISCORD_ERROR_MENTION=${{ secrets.DISCORD_ERROR_MENTION }}" \
             --update-secrets "DISCORD_ALERT_WEBHOOK_URL=${{ env.DISCORD_ALERT_SECRET_NAME }}:latest"
