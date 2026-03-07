@@ -17,6 +17,11 @@ function normalizeInlineText(value) {
     return value.replace(/\s+/g, ' ').trim();
 }
 
+function shouldMentionIncident(incident) {
+    const state = normalizeInlineText(incident?.state).toUpperCase();
+    return state !== 'CLOSED';
+}
+
 export function parseMonitoringPayload(event, logger = console) {
     if (event && typeof event === 'object' && event.incident && typeof event.incident === 'object') {
         return event;
@@ -94,8 +99,28 @@ export function buildDiscordMessage(incident) {
     return truncateText(lines.join('\n'), MAX_DISCORD_CONTENT_LENGTH);
 }
 
-export async function sendDiscordNotification(
+export function buildDiscordPayload(
     content,
+    {
+        mention = process.env.DISCORD_ERROR_MENTION,
+        enableMention = false,
+    } = {},
+) {
+    const normalizedMention = normalizeInlineText(mention);
+    const shouldMention = enableMention && normalizedMention.length > 0;
+
+    const finalContent = shouldMention ? `${normalizedMention}\n${content}` : content;
+
+    return {
+        content: truncateText(finalContent, MAX_DISCORD_CONTENT_LENGTH),
+        allowed_mentions: shouldMention
+            ? { parse: ['users', 'roles'] }
+            : { parse: [] },
+    };
+}
+
+export async function sendDiscordNotification(
+    payload,
     {
         fetchImpl = globalThis.fetch,
         webhookUrl = process.env.DISCORD_ALERT_WEBHOOK_URL,
@@ -114,10 +139,7 @@ export async function sendDiscordNotification(
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-            content,
-            allowed_mentions: { parse: [] },
-        }),
+        body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
@@ -143,7 +165,12 @@ export async function monitoringAlertToDiscord(event, options = {}) {
     }
 
     const content = buildDiscordMessage(incident);
-    await sendDiscordNotification(content, {
+    const payloadForDiscord = buildDiscordPayload(content, {
+        mention: options.mention,
+        enableMention: shouldMentionIncident(incident),
+    });
+
+    await sendDiscordNotification(payloadForDiscord, {
         fetchImpl: options.fetchImpl,
         webhookUrl: options.webhookUrl,
     });
@@ -152,6 +179,6 @@ export async function monitoringAlertToDiscord(event, options = {}) {
 
     return {
         skipped: false,
-        content,
+        content: payloadForDiscord.content,
     };
 }
