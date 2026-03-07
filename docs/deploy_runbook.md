@@ -345,7 +345,7 @@ Cloud Run function の固定値:
 - entrypoint: `monitoringAlertToDiscord`
 - base image: `nodejs20`
 - runtime service account 名: `discord-alert-relay-sa`
-- Eventarc trigger service account 名: `eventarc-discord-alert-relay-sa`
+- Eventarc trigger service account 名: `eventarc-discord-relay-sa`
 - Pub/Sub topic 名: `monitoring-alerts-production`
 - notification channel 表示名: `Production Alerts PubSub`
 
@@ -360,7 +360,7 @@ export REGION="asia-northeast1"
 export ALERT_TOPIC="monitoring-alerts-production"
 export RELAY_SERVICE="discord-alert-relay-production"
 export RELAY_RUNTIME_SA="discord-alert-relay-sa"
-export RELAY_TRIGGER_SA="eventarc-discord-alert-relay-sa"
+export RELAY_TRIGGER_SA="eventarc-discord-relay-sa"
 export ALERT_SECRET="discord-alert-webhook-url-production"
 
 export WIF_DEPLOYER_SA="<GitHub Actionsで使っているWIF_SERVICE_ACCOUNTのメールアドレス>"
@@ -516,7 +516,7 @@ npx vitest run tests/discord-alert-relay.test.ts
 - GitHub Actions の deploy が失敗する
   - `discord-alert-relay-sa@<PROJECT_ID>.iam.gserviceaccount.com` が未作成か、`roles/iam.serviceAccountUser` が WIF deployer に付与されていない可能性があります
 - Eventarc trigger は作れたが Discord に届かない
-  - `roles/run.invoker` が `eventarc-discord-alert-relay-sa` に付与されているか確認します
+  - `roles/run.invoker` が `eventarc-discord-relay-sa` に付与されているか確認します
   - trigger 作成直後は伝播まで数分かかることがあります
 - Alert policy は発火しているのに relay が呼ばれない
   - `service-${PROJECT_NUMBER}@gcp-sa-monitoring-notification.iam.gserviceaccount.com` に `roles/pubsub.publisher` が topic 単位で付いているか確認します
