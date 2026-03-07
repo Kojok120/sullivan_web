@@ -242,3 +242,55 @@ jobs:
 
       - name: Prisma マイグレーション実行
         run: npx prisma migrate deploy
+
+  notify-discord:
+    name: Discord 通知 (PRODUCTION)
+    runs-on: ubuntu-latest
+    needs: [migrate-db, deploy-grading-worker, deploy-web]
+    if: always()
+    environment: production
+
+    steps:
+      - name: Discord Webhook 設定確認
+        id: webhook
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "::warning::DISCORD_WEBHOOK_URL が未設定のため、Discord 通知をスキップします。"
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+
+      - name: Discord に通知
+        if: steps.webhook.outputs.enabled == 'true'
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          MIGRATE_RESULT: ${{ needs.migrate-db.result }}
+          WORKER_RESULT: ${{ needs.deploy-grading-worker.result }}
+          WEB_RESULT: ${{ needs.deploy-web.result }}
+        run: |
+          STATUS="成功"
+          if [ "$MIGRATE_RESULT" != "success" ] || [ "$WORKER_RESULT" != "success" ] || [ "$WEB_RESULT" != "success" ]; then
+            STATUS="失敗"
+          fi
+
+          SHORT_SHA="$(printf '%s' "$GITHUB_SHA" | cut -c1-7)"
+          RUN_URL="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          COMMIT_URL="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}"
+
+          MESSAGE="$(printf '%s\n' \
+            "[Sullivan] production デプロイ${STATUS}" \
+            "repo: ${GITHUB_REPOSITORY}" \
+            "branch: ${GITHUB_REF_NAME}" \
+            "actor: ${GITHUB_ACTOR}" \
+            "commit: ${SHORT_SHA} ${COMMIT_URL}" \
+            "web: ${WEB_RESULT}" \
+            "worker: ${WORKER_RESULT}" \
+            "db: ${MIGRATE_RESULT}" \
+            "run: ${RUN_URL}")"
+
+          PAYLOAD="$(jq -nc --arg content "$MESSAGE" '{content: $content}')"
+          curl -fsS -H "Content-Type: application/json" -d "$PAYLOAD" "$DISCORD_WEBHOOK_URL"

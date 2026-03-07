@@ -322,7 +322,209 @@ gcloud scheduler jobs update http sullivan-drive-watch-renew \
 
 ---
 
-## 8. 参考リンク（Web Search）
+## 8. Production監視通知（Pub/Sub + Cloud Run function）
+
+production のデプロイ通知と、Cloud Run エラー通知は保存先を分けます。
+
+- GitHub Actions のデプロイ通知:
+  - GitHub `production` environment secret の `DISCORD_WEBHOOK_URL`
+- GCP Monitoring のアラート通知:
+  - Secret Manager の `discord-alert-webhook-url-production`
+  - Cloud Run function の環境変数 `DISCORD_ALERT_WEBHOOK_URL` に注入
+
+### 8.1 repo 側の実装内容
+- `ops/discord-alert-relay/`
+  - Pub/Sub 経由の Monitoring incident を受けて Discord に転送する Cloud Run function
+- `.github/workflows/deploy-discord-alert-relay-production.yml`
+  - `main` への push か手動実行で relay をデプロイ
+- `tests/discord-alert-relay.test.ts`
+  - payload デコードと Discord メッセージ整形のテスト
+
+Cloud Run function の固定値:
+- service 名: `discord-alert-relay-production`
+- entrypoint: `monitoringAlertToDiscord`
+- base image: `nodejs20`
+- runtime service account 名: `discord-alert-relay-sa`
+- Eventarc trigger service account 名: `eventarc-discord-alert-relay-sa`
+- Pub/Sub topic 名: `monitoring-alerts-production`
+- notification channel 表示名: `Production Alerts PubSub`
+
+### 8.2 GCP の one-time setup
+以下は手動設定です。
+
+```bash
+export PROJECT_ID="<GCP_PROJECT_ID>"
+export PROJECT_NUMBER="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')"
+export REGION="asia-northeast1"
+
+export ALERT_TOPIC="monitoring-alerts-production"
+export RELAY_SERVICE="discord-alert-relay-production"
+export RELAY_RUNTIME_SA="discord-alert-relay-sa"
+export RELAY_TRIGGER_SA="eventarc-discord-alert-relay-sa"
+export ALERT_SECRET="discord-alert-webhook-url-production"
+
+export WIF_DEPLOYER_SA="<GitHub Actionsで使っているWIF_SERVICE_ACCOUNTのメールアドレス>"
+```
+
+1. Discord にアラート専用チャンネルを作成し、webhook URL を発行する
+2. 必要 API を有効化する
+
+```bash
+gcloud services enable \
+  run.googleapis.com \
+  cloudbuild.googleapis.com \
+  artifactregistry.googleapis.com \
+  eventarc.googleapis.com \
+  pubsub.googleapis.com \
+  monitoring.googleapis.com \
+  logging.googleapis.com \
+  secretmanager.googleapis.com \
+  --project "$PROJECT_ID"
+```
+
+3. Pub/Sub topic を作成する
+
+```bash
+gcloud pubsub topics create "$ALERT_TOPIC" --project "$PROJECT_ID"
+```
+
+4. Discord webhook URL を Secret Manager に保存する
+
+```bash
+printf '%s' 'https://discord.com/api/webhooks/...' | \
+gcloud secrets create "$ALERT_SECRET" \
+  --replication-policy="automatic" \
+  --data-file=- \
+  --project "$PROJECT_ID"
+```
+
+既に secret がある場合は、次で version を追加します。
+
+```bash
+printf '%s' 'https://discord.com/api/webhooks/...' | \
+gcloud secrets versions add "$ALERT_SECRET" \
+  --data-file=- \
+  --project "$PROJECT_ID"
+```
+
+5. runtime service account を作成し、secret 読み取り権限を付与する
+
+```bash
+gcloud iam service-accounts create "$RELAY_RUNTIME_SA" --project "$PROJECT_ID"
+
+gcloud secrets add-iam-policy-binding "$ALERT_SECRET" \
+  --member="serviceAccount:${RELAY_RUNTIME_SA}@${PROJECT_ID}.iam.gserviceaccount.com" \
+  --role="roles/secretmanager.secretAccessor" \
+  --project "$PROJECT_ID"
+```
+
+6. GitHub Actions の deployer に runtime service account の指定権限を付与する
+
+```bash
+gcloud iam service-accounts add-iam-policy-binding \
+  "${RELAY_RUNTIME_SA}@${PROJECT_ID}.iam.gserviceaccount.com" \
+  --member="serviceAccount:${WIF_DEPLOYER_SA}" \
+  --role="roles/iam.serviceAccountUser" \
+  --project "$PROJECT_ID"
+```
+
+7. Eventarc trigger 用 service account を作成し、Eventarc 受信権限を付与する
+
+```bash
+gcloud iam service-accounts create "$RELAY_TRIGGER_SA" --project "$PROJECT_ID"
+
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:${RELAY_TRIGGER_SA}@${PROJECT_ID}.iam.gserviceaccount.com" \
+  --role="roles/eventarc.eventReceiver"
+```
+
+8. repo 側の変更を `main` に入れたあと、GitHub Actions の `Deploy Discord Alert Relay (PRODUCTION)` を 1 回実行して relay をデプロイする
+
+9. relay への invoke 権限を Eventarc trigger service account に付与する
+
+```bash
+gcloud run services add-iam-policy-binding "$RELAY_SERVICE" \
+  --region "$REGION" \
+  --member="serviceAccount:${RELAY_TRIGGER_SA}@${PROJECT_ID}.iam.gserviceaccount.com" \
+  --role="roles/run.invoker" \
+  --project "$PROJECT_ID"
+```
+
+10. Eventarc trigger を作成する
+
+```bash
+gcloud eventarc triggers create discord-alert-relay-production \
+  --location="$REGION" \
+  --destination-run-service="$RELAY_SERVICE" \
+  --destination-run-region="$REGION" \
+  --event-filters="type=google.cloud.pubsub.topic.v1.messagePublished" \
+  --transport-topic="projects/${PROJECT_ID}/topics/${ALERT_TOPIC}" \
+  --service-account="${RELAY_TRIGGER_SA}@${PROJECT_ID}.iam.gserviceaccount.com" \
+  --project "$PROJECT_ID"
+```
+
+11. Monitoring の Pub/Sub notification channel を作成する
+- Console で `Monitoring > Alerting > Edit notification channels > Pub/Sub > Add new`
+- Topic に `projects/<PROJECT_ID>/topics/monitoring-alerts-production` を指定
+- 表示名は `Production Alerts PubSub`
+
+12. Monitoring notification service account に `Pub/Sub Publisher` を付与する
+
+```bash
+gcloud pubsub topics add-iam-policy-binding "$ALERT_TOPIC" \
+  --member="serviceAccount:service-${PROJECT_NUMBER}@gcp-sa-monitoring-notification.iam.gserviceaccount.com" \
+  --role="roles/pubsub.publisher" \
+  --project "$PROJECT_ID"
+```
+
+13. Logs Explorer から log-based alert policy を 2 本作成する
+- alert policy 名: `Sullivan Web Production Error Logs`
+  - `resource.type="cloud_run_revision"`
+  - `resource.labels.service_name="sullivan-app-production"`
+  - `severity>=ERROR`
+- alert policy 名: `Sullivan Worker Production Error Logs`
+  - `resource.type="cloud_run_revision"`
+  - `resource.labels.service_name="sullivan-grading-worker-production"`
+  - `severity>=ERROR`
+- 共通設定:
+  - Notification channel は `Production Alerts PubSub`
+  - `Minimum time between notifications` は `5 minutes`
+  - 通知文書には Cloud Run Logs へのリンクと一次切り分けメモを入れる
+
+### 8.3 動作確認
+relay 単体の疎通確認:
+
+```bash
+TEST_PAYLOAD='{"version":"1.2","incident":{"state":"open","policy_name":"manual test","summary":"manual Pub/Sub test","url":"https://console.cloud.google.com/","resource":{"labels":{"service_name":"sullivan-app-production"}}}}'
+
+gcloud pubsub topics publish "$ALERT_TOPIC" \
+  --message="$TEST_PAYLOAD" \
+  --project "$PROJECT_ID"
+```
+
+期待結果:
+- Discord のアラート用チャンネルに 1 件届く
+- Cloud Run `discord-alert-relay-production` のログにエラーが出ない
+
+relay のローカルテスト:
+
+```bash
+npx vitest run tests/discord-alert-relay.test.ts
+```
+
+### 8.4 トラブルシュート
+- GitHub Actions の deploy が失敗する
+  - `discord-alert-relay-sa@<PROJECT_ID>.iam.gserviceaccount.com` が未作成か、`roles/iam.serviceAccountUser` が WIF deployer に付与されていない可能性があります
+- Eventarc trigger は作れたが Discord に届かない
+  - `roles/run.invoker` が `eventarc-discord-alert-relay-sa` に付与されているか確認します
+  - trigger 作成直後は伝播まで数分かかることがあります
+- Alert policy は発火しているのに relay が呼ばれない
+  - `service-${PROJECT_NUMBER}@gcp-sa-monitoring-notification.iam.gserviceaccount.com` に `roles/pubsub.publisher` が topic 単位で付いているか確認します
+- relay が Discord へ投げるところで失敗する
+  - Secret Manager の `discord-alert-webhook-url-production` の値を確認します
+  - Discord 側で webhook が削除・再生成されていないか確認します
+
+## 9. 参考リンク（Web Search）
 - Cloud Run: デプロイ/環境変数/シークレット  
   https://docs.cloud.google.com/run/docs/deploying-source-code  
   https://docs.cloud.google.com/run/docs/configuring/services/environment-variables  
