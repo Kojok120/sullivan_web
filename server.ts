@@ -161,26 +161,25 @@ server.on('upgrade', (req, socket, head) => {
     });
 });
 
-console.log(`[Server] Booting HTTP server on ${hostname}:${port} (dev=${dev}) ...`);
-server.listen(port, hostname, () => {
-    console.log(`[Server] Listening on http://${hostname}:${port}`);
-});
-
 console.log(`[Server] Preparing Next app (dev=${dev}) ...`);
 app.prepare().then(() => {
     handle = app.getRequestHandler();
     handleUpgrade = app.getUpgradeHandler();
     isPrepared = true;
     console.log('[Server] Next app prepared');
-    console.log(`> Ready on http://${hostname}:${port}`);
+    console.log(`[Server] Booting HTTP server on ${hostname}:${port} (dev=${dev}) ...`);
+    server.listen(port, hostname, () => {
+        console.log(`[Server] Listening on http://${hostname}:${port}`);
+        console.log(`> Ready on http://${hostname}:${port}`);
 
-    void warmupPdfBrowser()
-        .then(() => {
-            console.log('[Server] PDF browser warmup completed');
-        })
-        .catch((error) => {
-            console.warn('[Server] PDF browser warmup failed:', error);
-        });
+        void warmupPdfBrowser()
+            .then(() => {
+                console.log('[Server] PDF browser warmup completed');
+            })
+            .catch((error) => {
+                console.warn('[Server] PDF browser warmup failed:', error);
+            });
+    });
 }).catch((err) => {
     preparationError = err instanceof Error ? err.message : 'Unknown startup error';
     console.error('[Server] Failed to prepare Next app:', err);
