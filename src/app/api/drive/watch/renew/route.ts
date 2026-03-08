@@ -19,8 +19,8 @@ const RENEW_THRESHOLD_MS = RENEW_THRESHOLD_HOURS * 60 * 60 * 1000;
 
 /**
  * POST /api/drive/watch/renew
- * Called by Cloud Scheduler every 6 hours to renew the Drive watch.
- * Google Drive watches expire within ~24 hours, so we renew proactively.
+ * Cloud Scheduler から平日 15:30 / 21:30 に呼び出して Drive watch を更新する。
+ * Google Drive の files.watch は約24時間で失効するため、余裕を持って更新する。
  * 閾値は DRIVE_WATCH_RENEW_THRESHOLD_HOURS（既定18時間）で調整可能。
  */
 export async function POST(request: Request) {

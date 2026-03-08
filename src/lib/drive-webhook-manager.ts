@@ -7,6 +7,7 @@ function getDrive() {
 }
 
 const CHANNEL_ID_MAX_LENGTH = 64;
+const FILE_WATCH_DURATION_MS = 24 * 60 * 60 * 1000;
 
 function shouldUseFixedChannelId(): boolean {
     const value = (process.env.DRIVE_WEBHOOK_CHANNEL_ID_FIXED || '').toLowerCase();
@@ -48,7 +49,8 @@ async function registerWatch(channelId: string, webhookUrl: string, token?: stri
             type: 'web_hook',
             address: webhookUrl,
             token,
-            expiration: (Date.now() + 604800000).toString() // 7 days (Google Drive Max)
+            // files.watch の有効期限上限は約24時間。
+            expiration: (Date.now() + FILE_WATCH_DURATION_MS).toString()
         }
     });
 
