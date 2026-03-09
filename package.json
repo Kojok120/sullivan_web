@@ -42,8 +42,6 @@
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.89.0",
     "@types/papaparse": "^5.5.1",
-    "@upstash/qstash": "^2.8.4",
-    "@upstash/redis": "^1.35.7",
     "bcryptjs": "^3.0.3",
     "canvas-confetti": "^1.9.4",
     "class-variance-authority": "^0.7.1",

@@ -76,7 +76,7 @@ Sullivan が解こうとしている中心課題は、次のループです。
 - DB: PostgreSQL + Prisma
 - 認証: Supabase Auth (`@supabase/ssr`)
 - AI: Google Gemini (`@google/genai`)
-- 外部連携: Google Drive API, Upstash QStash, Upstash Redis, Supabase Realtime
+- 外部連携: Google Drive API, Google Cloud Tasks, Supabase Realtime
 - デプロイ: Google Cloud Run (Webサービス + Workerサービス)
 
 ## システム構成（実運用）
@@ -84,11 +84,12 @@ Sullivan が解こうとしている中心課題は、次のループです。
 - `web` サービス
   - Next.js UI/API
   - Drive Webhook受信
-  - QStash へのジョブ発行
+  - Cloud Tasks へのジョブ発行
   - `/ws` で Gemini Live 音声中継
 - `worker` サービス
   - `/api/queue/grading`, `/api/queue/drive-check` を処理
   - 重い採点処理を分離
+  - Cloud Run IAM で保護された private service
 
 ## クイックスタート
 
@@ -134,10 +135,12 @@ npm run test:e2e        # Playwright
 ### 採点/キュー/Drive（運用時）
 
 - `DRIVE_FOLDER_ID`
-- `QSTASH_TOKEN`, `QSTASH_CURRENT_SIGNING_KEY`, `QSTASH_NEXT_SIGNING_KEY`
 - `GRADING_WORKER_URL`
-- `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`
+- `GOOGLE_CLOUD_PROJECT_ID`, `CLOUD_TASKS_LOCATION`
+- `GRADING_TASK_QUEUE`, `DRIVE_CHECK_TASK_QUEUE`
+- `CLOUD_TASKS_CALLER_SERVICE_ACCOUNT`
 - `APP_URL`, `INTERNAL_API_SECRET`, `DRIVE_WEBHOOK_TOKEN`
+- `DRIVE_WATCH_STATE_KEY`, `DRIVE_WATCH_RENEW_THRESHOLD_HOURS`
 
 ### AI音声チューター（任意）
 

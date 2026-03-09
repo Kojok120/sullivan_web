@@ -4,6 +4,7 @@ import {
     CloudRunServiceScalingError,
     parseCloudRunMinInstancesPayload,
     resolveCloudRunServiceTarget,
+    summarizeCloudRunScalingErrorDetails,
     updateCloudRunMinInstances,
 } from '@/lib/cloud-run-service-scaling';
 import { verifyInternalApiAuthorization } from '@/lib/drive-watch-api';
@@ -45,30 +46,33 @@ export async function POST(request: Request) {
 
         return NextResponse.json({
             success: true,
-            projectId: target.projectId,
-            region: target.region,
-            serviceName: target.serviceName,
             reason: payload.reason,
             requestedMinInstances: payload.minInstances,
             appliedMinInstances: result.appliedMinInstances,
+            operationName: result.operationName,
             cloudRunStatus: result.status,
-            details: result.details,
         });
     } catch (error) {
-        console.error('[CloudRunMinInstances] Failed to update service min instances:', error);
-
         if (error instanceof CloudRunServiceScalingError) {
+            console.error('[CloudRunMinInstances] Failed to update service min instances:', {
+                message: error.message,
+                status: error.status,
+                detailSummary: summarizeCloudRunScalingErrorDetails(error.details),
+            });
+
             return NextResponse.json(
                 {
                     success: false,
                     error: error.message,
-                    details: error.details,
                 },
                 { status: error.status },
             );
         }
 
         const message = error instanceof Error ? error.message : 'Unknown error';
+        console.error('[CloudRunMinInstances] Failed to update service min instances:', {
+            message,
+        });
         return NextResponse.json(
             { success: false, error: message },
             { status: 500 },

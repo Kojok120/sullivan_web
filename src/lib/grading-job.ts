@@ -1,5 +1,10 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
+import {
+    DEFAULT_DRIVE_CHECK_TASK_QUEUE,
+    DEFAULT_GRADING_TASK_QUEUE,
+    enqueueCloudTask,
+} from '@/lib/cloud-tasks';
 
 export type ClaimResult = {
   shouldProcess: boolean;
@@ -63,53 +68,29 @@ export async function markGradingJobFailed(fileId: string, message: string): Pro
   });
 }
 
-// ==========================================
-// QStash Helpers
-// ==========================================
-import { Client as QStashClient } from '@upstash/qstash';
+function resolveGradingTaskQueue() {
+  return (process.env.GRADING_TASK_QUEUE || DEFAULT_GRADING_TASK_QUEUE).trim() || DEFAULT_GRADING_TASK_QUEUE;
+}
 
-function resolveWorkerBaseUrl() {
-  // Webサービスへの誤配信を防ぐため、採点ジョブ送信先は専用Workerのみを許可する。
-  const workerUrl = process.env.GRADING_WORKER_URL?.trim();
-  if (!workerUrl) {
-    throw new Error('GRADING_WORKER_URL is missing');
-  }
-  return workerUrl.replace(/\/+$/, '');
+function resolveDriveCheckTaskQueue() {
+  return (process.env.DRIVE_CHECK_TASK_QUEUE || DEFAULT_DRIVE_CHECK_TASK_QUEUE).trim() || DEFAULT_DRIVE_CHECK_TASK_QUEUE;
 }
 
 export async function publishGradingJob(fileId: string, fileName: string): Promise<void> {
-  const token = process.env.QSTASH_TOKEN;
-  const baseUrl = resolveWorkerBaseUrl();
-
-  if (!token) {
-    throw new Error('QStash configuration (QSTASH_TOKEN) is missing');
-  }
-
-  const client = new QStashClient({ token });
-
-  await client.publishJSON({
-    url: `${baseUrl}/api/queue/grading`,
-    body: { fileId, fileName },
-    retries: 3,
+  await enqueueCloudTask({
+    queue: resolveGradingTaskQueue(),
+    path: '/api/queue/grading',
+    payload: { fileId, fileName },
   });
-  console.log(`Published grading job to QStash for ${fileName}`);
+  console.log(`Published grading job to Cloud Tasks for ${fileName}`);
 }
 
 export async function publishDriveCheckJob(source: string, state: string | null, channelId: string | null): Promise<void> {
-  const token = process.env.QSTASH_TOKEN;
-  const baseUrl = resolveWorkerBaseUrl();
-
-  if (!token) {
-    throw new Error('QStash configuration (QSTASH_TOKEN) is missing');
-  }
-
-  const client = new QStashClient({ token });
-
-  await client.publishJSON({
-    url: `${baseUrl}/api/queue/drive-check`,
-    body: { source, state, channelId },
-    delay: "5s", // Wait 5 seconds for Drive API consistency
-    retries: 3,
+  await enqueueCloudTask({
+    queue: resolveDriveCheckTaskQueue(),
+    path: '/api/queue/drive-check',
+    payload: { source, state, channelId },
+    delaySeconds: 5,
   });
-  console.log(`Queued drive check via QStash (from: ${source})`);
+  console.log(`Queued drive check via Cloud Tasks (from: ${source})`);
 }

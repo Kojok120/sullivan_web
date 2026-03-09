@@ -1,11 +1,11 @@
-
 import { NextRequest, NextResponse } from 'next/server';
-import { verifySignatureAppRouter } from '@upstash/qstash/nextjs';
+
 import { isWorkerRuntime } from '@/lib/runtime-utils';
 
-export const maxDuration = 300; // Allow up to 5 minutes for AI grading
+export const dynamic = 'force-dynamic';
+export const maxDuration = 300;
 
-async function handler(req: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
         if (!isWorkerRuntime()) {
             console.error('[API] /api/queue/grading is disabled on non-worker service');
@@ -13,15 +13,13 @@ async function handler(req: NextRequest) {
         }
 
         const body = await req.json();
-        const { fileId, fileName } = body;
+        const fileId = typeof body?.fileId === 'string' ? body.fileId.trim() : '';
+        const fileName = typeof body?.fileName === 'string' ? body.fileName.trim() : '';
 
         if (!fileId || !fileName) {
             return NextResponse.json({ error: 'Missing fileId or fileName' }, { status: 400 });
         }
 
-        console.log(`[API] Received grading job for ${fileName} (${fileId})`);
-
-        // Execute the processing (Long running)
         const { processFile } = await import('@/lib/grading-service');
         await processFile(fileId, fileName);
 
@@ -31,17 +29,3 @@ async function handler(req: NextRequest) {
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
-
-export const dynamic = 'force-dynamic';
-
-export const POST = async (req: NextRequest) => {
-    // 実行時に環境変数をチェックすることで、ビルド時（環境変数がない状態）のエラーを回避
-    if (!process.env.QSTASH_CURRENT_SIGNING_KEY || !process.env.QSTASH_NEXT_SIGNING_KEY) {
-        console.error('[API] QStash signing keys are missing');
-        return NextResponse.json({ error: 'Server Configuration Error' }, { status: 500 });
-    }
-
-    // 遅延してラッパーを生成
-    const wrapped = verifySignatureAppRouter(handler);
-    return wrapped(req);
-};

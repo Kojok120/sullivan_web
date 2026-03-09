@@ -3,8 +3,11 @@ config();
 
 import type { IncomingMessage, ServerResponse } from 'http';
 import { createServer } from 'http';
-import { Receiver } from '@upstash/qstash';
 import { parse } from 'url';
+import {
+    hasValidInternalApiSecret,
+    INTERNAL_API_SECRET_HEADER_NAME,
+} from '../src/lib/internal-api-auth';
 
 const hostname = process.env.BIND_HOST || '0.0.0.0';
 const port = Number.parseInt(process.env.PORT || '8080', 10);
@@ -55,41 +58,6 @@ function readRawBody(req: IncomingMessage, maxBytes = MAX_QUEUE_BODY_BYTES): Pro
     });
 }
 
-function buildRequestUrl(req: IncomingMessage) {
-    const host = getSingleHeader(req.headers.host);
-    if (!host) return undefined;
-    const proto = getSingleHeader(req.headers['x-forwarded-proto']) || 'https';
-    return `${proto}://${host}${req.url || ''}`;
-}
-
-async function verifyQueueSignature(req: IncomingMessage, rawBody: string) {
-    const currentSigningKey = process.env.QSTASH_CURRENT_SIGNING_KEY;
-    const nextSigningKey = process.env.QSTASH_NEXT_SIGNING_KEY;
-    const signature = getSingleHeader(req.headers['upstash-signature']);
-
-    if (!currentSigningKey || !nextSigningKey) {
-        console.error('[Worker] Missing QStash signing keys');
-        return false;
-    }
-    if (!signature) {
-        console.warn('[Worker] Missing upstash-signature header');
-        return false;
-    }
-
-    const receiver = new Receiver({ currentSigningKey, nextSigningKey });
-
-    try {
-        return await receiver.verify({
-            signature,
-            body: rawBody,
-            url: buildRequestUrl(req),
-        });
-    } catch (error) {
-        console.error('[Worker] Failed to verify QStash signature:', error);
-        return false;
-    }
-}
-
 async function handleGrading(rawBody: string, res: ServerResponse) {
     let payload: unknown;
     try {
@@ -113,24 +81,47 @@ async function handleGrading(rawBody: string, res: ServerResponse) {
     sendJson(res, 200, { success: true });
 }
 
-async function handleDriveCheck(res: ServerResponse) {
+async function handleDriveCheck(rawBody: string, res: ServerResponse) {
+    let reason = 'cloud-tasks';
+    if (rawBody.trim()) {
+        let payload: unknown;
+        try {
+            payload = JSON.parse(rawBody);
+        } catch {
+            sendJson(res, 400, { error: 'Invalid JSON body' });
+            return;
+        }
+
+        const data = payload as { source?: unknown; state?: unknown; channelId?: unknown };
+        const source = typeof data.source === 'string' ? data.source.trim() : '';
+        const state = typeof data.state === 'string' ? data.state.trim() : null;
+        const channelId = typeof data.channelId === 'string' ? data.channelId.trim() : null;
+        if (source) {
+            reason = `cloud-tasks:${source}`;
+        }
+
+        console.log(
+            `[Worker] Received drive check task. source=${source || 'unknown'} state=${state || 'null'} channelId=${channelId || 'null'}`,
+        );
+    }
+
     const { secureDriveCheck } = await import('../src/lib/grading-service');
-    await secureDriveCheck('webhook-qstash-queue');
+    await secureDriveCheck(reason);
     sendJson(res, 200, { success: true });
 }
 
 async function handleManualDriveCheck(req: IncomingMessage, res: ServerResponse) {
-    const expectedSecret = process.env.INTERNAL_API_SECRET;
     const authHeader = getSingleHeader(req.headers.authorization);
+    const secretHeader = getSingleHeader(req.headers[INTERNAL_API_SECRET_HEADER_NAME]);
 
-    if (!expectedSecret || authHeader !== `Bearer ${expectedSecret}`) {
+    if (!hasValidInternalApiSecret(secretHeader, authHeader, process.env.INTERNAL_API_SECRET)) {
         sendJson(res, 401, { error: 'Unauthorized' });
         return;
     }
 
     const { acquireGradingLock, releaseGradingLock } = await import('../src/lib/grading-lock');
-    const lockAcquired = await acquireGradingLock();
-    if (!lockAcquired) {
+    const lockLease = await acquireGradingLock();
+    if (!lockLease) {
         sendJson(res, 429, { success: false, message: 'Processing in progress' });
         return;
     }
@@ -140,7 +131,73 @@ async function handleManualDriveCheck(req: IncomingMessage, res: ServerResponse)
         await checkDriveForNewFiles();
         sendJson(res, 200, { success: true, message: 'Drive check completed' });
     } finally {
-        await releaseGradingLock();
+        await releaseGradingLock(lockLease);
+    }
+}
+
+async function handleCloudRunMinInstances(rawBody: string, req: IncomingMessage, res: ServerResponse) {
+    const authHeader = getSingleHeader(req.headers.authorization);
+    const secretHeader = getSingleHeader(req.headers[INTERNAL_API_SECRET_HEADER_NAME]);
+
+    if (!hasValidInternalApiSecret(secretHeader, authHeader, process.env.INTERNAL_API_SECRET)) {
+        sendJson(res, 401, { error: 'Unauthorized' });
+        return;
+    }
+
+    let requestBody: unknown;
+    try {
+        requestBody = JSON.parse(rawBody);
+    } catch {
+        sendJson(res, 400, { success: false, error: 'Invalid JSON body' });
+        return;
+    }
+
+    const {
+        CloudRunServiceScalingError,
+        parseCloudRunMinInstancesPayload,
+        resolveCloudRunServiceTarget,
+        summarizeCloudRunScalingErrorDetails,
+        updateCloudRunMinInstances,
+    } = await import('../src/lib/cloud-run-service-scaling');
+
+    const payload = parseCloudRunMinInstancesPayload(requestBody);
+    if (!payload) {
+        sendJson(res, 400, { success: false, error: 'Invalid request body' });
+        return;
+    }
+
+    try {
+        const target = resolveCloudRunServiceTarget();
+        const result = await updateCloudRunMinInstances(target, payload);
+
+        sendJson(res, 200, {
+            success: true,
+            reason: payload.reason,
+            requestedMinInstances: payload.minInstances,
+            appliedMinInstances: result.appliedMinInstances,
+            operationName: result.operationName,
+            cloudRunStatus: result.status,
+        });
+    } catch (error) {
+        if (error instanceof CloudRunServiceScalingError) {
+            console.error('[CloudRunMinInstances] Failed to update worker service min instances:', {
+                message: error.message,
+                status: error.status,
+                detailSummary: summarizeCloudRunScalingErrorDetails(error.details),
+            });
+
+            sendJson(res, error.status, {
+                success: false,
+                error: error.message,
+            });
+            return;
+        }
+
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        console.error('[CloudRunMinInstances] Failed to update worker service min instances:', {
+            message,
+        });
+        sendJson(res, 500, { success: false, error: message });
     }
 }
 
@@ -161,23 +218,24 @@ const server = createServer(async (req, res) => {
             return;
         }
 
+        if (method === 'POST' && pathname === '/api/internal/cloud-run/min-instances') {
+            const rawBody = await readRawBody(req);
+            await handleCloudRunMinInstances(rawBody, req, res);
+            return;
+        }
+
         if (
             method === 'POST'
             && (pathname === '/api/queue/grading' || pathname === '/api/queue/drive-check')
         ) {
             const rawBody = await readRawBody(req);
-            const verified = await verifyQueueSignature(req, rawBody);
-            if (!verified) {
-                sendJson(res, 401, { error: 'Invalid signature' });
-                return;
-            }
 
             if (pathname === '/api/queue/grading') {
                 await handleGrading(rawBody, res);
                 return;
             }
 
-            await handleDriveCheck(res);
+            await handleDriveCheck(rawBody, res);
             return;
         }
 
