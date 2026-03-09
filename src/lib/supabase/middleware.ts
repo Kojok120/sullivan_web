@@ -1,5 +1,36 @@
 import { createServerClient } from '@supabase/ssr';
+import { AuthApiError } from '@supabase/supabase-js';
 import { NextResponse, type NextRequest } from 'next/server';
+
+function isSupabaseAuthCookieName(name: string) {
+    return name.startsWith('sb-') && name.includes('-auth-token');
+}
+
+function clearSupabaseAuthCookies(request: NextRequest) {
+    const authCookieNames = request.cookies
+        .getAll()
+        .map(({ name }) => name)
+        .filter(isSupabaseAuthCookieName);
+
+    authCookieNames.forEach((name) => {
+        request.cookies.delete(name);
+    });
+
+    const response = NextResponse.next({
+        request,
+    });
+
+    authCookieNames.forEach((name) => {
+        response.cookies.delete(name);
+    });
+
+    return response;
+}
+
+function isRecoverableRefreshTokenError(error: unknown) {
+    return error instanceof AuthApiError
+        && /invalid refresh token|refresh token not found/i.test(error.message);
+}
 
 export async function updateSession(request: NextRequest) {
     let supabaseResponse = NextResponse.next({
@@ -29,9 +60,35 @@ export async function updateSession(request: NextRequest) {
         }
     );
 
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
+    try {
+        const {
+            data: { user },
+            error,
+        } = await supabase.auth.getUser();
 
-    return { supabaseResponse, user, supabase };
+        if (isRecoverableRefreshTokenError(error)) {
+            return {
+                supabaseResponse: clearSupabaseAuthCookies(request),
+                user: null,
+                supabase,
+            };
+        }
+
+        if (error) {
+            throw error;
+        }
+
+        return { supabaseResponse, user, supabase };
+    } catch (error) {
+        // 失効済み refresh token は未ログイン扱いに戻して先へ進める。
+        if (isRecoverableRefreshTokenError(error)) {
+            return {
+                supabaseResponse: clearSupabaseAuthCookies(request),
+                user: null,
+                supabase,
+            };
+        }
+
+        throw error;
+    }
 }

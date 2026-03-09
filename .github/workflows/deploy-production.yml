@@ -203,6 +203,28 @@ jobs:
             "30 15,21 * * 1-5" \
             "${SERVICE_URL}/api/drive/watch/renew?check=1"
 
+      - name: Warm 制御 API 疎通確認
+        env:
+          APP_INTERNAL_SECRET: ${{ secrets.INTERNAL_API_SECRET }}
+        run: |
+          set -euo pipefail
+
+          SERVICE_URL="$(gcloud run services describe sullivan-app-production \
+            --project "${{ secrets.GCP_PROJECT_ID }}" \
+            --region "${{ env.GCP_REGION }}" \
+            --format='value(status.url)')"
+
+          if [ -z "$SERVICE_URL" ]; then
+            echo "Failed to resolve Cloud Run service URL"
+            exit 1
+          fi
+
+          curl --fail --silent --show-error \
+            -X POST "${SERVICE_URL}/api/internal/cloud-run/min-instances" \
+            -H "Authorization: Bearer ${APP_INTERNAL_SECRET}" \
+            -H "Content-Type: application/json" \
+            -d '{"minInstances":0,"reason":"weekday-warm-stop"}' >/dev/null
+
   deploy-grading-worker:
     name: Deploy Grading Worker (PRODUCTION)
     runs-on: ubuntu-latest

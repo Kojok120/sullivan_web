@@ -161,6 +161,13 @@ gcloud run deploy "$SERVICE_NAME" \
   --set-env-vars "GRADING_WORKER_URL=$GRADING_WORKER_URL"
 
 # Cloud Run から自分自身の min instances を更新できるようにする。
+# service を更新するときは、設定済み service account への actAs も必要。
+gcloud iam service-accounts add-iam-policy-binding "$RUNTIME_SA_EMAIL" \
+  --project "$GOOGLE_CLOUD_PROJECT_ID" \
+  --member "serviceAccount:$RUNTIME_SA_EMAIL" \
+  --role "roles/iam.serviceAccountUser" \
+  --quiet >/dev/null
+
 gcloud run services add-iam-policy-binding "$SERVICE_NAME" \
   --project "$GOOGLE_CLOUD_PROJECT_ID" \
   --region "$CLOUD_RUN_REGION" \
@@ -197,3 +204,10 @@ upsert_scheduler_job \
   "$DRIVE_RENEW_JOB_NAME" \
   "30 15,21 * * 1-5" \
   "$DRIVE_RENEW_URL"
+
+# warm 制御 API が deploy 直後に機能することを確認する。
+curl --fail --silent --show-error \
+  -X POST "$SCALING_API_URL" \
+  -H "Authorization: Bearer $INTERNAL_API_SECRET_VALUE" \
+  -H "Content-Type: application/json" \
+  -d '{"minInstances":0,"reason":"weekday-warm-stop"}' >/dev/null
