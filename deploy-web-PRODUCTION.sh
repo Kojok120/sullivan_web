@@ -158,6 +158,7 @@ gcloud run deploy "$SERVICE_NAME" \
   --min 0 \
   --concurrency 4 \
   --timeout 120s \
+  --quiet \
   --allow-unauthenticated \
   --set-env-vars "BIND_HOST=0.0.0.0" \
   --set-build-env-vars "NODE_ENV=production" \
