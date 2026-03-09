@@ -1,78 +1,100 @@
-import { redis } from '@/lib/redis';
+import { randomUUID } from 'crypto';
+
+import { Prisma } from '@prisma/client';
+
+import { prisma } from '@/lib/prisma';
 
 const SCAN_LOCK_KEY = 'sullivan:grading:scan:lock';
 const SCAN_LOCK_TTL_SECONDS = 60;
 const FILE_LOCK_PREFIX = 'sullivan:grading:file:';
 const FILE_LOCK_TTL_SECONDS = 15 * 60;
-const REDIS_RETRY_ATTEMPTS = 3;
-const REDIS_RETRY_BASE_DELAY_MS = 100;
+
+export type GradingLease = {
+    key: string;
+    ownerId: string;
+    expiresAt: Date;
+};
+
+type LockRow = {
+    key: string;
+    ownerId: string;
+    expiresAt: Date;
+};
 
 function fileLockKey(fileId: string) {
-  return `${FILE_LOCK_PREFIX}${fileId}`;
+    return `${FILE_LOCK_PREFIX}${fileId}`;
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+async function acquireLease(key: string, ttlSeconds: number): Promise<GradingLease | null> {
+    const ownerId = randomUUID();
+    const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
+    const rows = await prisma.$queryRaw<LockRow[]>(Prisma.sql`
+        INSERT INTO "distributed_locks" ("key", "owner_id", "expires_at", "created_at", "updated_at")
+        VALUES (${key}, ${ownerId}, ${expiresAt}, NOW(), NOW())
+        ON CONFLICT ("key") DO UPDATE
+        SET
+            "owner_id" = EXCLUDED."owner_id",
+            "expires_at" = EXCLUDED."expires_at",
+            "updated_at" = NOW()
+        WHERE "distributed_locks"."expires_at" <= NOW()
+        RETURNING
+            "key",
+            "owner_id" AS "ownerId",
+            "expires_at" AS "expiresAt"
+    `);
+
+    return rows[0] ?? null;
 }
 
-async function withRedisRetry<T>(actionName: string, operation: () => Promise<T>): Promise<T> {
-  let lastError: unknown = null;
+async function releaseLease(lease: GradingLease): Promise<void> {
+    await prisma.distributedLock.deleteMany({
+        where: {
+            key: lease.key,
+            ownerId: lease.ownerId,
+        },
+    });
+}
 
-  for (let attempt = 1; attempt <= REDIS_RETRY_ATTEMPTS; attempt++) {
-    try {
-      return await operation();
-    } catch (error) {
-      lastError = error;
-      if (attempt < REDIS_RETRY_ATTEMPTS) {
-        await sleep(REDIS_RETRY_BASE_DELAY_MS * attempt);
-      }
-    }
-  }
+async function isLeaseActive(key: string): Promise<boolean> {
+    const lock = await prisma.distributedLock.findUnique({
+        where: { key },
+        select: { expiresAt: true },
+    });
 
-  const message = lastError instanceof Error ? lastError.message : String(lastError);
-  throw new Error(`[GradingLock] ${actionName} failed after ${REDIS_RETRY_ATTEMPTS} attempts: ${message}`);
+    return Boolean(lock && lock.expiresAt.getTime() > Date.now());
 }
 
 /**
- * Attempts to acquire the global scan lock (for Drive polling).
+ * Drive ポーリング全体を直列化するグローバルロック。
  */
-export async function acquireGradingLock(): Promise<boolean> {
-  const result = await withRedisRetry('acquireGradingLock', () => redis.set(SCAN_LOCK_KEY, '1', {
-    nx: true,
-    ex: SCAN_LOCK_TTL_SECONDS,
-  }));
-  return result === 'OK';
+export async function acquireGradingLock(): Promise<GradingLease | null> {
+    return acquireLease(SCAN_LOCK_KEY, SCAN_LOCK_TTL_SECONDS);
 }
 
 /**
- * Releases the global scan lock.
+ * グローバルロックを解放する。
  */
-export async function releaseGradingLock(): Promise<void> {
-  await withRedisRetry('releaseGradingLock', () => redis.del(SCAN_LOCK_KEY));
+export async function releaseGradingLock(lease: GradingLease): Promise<void> {
+    await releaseLease(lease);
 }
 
 /**
- * Attempts to acquire a file-level lock for grading.
+ * 1ファイル単位の採点ロック。
  */
-export async function acquireGradingFileLock(fileId: string): Promise<boolean> {
-  const result = await withRedisRetry('acquireGradingFileLock', () => redis.set(fileLockKey(fileId), '1', {
-    nx: true,
-    ex: FILE_LOCK_TTL_SECONDS,
-  }));
-  return result === 'OK';
+export async function acquireGradingFileLock(fileId: string): Promise<GradingLease | null> {
+    return acquireLease(fileLockKey(fileId), FILE_LOCK_TTL_SECONDS);
 }
 
 /**
- * Releases the file-level grading lock.
+ * ファイル単位ロックを解放する。
  */
-export async function releaseGradingFileLock(fileId: string): Promise<void> {
-  await withRedisRetry('releaseGradingFileLock', () => redis.del(fileLockKey(fileId)));
+export async function releaseGradingFileLock(lease: GradingLease): Promise<void> {
+    await releaseLease(lease);
 }
 
 /**
- * Returns true when the file-level lock exists.
+ * 現在有効なファイルロックが存在するかを返す。
  */
 export async function isGradingFileLocked(fileId: string): Promise<boolean> {
-  const result = await withRedisRetry('isGradingFileLocked', () => redis.exists(fileLockKey(fileId)));
-  return result === 1;
+    return isLeaseActive(fileLockKey(fileId));
 }

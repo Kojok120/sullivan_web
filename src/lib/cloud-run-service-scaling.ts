@@ -14,6 +14,7 @@ type CloudRunServiceTarget = {
 type CloudRunServiceUpdateResult = {
     status: number;
     appliedMinInstances: number | null;
+    operationName: string | null;
     details: unknown;
 };
 
@@ -30,6 +31,26 @@ export class CloudRunServiceScalingError extends Error {
         this.status = status;
         this.details = details;
     }
+}
+
+export function summarizeCloudRunScalingErrorDetails(details: unknown): string | null {
+    if (typeof details === 'string') {
+        return details;
+    }
+
+    if (
+        typeof details === 'object'
+        && details !== null
+        && 'error' in details
+        && typeof details.error === 'object'
+        && details.error !== null
+        && 'message' in details.error
+        && typeof details.error.message === 'string'
+    ) {
+        return details.error.message;
+    }
+
+    return null;
 }
 
 export function parseCloudRunMinInstancesPayload(value: unknown): CloudRunMinInstancesPayload | null {
@@ -83,6 +104,19 @@ async function readResponseDetails(response: Response): Promise<unknown> {
     } catch {
         return text;
     }
+}
+
+function extractOperationName(details: unknown): string | null {
+    if (
+        typeof details === 'object'
+        && details !== null
+        && 'name' in details
+        && typeof details.name === 'string'
+    ) {
+        return details.name;
+    }
+
+    return null;
 }
 
 async function fetchMetadataAccessToken(fetchImpl: typeof fetch): Promise<string> {
@@ -164,6 +198,7 @@ export async function updateCloudRunMinInstances(
     return {
         status: response.status,
         appliedMinInstances,
+        operationName: extractOperationName(details),
         details,
     };
 }

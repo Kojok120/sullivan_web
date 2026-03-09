@@ -10,12 +10,12 @@ export async function POST(request: Request) {
         const channelToken = headers.get('x-goog-channel-token');
         const resourceState = headers.get('x-goog-resource-state');
 
-        // セキュリティ: WebhookのチャンネルIDがRedisに保存されている有効な監視設定と一致するか確認
+        // セキュリティ: WebhookのチャンネルIDがDBに保存されている有効な監視設定と一致するか確認
         const { getWatchState } = await import('@/lib/drive-watch-state');
         const activeState = await getWatchState();
 
         if (!activeState) {
-            console.error('No active watch state found in Redis. Rejecting webhook.');
+            console.error('No active watch state found in DB. Rejecting webhook.');
             return NextResponse.json({ error: 'No Active Watch' }, { status: 401 });
         }
 
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
                 const { publishDriveCheckJob } = await import('@/lib/grading-job');
                 await publishDriveCheckJob('webhook', resourceState, channelId);
             } catch (e) {
-                console.error("QStashキューへの追加に失敗しました:", e);
+                console.error("Cloud Tasks キューへの追加に失敗しました:", e);
                 // キュー登録不可の場合は処理を継続せず、エラーで返して再送を促す
                 return NextResponse.json({ success: false, error: 'Queue mechanism unavailable' }, { status: 503 });
             }

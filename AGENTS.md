@@ -12,7 +12,7 @@ Sullivan は Next.js 16 (App Router) ベースの**学習管理システム（LM
 - **ORM**: Prisma (PostgreSQL)
 - **認証**: Supabase Auth (SSR) — `@supabase/ssr`
 - **AI**: Google Gemini API (`@google/generative-ai`)
-- **外部サービス**: Google Drive API, Upstash QStash/Redis, Supabase Realtime
+- **外部サービス**: Google Drive API, Google Cloud Tasks, Supabase Realtime
 - **デプロイ**: Google Cloud Run (Docker)
 - **CI/CD**: GitHub Actions
 

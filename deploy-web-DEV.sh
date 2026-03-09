@@ -16,18 +16,45 @@ require_env() {
   fi
 }
 
+ensure_gcp_service_enabled() {
+  local service_name="$1"
+  gcloud services enable "$service_name" \
+    --project "$GOOGLE_CLOUD_PROJECT_ID" >/dev/null
+}
+
+upsert_task_queue() {
+  local queue_name="$1"
+
+  local queue_args=(
+    --location "$CLOUD_TASKS_LOCATION"
+    --project "$GOOGLE_CLOUD_PROJECT_ID"
+    --max-attempts 4
+    --max-retry-duration 0s
+    --min-backoff 5s
+    --max-backoff 300s
+    --max-doublings 4
+  )
+
+  if gcloud tasks queues describe "$queue_name" --location "$CLOUD_TASKS_LOCATION" --project "$GOOGLE_CLOUD_PROJECT_ID" >/dev/null 2>&1; then
+    gcloud tasks queues update "$queue_name" "${queue_args[@]}" >/dev/null
+    return 0
+  fi
+
+  gcloud tasks queues create "$queue_name" "${queue_args[@]}" >/dev/null
+}
+
 require_env "NEXT_PUBLIC_SUPABASE_URL"
 require_env "NEXT_PUBLIC_SUPABASE_ANON_KEY"
 require_env "SUPABASE_SERVICE_ROLE_KEY"
 require_env "GEMINI_API_KEY"
 require_env "GRADING_WORKER_URL"
-require_env "QSTASH_TOKEN"
-require_env "QSTASH_CURRENT_SIGNING_KEY"
-require_env "QSTASH_NEXT_SIGNING_KEY"
 
 GEMINI_MODEL="${GEMINI_MODEL:-gemini-3.1-pro-preview}"
 GEMINI_CHAT_MODEL="${GEMINI_CHAT_MODEL:-gemini-3.1-pro-preview}"
 GEMINI_CHAT_FALLBACK_MODEL="${GEMINI_CHAT_FALLBACK_MODEL:-$GEMINI_CHAT_MODEL}"
+CLOUD_TASKS_LOCATION="${CLOUD_TASKS_LOCATION:-asia-northeast1}"
+GRADING_TASK_QUEUE="${GRADING_TASK_QUEUE:-sullivan-grading}"
+DRIVE_CHECK_TASK_QUEUE="${DRIVE_CHECK_TASK_QUEUE:-sullivan-drive-check}"
 
 cat > .env.build <<EOF
 NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
@@ -36,8 +63,16 @@ NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS=${NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS:-500}
 EOF
 
 RUNTIME_SA_EMAIL="${RUNTIME_SA_EMAIL:-sullivan-runtime@${GOOGLE_CLOUD_PROJECT_ID}.iam.gserviceaccount.com}"
+CLOUD_TASKS_CALLER_SERVICE_ACCOUNT="${CLOUD_TASKS_CALLER_SERVICE_ACCOUNT:-$RUNTIME_SA_EMAIL}"
+PROJECT_NUMBER="$(gcloud projects describe "$GOOGLE_CLOUD_PROJECT_ID" --format='value(projectNumber)')"
+CLOUD_TASKS_SERVICE_AGENT="service-${PROJECT_NUMBER}@gcp-sa-cloudtasks.iam.gserviceaccount.com"
 
 echo "Deploying to Project: $GOOGLE_CLOUD_PROJECT_ID"
+
+ensure_gcp_service_enabled "cloudtasks.googleapis.com"
+
+upsert_task_queue "$GRADING_TASK_QUEUE"
+upsert_task_queue "$DRIVE_CHECK_TASK_QUEUE"
 
 # Deploy Command
 gcloud run deploy sullivan-app-dev \
@@ -56,11 +91,6 @@ gcloud run deploy sullivan-app-dev \
   --set-env-vars "NODE_ENV=production" \
   --update-secrets "DATABASE_URL=database-url:latest" \
   --update-secrets "DIRECT_URL=direct-url:latest" \
-  --set-env-vars "QSTASH_TOKEN=$QSTASH_TOKEN" \
-  --set-env-vars "QSTASH_CURRENT_SIGNING_KEY=$QSTASH_CURRENT_SIGNING_KEY" \
-  --set-env-vars "QSTASH_NEXT_SIGNING_KEY=$QSTASH_NEXT_SIGNING_KEY" \
-  --set-env-vars "UPSTASH_REDIS_REST_URL=$UPSTASH_REDIS_REST_URL" \
-  --set-env-vars "UPSTASH_REDIS_REST_TOKEN=$UPSTASH_REDIS_REST_TOKEN" \
   --set-env-vars "GEMINI_API_KEY=$GEMINI_API_KEY" \
   --set-env-vars "GEMINI_MODEL=$GEMINI_MODEL" \
   --set-env-vars "GEMINI_CHAT_MODEL=$GEMINI_CHAT_MODEL" \
@@ -70,6 +100,12 @@ gcloud run deploy sullivan-app-dev \
   --set-env-vars "GEMINI_LIVE_VOICE=${GEMINI_LIVE_VOICE:-Aoede}" \
   --set-env-vars "DRIVE_FOLDER_ID=$DRIVE_FOLDER_ID" \
   --set-env-vars "APP_URL=$APP_URL" \
+  --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=$GOOGLE_CLOUD_PROJECT_ID" \
+  --set-env-vars "CLOUD_TASKS_LOCATION=$CLOUD_TASKS_LOCATION" \
+  --set-env-vars "GRADING_TASK_QUEUE=$GRADING_TASK_QUEUE" \
+  --set-env-vars "DRIVE_CHECK_TASK_QUEUE=$DRIVE_CHECK_TASK_QUEUE" \
+  --set-env-vars "CLOUD_TASKS_CALLER_SERVICE_ACCOUNT=$CLOUD_TASKS_CALLER_SERVICE_ACCOUNT" \
+  --set-env-vars "RUNTIME_SA_EMAIL=$RUNTIME_SA_EMAIL" \
   --set-build-env-vars "NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL" \
   --set-build-env-vars "NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
   --set-build-env-vars "NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS=${NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS:-500}" \
@@ -84,3 +120,19 @@ gcloud run deploy sullivan-app-dev \
   --set-env-vars "DRIVE_WATCH_RENEW_THRESHOLD_HOURS=${DRIVE_WATCH_RENEW_THRESHOLD_HOURS:-18}" \
   --set-env-vars "DRIVE_WATCH_STATE_KEY=${DRIVE_WATCH_STATE_KEY}" \
   --set-env-vars "GRADING_WORKER_URL=$GRADING_WORKER_URL"
+
+gcloud run services update-traffic "sullivan-app-dev" \
+  --project "$GOOGLE_CLOUD_PROJECT_ID" \
+  --region asia-northeast1 \
+  --to-latest >/dev/null
+
+gcloud iam service-accounts add-iam-policy-binding "$CLOUD_TASKS_CALLER_SERVICE_ACCOUNT" \
+  --project "$GOOGLE_CLOUD_PROJECT_ID" \
+  --member "serviceAccount:$CLOUD_TASKS_SERVICE_AGENT" \
+  --role "roles/iam.serviceAccountUser" \
+  --quiet >/dev/null
+
+gcloud projects add-iam-policy-binding "$GOOGLE_CLOUD_PROJECT_ID" \
+  --member "serviceAccount:$RUNTIME_SA_EMAIL" \
+  --role "roles/cloudtasks.enqueuer" \
+  --quiet >/dev/null

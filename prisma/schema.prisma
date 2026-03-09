@@ -315,6 +315,29 @@ model GradingJob {
   @@map("grading_jobs")
 }
 
+model DistributedLock {
+  key       String   @id
+  ownerId   String   @map("owner_id")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([expiresAt])
+  @@map("distributed_locks")
+}
+
+model DriveWatchState {
+  scopeKey   String   @id @map("scope_key")
+  channelId  String   @map("channel_id")
+  resourceId String   @map("resource_id")
+  token      String?
+  expiration DateTime
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("drive_watch_states")
+}
+
 enum SurveyCategory {
   GRIT
   SELF_EFFICACY

@@ -19,7 +19,7 @@
 
 ### 2.2 スキャン/採点
 1. Drive Webhook（`/api/grading/webhook`）または内部チェック（**Workerサービスの** `/api/grading/check`）で `checkDriveForNewFiles` を起動。
-2. `checkDriveForNewFiles` が対象ファイルを抽出し、QStash もしくは同期処理で採点ジョブを実行。
+2. `checkDriveForNewFiles` が対象ファイルを抽出し、Cloud Tasks 経由で採点ジョブを実行。
 3. `processFile` がファイルをダウンロードし、QR解析 + Gemini採点を実施。
 4. 採点結果を保存し、優先度/アンロックを更新、ファイルをアーカイブ、Realtime通知を送出。
 
@@ -89,18 +89,18 @@
 - いずれの形式でも後段の採点処理で「生徒ID × 問題ID群」を復元可能。
 
 ## 6. スキャン/採点ロジック詳細
-実装: `src/lib/grading-service.ts` / `src/app/api/grading/webhook/route.ts` / `src/app/api/queue/grading/route.ts`
+実装: `src/lib/grading-service.ts` / `src/app/api/grading/webhook/route.ts` / `worker/server.ts`
 
 ### 6.1 トリガと排他制御
-- Webhook は `x-goog-channel-id` をRedis保存のWatch stateの `channelId` と照合し、`resourceState=change|update|add` のみ処理。
+- Webhook は `x-goog-channel-id` をDB保存のWatch stateの `channelId` と照合し、`resourceState=change|update|add` のみ処理。
 - 連続呼び出しを 5 秒でデバウンス（`DEBOUNCE_MS = 5000`）。
-- 排他制御は Redis ロック（`sullivan:grading:scan:lock` / `sullivan:grading:file:<fileId>`）で実施（`src/lib/grading-lock.ts`）。
+- 排他制御は Postgres lease（`distributed_locks`）で実施（`src/lib/grading-lock.ts`）。
 - 内部手動チェック用の `/api/grading/check` は **Workerサービス** で受け付け、`INTERNAL_API_SECRET` が必要。
 
 ### 6.2 Driveファイル抽出とジョブ発行
 - `checkDriveForNewFiles` で `DRIVE_FOLDER_ID` 配下の最新ファイルを取得。
 - ファイル名が `[PROCESSED]` / `[ERROR]` で始まるものは対象外。
-- `QSTASH_TOKEN` + `GRADING_WORKER_URL` が必須で、`/api/queue/grading` へ非同期発行する（Webサービスでの同期採点フォールバックは無効）。
+- `GRADING_WORKER_URL` + `GOOGLE_CLOUD_PROJECT_ID` + `CLOUD_TASKS_CALLER_SERVICE_ACCOUNT` が必須で、`/api/queue/grading` へ Cloud Tasks push する（Webサービスでの同期採点フォールバックは無効）。
 
 ### 6.3 ファイル処理
 - Drive からファイルを `/tmp` にストリーム保存。
