@@ -110,6 +110,7 @@ CLOUD_RUN_REGION="asia-northeast1"
 CLOUD_TASKS_LOCATION="${CLOUD_TASKS_LOCATION:-asia-northeast1}"
 SCHEDULER_LOCATION="asia-northeast1"
 SCHEDULER_TIME_ZONE="Asia/Tokyo"
+SKIP_INFRA_SETUP="${SKIP_INFRA_SETUP:-0}"
 SERVICE_NAME="sullivan-app-production"
 WARM_START_JOB_NAME="sullivan-app-warm-start"
 WARM_STOP_JOB_NAME="sullivan-app-warm-stop"
@@ -136,15 +137,14 @@ EOF
 
 RUNTIME_SA_EMAIL="${RUNTIME_SA_EMAIL:-sullivan-runtime@${GOOGLE_CLOUD_PROJECT_ID}.iam.gserviceaccount.com}"
 CLOUD_TASKS_CALLER_SERVICE_ACCOUNT="${CLOUD_TASKS_CALLER_SERVICE_ACCOUNT:-$RUNTIME_SA_EMAIL}"
-PROJECT_NUMBER="$(gcloud projects describe "$GOOGLE_CLOUD_PROJECT_ID" --format='value(projectNumber)')"
-CLOUD_TASKS_SERVICE_AGENT="service-${PROJECT_NUMBER}@gcp-sa-cloudtasks.iam.gserviceaccount.com"
 
 echo "Deploying to Project: $GOOGLE_CLOUD_PROJECT_ID"
 
-ensure_gcp_service_enabled "cloudtasks.googleapis.com"
-
-upsert_task_queue "$GRADING_TASK_QUEUE"
-upsert_task_queue "$DRIVE_CHECK_TASK_QUEUE"
+if [ "$SKIP_INFRA_SETUP" != "1" ]; then
+  ensure_gcp_service_enabled "cloudtasks.googleapis.com"
+  upsert_task_queue "$GRADING_TASK_QUEUE"
+  upsert_task_queue "$DRIVE_CHECK_TASK_QUEUE"
+fi
 
 # Deploy Command
 gcloud run deploy "$SERVICE_NAME" \
@@ -200,65 +200,70 @@ gcloud run services update-traffic "$SERVICE_NAME" \
   --region "$CLOUD_RUN_REGION" \
   --to-latest >/dev/null
 
-gcloud iam service-accounts add-iam-policy-binding "$CLOUD_TASKS_CALLER_SERVICE_ACCOUNT" \
-  --project "$GOOGLE_CLOUD_PROJECT_ID" \
-  --member "serviceAccount:$CLOUD_TASKS_SERVICE_AGENT" \
-  --role "roles/iam.serviceAccountUser" \
-  --quiet >/dev/null
+if [ "$SKIP_INFRA_SETUP" != "1" ]; then
+  PROJECT_NUMBER="$(gcloud projects describe "$GOOGLE_CLOUD_PROJECT_ID" --format='value(projectNumber)')"
+  CLOUD_TASKS_SERVICE_AGENT="service-${PROJECT_NUMBER}@gcp-sa-cloudtasks.iam.gserviceaccount.com"
 
-gcloud projects add-iam-policy-binding "$GOOGLE_CLOUD_PROJECT_ID" \
-  --member "serviceAccount:$RUNTIME_SA_EMAIL" \
-  --role "roles/cloudtasks.enqueuer" \
-  --quiet >/dev/null
+  gcloud iam service-accounts add-iam-policy-binding "$CLOUD_TASKS_CALLER_SERVICE_ACCOUNT" \
+    --project "$GOOGLE_CLOUD_PROJECT_ID" \
+    --member "serviceAccount:$CLOUD_TASKS_SERVICE_AGENT" \
+    --role "roles/iam.serviceAccountUser" \
+    --quiet >/dev/null
 
-# Cloud Run から自分自身の min instances を更新できるようにする。
-# service を更新するときは、設定済み service account への actAs も必要。
-gcloud iam service-accounts add-iam-policy-binding "$RUNTIME_SA_EMAIL" \
-  --project "$GOOGLE_CLOUD_PROJECT_ID" \
-  --member "serviceAccount:$RUNTIME_SA_EMAIL" \
-  --role "roles/iam.serviceAccountUser" \
-  --quiet >/dev/null
+  gcloud projects add-iam-policy-binding "$GOOGLE_CLOUD_PROJECT_ID" \
+    --member "serviceAccount:$RUNTIME_SA_EMAIL" \
+    --role "roles/cloudtasks.enqueuer" \
+    --quiet >/dev/null
 
-gcloud run services add-iam-policy-binding "$SERVICE_NAME" \
-  --project "$GOOGLE_CLOUD_PROJECT_ID" \
-  --region "$CLOUD_RUN_REGION" \
-  --member "serviceAccount:$RUNTIME_SA_EMAIL" \
-  --role "roles/run.admin" \
-  --quiet >/dev/null
+  # Cloud Run から自分自身の min instances を更新できるようにする。
+  # service を更新するときは、設定済み service account への actAs も必要。
+  gcloud iam service-accounts add-iam-policy-binding "$RUNTIME_SA_EMAIL" \
+    --project "$GOOGLE_CLOUD_PROJECT_ID" \
+    --member "serviceAccount:$RUNTIME_SA_EMAIL" \
+    --role "roles/iam.serviceAccountUser" \
+    --quiet >/dev/null
 
-SERVICE_URL="$(gcloud run services describe "$SERVICE_NAME" \
-  --project "$GOOGLE_CLOUD_PROJECT_ID" \
-  --region "$CLOUD_RUN_REGION" \
-  --format='value(status.url)')"
+  gcloud run services add-iam-policy-binding "$SERVICE_NAME" \
+    --project "$GOOGLE_CLOUD_PROJECT_ID" \
+    --region "$CLOUD_RUN_REGION" \
+    --member "serviceAccount:$RUNTIME_SA_EMAIL" \
+    --role "roles/run.admin" \
+    --quiet >/dev/null
 
-if [ -z "$SERVICE_URL" ]; then
-  echo "Failed to resolve Cloud Run service URL"
-  exit 1
+  SERVICE_URL="$(gcloud run services describe "$SERVICE_NAME" \
+    --project "$GOOGLE_CLOUD_PROJECT_ID" \
+    --region "$CLOUD_RUN_REGION" \
+    --format='value(status.url)')"
+
+  if [ -z "$SERVICE_URL" ]; then
+    echo "Failed to resolve Cloud Run service URL"
+    exit 1
+  fi
+
+  SCALING_API_URL="$SERVICE_URL/api/internal/cloud-run/min-instances"
+  DRIVE_RENEW_URL="$SERVICE_URL/api/drive/watch/renew?check=1"
+
+  upsert_scheduler_job \
+    "$WARM_START_JOB_NAME" \
+    "0 15 * * 1-5" \
+    "$SCALING_API_URL" \
+    '{"minInstances":1,"reason":"weekday-warm-start"}'
+
+  upsert_scheduler_job \
+    "$WARM_STOP_JOB_NAME" \
+    "0 22 * * 1-5" \
+    "$SCALING_API_URL" \
+    '{"minInstances":0,"reason":"weekday-warm-stop"}'
+
+  upsert_scheduler_job \
+    "$DRIVE_RENEW_JOB_NAME" \
+    "30 15,21 * * 1-5" \
+    "$DRIVE_RENEW_URL"
+
+  # warm 制御 API が deploy 直後に機能することを確認する。
+  curl --fail --silent --show-error \
+    -X POST "$SCALING_API_URL" \
+    -H "Authorization: Bearer $INTERNAL_API_SECRET_VALUE" \
+    -H "Content-Type: application/json" \
+    -d '{"minInstances":0,"reason":"weekday-warm-stop"}' >/dev/null
 fi
-
-SCALING_API_URL="$SERVICE_URL/api/internal/cloud-run/min-instances"
-DRIVE_RENEW_URL="$SERVICE_URL/api/drive/watch/renew?check=1"
-
-upsert_scheduler_job \
-  "$WARM_START_JOB_NAME" \
-  "0 15 * * 1-5" \
-  "$SCALING_API_URL" \
-  '{"minInstances":1,"reason":"weekday-warm-start"}'
-
-upsert_scheduler_job \
-  "$WARM_STOP_JOB_NAME" \
-  "0 22 * * 1-5" \
-  "$SCALING_API_URL" \
-  '{"minInstances":0,"reason":"weekday-warm-stop"}'
-
-upsert_scheduler_job \
-  "$DRIVE_RENEW_JOB_NAME" \
-  "30 15,21 * * 1-5" \
-  "$DRIVE_RENEW_URL"
-
-# warm 制御 API が deploy 直後に機能することを確認する。
-curl --fail --silent --show-error \
-  -X POST "$SCALING_API_URL" \
-  -H "Authorization: Bearer $INTERNAL_API_SECRET_VALUE" \
-  -H "Content-Type: application/json" \
-  -d '{"minInstances":0,"reason":"weekday-warm-stop"}' >/dev/null

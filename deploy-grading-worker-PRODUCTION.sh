@@ -92,6 +92,7 @@ WARM_START_JOB_NAME="${WARM_START_JOB_NAME:-sullivan-grading-worker-warm-start}"
 WARM_STOP_JOB_NAME="${WARM_STOP_JOB_NAME:-sullivan-grading-worker-warm-stop}"
 WORKER_MIN_INSTANCES="${WORKER_MIN_INSTANCES:-0}"
 WORKER_MAX_INSTANCES="${WORKER_MAX_INSTANCES:-50}"
+SKIP_INFRA_SETUP="${SKIP_INFRA_SETUP:-0}"
 GEMINI_MODEL="${GEMINI_MODEL:-gemini-3.1-pro-preview}"
 GEMINI_CHAT_MODEL="${GEMINI_CHAT_MODEL:-gemini-3.1-pro-preview}"
 GEMINI_CHAT_FALLBACK_MODEL="${GEMINI_CHAT_FALLBACK_MODEL:-$GEMINI_CHAT_MODEL}"
@@ -101,8 +102,6 @@ DRIVE_CHECK_TASK_QUEUE="${DRIVE_CHECK_TASK_QUEUE:-sullivan-drive-check}"
 CLOUD_TASKS_CALLER_SERVICE_ACCOUNT="${CLOUD_TASKS_CALLER_SERVICE_ACCOUNT:-$RUNTIME_SA_EMAIL}"
 WORKER_SCHEDULER_CALLER_SERVICE_ACCOUNT="${WORKER_SCHEDULER_CALLER_SERVICE_ACCOUNT:-$RUNTIME_SA_EMAIL}"
 INTERNAL_API_SECRET_VALUE="$(resolve_secret_value "INTERNAL_API_SECRET" "internal-api-secret")"
-PROJECT_NUMBER="$(gcloud projects describe "$GOOGLE_CLOUD_PROJECT_ID" --format='value(projectNumber)')"
-CLOUD_SCHEDULER_SERVICE_AGENT="service-${PROJECT_NUMBER}@gcp-sa-cloudscheduler.iam.gserviceaccount.com"
 CLOUD_RUN_REGION="${CLOUD_RUN_REGION:-asia-northeast1}"
 
 if [ -z "${GRADING_WORKER_URL:-}" ]; then
@@ -113,7 +112,9 @@ fi
 echo "Deploying grading worker to Project: $GOOGLE_CLOUD_PROJECT_ID"
 echo "Building worker image: $IMAGE_URI"
 
-ensure_gcp_service_enabled "cloudscheduler.googleapis.com"
+if [ "$SKIP_INFRA_SETUP" != "1" ]; then
+  ensure_gcp_service_enabled "cloudscheduler.googleapis.com"
+fi
 
 gcloud builds submit \
   --project "$GOOGLE_CLOUD_PROJECT_ID" \
@@ -159,64 +160,69 @@ gcloud run services update-traffic "$SERVICE_NAME" \
   --region asia-northeast1 \
   --to-latest >/dev/null
 
-gcloud run services add-iam-policy-binding "$SERVICE_NAME" \
-  --project "$GOOGLE_CLOUD_PROJECT_ID" \
-  --region asia-northeast1 \
-  --member "serviceAccount:$CLOUD_TASKS_CALLER_SERVICE_ACCOUNT" \
-  --role "roles/run.invoker" \
-  --quiet >/dev/null
+if [ "$SKIP_INFRA_SETUP" != "1" ]; then
+  PROJECT_NUMBER="$(gcloud projects describe "$GOOGLE_CLOUD_PROJECT_ID" --format='value(projectNumber)')"
+  CLOUD_SCHEDULER_SERVICE_AGENT="service-${PROJECT_NUMBER}@gcp-sa-cloudscheduler.iam.gserviceaccount.com"
 
-gcloud projects add-iam-policy-binding "$GOOGLE_CLOUD_PROJECT_ID" \
-  --member "serviceAccount:$RUNTIME_SA_EMAIL" \
-  --role "roles/cloudtasks.enqueuer" \
-  --quiet >/dev/null
+  gcloud run services add-iam-policy-binding "$SERVICE_NAME" \
+    --project "$GOOGLE_CLOUD_PROJECT_ID" \
+    --region asia-northeast1 \
+    --member "serviceAccount:$CLOUD_TASKS_CALLER_SERVICE_ACCOUNT" \
+    --role "roles/run.invoker" \
+    --quiet >/dev/null
 
-gcloud iam service-accounts add-iam-policy-binding "$RUNTIME_SA_EMAIL" \
-  --project "$GOOGLE_CLOUD_PROJECT_ID" \
-  --member "serviceAccount:$RUNTIME_SA_EMAIL" \
-  --role "roles/iam.serviceAccountUser" \
-  --quiet >/dev/null
+  gcloud projects add-iam-policy-binding "$GOOGLE_CLOUD_PROJECT_ID" \
+    --member "serviceAccount:$RUNTIME_SA_EMAIL" \
+    --role "roles/cloudtasks.enqueuer" \
+    --quiet >/dev/null
 
-gcloud run services add-iam-policy-binding "$SERVICE_NAME" \
-  --project "$GOOGLE_CLOUD_PROJECT_ID" \
-  --region asia-northeast1 \
-  --member "serviceAccount:$RUNTIME_SA_EMAIL" \
-  --role "roles/run.admin" \
-  --quiet >/dev/null
+  gcloud iam service-accounts add-iam-policy-binding "$RUNTIME_SA_EMAIL" \
+    --project "$GOOGLE_CLOUD_PROJECT_ID" \
+    --member "serviceAccount:$RUNTIME_SA_EMAIL" \
+    --role "roles/iam.serviceAccountUser" \
+    --quiet >/dev/null
 
-gcloud run services add-iam-policy-binding "$SERVICE_NAME" \
-  --project "$GOOGLE_CLOUD_PROJECT_ID" \
-  --region asia-northeast1 \
-  --member "serviceAccount:$WORKER_SCHEDULER_CALLER_SERVICE_ACCOUNT" \
-  --role "roles/run.invoker" \
-  --quiet >/dev/null
+  gcloud run services add-iam-policy-binding "$SERVICE_NAME" \
+    --project "$GOOGLE_CLOUD_PROJECT_ID" \
+    --region asia-northeast1 \
+    --member "serviceAccount:$RUNTIME_SA_EMAIL" \
+    --role "roles/run.admin" \
+    --quiet >/dev/null
 
-gcloud iam service-accounts add-iam-policy-binding "$WORKER_SCHEDULER_CALLER_SERVICE_ACCOUNT" \
-  --project "$GOOGLE_CLOUD_PROJECT_ID" \
-  --member "serviceAccount:$CLOUD_SCHEDULER_SERVICE_AGENT" \
-  --role "roles/iam.serviceAccountUser" \
-  --quiet >/dev/null
+  gcloud run services add-iam-policy-binding "$SERVICE_NAME" \
+    --project "$GOOGLE_CLOUD_PROJECT_ID" \
+    --region asia-northeast1 \
+    --member "serviceAccount:$WORKER_SCHEDULER_CALLER_SERVICE_ACCOUNT" \
+    --role "roles/run.invoker" \
+    --quiet >/dev/null
 
-WORKER_SERVICE_URL="$(gcloud run services describe "$SERVICE_NAME" \
-  --project "$GOOGLE_CLOUD_PROJECT_ID" \
-  --region asia-northeast1 \
-  --format='value(status.url)')"
+  gcloud iam service-accounts add-iam-policy-binding "$WORKER_SCHEDULER_CALLER_SERVICE_ACCOUNT" \
+    --project "$GOOGLE_CLOUD_PROJECT_ID" \
+    --member "serviceAccount:$CLOUD_SCHEDULER_SERVICE_AGENT" \
+    --role "roles/iam.serviceAccountUser" \
+    --quiet >/dev/null
 
-if [ -z "$WORKER_SERVICE_URL" ]; then
-  echo "Failed to resolve Worker service URL"
-  exit 1
+  WORKER_SERVICE_URL="$(gcloud run services describe "$SERVICE_NAME" \
+    --project "$GOOGLE_CLOUD_PROJECT_ID" \
+    --region asia-northeast1 \
+    --format='value(status.url)')"
+
+  if [ -z "$WORKER_SERVICE_URL" ]; then
+    echo "Failed to resolve Worker service URL"
+    exit 1
+  fi
+
+  WORKER_SCALING_API_URL="$WORKER_SERVICE_URL/api/internal/cloud-run/min-instances"
+
+  upsert_scheduler_job \
+    "$WARM_START_JOB_NAME" \
+    "0 15 * * 1-5" \
+    "$WORKER_SCALING_API_URL" \
+    '{"minInstances":1,"reason":"weekday-warm-start"}'
+
+  upsert_scheduler_job \
+    "$WARM_STOP_JOB_NAME" \
+    "0 22 * * 1-5" \
+    "$WORKER_SCALING_API_URL" \
+    '{"minInstances":0,"reason":"weekday-warm-stop"}'
 fi
-
-WORKER_SCALING_API_URL="$WORKER_SERVICE_URL/api/internal/cloud-run/min-instances"
-
-upsert_scheduler_job \
-  "$WARM_START_JOB_NAME" \
-  "0 15 * * 1-5" \
-  "$WORKER_SCALING_API_URL" \
-  '{"minInstances":1,"reason":"weekday-warm-start"}'
-
-upsert_scheduler_job \
-  "$WARM_STOP_JOB_NAME" \
-  "0 22 * * 1-5" \
-  "$WORKER_SCALING_API_URL" \
-  '{"minInstances":0,"reason":"weekday-warm-stop"}'
