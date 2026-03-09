@@ -49,6 +49,7 @@ require_env "SUPABASE_SERVICE_ROLE_KEY"
 require_env "GEMINI_API_KEY"
 require_env "GRADING_WORKER_URL"
 
+SKIP_INFRA_SETUP="${SKIP_INFRA_SETUP:-0}"
 GEMINI_MODEL="${GEMINI_MODEL:-gemini-3.1-pro-preview}"
 GEMINI_CHAT_MODEL="${GEMINI_CHAT_MODEL:-gemini-3.1-pro-preview}"
 GEMINI_CHAT_FALLBACK_MODEL="${GEMINI_CHAT_FALLBACK_MODEL:-$GEMINI_CHAT_MODEL}"
@@ -64,15 +65,14 @@ EOF
 
 RUNTIME_SA_EMAIL="${RUNTIME_SA_EMAIL:-sullivan-runtime@${GOOGLE_CLOUD_PROJECT_ID}.iam.gserviceaccount.com}"
 CLOUD_TASKS_CALLER_SERVICE_ACCOUNT="${CLOUD_TASKS_CALLER_SERVICE_ACCOUNT:-$RUNTIME_SA_EMAIL}"
-PROJECT_NUMBER="$(gcloud projects describe "$GOOGLE_CLOUD_PROJECT_ID" --format='value(projectNumber)')"
-CLOUD_TASKS_SERVICE_AGENT="service-${PROJECT_NUMBER}@gcp-sa-cloudtasks.iam.gserviceaccount.com"
 
 echo "Deploying to Project: $GOOGLE_CLOUD_PROJECT_ID"
 
-ensure_gcp_service_enabled "cloudtasks.googleapis.com"
-
-upsert_task_queue "$GRADING_TASK_QUEUE"
-upsert_task_queue "$DRIVE_CHECK_TASK_QUEUE"
+if [ "$SKIP_INFRA_SETUP" != "1" ]; then
+  ensure_gcp_service_enabled "cloudtasks.googleapis.com"
+  upsert_task_queue "$GRADING_TASK_QUEUE"
+  upsert_task_queue "$DRIVE_CHECK_TASK_QUEUE"
+fi
 
 # Deploy Command
 gcloud run deploy sullivan-app-dev \
@@ -126,13 +126,18 @@ gcloud run services update-traffic "sullivan-app-dev" \
   --region asia-northeast1 \
   --to-latest >/dev/null
 
-gcloud iam service-accounts add-iam-policy-binding "$CLOUD_TASKS_CALLER_SERVICE_ACCOUNT" \
-  --project "$GOOGLE_CLOUD_PROJECT_ID" \
-  --member "serviceAccount:$CLOUD_TASKS_SERVICE_AGENT" \
-  --role "roles/iam.serviceAccountUser" \
-  --quiet >/dev/null
+if [ "$SKIP_INFRA_SETUP" != "1" ]; then
+  PROJECT_NUMBER="$(gcloud projects describe "$GOOGLE_CLOUD_PROJECT_ID" --format='value(projectNumber)')"
+  CLOUD_TASKS_SERVICE_AGENT="service-${PROJECT_NUMBER}@gcp-sa-cloudtasks.iam.gserviceaccount.com"
 
-gcloud projects add-iam-policy-binding "$GOOGLE_CLOUD_PROJECT_ID" \
-  --member "serviceAccount:$RUNTIME_SA_EMAIL" \
-  --role "roles/cloudtasks.enqueuer" \
-  --quiet >/dev/null
+  gcloud iam service-accounts add-iam-policy-binding "$CLOUD_TASKS_CALLER_SERVICE_ACCOUNT" \
+    --project "$GOOGLE_CLOUD_PROJECT_ID" \
+    --member "serviceAccount:$CLOUD_TASKS_SERVICE_AGENT" \
+    --role "roles/iam.serviceAccountUser" \
+    --quiet >/dev/null
+
+  gcloud projects add-iam-policy-binding "$GOOGLE_CLOUD_PROJECT_ID" \
+    --member "serviceAccount:$RUNTIME_SA_EMAIL" \
+    --role "roles/cloudtasks.enqueuer" \
+    --quiet >/dev/null
+fi
