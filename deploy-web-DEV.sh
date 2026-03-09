@@ -86,6 +86,7 @@ gcloud run deploy sullivan-app-dev \
   --cpu 2 \
   --concurrency 4 \
   --timeout 120s \
+  --quiet \
   --allow-unauthenticated \
   --set-env-vars "BIND_HOST=0.0.0.0,SERVICE_ROLE=web" \
   --set-env-vars "NODE_ENV=production" \

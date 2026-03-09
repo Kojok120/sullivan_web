@@ -120,6 +120,8 @@ gcloud builds submit \
   --project "$GOOGLE_CLOUD_PROJECT_ID" \
   --config cloudbuild.worker.yaml \
   --substitutions "_IMAGE_URI=$IMAGE_URI" \
+  --quiet \
+  --suppress-logs \
   .
 
 gcloud run deploy sullivan-grading-worker-production \
@@ -133,6 +135,7 @@ gcloud run deploy sullivan-grading-worker-production \
   --concurrency 1 \
   --min-instances "$WORKER_MIN_INSTANCES" \
   --max-instances "$WORKER_MAX_INSTANCES" \
+  --quiet \
   --no-allow-unauthenticated \
   --set-env-vars "NODE_ENV=production,SERVICE_ROLE=worker" \
   --update-secrets "DATABASE_URL=database-url:latest" \
