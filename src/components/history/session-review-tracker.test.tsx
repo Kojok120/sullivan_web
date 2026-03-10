@@ -1,5 +1,5 @@
 import { render, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SessionReviewTracker } from '@/components/history/session-review-tracker';
 
@@ -16,6 +16,10 @@ describe('SessionReviewTracker', () => {
         vi.clearAllMocks();
         markSessionReviewedMock.mockResolvedValue(undefined);
         vi.spyOn(console, 'error').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
     });
 
     it('mount 時に既読化 action を1回だけ呼ぶ', async () => {
@@ -54,6 +58,7 @@ describe('SessionReviewTracker', () => {
 
         await waitFor(() => {
             expect(markSessionReviewedMock).toHaveBeenCalledTimes(1);
+            expect(console.error).toHaveBeenCalledTimes(1);
         });
 
         rerender(<SessionReviewTracker groupId="group-1" />);

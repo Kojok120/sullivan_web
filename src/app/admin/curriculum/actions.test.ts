@@ -43,13 +43,16 @@ describe('curriculum actions', () => {
                 {
                     id: 'problem-1',
                     question: '問題文',
+                    answer: '答え',
+                    customId: 'M-1',
+                    grade: '中1',
+                    masterNumber: 1,
+                    videoUrl: 'https://example.com/video',
                     coreProblems: [
                         {
                             id: 'cp-1',
                             name: '方程式',
-                            order: 1,
                             subject: {
-                                id: 'subject-1',
                                 name: '数学',
                             },
                         },

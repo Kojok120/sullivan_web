@@ -48,6 +48,36 @@ describe('proxy', () => {
         expect(result.headers.get('location')).toBe('http://localhost/login');
     });
 
+    it('未ログインの /admin は /login に redirect する', async () => {
+        const request = new NextRequest('http://localhost/admin');
+        const supabaseResponse = NextResponse.next({ request });
+
+        updateSessionMock.mockResolvedValue({
+            supabaseResponse,
+            user: null,
+        });
+
+        const result = await proxy(request);
+
+        expect(result.status).toBe(307);
+        expect(result.headers.get('location')).toBe('http://localhost/login');
+    });
+
+    it('未ログインの /teacher は /login に redirect する', async () => {
+        const request = new NextRequest('http://localhost/teacher');
+        const supabaseResponse = NextResponse.next({ request });
+
+        updateSessionMock.mockResolvedValue({
+            supabaseResponse,
+            user: null,
+        });
+
+        const result = await proxy(request);
+
+        expect(result.status).toBe(307);
+        expect(result.headers.get('location')).toBe('http://localhost/login');
+    });
+
     it('学生向け印刷ページには no-store ヘッダーを付与する', async () => {
         const request = new NextRequest('http://localhost/dashboard/print?subjectId=subject-1&sets=1');
         const supabaseResponse = NextResponse.next({ request });
@@ -98,7 +128,7 @@ describe('proxy', () => {
         const result = await proxy(request);
 
         expect(result.status).toBe(307);
-        expect(result.headers.get('location')).toBe('http://localhost/');
+        expect(result.headers.get('location')).toBe('http://localhost/login');
         expect(result.headers.get('Cache-Control')).toBe('private, no-store, no-cache, max-age=0, must-revalidate');
         expect(result.headers.get('Pragma')).toBe('no-cache');
         expect(result.headers.get('Expires')).toBe('0');

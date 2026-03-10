@@ -39,7 +39,10 @@ export async function proxy(request: NextRequest) {
 
     // Admin routes check - must be authenticated AND have ADMIN role
     if (request.nextUrl.pathname.startsWith('/admin')) {
-        if (!user || userRole !== 'ADMIN') {
+        if (!user) {
+            return maybeApplyNoStoreHeaders(NextResponse.redirect(new URL('/login', request.url)));
+        }
+        if (userRole !== 'ADMIN') {
             return maybeApplyNoStoreHeaders(NextResponse.redirect(new URL('/', request.url)));
         }
         return maybeApplyNoStoreHeaders(supabaseResponse);
@@ -47,7 +50,10 @@ export async function proxy(request: NextRequest) {
 
     // Teacher routes check - must be authenticated AND have TEACHER/HEAD_TEACHER or ADMIN role
     if (request.nextUrl.pathname.startsWith('/teacher')) {
-        if (!user || (userRole !== 'TEACHER' && userRole !== 'HEAD_TEACHER' && userRole !== 'ADMIN')) {
+        if (!user) {
+            return maybeApplyNoStoreHeaders(NextResponse.redirect(new URL('/login', request.url)));
+        }
+        if (userRole !== 'TEACHER' && userRole !== 'HEAD_TEACHER' && userRole !== 'ADMIN') {
             return maybeApplyNoStoreHeaders(NextResponse.redirect(new URL('/', request.url)));
         }
         return maybeApplyNoStoreHeaders(supabaseResponse);

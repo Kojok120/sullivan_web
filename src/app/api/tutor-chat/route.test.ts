@@ -207,6 +207,6 @@ describe('tutor chat route', () => {
 
         expect(response.status).toBe(200);
         expect(body.reply).toContain('いい質問です。');
-        expect(createChatMock).toHaveBeenCalledTimes(2);
+        expect(createChatMock).toHaveBeenCalledTimes(1);
     });
 });

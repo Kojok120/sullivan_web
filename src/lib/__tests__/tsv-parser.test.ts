@@ -36,6 +36,26 @@ describe('tsv-parser', () => {
         });
     });
 
+    it('問題 TSV の旧ヘッダー形式でも列ずれせずに読み込む', () => {
+        const rows = parseProblemTSV([
+            '学年\tCoreProblem名\t問題文\t正解\t別解\t動画URL',
+            '中2\t連立方程式\t連立方程式を解け\tx=1,y=2\tx=2,y=1\thttps://example.com/movie',
+        ].join('\n'));
+
+        expect(rows).toEqual([
+            {
+                masterNumber: undefined,
+                grade: '中2',
+                coreProblemName: '連立方程式',
+                coreProblemNames: ['連立方程式'],
+                question: '連立方程式を解け',
+                answer: 'x=1,y=2',
+                acceptedAnswers: ['x=2', 'y=1'],
+                videoUrl: 'https://example.com/movie',
+            },
+        ]);
+    });
+
     it('CoreProblem TSV ではデータ行に CoreProblem が含まれても除外しない', () => {
         const rows = parseCoreProblemTSV([
             'マスタNo\tCoreProblem名\t動画タイトル1\t動画URL1',

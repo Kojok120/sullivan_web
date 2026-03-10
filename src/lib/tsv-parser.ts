@@ -89,29 +89,35 @@ export interface ParsedProblemRow {
 
 export function parseProblemTSV(input: string, skipHeader = true): ParsedProblemRow[] {
     const rows = parseTSV(input);
+    const problemHeaderFormat = skipHeader ? detectProblemHeaderFormat(rows[0]) : null;
 
     const dataRows = skipHeader
         ? excludeLeadingHeaderRow(rows, isProblemHeaderRow)
         : rows;
 
     return dataRows.map(cols => {
+        const usesLegacyColumns = problemHeaderFormat === 'old';
+        const columnOffset = usesLegacyColumns ? 0 : 1;
+
         // 新形式:
         // 0: マスタ内問題番号, 1: 学年, 2: CoreProblem名, 3: 問題文, 4: 正解, 5: 別解(任意), 6: 動画URL(任意)
+        // 旧形式:
+        // 0: 学年, 1: CoreProblem名, 2: 問題文, 3: 正解, 4: 別解(任意), 5: 動画URL(任意)
 
         let masterNumber: number | undefined;
-        if (cols[0]) {
+        if (!usesLegacyColumns && cols[0]) {
             const parsed = parseInt(cols[0].replace(/[^\d]/g, ''), 10);
             if (!isNaN(parsed)) {
                 masterNumber = parsed;
             }
         }
 
-        const grade = cols[1] || '';
-        const cpRaw = cols[2] || '';
-        const question = cols[3] || '';
-        const answer = cols[4] || '';
-        const acceptedRaw = cols[5] || '';
-        const videoUrl = cols[6] || '';
+        const grade = cols[columnOffset] || '';
+        const cpRaw = cols[columnOffset + 1] || '';
+        const question = cols[columnOffset + 2] || '';
+        const answer = cols[columnOffset + 3] || '';
+        const acceptedRaw = cols[columnOffset + 4] || '';
+        const videoUrl = cols[columnOffset + 5] || '';
 
         // CoreProblem 名はカンマまたは改行区切りに対応する
         const coreProblemNames = cpRaw.split(/[,\n、]+/).map(s => s.trim()).filter(Boolean);
@@ -183,6 +189,26 @@ export function parseCoreProblemTSV(input: string, skipHeader = true): ParsedCor
 
 function normalizeHeaderCell(value: string | undefined) {
     return (value ?? '').trim().replace(/\s+/g, '');
+}
+
+function detectProblemHeaderFormat(cols: string[] | undefined) {
+    if (!cols) {
+        return null;
+    }
+
+    const firstCol = normalizeHeaderCell(cols[0]);
+    const secondCol = normalizeHeaderCell(cols[1]);
+    const thirdCol = normalizeHeaderCell(cols[2]);
+
+    if (firstCol === 'マスタ内問題番号' || (secondCol === '学年' && thirdCol === 'CoreProblem名')) {
+        return 'new';
+    }
+
+    if (firstCol === '学年' && secondCol === 'CoreProblem名') {
+        return 'old';
+    }
+
+    return null;
 }
 
 function excludeLeadingHeaderRow<T extends string[]>(rows: T[], isHeaderRow: (cols: string[]) => boolean): T[] {

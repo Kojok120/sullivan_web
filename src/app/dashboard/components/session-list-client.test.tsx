@@ -1,8 +1,16 @@
 import type { ReactNode } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SessionListClient } from './session-list-client';
+
+function createDeferred<T>() {
+    let resolve!: (value: T | PromiseLike<T>) => void;
+    const promise = new Promise<T>((res) => {
+        resolve = res;
+    });
+    return { promise, resolve };
+}
 
 const { fetchUserSessionsMock, markSessionReviewedMock } = vi.hoisted(() => ({
     fetchUserSessionsMock: vi.fn(),
@@ -16,7 +24,13 @@ vi.mock('@/app/actions', () => ({
 
 vi.mock('next/link', () => ({
     default: ({ children, href, onClick }: { children: ReactNode; href: string; onClick?: () => void }) => (
-        <a href={href} onClick={onClick}>
+        <a
+            href={href}
+            onClick={(event) => {
+                event.preventDefault();
+                onClick?.();
+            }}
+        >
             {children}
         </a>
     ),
@@ -92,6 +106,10 @@ describe('SessionListClient', () => {
         },
     ];
 
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
     it('動画未視聴フィルタ文言と空状態文言を表示する', async () => {
         fetchUserSessionsMock.mockResolvedValueOnce([]);
 
@@ -126,5 +144,60 @@ describe('SessionListClient', () => {
         fireEvent.click(screen.getByRole('link'));
 
         expect(markSessionReviewedMock).not.toHaveBeenCalled();
+    });
+
+    it('古いフィルタ取得結果で一覧を巻き戻さない', async () => {
+        const firstFetch = createDeferred<typeof initialSessions>();
+        const secondFetch = createDeferred<typeof initialSessions>();
+
+        fetchUserSessionsMock
+            .mockImplementationOnce(() => firstFetch.promise)
+            .mockImplementationOnce(() => secondFetch.promise);
+
+        render(
+            <SessionListClient
+                initialSessions={initialSessions}
+                userId="user-1"
+                basePath="/dashboard/history"
+            />
+        );
+
+        const checkbox = screen.getByRole('checkbox') as HTMLInputElement;
+        fireEvent.click(checkbox);
+
+        await waitFor(() => {
+            expect(checkbox.checked).toBe(true);
+            expect(fetchUserSessionsMock).toHaveBeenNthCalledWith(1, 0, 10, { onlyPendingVideoReview: true }, 'user-1');
+        });
+
+        fireEvent.click(screen.getByRole('checkbox'));
+
+        await waitFor(() => {
+            expect((screen.getByRole('checkbox') as HTMLInputElement).checked).toBe(false);
+            expect(fetchUserSessionsMock).toHaveBeenNthCalledWith(2, 0, 10, { onlyPendingVideoReview: false }, 'user-1');
+        });
+
+        secondFetch.resolve([
+            {
+                groupId: 'group-2',
+                date: new Date('2026-03-11T00:00:00Z'),
+                subjectName: '英語',
+                totalProblems: 6,
+                correctCount: 5,
+                hasUnread: false,
+                unwatchedMistakeCount: 0,
+            },
+        ]);
+
+        await waitFor(() => {
+            expect(screen.getByText('英語')).toBeTruthy();
+        });
+
+        firstFetch.resolve([]);
+
+        await waitFor(() => {
+            expect(screen.getByText('英語')).toBeTruthy();
+        });
+        expect(screen.queryByText(/解説動画未視聴のセッションはありません/)).toBeNull();
     });
 });

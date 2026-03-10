@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowRight, CheckCircle, AlertCircle, Filter } from 'lucide-react';
 import { Button } from "@/components/ui/button";
-import { useState, useCallback } from 'react';
+import { useRef, useState } from 'react';
 import { fetchUserSessions } from '@/app/actions';
 import { DateDisplay } from '@/components/ui/date-display';
 import { Badge } from "@/components/ui/badge";
@@ -19,58 +19,85 @@ type SessionListClientProps = {
 };
 
 export function SessionListClient({ initialSessions, userId, basePath }: SessionListClientProps) {
-    // Initial sessions are unfiltered.
-    // If we want to filter from start, we might need to fetch again, 
-    // but the default is usually "All".
+    // 初期表示は全件前提で受け取り、フィルタ変更時のみ再取得する。
     const [sessions, setSessions] = useState<LearningSession[]>(initialSessions);
     const [offset, setOffset] = useState(initialSessions.length);
     const [loading, setLoading] = useState(false);
     const [hasMore, setHasMore] = useState(true);
     const [showPendingVideoReviewOnly, setShowPendingVideoReviewOnly] = useState(false);
+    const latestRequestIdRef = useRef(0);
+    const latestFilterRef = useRef(false);
 
-    // Function to reload sessions based on filter
-    const reloadSessions = useCallback(async (onlyPendingVideoReview: boolean) => {
+    const requestSessions = async ({
+        onlyPendingVideoReview,
+        nextOffset,
+        append,
+    }: {
+        onlyPendingVideoReview: boolean;
+        nextOffset: number;
+        append: boolean;
+    }) => {
+        const requestId = latestRequestIdRef.current + 1;
+        latestRequestIdRef.current = requestId;
+        latestFilterRef.current = onlyPendingVideoReview;
         setLoading(true);
         try {
-            // Reset offset and fetch first batch
-            const newSessions = await fetchUserSessions(0, 10, { onlyPendingVideoReview }, userId);
-            setSessions(newSessions);
-            setOffset(newSessions.length);
-            setHasMore(newSessions.length === 10);
+            const newSessions = await fetchUserSessions( nextOffset, 10, { onlyPendingVideoReview }, userId);
+
+            if (
+                requestId !== latestRequestIdRef.current
+                || latestFilterRef.current !== onlyPendingVideoReview
+            ) {
+                return;
+            }
+
+            if (!append) {
+                setSessions(newSessions);
+                setOffset(newSessions.length);
+                setHasMore(newSessions.length === 10);
+                return;
+            }
+
+            if (newSessions.length === 0) {
+                setHasMore(false);
+                return;
+            }
+
+            setSessions((prev) => {
+                const existingIds = new Set(prev.map(s => s.groupId));
+                const filteredNew = newSessions.filter(s => !existingIds.has(s.groupId));
+                return [...prev, ...filteredNew];
+            });
+            setOffset((prev) => prev + newSessions.length);
+            if (newSessions.length < 10) {
+                setHasMore(false);
+            }
         } catch (error) {
-            console.error("Failed to load sessions", error);
+            if (requestId === latestRequestIdRef.current) {
+                console.error("Failed to load sessions", error);
+            }
         } finally {
-            setLoading(false);
+            if (requestId === latestRequestIdRef.current) {
+                setLoading(false);
+            }
         }
-    }, [userId]);
+    };
 
     const handleFilterChange = (checked: boolean) => {
         setShowPendingVideoReviewOnly(checked);
-        reloadSessions(checked);
+        void requestSessions({
+            onlyPendingVideoReview: checked,
+            nextOffset: 0,
+            append: false,
+        });
     };
 
     const loadMore = async () => {
-        setLoading(true);
-        try {
-            const newSessions = await fetchUserSessions(offset, 10, { onlyPendingVideoReview: showPendingVideoReviewOnly }, userId);
-            if (newSessions.length === 0) {
-                setHasMore(false);
-            } else {
-                setSessions((prev) => {
-                    const existingIds = new Set(prev.map(s => s.groupId));
-                    const filteredNew = newSessions.filter(s => !existingIds.has(s.groupId));
-                    return [...prev, ...filteredNew];
-                });
-                setOffset((prev) => prev + newSessions.length);
-                if (newSessions.length < 10) {
-                    setHasMore(false);
-                }
-            }
-        } catch (error) {
-            console.error("Failed to load sessions", error);
-        } finally {
-            setLoading(false);
-        }
+        void requestSessions({
+            onlyPendingVideoReview: showPendingVideoReviewOnly,
+            nextOffset: offset,
+            append: true,
+        });
     };
 
     if (sessions.length === 0 && !loading && !showPendingVideoReviewOnly) {
@@ -121,7 +148,7 @@ export function SessionListClient({ initialSessions, userId, basePath }: Session
                                         ) : (
                                             <CheckCircle className="h-6 w-6 text-blue-600" />
                                         )}
-                                        {/* カード全体の色で状態を表現するため、個別バッジは置かない */}
+                                        {/* カード全体の色で状態を表すため、個別バッジは置かない */}
                                     </div>
                                     <div>
                                         <div className="flex items-center gap-2">
