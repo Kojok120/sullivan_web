@@ -2,7 +2,7 @@
  * TSVパーサ - Excel/スプレッドシートからの貼り付けに対応
  * 引用符内の改行をサポート
  */
-export function parseTSV(input: string): string[][] {
+function parseTSV(input: string): string[][] {
     const rows: string[][] = [];
     let currentRow: string[] = [];
     let currentField = '';
@@ -16,11 +16,11 @@ export function parseTSV(input: string): string[][] {
         if (inQuotes) {
             if (char === '"') {
                 if (nextChar === '"') {
-                    // Escaped quote
+                    // エスケープされた引用符
                     currentField += '"';
                     i += 2;
                 } else {
-                    // End of quoted field
+                    // 引用符で囲まれたフィールドの終端
                     inQuotes = false;
                     i++;
                 }
@@ -30,16 +30,16 @@ export function parseTSV(input: string): string[][] {
             }
         } else {
             if (char === '"') {
-                // Start of quoted field
+                // 引用符で囲まれたフィールドの開始
                 inQuotes = true;
                 i++;
             } else if (char === '\t') {
-                // Field separator
+                // フィールド区切り
                 currentRow.push(currentField.trim());
                 currentField = '';
                 i++;
             } else if (char === '\n' || (char === '\r' && nextChar === '\n')) {
-                // Row separator
+                // 行区切り
                 currentRow.push(currentField.trim());
                 if (currentRow.some(cell => cell.length > 0)) {
                     rows.push(currentRow);
@@ -48,7 +48,7 @@ export function parseTSV(input: string): string[][] {
                 currentField = '';
                 i += (char === '\r' ? 2 : 1);
             } else if (char === '\r') {
-                // Single CR as row separator
+                // 単独の CR も行区切りとして扱う
                 currentRow.push(currentField.trim());
                 if (currentRow.some(cell => cell.length > 0)) {
                     rows.push(currentRow);
@@ -63,7 +63,7 @@ export function parseTSV(input: string): string[][] {
         }
     }
 
-    // Don't forget the last field and row
+    // 末尾のフィールドと行を取り込む
     currentRow.push(currentField.trim());
     if (currentRow.some(cell => cell.length > 0)) {
         rows.push(currentRow);
@@ -77,7 +77,7 @@ export function parseTSV(input: string): string[][] {
  * カラム: [学年] [CoreProblem名] [問題文] [正解] [別解(任意)] [動画URL(任意)]
  */
 export interface ParsedProblemRow {
-    masterNumber?: number; // 新規: マスタ内問題番号
+    masterNumber?: number; // マスタ内問題番号
     grade: string;
     coreProblemName: string;
     coreProblemNames: string[]; // 複数対応 (改行・カンマ区切り)
@@ -89,39 +89,41 @@ export interface ParsedProblemRow {
 
 export function parseProblemTSV(input: string, skipHeader = true): ParsedProblemRow[] {
     const rows = parseTSV(input);
+    const problemHeaderFormat = detectProblemHeaderFormat(rows[0]) ?? inferProblemRowFormat(rows[0]);
 
-    // Skip header row if it contains "マスタ内問題番号" or similar
     const dataRows = skipHeader
-        ? rows.filter(cols => {
-            const firstCol = cols[0];
-            return !firstCol?.includes('マスタ') && !firstCol?.includes('学年');
-        })
+        ? excludeLeadingHeaderRow(rows, isProblemHeaderRow)
         : rows;
 
     return dataRows.map(cols => {
-        // New Format:
-        // 0: MasterNumber, 1: Grade, 2: CoreProblem(s), 3: Question, 4: Answer, 5: Accepted (opt), 6: Video (opt)
+        const usesLegacyColumns = problemHeaderFormat === 'old';
+        const columnOffset = usesLegacyColumns ? 0 : 1;
+
+        // 新形式:
+        // 0: マスタ内問題番号, 1: 学年, 2: CoreProblem名, 3: 問題文, 4: 正解, 5: 別解(任意), 6: 動画URL(任意)
+        // 旧形式:
+        // 0: 学年, 1: CoreProblem名, 2: 問題文, 3: 正解, 4: 別解(任意), 5: 動画URL(任意)
 
         let masterNumber: number | undefined;
-        if (cols[0]) {
+        if (!usesLegacyColumns && cols[0]) {
             const parsed = parseInt(cols[0].replace(/[^\d]/g, ''), 10);
             if (!isNaN(parsed)) {
                 masterNumber = parsed;
             }
         }
 
-        const grade = cols[1] || '';
-        const cpRaw = cols[2] || '';
-        const question = cols[3] || '';
-        const answer = cols[4] || '';
-        const acceptedRaw = cols[5] || '';
-        const videoUrl = cols[6] || '';
+        const grade = cols[columnOffset] || '';
+        const cpRaw = cols[columnOffset + 1] || '';
+        const question = cols[columnOffset + 2] || '';
+        const answer = cols[columnOffset + 3] || '';
+        const acceptedRaw = cols[columnOffset + 4] || '';
+        const videoUrl = cols[columnOffset + 5] || '';
 
-        // Parse CoreProblem names (can be comma or newline separated)
+        // CoreProblem 名はカンマまたは改行区切りに対応する
         const coreProblemNames = cpRaw.split(/[,\n、]+/).map(s => s.trim()).filter(Boolean);
-        const coreProblemName = cpRaw; // raw value for single name case
+        const coreProblemName = cpRaw; // 単一名利用時のため元の文字列も保持する
 
-        // Parse accepted answers (comma separated)
+        // 別解はカンマ区切りで解釈する
         const acceptedAnswers = acceptedRaw
             ? acceptedRaw.split(/[,、]+/).map(s => s.trim()).filter(Boolean)
             : [];
@@ -157,11 +159,7 @@ export function parseCoreProblemTSV(input: string, skipHeader = true): ParsedCor
     const rows = parseTSV(input);
 
     const dataRows = skipHeader
-        ? rows.filter((cols) => {
-            const firstCol = cols[0] || '';
-            const secondCol = cols[1] || '';
-            return !firstCol.includes('マスタ') && !secondCol.includes('CoreProblem');
-        })
+        ? excludeLeadingHeaderRow(rows, isCoreProblemHeaderRow)
         : rows;
 
     return dataRows.map((cols) => {
@@ -187,4 +185,95 @@ export function parseCoreProblemTSV(input: string, skipHeader = true): ParsedCor
             lectureVideos,
         };
     });
+}
+
+function normalizeHeaderCell(value: string | undefined) {
+    return (value ?? '').trim().replace(/\s+/g, '');
+}
+
+/**
+ * 問題TSVのヘッダー形式を判定する。
+ * ヘッダーを読まない場合や形式を判定できない場合は null を返し、
+ * 呼び出し元では現行の新形式を既定値として扱う。
+ */
+function detectProblemHeaderFormat(cols: string[] | undefined) {
+    if (!cols) {
+        return null;
+    }
+
+    const firstCol = normalizeHeaderCell(cols[0]);
+    const secondCol = normalizeHeaderCell(cols[1]);
+    const thirdCol = normalizeHeaderCell(cols[2]);
+
+    if (firstCol === 'マスタ内問題番号' || (secondCol === '学年' && thirdCol === 'CoreProblem名')) {
+        return 'new';
+    }
+
+    if (firstCol === '学年' && secondCol === 'CoreProblem名') {
+        return 'old';
+    }
+
+    return null;
+}
+
+function inferProblemRowFormat(cols: string[] | undefined) {
+    if (!cols || cols.length === 0) {
+        return null;
+    }
+
+    const firstCol = (cols[0] ?? '').trim();
+    const secondCol = (cols[1] ?? '').trim();
+
+    if (!firstCol && !secondCol) {
+        return null;
+    }
+
+    if (looksLikeGrade(firstCol)) {
+        return 'old';
+    }
+
+    if (looksLikeGrade(secondCol) || (!firstCol && secondCol.length > 0)) {
+        return 'new';
+    }
+
+    if (firstCol.replace(/[^\d]/g, '').length > 0) {
+        return 'new';
+    }
+
+    return null;
+}
+
+function looksLikeGrade(value: string) {
+    const normalized = normalizeHeaderCell(value).replace(/第/g, '');
+
+    return /^(?:小|中)(?:[1-6１-６一二三四五六])(?:年)?$/.test(normalized)
+        || /^高(?:[1-3１-３一二三])(?:年)?$/.test(normalized)
+        || /^(?:小学|中学)(?:[1-6１-６一二三四五六])年$/.test(normalized)
+        || /^高校?(?:[1-3１-３一二三])年$/.test(normalized);
+}
+
+function excludeLeadingHeaderRow<T extends string[]>(rows: T[], isHeaderRow: (cols: string[]) => boolean): T[] {
+    if (rows.length === 0) {
+        return rows;
+    }
+
+    return isHeaderRow(rows[0]) ? rows.slice(1) : rows;
+}
+
+function isProblemHeaderRow(cols: string[]) {
+    const firstCol = normalizeHeaderCell(cols[0]);
+    const secondCol = normalizeHeaderCell(cols[1]);
+    const thirdCol = normalizeHeaderCell(cols[2]);
+
+    return firstCol === 'マスタ内問題番号'
+        || (firstCol === '学年' && secondCol === 'CoreProblem名')
+        || (secondCol === '学年' && thirdCol === 'CoreProblem名');
+}
+
+function isCoreProblemHeaderRow(cols: string[]) {
+    const firstCol = normalizeHeaderCell(cols[0]);
+    const secondCol = normalizeHeaderCell(cols[1]);
+
+    return ['マスタNo', 'マスタNO', 'マスタ内問題番号'].includes(firstCol)
+        && secondCol === 'CoreProblem名';
 }

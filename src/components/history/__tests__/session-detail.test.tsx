@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react'
 import { SessionDetail } from '../session-detail'
 import * as analytics from '@/lib/analytics'
 import * as surveyActions from '@/actions/survey'
+import * as auth from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import fs from 'fs'
 import type { MouseEventHandler, ReactNode } from 'react'
@@ -45,6 +46,10 @@ type SurveyModalProps = {
     userId: string
 }
 
+type SessionReviewTrackerProps = {
+    groupId: string
+}
+
 type SessionDetailMock = {
     id: string
     evaluation: 'A' | 'B' | 'C' | 'D'
@@ -77,6 +82,10 @@ vi.mock('@/lib/analytics', () => ({
 
 vi.mock('@/actions/survey', () => ({
     checkSurveyEligibility: vi.fn(),
+}))
+
+vi.mock('@/lib/auth', () => ({
+    getSession: vi.fn(),
 }))
 
 vi.mock('@/lib/prisma', () => ({
@@ -144,12 +153,25 @@ vi.mock('@/components/survey/SurveyModal', () => ({
     SurveyModal: ({ userId }: SurveyModalProps) => <div data-testid="survey-modal" data-user-id={userId}>Survey Modal</div>,
 }))
 
+vi.mock('@/components/history/session-review-tracker', () => ({
+    SessionReviewTracker: ({ groupId }: SessionReviewTrackerProps) => (
+        <div data-testid="session-review-tracker" data-group-id={groupId}>
+            Session Review Tracker
+        </div>
+    ),
+}))
+
 describe('SessionDetail', () => {
     const mockSystemPrompt = '# System Prompt Content'
 
     beforeEach(() => {
         vi.clearAllMocks()
         vi.mocked(fs.readFileSync).mockReturnValue(mockSystemPrompt)
+        vi.mocked(auth.getSession).mockResolvedValue({
+            userId: 'user1',
+            role: 'STUDENT',
+            name: '生徒1',
+        })
         vi.mocked(prisma.user.findUnique).mockResolvedValue({
             classroom: {
                 plan: 'PREMIUM',
@@ -410,23 +432,40 @@ describe('SessionDetail', () => {
     })
 
     describe('レビュー済みマーク', () => {
-        it('生徒ビューの場合、markSessionAsReviewedを呼ぶ', async () => {
+        it('生徒ビューの場合、SessionReviewTrackerを表示する', async () => {
             const mockDetails = [createMockSessionDetail()]
             mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
-            await SessionDetail({ groupId: 'group1', userId: 'user1', isTeacherView: false })
+            render(await SessionDetail({ groupId: 'group1', userId: 'user1', isTeacherView: false }))
 
-            expect(analytics.markSessionAsReviewed).toHaveBeenCalledWith('group1', 'user1')
+            const tracker = screen.getByTestId('session-review-tracker')
+            expect(tracker).toBeTruthy()
+            expect(tracker.getAttribute('data-group-id')).toBe('group1')
         })
 
-        it('教師ビューの場合、markSessionAsReviewedを呼ばない', async () => {
+        it('教師ビューの場合、SessionReviewTrackerを表示しない', async () => {
             const mockDetails = [createMockSessionDetail()]
             mockSessionDetails(mockDetails)
 
-            await SessionDetail({ groupId: 'group1', userId: 'user1', isTeacherView: true })
+            render(await SessionDetail({ groupId: 'group1', userId: 'user1', isTeacherView: true }))
 
-            expect(analytics.markSessionAsReviewed).not.toHaveBeenCalled()
+            expect(screen.queryByTestId('session-review-tracker')).toBeFalsy()
+        })
+
+        it('表示対象が現在ユーザーと異なる場合はSessionReviewTrackerを表示しない', async () => {
+            const mockDetails = [createMockSessionDetail()]
+            mockSessionDetails(mockDetails)
+            vi.mocked(auth.getSession).mockResolvedValue({
+                userId: 'other-user',
+                role: 'STUDENT',
+                name: '別の生徒',
+            })
+            vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
+
+            render(await SessionDetail({ groupId: 'group1', userId: 'user1', isTeacherView: false }))
+
+            expect(screen.queryByTestId('session-review-tracker')).toBeFalsy()
         })
     })
 

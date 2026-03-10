@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
+source "$SCRIPT_DIR/scripts/deploy-common.sh"
 
 # Load DEV env vars
 if [ -f .env.DEV ]; then
@@ -85,6 +86,8 @@ upsert_scheduler_job() {
 RUNTIME_SA_EMAIL="${RUNTIME_SA_EMAIL:-sullivan-runtime@${GOOGLE_CLOUD_PROJECT_ID}.iam.gserviceaccount.com}"
 IMAGE_TAG="${IMAGE_TAG:-$(date +%Y%m%d-%H%M%S)}"
 IMAGE_URI="${IMAGE_URI:-asia.gcr.io/${GOOGLE_CLOUD_PROJECT_ID}/sullivan-grading-worker-dev:${IMAGE_TAG}}"
+WORKER_BASE_IMAGE_TAG="${WORKER_BASE_IMAGE_TAG:-$(compute_file_hash Dockerfile.worker-base cloudbuild.worker-base.yaml)}"
+WORKER_BASE_IMAGE_URI="${WORKER_BASE_IMAGE_URI:-asia.gcr.io/${GOOGLE_CLOUD_PROJECT_ID}/sullivan-grading-worker-base:${WORKER_BASE_IMAGE_TAG}}"
 SERVICE_NAME="sullivan-grading-worker-dev"
 SCHEDULER_LOCATION="${SCHEDULER_LOCATION:-asia-northeast1}"
 SCHEDULER_TIME_ZONE="${SCHEDULER_TIME_ZONE:-Asia/Tokyo}"
@@ -93,6 +96,9 @@ WARM_STOP_JOB_NAME="${WARM_STOP_JOB_NAME:-sullivan-grading-worker-dev-warm-stop}
 WORKER_MIN_INSTANCES="${WORKER_MIN_INSTANCES:-0}"
 WORKER_MAX_INSTANCES="${WORKER_MAX_INSTANCES:-10}"
 SKIP_INFRA_SETUP="${SKIP_INFRA_SETUP:-0}"
+DATABASE_URL_SECRET_NAME="${DATABASE_URL_SECRET_NAME:-database-url}"
+DIRECT_URL_SECRET_NAME="${DIRECT_URL_SECRET_NAME:-direct-url}"
+GEMINI_API_KEY_SECRET_NAME="${GEMINI_API_KEY_SECRET_NAME:-gemini-api-key}"
 GEMINI_MODEL="${GEMINI_MODEL:-gemini-3.1-pro-preview}"
 GEMINI_CHAT_MODEL="${GEMINI_CHAT_MODEL:-gemini-3.1-pro-preview}"
 GEMINI_CHAT_FALLBACK_MODEL="${GEMINI_CHAT_FALLBACK_MODEL:-$GEMINI_CHAT_MODEL}"
@@ -101,8 +107,11 @@ GRADING_TASK_QUEUE="${GRADING_TASK_QUEUE:-sullivan-grading}"
 DRIVE_CHECK_TASK_QUEUE="${DRIVE_CHECK_TASK_QUEUE:-sullivan-drive-check}"
 CLOUD_TASKS_CALLER_SERVICE_ACCOUNT="${CLOUD_TASKS_CALLER_SERVICE_ACCOUNT:-$RUNTIME_SA_EMAIL}"
 WORKER_SCHEDULER_CALLER_SERVICE_ACCOUNT="${WORKER_SCHEDULER_CALLER_SERVICE_ACCOUNT:-$RUNTIME_SA_EMAIL}"
-INTERNAL_API_SECRET_VALUE="$(resolve_secret_value "INTERNAL_API_SECRET" "internal-api-secret")"
+INTERNAL_API_SECRET_NAME="${INTERNAL_API_SECRET_NAME:-internal-api-secret}"
 CLOUD_RUN_REGION="${CLOUD_RUN_REGION:-asia-northeast1}"
+CLOUD_BUILD_REGION="${CLOUD_BUILD_REGION:-asia-northeast1}"
+
+normalize_cloud_build_region
 
 if [ -z "${GRADING_WORKER_URL:-}" ]; then
   echo "GRADING_WORKER_URL is required in .env.DEV for worker self-queue publishing."
@@ -111,18 +120,23 @@ fi
 
 echo "Deploying grading worker to Project: $GOOGLE_CLOUD_PROJECT_ID"
 echo "Building worker image: $IMAGE_URI"
+echo "Using worker base image: $WORKER_BASE_IMAGE_URI"
+echo "Cloud Build region: $CLOUD_BUILD_REGION"
 
 if [ "$SKIP_INFRA_SETUP" != "1" ]; then
   ensure_gcp_service_enabled "cloudscheduler.googleapis.com"
 fi
 
-gcloud builds submit \
-  --project "$GOOGLE_CLOUD_PROJECT_ID" \
-  --config cloudbuild.worker.yaml \
-  --substitutions "_IMAGE_URI=$IMAGE_URI" \
-  --quiet \
-  --suppress-logs \
-  .
+ensure_secret_exists "$GEMINI_API_KEY_SECRET_NAME"
+ensure_secret_exists "$DATABASE_URL_SECRET_NAME"
+ensure_secret_exists "$DIRECT_URL_SECRET_NAME"
+ensure_secret_exists "$INTERNAL_API_SECRET_NAME"
+
+INTERNAL_API_SECRET_VALUE="$(resolve_secret_value "INTERNAL_API_SECRET" "$INTERNAL_API_SECRET_NAME")"
+
+ensure_base_image "$WORKER_BASE_IMAGE_URI" "cloudbuild.worker-base.yaml"
+
+run_cloud_build "cloudbuild.worker.yaml" "_IMAGE_URI=$IMAGE_URI,_BASE_IMAGE_URI=$WORKER_BASE_IMAGE_URI"
 
 gcloud run deploy sullivan-grading-worker-dev \
   --project "$GOOGLE_CLOUD_PROJECT_ID" \
@@ -138,10 +152,10 @@ gcloud run deploy sullivan-grading-worker-dev \
   --quiet \
   --no-allow-unauthenticated \
   --set-env-vars "NODE_ENV=development,SERVICE_ROLE=worker" \
-  --update-secrets "DATABASE_URL=database-url:latest" \
-  --update-secrets "DIRECT_URL=direct-url:latest" \
-  --update-secrets "INTERNAL_API_SECRET=internal-api-secret:latest" \
-  --set-env-vars "GEMINI_API_KEY=$GEMINI_API_KEY" \
+  --update-secrets "DATABASE_URL=${DATABASE_URL_SECRET_NAME}:latest" \
+  --update-secrets "DIRECT_URL=${DIRECT_URL_SECRET_NAME}:latest" \
+  --update-secrets "INTERNAL_API_SECRET=${INTERNAL_API_SECRET_NAME}:latest" \
+  --update-secrets "GEMINI_API_KEY=${GEMINI_API_KEY_SECRET_NAME}:latest" \
   --set-env-vars "GEMINI_MODEL=$GEMINI_MODEL" \
   --set-env-vars "GEMINI_CHAT_MODEL=$GEMINI_CHAT_MODEL" \
   --set-env-vars "GEMINI_CHAT_FALLBACK_MODEL=$GEMINI_CHAT_FALLBACK_MODEL" \

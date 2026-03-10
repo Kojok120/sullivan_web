@@ -9,7 +9,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 
 // Type definitions including relations
-export type SubjectWithRelations = Subject & {
+type SubjectWithRelations = Subject & {
     coreProblems: CoreProblem[];
 };
 

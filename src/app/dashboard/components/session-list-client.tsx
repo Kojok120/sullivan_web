@@ -5,8 +5,8 @@ import Link from 'next/link';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowRight, CheckCircle, AlertCircle, Filter } from 'lucide-react';
 import { Button } from "@/components/ui/button";
-import { useState, useCallback } from 'react';
-import { fetchUserSessions, markSessionReviewed } from '@/app/actions';
+import { useRef, useState } from 'react';
+import { fetchUserSessions } from '@/app/actions';
 import { DateDisplay } from '@/components/ui/date-display';
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -18,62 +18,99 @@ type SessionListClientProps = {
     basePath: string;
 };
 
+const PAGE_SIZE = 10;
+
 export function SessionListClient({ initialSessions, userId, basePath }: SessionListClientProps) {
-    // Initial sessions are unfiltered.
-    // If we want to filter from start, we might need to fetch again, 
-    // but the default is usually "All".
+    // 初期表示は全件前提で受け取り、フィルタ変更時のみ再取得する。
     const [sessions, setSessions] = useState<LearningSession[]>(initialSessions);
     const [offset, setOffset] = useState(initialSessions.length);
     const [loading, setLoading] = useState(false);
-    const [hasMore, setHasMore] = useState(true);
-    const [showUnreviewedOnly, setShowUnreviewedOnly] = useState(false);
+    const [hasMore, setHasMore] = useState(initialSessions.length >= PAGE_SIZE);
+    const [showPendingVideoReviewOnly, setShowPendingVideoReviewOnly] = useState(false);
+    const latestRequestIdRef = useRef(0);
+    const latestFilterRef = useRef(false);
 
-    // Function to reload sessions based on filter
-    const reloadSessions = useCallback(async (filterUnreviewed: boolean) => {
+    const requestSessions = async ({
+        onlyPendingVideoReview,
+        nextOffset,
+        append,
+    }: {
+        onlyPendingVideoReview: boolean;
+        nextOffset: number;
+        append: boolean;
+    }): Promise<'success' | 'stale' | 'error'> => {
+        const requestId = latestRequestIdRef.current + 1;
+        latestRequestIdRef.current = requestId;
+        latestFilterRef.current = onlyPendingVideoReview;
         setLoading(true);
         try {
-            // Reset offset and fetch first batch
-            const newSessions = await fetchUserSessions(0, 10, { onlyUnreviewed: filterUnreviewed }, userId);
-            setSessions(newSessions);
-            setOffset(newSessions.length);
-            setHasMore(newSessions.length === 10);
-        } catch (error) {
-            console.error("Failed to load sessions", error);
-        } finally {
-            setLoading(false);
-        }
-    }, [userId]);
+            const newSessions = await fetchUserSessions(nextOffset, PAGE_SIZE, { onlyPendingVideoReview }, userId);
 
-    const handleFilterChange = (checked: boolean) => {
-        setShowUnreviewedOnly(checked);
-        reloadSessions(checked);
-    };
+            if (
+                requestId !== latestRequestIdRef.current
+                || latestFilterRef.current !== onlyPendingVideoReview
+            ) {
+                return 'stale';
+            }
 
-    const loadMore = async () => {
-        setLoading(true);
-        try {
-            const newSessions = await fetchUserSessions(offset, 10, { onlyUnreviewed: showUnreviewedOnly }, userId);
+            if (!append) {
+                setSessions(newSessions);
+                setOffset(newSessions.length);
+                setHasMore(newSessions.length === PAGE_SIZE);
+                return 'success';
+            }
+
             if (newSessions.length === 0) {
                 setHasMore(false);
-            } else {
-                setSessions((prev) => {
-                    const existingIds = new Set(prev.map(s => s.groupId));
-                    const filteredNew = newSessions.filter(s => !existingIds.has(s.groupId));
-                    return [...prev, ...filteredNew];
-                });
-                setOffset((prev) => prev + newSessions.length);
-                if (newSessions.length < 10) {
-                    setHasMore(false);
-                }
+                return 'success';
             }
+
+            setSessions((prev) => {
+                const existingIds = new Set(prev.map(s => s.groupId));
+                const filteredNew = newSessions.filter(s => !existingIds.has(s.groupId));
+                return [...prev, ...filteredNew];
+            });
+            setOffset((prev) => prev + newSessions.length);
+            if (newSessions.length < PAGE_SIZE) {
+                setHasMore(false);
+            }
+            return 'success';
         } catch (error) {
-            console.error("Failed to load sessions", error);
+            if (requestId === latestRequestIdRef.current) {
+                console.error('セッション一覧の取得に失敗しました', error);
+                return 'error';
+            }
+            return 'stale';
         } finally {
-            setLoading(false);
+            if (requestId === latestRequestIdRef.current) {
+                setLoading(false);
+            }
         }
     };
 
-    if (sessions.length === 0 && !loading && !showUnreviewedOnly) {
+    const handleFilterChange = async (checked: boolean) => {
+        const previousValue = showPendingVideoReviewOnly;
+        setShowPendingVideoReviewOnly(checked);
+        const result = await requestSessions({
+            onlyPendingVideoReview: checked,
+            nextOffset: 0,
+            append: false,
+        });
+
+        if (result === 'error') {
+            setShowPendingVideoReviewOnly(previousValue);
+        }
+    };
+
+    const loadMore = () => {
+        void requestSessions({
+            onlyPendingVideoReview: showPendingVideoReviewOnly,
+            nextOffset: offset,
+            append: true,
+        });
+    };
+
+    if (sessions.length === 0 && !loading && !showPendingVideoReviewOnly) {
         return <div className="text-muted-foreground text-sm">まだ学習履歴がありません</div>;
     }
 
@@ -81,53 +118,47 @@ export function SessionListClient({ initialSessions, userId, basePath }: Session
         <div className="space-y-4">
             <div className="flex items-center justify-end space-x-2 pb-2">
                 <Switch
-                    id="unreviewed-filter"
-                    checked={showUnreviewedOnly}
+                    id="pending-video-review-filter"
+                    checked={showPendingVideoReviewOnly}
                     onCheckedChange={handleFilterChange}
                 />
-                <Label htmlFor="unreviewed-filter" className="text-sm cursor-pointer flex items-center gap-1.5 font-medium text-muted-foreground">
+                <Label htmlFor="pending-video-review-filter" className="text-sm cursor-pointer flex items-center gap-1.5 font-medium text-muted-foreground">
                     <Filter className="h-4 w-4" />
-                    未復習のみ表示
+                    解説動画未視聴のみ表示
                 </Label>
             </div>
 
-            {sessions.length === 0 && !loading && showUnreviewedOnly && (
+            {sessions.length === 0 && !loading && showPendingVideoReviewOnly && (
                 <div className="text-muted-foreground text-sm py-8 text-center bg-gray-50 rounded-lg border border-dashed text-gray-400">
                     <CheckCircle className="h-8 w-8 mx-auto mb-2 text-green-400/50" />
-                    未復習のセッションはありません。<br />素晴らしい！
+                    解説動画未視聴のセッションはありません。<br />素晴らしい！
                 </div>
             )}
 
             {sessions.map((session) => {
-                const unreviewedMistakes = session.unwatchedMistakeCount > 0;
-                // Blue/Check condition: No unreviewed mistakes (either perfect or all videos watched)
-                const isCompleted = !unreviewedMistakes;
+                const hasPendingVideoReview = session.unwatchedMistakeCount > 0;
+                // 解説動画の未視聴がなければ完了扱いにする
+                const isCompleted = !hasPendingVideoReview;
 
                 return (
                     <Link
                         key={session.groupId}
                         href={`${basePath}/${session.groupId}`}
-                        onClick={() => {
-                            // Only mark as reviewed if it's a simple "read" check, 
-                            // but for video watching, the status update happens when video is watched.
-                            // However, we still might want to track "clicked to view details"
-                            markSessionReviewed(session.groupId);
-                        }}
                     >
                         <Card className={`hover:bg-accent/50 transition-colors cursor-pointer border-2 
-                            ${unreviewedMistakes
-                                ? 'border-red-500 bg-red-50 hover:bg-red-100' // Red for unreviewed mistakes
-                                : 'border-blue-500 bg-blue-50 hover:bg-blue-100' // Blue for completed/reviewed
+                            ${hasPendingVideoReview
+                                ? 'border-red-500 bg-red-50 hover:bg-red-100' // 解説動画の未視聴が残っている状態
+                                : 'border-blue-500 bg-blue-50 hover:bg-blue-100' // 復習完了または視聴済みの状態
                             }`}>
                             <CardHeader className="flex flex-row items-center justify-between p-4">
                                 <div className="flex items-center space-x-4">
-                                    <div className={`p-3 rounded-full relative ${unreviewedMistakes ? 'bg-red-100' : 'bg-blue-100'}`}>
-                                        {unreviewedMistakes ? (
+                                    <div className={`p-3 rounded-full relative ${hasPendingVideoReview ? 'bg-red-100' : 'bg-blue-100'}`}>
+                                        {hasPendingVideoReview ? (
                                             <AlertCircle className="h-6 w-6 text-red-600" />
                                         ) : (
                                             <CheckCircle className="h-6 w-6 text-blue-600" />
                                         )}
-                                        {/* Status Badge/Indicator logic can be simplified since the whole card is colored now */}
+                                        {/* カード全体の色で状態を表すため、個別バッジは置かない */}
                                     </div>
                                     <div>
                                         <div className="flex items-center gap-2">
@@ -145,10 +176,10 @@ export function SessionListClient({ initialSessions, userId, basePath }: Session
                                 </div>
                                 <div className="flex items-center space-x-4">
                                     <div className="text-right">
-                                        <div className={`text-lg font-bold ${unreviewedMistakes ? 'text-red-700' : 'text-blue-700'}`}>
+                                        <div className={`text-lg font-bold ${hasPendingVideoReview ? 'text-red-700' : 'text-blue-700'}`}>
                                             {session.correctCount} / {session.totalProblems} 問正解
                                         </div>
-                                        {unreviewedMistakes && (
+                                        {hasPendingVideoReview && (
                                             <div className="text-xs text-red-600 font-bold">
                                                 解説動画未視聴: {session.unwatchedMistakeCount}
                                             </div>

@@ -40,6 +40,11 @@ function getProblemLabel(problem: Pick<CreateProblemData, 'question' | 'masterNu
     return `【マスタNo: ${masterNumberLabel}】問題文: ${question}`;
 }
 
+function formatProblemServiceError(error: unknown): string {
+    console.error('[problem-service] バッチ処理中に内部エラーが発生しました', error);
+    return '内部エラーが発生しました';
+}
+
 export interface CreateProblemData {
     question: string;
     answer?: string;
@@ -63,7 +68,7 @@ export type BulkCreateOptions = {
  * @param coreProblemIds CoreProblem IDの配列
  * @param tx Prismaトランザクション（オプション）
  */
-export async function fetchCoreProblemMap(
+async function fetchCoreProblemMap(
     coreProblemIds: string[],
     tx: ProblemServiceClient = prisma
 ): Promise<Map<string, { id: string; subjectId: string; subject: { name: string } }>> {
@@ -198,7 +203,7 @@ export async function deleteProblemsWithRelations(
 /**
  * 問題の重複チェック
  */
-export async function checkDuplicateQuestions(
+async function checkDuplicateQuestions(
     questions: string[],
     tx: ProblemServiceClient = prisma
 ): Promise<Set<string>> {
@@ -265,7 +270,7 @@ async function normalizeProblemsForBulk(
 /**
  * 問題の一括作成（重複チェック・customId生成・順序付けを共通化）
  */
-export async function bulkCreateProblemsCore(
+async function bulkCreateProblemsCore(
     problems: CreateProblemData[],
     options: BulkCreateOptions = {},
     client: ProblemServiceClientWithTransaction = prisma
@@ -361,7 +366,8 @@ export async function bulkCreateProblemsCore(
             await runBatchTransaction(client, createOperations);
             createdCount += batch.length;
         } catch (error) {
-            warnings.push(`バッチ処理エラー (${i + 1}〜${Math.min(i + batchSize, normalizedProblems.length)}件目): ${error}`);
+            const errorMessage = formatProblemServiceError(error);
+            warnings.push(`バッチ処理エラー (${i + 1}〜${Math.min(i + batchSize, normalizedProblems.length)}件目): ${errorMessage}`);
             warnings.push('エラーのため処理を中断しました。');
             break;
         }
@@ -519,7 +525,8 @@ export async function bulkUpsertProblemsCore(
                 await runBatchTransaction(client, updateOperations);
                 updatedCount += batch.length;
             } catch (error) {
-                warnings.push(`更新バッチ処理エラー (${i + 1}〜${Math.min(i + batchSize, toUpdate.length)}件目): ${error}`);
+                const errorMessage = formatProblemServiceError(error);
+                warnings.push(`更新バッチ処理エラー (${i + 1}〜${Math.min(i + batchSize, toUpdate.length)}件目): ${errorMessage}`);
             }
         }
     }

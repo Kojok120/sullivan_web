@@ -1,5 +1,11 @@
 #!/bin/bash
 
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+source "$SCRIPT_DIR/scripts/deploy-common.sh"
+
 # Load .env.DEV variables for deployment
 if [ -f .env.DEV ]; then
   export $(grep -v '^#' .env.DEV | xargs)
@@ -10,7 +16,7 @@ fi
 
 require_env() {
   local name="$1"
-  if [ -z "${!name}" ]; then
+  if [ -z "${!name:-}" ]; then
     echo "Missing required env: $name"
     exit 1
   fi
@@ -43,19 +49,37 @@ upsert_task_queue() {
   gcloud tasks queues create "$queue_name" "${queue_args[@]}" >/dev/null
 }
 
+require_env "GOOGLE_CLOUD_PROJECT_ID"
 require_env "NEXT_PUBLIC_SUPABASE_URL"
 require_env "NEXT_PUBLIC_SUPABASE_ANON_KEY"
-require_env "SUPABASE_SERVICE_ROLE_KEY"
-require_env "GEMINI_API_KEY"
 require_env "GRADING_WORKER_URL"
+require_env "APP_URL"
+require_env "DRIVE_FOLDER_ID"
 
 SKIP_INFRA_SETUP="${SKIP_INFRA_SETUP:-0}"
 GEMINI_MODEL="${GEMINI_MODEL:-gemini-3.1-pro-preview}"
 GEMINI_CHAT_MODEL="${GEMINI_CHAT_MODEL:-gemini-3.1-pro-preview}"
 GEMINI_CHAT_FALLBACK_MODEL="${GEMINI_CHAT_FALLBACK_MODEL:-$GEMINI_CHAT_MODEL}"
 CLOUD_TASKS_LOCATION="${CLOUD_TASKS_LOCATION:-asia-northeast1}"
+CLOUD_RUN_REGION="${CLOUD_RUN_REGION:-asia-northeast1}"
+CLOUD_BUILD_REGION="${CLOUD_BUILD_REGION:-asia-northeast1}"
 GRADING_TASK_QUEUE="${GRADING_TASK_QUEUE:-sullivan-grading}"
 DRIVE_CHECK_TASK_QUEUE="${DRIVE_CHECK_TASK_QUEUE:-sullivan-drive-check}"
+SERVICE_NAME="sullivan-app-dev"
+IMAGE_TAG="${IMAGE_TAG:-$(date +%Y%m%d-%H%M%S)}"
+IMAGE_URI="${IMAGE_URI:-asia.gcr.io/${GOOGLE_CLOUD_PROJECT_ID}/sullivan-app-dev:${IMAGE_TAG}}"
+WEB_BASE_IMAGE_TAG="${WEB_BASE_IMAGE_TAG:-$(compute_file_hash Dockerfile.web-base cloudbuild.web-base.yaml)}"
+WEB_BASE_IMAGE_URI="${WEB_BASE_IMAGE_URI:-asia.gcr.io/${GOOGLE_CLOUD_PROJECT_ID}/sullivan-web-base:${WEB_BASE_IMAGE_TAG}}"
+DATABASE_URL_SECRET_NAME="${DATABASE_URL_SECRET_NAME:-database-url}"
+DIRECT_URL_SECRET_NAME="${DIRECT_URL_SECRET_NAME:-direct-url}"
+GEMINI_API_KEY_SECRET_NAME="${GEMINI_API_KEY_SECRET_NAME:-gemini-api-key}"
+SUPABASE_SERVICE_ROLE_KEY_SECRET_NAME="${SUPABASE_SERVICE_ROLE_KEY_SECRET_NAME:-supabase-service-role-key}"
+INTERNAL_API_SECRET_NAME="${INTERNAL_API_SECRET_NAME:-internal-api-secret}"
+DRIVE_WEBHOOK_TOKEN_SECRET_NAME="${DRIVE_WEBHOOK_TOKEN_SECRET_NAME:-drive-webhook-token}"
+DRIVE_WEBHOOK_CHANNEL_ID="${DRIVE_WEBHOOK_CHANNEL_ID:-}"
+DRIVE_WATCH_STATE_KEY="${DRIVE_WATCH_STATE_KEY:-sullivan:drive:watch:state:dev}"
+
+normalize_cloud_build_region
 
 cat > .env.build <<EOF
 NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
@@ -67,6 +91,9 @@ RUNTIME_SA_EMAIL="${RUNTIME_SA_EMAIL:-sullivan-runtime@${GOOGLE_CLOUD_PROJECT_ID
 CLOUD_TASKS_CALLER_SERVICE_ACCOUNT="${CLOUD_TASKS_CALLER_SERVICE_ACCOUNT:-$RUNTIME_SA_EMAIL}"
 
 echo "Deploying to Project: $GOOGLE_CLOUD_PROJECT_ID"
+echo "Building web image: $IMAGE_URI"
+echo "Using web base image: $WEB_BASE_IMAGE_URI"
+echo "Cloud Build region: $CLOUD_BUILD_REGION"
 
 if [ "$SKIP_INFRA_SETUP" != "1" ]; then
   ensure_gcp_service_enabled "cloudtasks.googleapis.com"
@@ -74,13 +101,32 @@ if [ "$SKIP_INFRA_SETUP" != "1" ]; then
   upsert_task_queue "$DRIVE_CHECK_TASK_QUEUE"
 fi
 
-# Deploy Command
-gcloud run deploy sullivan-app-dev \
+ensure_secret_exists "$GEMINI_API_KEY_SECRET_NAME"
+ensure_secret_exists "$SUPABASE_SERVICE_ROLE_KEY_SECRET_NAME"
+ensure_secret_exists "$DATABASE_URL_SECRET_NAME"
+ensure_secret_exists "$DIRECT_URL_SECRET_NAME"
+ensure_secret_exists "$INTERNAL_API_SECRET_NAME"
+ensure_secret_exists "$DRIVE_WEBHOOK_TOKEN_SECRET_NAME"
+
+ensure_base_image "$WEB_BASE_IMAGE_URI" "cloudbuild.web-base.yaml"
+
+WEB_BUILD_SUBSTITUTIONS=$(
+  printf '_IMAGE_URI=%s,_BASE_IMAGE_URI=%s,_NEXT_PUBLIC_SUPABASE_URL=%s,_NEXT_PUBLIC_SUPABASE_ANON_KEY=%s,_NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS=%s' \
+    "$IMAGE_URI" \
+    "$WEB_BASE_IMAGE_URI" \
+    "$NEXT_PUBLIC_SUPABASE_URL" \
+    "$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+    "${NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS:-500}"
+)
+
+run_cloud_build "cloudbuild.web.yaml" "$WEB_BUILD_SUBSTITUTIONS"
+
+gcloud run deploy "$SERVICE_NAME" \
   --project "$GOOGLE_CLOUD_PROJECT_ID" \
   --service-account "$RUNTIME_SA_EMAIL" \
-  --source . \
+  --image "$IMAGE_URI" \
   --platform managed \
-  --region asia-northeast1 \
+  --region "$CLOUD_RUN_REGION" \
   --port 8080 \
   --memory 4Gi \
   --cpu 2 \
@@ -90,9 +136,9 @@ gcloud run deploy sullivan-app-dev \
   --allow-unauthenticated \
   --set-env-vars "BIND_HOST=0.0.0.0,SERVICE_ROLE=web" \
   --set-env-vars "NODE_ENV=production" \
-  --update-secrets "DATABASE_URL=database-url:latest" \
-  --update-secrets "DIRECT_URL=direct-url:latest" \
-  --set-env-vars "GEMINI_API_KEY=$GEMINI_API_KEY" \
+  --update-secrets "DATABASE_URL=${DATABASE_URL_SECRET_NAME}:latest" \
+  --update-secrets "DIRECT_URL=${DIRECT_URL_SECRET_NAME}:latest" \
+  --update-secrets "GEMINI_API_KEY=${GEMINI_API_KEY_SECRET_NAME}:latest" \
   --set-env-vars "GEMINI_MODEL=$GEMINI_MODEL" \
   --set-env-vars "GEMINI_CHAT_MODEL=$GEMINI_CHAT_MODEL" \
   --set-env-vars "GEMINI_CHAT_FALLBACK_MODEL=$GEMINI_CHAT_FALLBACK_MODEL" \
@@ -107,24 +153,21 @@ gcloud run deploy sullivan-app-dev \
   --set-env-vars "DRIVE_CHECK_TASK_QUEUE=$DRIVE_CHECK_TASK_QUEUE" \
   --set-env-vars "CLOUD_TASKS_CALLER_SERVICE_ACCOUNT=$CLOUD_TASKS_CALLER_SERVICE_ACCOUNT" \
   --set-env-vars "RUNTIME_SA_EMAIL=$RUNTIME_SA_EMAIL" \
-  --set-build-env-vars "NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL" \
-  --set-build-env-vars "NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
-  --set-build-env-vars "NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS=${NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS:-500}" \
   --set-env-vars "NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL" \
   --set-env-vars "NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
   --set-env-vars "NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS=${NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS:-500}" \
-  --set-env-vars "SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY" \
-  --update-secrets "INTERNAL_API_SECRET=internal-api-secret:latest" \
-  --update-secrets "DRIVE_WEBHOOK_TOKEN=drive-webhook-token:latest" \
+  --update-secrets "SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY_SECRET_NAME}:latest" \
+  --update-secrets "INTERNAL_API_SECRET=${INTERNAL_API_SECRET_NAME}:latest" \
+  --update-secrets "DRIVE_WEBHOOK_TOKEN=${DRIVE_WEBHOOK_TOKEN_SECRET_NAME}:latest" \
   --set-env-vars "DRIVE_WEBHOOK_CHANNEL_ID=$DRIVE_WEBHOOK_CHANNEL_ID" \
   --set-env-vars "DRIVE_WEBHOOK_CHANNEL_ID_FIXED=${DRIVE_WEBHOOK_CHANNEL_ID_FIXED:-false}" \
   --set-env-vars "DRIVE_WATCH_RENEW_THRESHOLD_HOURS=${DRIVE_WATCH_RENEW_THRESHOLD_HOURS:-18}" \
   --set-env-vars "DRIVE_WATCH_STATE_KEY=${DRIVE_WATCH_STATE_KEY}" \
   --set-env-vars "GRADING_WORKER_URL=$GRADING_WORKER_URL"
 
-gcloud run services update-traffic "sullivan-app-dev" \
+gcloud run services update-traffic "$SERVICE_NAME" \
   --project "$GOOGLE_CLOUD_PROJECT_ID" \
-  --region asia-northeast1 \
+  --region "$CLOUD_RUN_REGION" \
   --to-latest >/dev/null
 
 if [ "$SKIP_INFRA_SETUP" != "1" ]; then
