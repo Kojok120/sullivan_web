@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 
+import { appendCacheBust } from '@/components/print/cache-bust';
 import { PdfPreviewClient } from '@/components/print/pdf-preview-client';
 
 type PrintSearchParams = {
@@ -38,12 +39,11 @@ export async function SharedStudentPrintPage({
         query.set('targetUserId', targetUserIdForApi);
     }
 
-    const autoPrint = searchParams.autoprint !== '0';
+    void searchParams.autoprint;
 
     return (
         <PdfPreviewClient
-            pdfUrl={`/api/print/pdf?${query.toString()}`}
-            autoPrint={autoPrint}
+            pdfUrl={appendCacheBust(`/api/print/pdf?${query.toString()}`)}
             backFallbackPath={redirectPathIfMissing}
         />
     );

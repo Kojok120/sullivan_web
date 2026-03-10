@@ -20,6 +20,11 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const API_TIMEOUT_MS = 60_000;
+const NO_STORE_HEADERS = {
+    'Cache-Control': 'private, no-store, no-cache, max-age=0, must-revalidate',
+    Pragma: 'no-cache',
+    Expires: '0',
+} as const;
 
 export async function GET(request: NextRequest) {
     const startedAt = Date.now();
@@ -37,12 +42,12 @@ export async function GET(request: NextRequest) {
         const session = await getCurrentUser();
         timings.authMs = Date.now() - authStartedAt;
         if (!session) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+            return jsonWithNoStore({ error: 'Unauthorized' }, { status: 401 });
         }
 
         const subjectId = request.nextUrl.searchParams.get('subjectId')?.trim();
         if (!subjectId) {
-            return NextResponse.json({ error: 'subjectId is required' }, { status: 400 });
+            return jsonWithNoStore({ error: 'subjectId is required' }, { status: 400 });
         }
 
         const sets = sanitizeSets(request.nextUrl.searchParams.get('sets'));
@@ -50,6 +55,7 @@ export async function GET(request: NextRequest) {
         const targetUserIdParam = toOptionalString(request.nextUrl.searchParams.get('targetUserId'));
         // クライアントの挙動用フラグ。API側では入力互換のため受け付けるだけにする。
         void request.nextUrl.searchParams.get('autoprint');
+        void request.nextUrl.searchParams.get('cb');
 
         const targetResolveStartedAt = Date.now();
         const targetUserId = await resolveTargetUserId({
@@ -60,7 +66,7 @@ export async function GET(request: NextRequest) {
         timings.targetResolveMs = Date.now() - targetResolveStartedAt;
 
         if (!targetUserId.allowed) {
-            return NextResponse.json({ error: targetUserId.errorMessage }, { status: targetUserId.statusCode });
+            return jsonWithNoStore({ error: targetUserId.errorMessage }, { status: targetUserId.statusCode });
         }
 
         if (session.role === 'STUDENT' && !coreProblemId) {
@@ -68,7 +74,7 @@ export async function GET(request: NextRequest) {
             const gate = await getPrintGate(session.userId, subjectId);
             timings.gateMs = Date.now() - gateStartedAt;
             if (gate.blocked) {
-                return NextResponse.json(
+                return jsonWithNoStore(
                     {
                         error: 'print blocked by lecture gate',
                         blocked: true,
@@ -89,7 +95,7 @@ export async function GET(request: NextRequest) {
         timings.dataMs = Date.now() - dataStartedAt;
 
         if (!data) {
-            return NextResponse.json({ error: 'Print data not found' }, { status: 404 });
+            return jsonWithNoStore({ error: 'Print data not found' }, { status: 404 });
         }
 
         const problemIdsHash = buildProblemIdsHash(data.problemSets);
@@ -116,23 +122,6 @@ export async function GET(request: NextRequest) {
         );
         timings.renderStepMs = Date.now() - renderStepStartedAt;
         const totalMs = Date.now() - startedAt;
-
-        const ifNoneMatch = request.headers.get('if-none-match');
-        if (ifNoneMatch && ifNoneMatch === pdf.etag) {
-            return new NextResponse(null, {
-                status: 304,
-                headers: {
-                    ETag: pdf.etag,
-                    'Cache-Control': 'private, max-age=300',
-                    'X-Auth-Ms': String(timings.authMs),
-                    'X-Target-Resolve-Ms': String(timings.targetResolveMs),
-                    'X-Gate-Ms': String(timings.gateMs),
-                    'X-Data-Ms': String(timings.dataMs),
-                    'X-Render-Ms': String(pdf.renderMs),
-                    'X-Total-Ms': String(totalMs),
-                },
-            });
-        }
 
         const filename = buildFilename({
             studentLoginId: data.studentLoginId,
@@ -162,11 +151,9 @@ export async function GET(request: NextRequest) {
 
         return new Response(new Uint8Array(pdf.buffer), {
             status: 200,
-            headers: {
+            headers: withNoStoreHeaders({
                 'Content-Type': 'application/pdf',
                 'Content-Disposition': `inline; filename="${filename}"`,
-                'Cache-Control': 'private, max-age=300',
-                ETag: pdf.etag,
                 'X-Auth-Ms': String(timings.authMs),
                 'X-Target-Resolve-Ms': String(timings.targetResolveMs),
                 'X-Gate-Ms': String(timings.gateMs),
@@ -174,7 +161,7 @@ export async function GET(request: NextRequest) {
                 'X-Render-Ms': String(pdf.renderMs),
                 'X-Total-Ms': String(totalMs),
                 'X-Page-Count': String(pdf.pageCount),
-            },
+            }),
         });
     } catch (error) {
         console.error('[PrintPDF]', JSON.stringify({
@@ -188,7 +175,7 @@ export async function GET(request: NextRequest) {
             message: error instanceof Error ? error.message : String(error),
         }));
 
-        return NextResponse.json({ error: 'Failed to generate print PDF' }, { status: 500 });
+        return jsonWithNoStore({ error: 'Failed to generate print PDF' }, { status: 500 });
     }
 }
 
@@ -267,6 +254,23 @@ function buildFilename(input: { studentLoginId: string; subjectId: string; diges
 
 function sanitizeFilenamePart(value: string): string {
     return value.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 60);
+}
+
+function withNoStoreHeaders(headersInit?: HeadersInit) {
+    const headers = new Headers(headersInit);
+
+    Object.entries(NO_STORE_HEADERS).forEach(([name, value]) => {
+        headers.set(name, value);
+    });
+
+    return headers;
+}
+
+function jsonWithNoStore(body: Record<string, unknown>, init?: ResponseInit) {
+    return NextResponse.json(body, {
+        ...init,
+        headers: withNoStoreHeaders(init?.headers),
+    });
 }
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {

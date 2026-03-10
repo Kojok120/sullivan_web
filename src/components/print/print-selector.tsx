@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { getSubjectConfig } from '@/lib/subject-config';
+import { appendCacheBust } from '@/components/print/cache-bust';
 import {
     Dialog,
     DialogContent,
@@ -73,7 +74,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
     const handlePrint = async () => {
         if (!selectedSubjectId || isCheckingGate) return;
 
-        const printUrl = `/dashboard/print?subjectId=${selectedSubjectId}&sets=${sets}&gateChecked=1`;
+        const printUrl = appendCacheBust(`/dashboard/print?subjectId=${selectedSubjectId}&sets=${sets}&gateChecked=1`);
         const previewTab = window.open('', '_blank');
         setIsCheckingGate(true);
         setGateErrorMessage(null);

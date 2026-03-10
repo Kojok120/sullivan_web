@@ -4,66 +4,92 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, ExternalLink, Loader2, Printer } from 'lucide-react';
 
+import { appendCacheBust } from '@/components/print/cache-bust';
 import { Button } from '@/components/ui/button';
-
-type AutoPrintState = 'idle' | 'running' | 'requested' | 'failed';
 
 type PdfPreviewClientProps = {
     pdfUrl: string;
-    autoPrint: boolean;
     backFallbackPath: string;
 };
 
-export function PdfPreviewClient({ pdfUrl, autoPrint, backFallbackPath }: PdfPreviewClientProps) {
+const RESTORE_RELOAD_THROTTLE_MS = 250;
+
+export function PdfPreviewClient({ pdfUrl, backFallbackPath }: PdfPreviewClientProps) {
     const router = useRouter();
     const iframeRef = useRef<HTMLIFrameElement | null>(null);
     const closeFallbackTimerRef = useRef<number | null>(null);
+    const hasLoadedFrameRef = useRef(false);
+    const lastReloadAtRef = useRef(0);
+    const [frameUrl, setFrameUrl] = useState(pdfUrl);
     const [isFrameLoaded, setIsFrameLoaded] = useState(false);
-    const [autoPrintState, setAutoPrintState] = useState<AutoPrintState>('idle');
-    const hasAutoPrintedRef = useRef(false);
 
     const triggerPrint = useCallback(() => {
         const frame = iframeRef.current;
         if (!frame) {
-            setAutoPrintState('failed');
             return false;
         }
 
         const frameWindow = frame.contentWindow;
         if (!frameWindow) {
-            setAutoPrintState('failed');
             return false;
         }
 
         try {
             frameWindow.focus();
             frameWindow.print();
-            setAutoPrintState('requested');
             return true;
         } catch {
-            setAutoPrintState('failed');
             return false;
         }
     }, []);
 
     useEffect(() => {
-        if (!autoPrint) return;
-        if (!isFrameLoaded) return;
-        if (hasAutoPrintedRef.current) return;
+        hasLoadedFrameRef.current = false;
+        setIsFrameLoaded(false);
+        setFrameUrl(pdfUrl);
+    }, [pdfUrl]);
 
-        hasAutoPrintedRef.current = true;
+    const reloadFrame = useCallback(() => {
+        const now = Date.now();
+        if (now - lastReloadAtRef.current < RESTORE_RELOAD_THROTTLE_MS) {
+            return;
+        }
 
-        const timer = window.setTimeout(() => {
-            const ok = triggerPrint();
-            if (!ok) {
-                setAutoPrintState('failed');
+        lastReloadAtRef.current = now;
+        hasLoadedFrameRef.current = false;
+        setIsFrameLoaded(false);
+        setFrameUrl(appendCacheBust(pdfUrl));
+    }, [pdfUrl]);
+
+    useEffect(() => {
+        const handlePageShow = (event: PageTransitionEvent) => {
+            if (!event.persisted || !hasLoadedFrameRef.current) {
+                return;
             }
-        }, 350);
 
-        return () => {
-            window.clearTimeout(timer);
+            reloadFrame();
         };
-    }, [autoPrint, isFrameLoaded, triggerPrint]);
+
+        window.addEventListener('pageshow', handlePageShow);
+        return () => {
+            window.removeEventListener('pageshow', handlePageShow);
+        };
+    }, [reloadFrame]);
+
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.visibilityState !== 'visible' || !hasLoadedFrameRef.current) {
+                return;
+            }
+
+            reloadFrame();
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [reloadFrame]);
 
     useEffect(() => {
         return () => {
@@ -126,7 +152,7 @@ export function PdfPreviewClient({ pdfUrl, autoPrint, backFallbackPath }: PdfPre
                             onClick={() => {
                                 const ok = triggerPrint();
                                 if (!ok) {
-                                    window.open(pdfUrl, '_blank', 'noopener,noreferrer');
+                                    window.open(frameUrl, '_blank', 'noopener,noreferrer');
                                 }
                             }}
                             disabled={!isFrameLoaded}
@@ -138,17 +164,16 @@ export function PdfPreviewClient({ pdfUrl, autoPrint, backFallbackPath }: PdfPre
 
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         {!isFrameLoaded && <Loader2 className="h-4 w-4 animate-spin" />}
-                        {autoPrintState === 'running' && '印刷ダイアログを起動しています...'}
-                        {autoPrintState === 'requested' && '自動印刷を試行しました。表示されない場合は「印刷する」を押してください。'}
-                        {autoPrintState === 'failed' && '自動印刷に失敗しました。手動で印刷してください。'}
-                        {autoPrintState === 'idle' && 'PDFを読み込み中です...'}
+                        {isFrameLoaded
+                            ? 'プレビューを確認して「印刷する」を押してください。'
+                            : 'PDFを読み込み中です...'}
                     </div>
 
                     <Button
                         variant="ghost"
                         asChild
                     >
-                        <a href={pdfUrl} target="_blank" rel="noopener noreferrer">
+                        <a href={frameUrl} target="_blank" rel="noopener noreferrer">
                             PDFを別タブで開く
                             <ExternalLink className="ml-2 h-4 w-4" />
                         </a>
@@ -159,13 +184,11 @@ export function PdfPreviewClient({ pdfUrl, autoPrint, backFallbackPath }: PdfPre
                     <iframe
                         ref={iframeRef}
                         title="印刷プレビュー"
-                        src={pdfUrl}
+                        src={frameUrl}
                         className="h-[calc(100vh-130px)] w-full rounded-md"
                         onLoad={() => {
+                            hasLoadedFrameRef.current = true;
                             setIsFrameLoaded(true);
-                            if (autoPrint && autoPrintState === 'idle') {
-                                setAutoPrintState('running');
-                            }
                         }}
                     />
                 </div>

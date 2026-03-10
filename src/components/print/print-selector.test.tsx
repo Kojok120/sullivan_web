@@ -59,7 +59,13 @@ describe('印刷セレクター', () => {
                 cache: 'no-store',
             })
             expect(window.open).toHaveBeenCalledWith('', '_blank')
-            expect(mockPopup.location.href).toBe('/dashboard/print?subjectId=subject-1&sets=1&gateChecked=1')
+
+            const printUrl = new URL(mockPopup.location.href, 'http://localhost')
+            expect(printUrl.pathname).toBe('/dashboard/print')
+            expect(printUrl.searchParams.get('subjectId')).toBe('subject-1')
+            expect(printUrl.searchParams.get('sets')).toBe('1')
+            expect(printUrl.searchParams.get('gateChecked')).toBe('1')
+            expect(printUrl.searchParams.get('cb')).toBeTruthy()
         })
     })
 

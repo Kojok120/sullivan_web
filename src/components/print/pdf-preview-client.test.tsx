@@ -35,6 +35,89 @@ describe('PDFプレビューの戻る動作', () => {
         vi.restoreAllMocks()
     })
 
+    it('読み込み完了後も自動印刷を試みない', () => {
+        render(
+            <PdfPreviewClient
+                pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1&cb=initial"
+                backFallbackPath="/dashboard"
+            />
+        )
+
+        const iframe = screen.getByTitle('印刷プレビュー')
+        const printSpy = vi.fn()
+        Object.defineProperty(iframe, 'contentWindow', {
+            configurable: true,
+            value: {
+                focus: vi.fn(),
+                print: printSpy,
+            },
+        })
+
+        fireEvent.load(iframe)
+        act(() => {
+            vi.advanceTimersByTime(1000)
+        })
+
+        expect(printSpy).not.toHaveBeenCalled()
+    })
+
+    it('pageshow persisted=true のとき iframe を再読み込みする', () => {
+        render(
+            <PdfPreviewClient
+                pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1&cb=initial"
+                backFallbackPath="/dashboard"
+            />
+        )
+
+        const iframe = screen.getByTitle('印刷プレビュー')
+        const initialSrc = iframe.getAttribute('src')
+        fireEvent.load(iframe)
+
+        const event = new Event('pageshow')
+        Object.defineProperty(event, 'persisted', {
+            configurable: true,
+            value: true,
+        })
+
+        act(() => {
+            window.dispatchEvent(event)
+        })
+
+        const nextSrc = iframe.getAttribute('src')
+        expect(nextSrc).not.toBe(initialSrc)
+        expect(nextSrc).toContain('/api/print/pdf?')
+        expect(nextSrc).toContain('subjectId=subject-1')
+        expect(nextSrc).toContain('sets=1')
+    })
+
+    it('visible に戻ったとき iframe を再読み込みする', () => {
+        render(
+            <PdfPreviewClient
+                pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1&cb=initial"
+                backFallbackPath="/dashboard"
+            />
+        )
+
+        const iframe = screen.getByTitle('印刷プレビュー')
+        const initialSrc = iframe.getAttribute('src')
+        fireEvent.load(iframe)
+
+        Object.defineProperty(document, 'visibilityState', {
+            configurable: true,
+            get: () => 'visible',
+        })
+
+        act(() => {
+            document.dispatchEvent(new Event('visibilitychange'))
+        })
+
+        const nextSrc = iframe.getAttribute('src')
+        expect(nextSrc).not.toBe(initialSrc)
+        expect(nextSrc).toContain('/api/print/pdf?')
+        expect(nextSrc).toContain('subjectId=subject-1')
+        expect(nextSrc).toContain('sets=1')
+    })
+
     it('openerがある場合は元タブをフォーカスして現在タブを閉じる', () => {
         const openerFocus = vi.fn()
         const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
@@ -48,7 +131,6 @@ describe('PDFプレビューの戻る動作', () => {
         render(
             <PdfPreviewClient
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
-                autoPrint={false}
                 backFallbackPath="/dashboard"
             />
         )
@@ -67,7 +149,6 @@ describe('PDFプレビューの戻る動作', () => {
         render(
             <PdfPreviewClient
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
-                autoPrint={false}
                 backFallbackPath="/dashboard"
             />
         )
@@ -89,7 +170,6 @@ describe('PDFプレビューの戻る動作', () => {
         render(
             <PdfPreviewClient
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
-                autoPrint={false}
                 backFallbackPath="/dashboard"
             />
         )
