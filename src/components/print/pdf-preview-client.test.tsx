@@ -118,6 +118,29 @@ describe('PDFプレビューの戻る動作', () => {
         expect(nextSrc).toContain('sets=1')
     })
 
+    it('pdfUrl が変わると iframe を新しい URL で再初期化する', () => {
+        const { rerender } = render(
+            <PdfPreviewClient
+                pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1&cb=initial"
+                backFallbackPath="/dashboard"
+            />
+        )
+
+        fireEvent.load(screen.getByTitle('印刷プレビュー'))
+
+        rerender(
+            <PdfPreviewClient
+                pdfUrl="/api/print/pdf?subjectId=subject-2&sets=2&cb=next"
+                backFallbackPath="/dashboard"
+            />
+        )
+
+        const iframe = screen.getByTitle('印刷プレビュー')
+        expect(iframe.getAttribute('src')).toContain('subjectId=subject-2')
+        expect(iframe.getAttribute('src')).toContain('sets=2')
+        expect(screen.getByText('PDFを読み込み中です...')).toBeTruthy()
+    })
+
     it('openerがある場合は元タブをフォーカスして現在タブを閉じる', () => {
         const openerFocus = vi.fn()
         const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})

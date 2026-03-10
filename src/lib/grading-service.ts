@@ -3,7 +3,6 @@ import { prisma } from '@/lib/prisma';
 import type { Prisma, User } from '@prisma/client';
 import fs from 'fs';
 import path from 'path';
-import os from 'os';
 import { calculateCoreProblemStatus } from '@/lib/progression';
 import { emitRealtimeEvent } from '@/lib/realtime-events';
 import { incrementStampCount } from '@/lib/stamp-service';
@@ -18,6 +17,7 @@ import {
 import { claimGradingJob, markGradingJobCompleted, markGradingJobFailed, publishGradingJob } from '@/lib/grading-job';
 import { loadInstructionPrompt as loadPrompt } from '@/lib/instruction-prompt';
 import { getGeminiMediaResolutionForMimeType } from '@/lib/gemini-media-resolution';
+import { buildGradingTempFileContext } from '@/lib/grading-temp-path';
 
 // Priority adjustment logic (inlined from removed priority-algo.ts)
 type Evaluation = "A" | "B" | "C" | "D";
@@ -151,21 +151,19 @@ type AnalyzedFile = {
 };
 
 async function downloadAndAnalyzeFile(fileId: string, fileName: string): Promise<AnalyzedFile> {
-    const destPath = path.join(os.tmpdir(), fileName);
+    const { jobDirPath, filePath: destPath } = buildGradingTempFileContext(fileId, fileName);
 
     const cleanup = async () => {
         try {
-            if (fs.existsSync(destPath)) {
-                await fs.promises.unlink(destPath);
-            }
+            await fs.promises.rm(jobDirPath, { recursive: true, force: true });
         } catch (cleanupError) {
-            console.error(`[Cleanup] Failed to unlink ${destPath}:`, cleanupError);
+            console.error(`[Cleanup] Failed to remove ${jobDirPath}:`, cleanupError);
         }
     };
 
     try {
-        // Ensure parent dir exists
-        await fs.promises.mkdir(path.dirname(destPath), { recursive: true });
+        // fileId ごとに専用ディレクトリを作り、同名ファイルの衝突を防ぐ。
+        await fs.promises.mkdir(jobDirPath, { recursive: true });
 
         const dest = fs.createWriteStream(destPath);
         const driveClient = getDrive();

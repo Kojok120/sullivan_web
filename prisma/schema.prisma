@@ -197,6 +197,11 @@ model LearningHistory {
   groupId           String? // UUID for batch grouping
   isVideoWatched    Boolean @default(false)
   isStudentReviewed Boolean @default(false) // New: Has the student reviewed this history?
+
+  @@index([userId, answeredAt(sort: Desc)])
+  @@index([groupId, userId, id])
+  @@index([userId, groupId, isStudentReviewed])
+  @@index([userId, groupId, answeredAt(sort: Desc)])
 }
 
 model VocabularyGameScore {

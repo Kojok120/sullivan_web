@@ -45,6 +45,10 @@ type SurveyModalProps = {
     userId: string
 }
 
+type SessionReviewTrackerProps = {
+    groupId: string
+}
+
 type SessionDetailMock = {
     id: string
     evaluation: 'A' | 'B' | 'C' | 'D'
@@ -142,6 +146,14 @@ vi.mock('@/components/voice/chat-tutor-button', () => ({
 
 vi.mock('@/components/survey/SurveyModal', () => ({
     SurveyModal: ({ userId }: SurveyModalProps) => <div data-testid="survey-modal" data-user-id={userId}>Survey Modal</div>,
+}))
+
+vi.mock('@/components/history/session-review-tracker', () => ({
+    SessionReviewTracker: ({ groupId }: SessionReviewTrackerProps) => (
+        <div data-testid="session-review-tracker" data-group-id={groupId}>
+            Session Review Tracker
+        </div>
+    ),
 }))
 
 describe('SessionDetail', () => {
@@ -410,23 +422,25 @@ describe('SessionDetail', () => {
     })
 
     describe('レビュー済みマーク', () => {
-        it('生徒ビューの場合、markSessionAsReviewedを呼ぶ', async () => {
+        it('生徒ビューの場合、SessionReviewTrackerを表示する', async () => {
             const mockDetails = [createMockSessionDetail()]
             mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
-            await SessionDetail({ groupId: 'group1', userId: 'user1', isTeacherView: false })
+            render(await SessionDetail({ groupId: 'group1', userId: 'user1', isTeacherView: false }))
 
-            expect(analytics.markSessionAsReviewed).toHaveBeenCalledWith('group1', 'user1')
+            const tracker = screen.getByTestId('session-review-tracker')
+            expect(tracker).toBeTruthy()
+            expect(tracker.getAttribute('data-group-id')).toBe('group1')
         })
 
-        it('教師ビューの場合、markSessionAsReviewedを呼ばない', async () => {
+        it('教師ビューの場合、SessionReviewTrackerを表示しない', async () => {
             const mockDetails = [createMockSessionDetail()]
             mockSessionDetails(mockDetails)
 
-            await SessionDetail({ groupId: 'group1', userId: 'user1', isTeacherView: true })
+            render(await SessionDetail({ groupId: 'group1', userId: 'user1', isTeacherView: true }))
 
-            expect(analytics.markSessionAsReviewed).not.toHaveBeenCalled()
+            expect(screen.queryByTestId('session-review-tracker')).toBeFalsy()
         })
     })
 

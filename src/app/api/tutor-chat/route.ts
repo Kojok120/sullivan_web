@@ -45,6 +45,9 @@ const MAX_TRANSCRIPT_CHARS = 8000;
 const MAX_HISTORY_MESSAGES = 12;
 const MAX_API_RETRIES = 2;
 const RETRY_BASE_DELAY_MS = 500;
+const REQUEST_DEADLINE_MS = 28_000;
+const DEADLINE_BUFFER_MS = 1_500;
+const MIN_ATTEMPT_BUDGET_MS = 1_000;
 const DANGLING_END_REGEX = /[、,:：;；]$/;
 const INCOMPLETE_PHRASE_END_REGEX = /(まず|次に|そして|たとえば|例えば|つまり|なので|だから)$/;
 const ACK_ONLY_REGEX = /^(なるほど|ありがとう|ありがとうございます|わかった|わかりました|了解|はい|うん|ok|OK|助かった|助かります)[。!！?？\s]*$/;
@@ -241,15 +244,43 @@ async function wait(ms: number) {
     await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function getRemainingDeadlineMs(deadlineAt: number) {
+    return deadlineAt - Date.now();
+}
+
+function getAttemptTimeoutMs(deadlineAt: number) {
+    const remainingMs = getRemainingDeadlineMs(deadlineAt);
+    const attemptBudgetMs = remainingMs - DEADLINE_BUFFER_MS;
+
+    if (attemptBudgetMs < MIN_ATTEMPT_BUDGET_MS) {
+        return null;
+    }
+
+    return Math.min(CHAT_TIMEOUT_MS, attemptBudgetMs);
+}
+
+function getRetryDelayMs(attempt: number, deadlineAt: number) {
+    const jitter = Math.floor(Math.random() * 120);
+    const delay = RETRY_BASE_DELAY_MS * 2 ** attempt + jitter;
+    const remainingMs = getRemainingDeadlineMs(deadlineAt) - DEADLINE_BUFFER_MS - MIN_ATTEMPT_BUDGET_MS;
+
+    if (remainingMs < delay) {
+        return null;
+    }
+
+    return delay;
+}
+
 async function callGeminiWithTimeout(
     ai: GoogleGenAI,
     model: string,
     history: Content[],
     latestUserMessage: string,
     systemInstruction: string,
+    timeoutMs: number,
 ): Promise<GenerateContentResponse> {
     const abortController = new AbortController();
-    const timeoutId = setTimeout(() => abortController.abort(), CHAT_TIMEOUT_MS);
+    const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
     const chat = ai.chats.create({ model, history });
 
     try {
@@ -314,11 +345,13 @@ async function generateTutorReply({
     history,
     latestUserMessage,
     systemInstruction,
+    deadlineAt,
 }: {
     ai: GoogleGenAI;
     history: Content[];
     latestUserMessage: string;
     systemInstruction: string;
+    deadlineAt: number;
 }) {
     const models = Array.from(new Set([CHAT_MODEL, CHAT_FALLBACK_MODEL].filter(Boolean)));
     let lastError: unknown = null;
@@ -326,7 +359,19 @@ async function generateTutorReply({
     for (const model of models) {
         for (let attempt = 0; attempt <= MAX_API_RETRIES; attempt += 1) {
             try {
-                const response = await callGeminiWithTimeout(ai, model, history, latestUserMessage, systemInstruction);
+                const timeoutMs = getAttemptTimeoutMs(deadlineAt);
+                if (timeoutMs === null) {
+                    throw lastError ?? new Error('Tutor chat deadline exceeded');
+                }
+
+                const response = await callGeminiWithTimeout(
+                    ai,
+                    model,
+                    history,
+                    latestUserMessage,
+                    systemInstruction,
+                    timeoutMs,
+                );
                 const candidateText = extractResponseText(response);
                 const parsedReply = parseReplyFromJsonText(candidateText);
 
@@ -352,8 +397,11 @@ async function generateTutorReply({
                     break;
                 }
 
-                const jitter = Math.floor(Math.random() * 120);
-                const delay = RETRY_BASE_DELAY_MS * 2 ** attempt + jitter;
+                const delay = getRetryDelayMs(attempt, deadlineAt);
+                if (delay === null) {
+                    break;
+                }
+
                 await wait(delay);
             }
         }
@@ -363,6 +411,7 @@ async function generateTutorReply({
 }
 
 export async function POST(request: NextRequest) {
+    const requestDeadlineAt = Date.now() + REQUEST_DEADLINE_MS;
     const session = await getSession();
     if (!session) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -459,7 +508,13 @@ export async function POST(request: NextRequest) {
         let reply = '';
         let modelContent: TutorChatModelContent | undefined;
         try {
-            const result = await generateTutorReply({ ai, history, latestUserMessage, systemInstruction });
+            const result = await generateTutorReply({
+                ai,
+                history,
+                latestUserMessage,
+                systemInstruction,
+                deadlineAt: requestDeadlineAt,
+            });
             reply = result.reply;
             modelContent = result.modelContent;
         } catch (error) {

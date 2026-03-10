@@ -357,7 +357,7 @@ export type LearningSession = {
 };
 
 // Group history by groupId
-export async function getLearningSessions(userId: string, limit = 10, offset = 0, onlyUnreviewed = false): Promise<LearningSession[]> {
+export async function getLearningSessions(userId: string, limit = 10, offset = 0, onlyPendingVideoReview = false): Promise<LearningSession[]> {
     // セッション単位の集計とラベル解決を分離して、JOINによる行増幅を防ぐ
     const sessions = await prisma.$queryRaw<Array<{
         groupId: string;
@@ -414,7 +414,7 @@ export async function getLearningSessions(userId: string, limit = 10, offset = 0
             sa."unwatchedMistakeCount"
         FROM session_agg sa
         LEFT JOIN session_label sl ON sl."groupId" = sa."groupId"
-        ${onlyUnreviewed ? Prisma.sql`WHERE sa."unwatchedMistakeCount" > 0` : Prisma.empty}
+        ${onlyPendingVideoReview ? Prisma.sql`WHERE sa."unwatchedMistakeCount" > 0` : Prisma.empty}
         ORDER BY sa."date" DESC, sa."groupId" DESC
         LIMIT ${limit}
         OFFSET ${offset}

@@ -15,6 +15,16 @@ type PdfPreviewClientProps = {
 const RESTORE_RELOAD_THROTTLE_MS = 250;
 
 export function PdfPreviewClient({ pdfUrl, backFallbackPath }: PdfPreviewClientProps) {
+    return (
+        <PdfPreviewClientInner
+            key={pdfUrl}
+            pdfUrl={pdfUrl}
+            backFallbackPath={backFallbackPath}
+        />
+    );
+}
+
+function PdfPreviewClientInner({ pdfUrl, backFallbackPath }: PdfPreviewClientProps) {
     const router = useRouter();
     const iframeRef = useRef<HTMLIFrameElement | null>(null);
     const closeFallbackTimerRef = useRef<number | null>(null);
@@ -42,12 +52,6 @@ export function PdfPreviewClient({ pdfUrl, backFallbackPath }: PdfPreviewClientP
             return false;
         }
     }, []);
-
-    useEffect(() => {
-        hasLoadedFrameRef.current = false;
-        setIsFrameLoaded(false);
-        setFrameUrl(pdfUrl);
-    }, [pdfUrl]);
 
     const reloadFrame = useCallback(() => {
         const now = Date.now();

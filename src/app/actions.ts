@@ -51,7 +51,7 @@ export async function markVideoWatched(historyId: string) {
 
 import { getLearningSessions, markSessionAsReviewed } from "@/lib/analytics";
 
-export async function fetchUserSessions(offset: number, limit: number, filter?: { onlyUnreviewed?: boolean }, targetUserId?: string) {
+export async function fetchUserSessions(offset: number, limit: number, filter?: { onlyPendingVideoReview?: boolean }, targetUserId?: string) {
     const session = await getSession();
     if (!session) throw new Error("Unauthorized");
 
@@ -72,7 +72,7 @@ export async function fetchUserSessions(offset: number, limit: number, filter?: 
         userId = targetUserId;
     }
 
-    return await getLearningSessions(userId, limit, offset, filter?.onlyUnreviewed);
+    return await getLearningSessions(userId, limit, offset, filter?.onlyPendingVideoReview);
 }
 
 export async function markSessionReviewed(groupId: string) {
