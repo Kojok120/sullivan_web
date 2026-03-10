@@ -35,7 +35,8 @@ describe('grading-temp-path', () => {
     it('長いファイル名は上限長に収まるよう切り詰める', () => {
         const context = buildGradingTempFileContext('file-1', `${'a'.repeat(100)}.pdf`);
 
-        expect(context.safeFileName.length).toBeLessThanOrEqual(84);
+        // stem は 80 文字上限、今回は拡張子が `.pdf` なので合計 84 文字以内になる。
+        expect(context.safeFileName.length).toBeLessThanOrEqual(80 + '.pdf'.length);
         expect(context.safeFileName.endsWith('.pdf')).toBe(true);
     });
 

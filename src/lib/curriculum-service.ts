@@ -1,7 +1,28 @@
 import { prisma } from '@/lib/prisma';
 import { getSubjectPrefix } from '@/lib/subject-config';
+import { Prisma } from '@prisma/client';
 
 type CurriculumServiceClient = Pick<typeof prisma, 'subject' | 'problem' | '$queryRaw'>;
+
+function shouldFallbackToCustomIdScan(error: unknown) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        return error.code === 'P2010';
+    }
+
+    if (!(error instanceof Error)) {
+        return false;
+    }
+
+    const normalizedMessage = error.message.toLowerCase();
+    return [
+        'invalid input syntax',
+        'syntax error',
+        'cast',
+        'operator does not exist',
+        'function substring',
+        'unrecognized token',
+    ].some((token) => normalizedMessage.includes(token));
+}
 
 export async function fetchSubjects(options?: { includeCoreProblems?: boolean }) {
     const includeCoreProblems = options?.includeCoreProblems ?? false;
@@ -51,6 +72,10 @@ async function getMaxCustomIdNumber(
             return Number(result[0].max_num);
         }
     } catch (e) {
+        if (!shouldFallbackToCustomIdScan(e)) {
+            throw e;
+        }
+
         console.warn('最大 customId の高速取得に失敗したため、フォールバック処理へ切り替えます', e);
         // customId を全件取得して JavaScript 側で安全に最大値を求める
         const all = await client.problem.findMany({

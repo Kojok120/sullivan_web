@@ -1,5 +1,6 @@
 "use server";
 
+import { getLearningSessions, markSessionAsReviewed } from "@/lib/analytics";
 import { getSession, logout, isTeacherOrAdmin } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -48,8 +49,6 @@ export async function markVideoWatched(historyId: string) {
 
     // revalidatePath('/dashboard');
 }
-
-import { getLearningSessions, markSessionAsReviewed } from "@/lib/analytics";
 
 export async function fetchUserSessions(offset: number, limit: number, filter?: { onlyPendingVideoReview?: boolean }, targetUserId?: string) {
     const session = await getSession();

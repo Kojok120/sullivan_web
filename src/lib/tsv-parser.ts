@@ -240,14 +240,16 @@ function inferProblemRowFormat(cols: string[] | undefined) {
         return 'new';
     }
 
-    return 'old';
+    return null;
 }
 
 function looksLikeGrade(value: string) {
     const normalized = normalizeHeaderCell(value).replace(/第/g, '');
 
-    return /^(?:小|中|高)(?:[1-6１-６一二三四五六])(?:年)?$/.test(normalized)
-        || /^(?:小学|中学|高校?)(?:[1-6１-６一二三四五六])年$/.test(normalized);
+    return /^(?:小|中)(?:[1-6１-６一二三四五六])(?:年)?$/.test(normalized)
+        || /^高(?:[1-3１-３一二三])(?:年)?$/.test(normalized)
+        || /^(?:小学|中学)(?:[1-6１-６一二三四五六])年$/.test(normalized)
+        || /^高校?(?:[1-3１-３一二三])年$/.test(normalized);
 }
 
 function excludeLeadingHeaderRow<T extends string[]>(rows: T[], isHeaderRow: (cols: string[]) => boolean): T[] {

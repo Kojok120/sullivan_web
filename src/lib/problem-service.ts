@@ -40,12 +40,9 @@ function getProblemLabel(problem: Pick<CreateProblemData, 'question' | 'masterNu
     return `【マスタNo: ${masterNumberLabel}】問題文: ${question}`;
 }
 
-function formatProblemServiceError(error: unknown) {
-    if (error instanceof Error) {
-        return error.message;
-    }
-
-    return String(error);
+function formatProblemServiceError(error: unknown): string {
+    console.error('[problem-service] バッチ処理中に内部エラーが発生しました', error);
+    return '内部エラーが発生しました';
 }
 
 export interface CreateProblemData {

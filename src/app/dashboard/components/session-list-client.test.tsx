@@ -200,4 +200,39 @@ describe('SessionListClient', () => {
         });
         expect(screen.queryByText(/解説動画未視聴のセッションはありません/)).toBeNull();
     });
+
+    it('フィルタ取得に失敗した場合はチェック状態を元に戻す', async () => {
+        fetchUserSessionsMock.mockRejectedValueOnce(new Error('network error'));
+
+        render(
+            <SessionListClient
+                initialSessions={initialSessions}
+                userId="user-1"
+                basePath="/dashboard/history"
+            />
+        );
+
+        const checkbox = screen.getByRole('checkbox') as HTMLInputElement;
+        fireEvent.click(checkbox);
+
+        await waitFor(() => {
+            expect(fetchUserSessionsMock).toHaveBeenCalledWith(0, 10, { onlyPendingVideoReview: true }, 'user-1');
+        });
+
+        await waitFor(() => {
+            expect((screen.getByRole('checkbox') as HTMLInputElement).checked).toBe(false);
+        });
+    });
+
+    it('初期表示が1ページ未満ならさらに読み込むを表示しない', () => {
+        render(
+            <SessionListClient
+                initialSessions={initialSessions}
+                userId="user-1"
+                basePath="/dashboard/history"
+            />
+        );
+
+        expect(screen.queryByRole('button', { name: 'さらに読み込む' })).toBeNull();
+    });
 });

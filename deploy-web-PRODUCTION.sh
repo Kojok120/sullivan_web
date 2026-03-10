@@ -133,13 +133,14 @@ GEMINI_API_KEY_SECRET_NAME="${GEMINI_API_KEY_SECRET_NAME:-gemini-api-key}"
 SUPABASE_SERVICE_ROLE_KEY_SECRET_NAME="${SUPABASE_SERVICE_ROLE_KEY_SECRET_NAME:-supabase-service-role-key}"
 RUNTIME_SA_EMAIL="${RUNTIME_SA_EMAIL:-sullivan-runtime@${GOOGLE_CLOUD_PROJECT_ID}.iam.gserviceaccount.com}"
 CLOUD_TASKS_CALLER_SERVICE_ACCOUNT="${CLOUD_TASKS_CALLER_SERVICE_ACCOUNT:-$RUNTIME_SA_EMAIL}"
+DATABASE_URL_SECRET_NAME="${DATABASE_URL_SECRET_NAME:-database-url}"
+DIRECT_URL_SECRET_NAME="${DIRECT_URL_SECRET_NAME:-direct-url}"
 DRIVE_WEBHOOK_CHANNEL_ID="${DRIVE_WEBHOOK_CHANNEL_ID:-}"
 DRIVE_WATCH_STATE_KEY="${DRIVE_WATCH_STATE_KEY:-sullivan:drive:watch:state:prod}"
-INTERNAL_API_SECRET_VALUE="$(resolve_secret_value "INTERNAL_API_SECRET" "internal-api-secret")"
+INTERNAL_API_SECRET_NAME="${INTERNAL_API_SECRET_NAME:-internal-api-secret}"
+DRIVE_WEBHOOK_TOKEN_SECRET_NAME="${DRIVE_WEBHOOK_TOKEN_SECRET_NAME:-drive-webhook-token}"
 
-if [ "$CLOUD_BUILD_REGION" = "global" ]; then
-  CLOUD_BUILD_REGION="asia-northeast1"
-fi
+normalize_cloud_build_region
 
 require_env "GOOGLE_CLOUD_PROJECT_ID"
 require_env "NEXT_PUBLIC_SUPABASE_URL"
@@ -167,6 +168,12 @@ fi
 
 ensure_secret_exists "$GEMINI_API_KEY_SECRET_NAME"
 ensure_secret_exists "$SUPABASE_SERVICE_ROLE_KEY_SECRET_NAME"
+ensure_secret_exists "$DATABASE_URL_SECRET_NAME"
+ensure_secret_exists "$DIRECT_URL_SECRET_NAME"
+ensure_secret_exists "$INTERNAL_API_SECRET_NAME"
+ensure_secret_exists "$DRIVE_WEBHOOK_TOKEN_SECRET_NAME"
+
+INTERNAL_API_SECRET_VALUE="$(resolve_secret_value "INTERNAL_API_SECRET" "$INTERNAL_API_SECRET_NAME")"
 
 ensure_base_image "$WEB_BASE_IMAGE_URI" "cloudbuild.web-base.yaml"
 
@@ -196,8 +203,8 @@ gcloud run deploy "$SERVICE_NAME" \
   --allow-unauthenticated \
   --set-env-vars "BIND_HOST=0.0.0.0" \
   --set-env-vars "NODE_ENV=production,SERVICE_ROLE=web" \
-  --update-secrets "DATABASE_URL=database-url:latest" \
-  --update-secrets "DIRECT_URL=direct-url:latest" \
+  --update-secrets "DATABASE_URL=${DATABASE_URL_SECRET_NAME}:latest" \
+  --update-secrets "DIRECT_URL=${DIRECT_URL_SECRET_NAME}:latest" \
   --update-secrets "GEMINI_API_KEY=${GEMINI_API_KEY_SECRET_NAME}:latest" \
   --set-env-vars "GEMINI_MODEL=$GEMINI_MODEL" \
   --set-env-vars "GEMINI_CHAT_MODEL=$GEMINI_CHAT_MODEL" \
@@ -218,8 +225,8 @@ gcloud run deploy "$SERVICE_NAME" \
   --set-env-vars "NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
   --set-env-vars "NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS=${NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS:-500}" \
   --update-secrets "SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY_SECRET_NAME}:latest" \
-  --update-secrets "INTERNAL_API_SECRET=internal-api-secret:latest" \
-  --update-secrets "DRIVE_WEBHOOK_TOKEN=drive-webhook-token:latest" \
+  --update-secrets "INTERNAL_API_SECRET=${INTERNAL_API_SECRET_NAME}:latest" \
+  --update-secrets "DRIVE_WEBHOOK_TOKEN=${DRIVE_WEBHOOK_TOKEN_SECRET_NAME}:latest" \
   --set-env-vars "DRIVE_WEBHOOK_CHANNEL_ID=$DRIVE_WEBHOOK_CHANNEL_ID" \
   --set-env-vars "DRIVE_WEBHOOK_CHANNEL_ID_FIXED=${DRIVE_WEBHOOK_CHANNEL_ID_FIXED:-false}" \
   --set-env-vars "DRIVE_WATCH_RENEW_THRESHOLD_HOURS=${DRIVE_WATCH_RENEW_THRESHOLD_HOURS:-18}" \

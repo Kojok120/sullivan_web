@@ -236,7 +236,82 @@ describe('ProblemEditor', () => {
 
         rerender(<ProblemEditor coreProblemId="cp-2" />);
 
-        expect(await screen.findByText('問題がありません。')).toBeInTheDocument();
+        expect(await screen.findByText('取得に失敗しました')).toBeInTheDocument();
         expect(screen.queryByText('表示中の問題')).toBeNull();
+    });
+
+    it('coreProblemId 切り替え中は前回の問題一覧ではなくローディングを表示する', async () => {
+        const firstRequest = createDeferred<{
+            success: boolean;
+            problems?: Array<{
+                id: string;
+                question: string;
+                answer: string | null;
+                customId: string | null;
+                grade: string | null;
+                masterNumber: number | null;
+                videoUrl: string | null;
+                coreProblems: Array<{ id: string; name: string; subject: { name: string } }>;
+            }>;
+        }>();
+        const secondRequest = createDeferred<{
+            success: boolean;
+            problems?: Array<{
+                id: string;
+                question: string;
+                answer: string | null;
+                customId: string | null;
+                grade: string | null;
+                masterNumber: number | null;
+                videoUrl: string | null;
+                coreProblems: Array<{ id: string; name: string; subject: { name: string } }>;
+            }>;
+        }>();
+
+        getProblemsByCoreProblemMock.mockImplementation((coreProblemId: string) => {
+            if (coreProblemId === 'cp-1') {
+                return firstRequest.promise;
+            }
+
+            return secondRequest.promise;
+        });
+
+        const { rerender } = render(<ProblemEditor coreProblemId="cp-1" />);
+
+        await act(async () => {
+            firstRequest.resolve({
+                success: true,
+                problems: [
+                    {
+                        id: 'problem-1',
+                        question: '表示中の問題',
+                        answer: 'x=3',
+                        customId: 'E-1',
+                        grade: '中1',
+                        masterNumber: 101,
+                        videoUrl: null,
+                        coreProblems: [],
+                    },
+                ],
+            });
+            await firstRequest.promise;
+        });
+
+        expect(await screen.findByText('表示中の問題')).toBeInTheDocument();
+
+        rerender(<ProblemEditor coreProblemId="cp-2" />);
+
+        expect(screen.getByText('読み込み中...')).toBeInTheDocument();
+        expect(screen.queryByText('表示中の問題')).toBeNull();
+
+        await act(async () => {
+            secondRequest.resolve({
+                success: true,
+                problems: [],
+            });
+            await secondRequest.promise;
+        });
+
+        expect(await screen.findByText('問題がありません。')).toBeInTheDocument();
     });
 });

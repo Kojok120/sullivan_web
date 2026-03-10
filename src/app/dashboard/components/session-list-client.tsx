@@ -18,12 +18,14 @@ type SessionListClientProps = {
     basePath: string;
 };
 
+const PAGE_SIZE = 10;
+
 export function SessionListClient({ initialSessions, userId, basePath }: SessionListClientProps) {
     // 初期表示は全件前提で受け取り、フィルタ変更時のみ再取得する。
     const [sessions, setSessions] = useState<LearningSession[]>(initialSessions);
     const [offset, setOffset] = useState(initialSessions.length);
     const [loading, setLoading] = useState(false);
-    const [hasMore, setHasMore] = useState(true);
+    const [hasMore, setHasMore] = useState(initialSessions.length >= PAGE_SIZE);
     const [showPendingVideoReviewOnly, setShowPendingVideoReviewOnly] = useState(false);
     const latestRequestIdRef = useRef(0);
     const latestFilterRef = useRef(false);
@@ -36,31 +38,31 @@ export function SessionListClient({ initialSessions, userId, basePath }: Session
         onlyPendingVideoReview: boolean;
         nextOffset: number;
         append: boolean;
-    }) => {
+    }): Promise<'success' | 'stale' | 'error'> => {
         const requestId = latestRequestIdRef.current + 1;
         latestRequestIdRef.current = requestId;
         latestFilterRef.current = onlyPendingVideoReview;
         setLoading(true);
         try {
-            const newSessions = await fetchUserSessions( nextOffset, 10, { onlyPendingVideoReview }, userId);
+            const newSessions = await fetchUserSessions(nextOffset, PAGE_SIZE, { onlyPendingVideoReview }, userId);
 
             if (
                 requestId !== latestRequestIdRef.current
                 || latestFilterRef.current !== onlyPendingVideoReview
             ) {
-                return;
+                return 'stale';
             }
 
             if (!append) {
                 setSessions(newSessions);
                 setOffset(newSessions.length);
-                setHasMore(newSessions.length === 10);
-                return;
+                setHasMore(newSessions.length === PAGE_SIZE);
+                return 'success';
             }
 
             if (newSessions.length === 0) {
                 setHasMore(false);
-                return;
+                return 'success';
             }
 
             setSessions((prev) => {
@@ -69,13 +71,16 @@ export function SessionListClient({ initialSessions, userId, basePath }: Session
                 return [...prev, ...filteredNew];
             });
             setOffset((prev) => prev + newSessions.length);
-            if (newSessions.length < 10) {
+            if (newSessions.length < PAGE_SIZE) {
                 setHasMore(false);
             }
+            return 'success';
         } catch (error) {
             if (requestId === latestRequestIdRef.current) {
                 console.error('セッション一覧の取得に失敗しました', error);
+                return 'error';
             }
+            return 'stale';
         } finally {
             if (requestId === latestRequestIdRef.current) {
                 setLoading(false);
@@ -83,13 +88,18 @@ export function SessionListClient({ initialSessions, userId, basePath }: Session
         }
     };
 
-    const handleFilterChange = (checked: boolean) => {
+    const handleFilterChange = async (checked: boolean) => {
+        const previousValue = showPendingVideoReviewOnly;
         setShowPendingVideoReviewOnly(checked);
-        void requestSessions({
+        const result = await requestSessions({
             onlyPendingVideoReview: checked,
             nextOffset: 0,
             append: false,
         });
+
+        if (result === 'error') {
+            setShowPendingVideoReviewOnly(previousValue);
+        }
     };
 
     const loadMore = () => {

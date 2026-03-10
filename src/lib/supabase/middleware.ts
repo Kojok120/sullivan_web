@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { isAuthApiError, isAuthSessionMissingError } from '@supabase/supabase-js';
 import { NextResponse, type NextRequest } from 'next/server';
 
-const RECOVERABLE_REFRESH_TOKEN_ERROR_CODES = new Set([
+const RECOVERABLE_AUTH_SESSION_ERROR_CODES = new Set([
     'refresh_token_not_found',
     'refresh_token_already_used',
     'session_expired',
@@ -46,8 +46,11 @@ function isRecoverableAuthSessionError(error: unknown) {
         ? error.code.toLowerCase()
         : '';
 
-    return RECOVERABLE_REFRESH_TOKEN_ERROR_CODES.has(errorCode)
-        || /invalid refresh token|refresh token not found|refresh token already used|session expired/i.test(error.message);
+    if (errorCode) {
+        return RECOVERABLE_AUTH_SESSION_ERROR_CODES.has(errorCode);
+    }
+
+    return /invalid refresh token|refresh token not found|refresh token already used|session expired/i.test(error.message);
 }
 
 export async function updateSession(request: NextRequest) {

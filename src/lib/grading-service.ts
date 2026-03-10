@@ -54,7 +54,8 @@ function getGenAI() {
     return genAI;
 }
 
-import { QRData, decodeUnitToken, expandProblemIds } from '@/lib/qr-utils';
+import type { QRData } from '@/lib/qr-utils';
+import { decodeUnitToken, expandProblemIds } from '@/lib/qr-utils';
 import {
     buildProgressionUpdateScope,
     filterCoreProblemIdsByScope,

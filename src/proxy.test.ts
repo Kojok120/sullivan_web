@@ -92,6 +92,8 @@ describe('proxy', () => {
 
         const result = await proxy(request);
 
+        expect(result).toBe(supabaseResponse);
+        expect(result.status).toBe(200);
         expect(result.headers.get('Cache-Control')).toBe('private, no-store, no-cache, max-age=0, must-revalidate');
         expect(result.headers.get('Pragma')).toBe('no-cache');
         expect(result.headers.get('Expires')).toBe('0');
@@ -111,6 +113,8 @@ describe('proxy', () => {
 
         const result = await proxy(request);
 
+        expect(result).toBe(supabaseResponse);
+        expect(result.status).toBe(200);
         expect(result.headers.get('Cache-Control')).toBe('private, no-store, no-cache, max-age=0, must-revalidate');
         expect(result.headers.get('Pragma')).toBe('no-cache');
         expect(result.headers.get('Expires')).toBe('0');

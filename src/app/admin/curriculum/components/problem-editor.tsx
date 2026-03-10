@@ -156,14 +156,17 @@ function ProblemItem({ problem }: { problem: ProblemEditorProblem }) {
 export function ProblemEditor({ coreProblemId }: ProblemEditorProps) {
     const [problems, setProblems] = useState<ProblemEditorProblem[]>([]);
     const [loading, setLoading] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
     const requestIdRef = useRef(0);
 
     useEffect(() => {
         const requestId = requestIdRef.current + 1;
         requestIdRef.current = requestId;
+        setErrorMessage('');
+        setProblems([]);
+        setLoading(true);
 
         const fetchProblems = async () => {
-            setLoading(true);
             try {
                 const res = await getProblemsByCoreProblem(coreProblemId);
                 if (requestIdRef.current !== requestId) {
@@ -175,12 +178,14 @@ export function ProblemEditor({ coreProblemId }: ProblemEditorProps) {
                     return;
                 }
 
+                setErrorMessage(res.error ?? '問題の取得に失敗しました。');
                 setProblems([]);
             } catch {
                 if (requestIdRef.current !== requestId) {
                     return;
                 }
 
+                setErrorMessage('問題の取得に失敗しました。');
                 setProblems([]);
             } finally {
                 if (requestIdRef.current === requestId) {
@@ -191,8 +196,6 @@ export function ProblemEditor({ coreProblemId }: ProblemEditorProps) {
 
         void fetchProblems();
     }, [coreProblemId]);
-
-    if (loading && problems.length === 0) return <div className="p-4 text-muted-foreground text-sm">読み込み中...</div>;
 
     return (
         <div className="flex flex-col h-full bg-slate-50/50">
@@ -206,7 +209,13 @@ export function ProblemEditor({ coreProblemId }: ProblemEditorProps) {
 
             {/* List */}
             <div className="flex-1 overflow-y-auto pb-4">
-                {problems.length === 0 ? (
+                {errorMessage ? (
+                    <div className="p-8 text-center text-sm text-red-600">
+                        {errorMessage}
+                    </div>
+                ) : loading ? (
+                    <div className="p-4 text-muted-foreground text-sm">読み込み中...</div>
+                ) : problems.length === 0 ? (
                     <div className="p-8 text-center text-muted-foreground text-sm">
                         問題がありません。
                     </div>

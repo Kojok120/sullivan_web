@@ -31,12 +31,13 @@ export async function SessionDetail({
     isTeacherView = false,
     backUrl = "/"
 }: SessionDetailProps) {
-    const currentSession = await getSession();
     const details = await getSessionDetails(groupId, userId);
 
     if (!details || details.length === 0) {
         return <div className="text-center py-8 text-muted-foreground">履歴が見つかりません</div>;
     }
+
+    const currentSession = isTeacherView ? null : await getSession();
 
     // Check for survey eligibility
     let showSurvey = false;

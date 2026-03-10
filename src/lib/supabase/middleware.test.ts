@@ -97,6 +97,24 @@ describe('supabase middleware', () => {
         expectAuthCookiesCleared(request, result.supabaseResponse.headers.getSetCookie());
     });
 
+    it('error.code がない AuthApiError でも message で未ログイン扱いにする', async () => {
+        const request = createRequest();
+        getUserMock.mockResolvedValue({
+            data: { user: null },
+            error: {
+                __isAuthError: true,
+                name: 'AuthApiError',
+                message: 'Invalid Refresh Token: Refresh Token Not Found',
+                status: 400,
+            },
+        });
+
+        const result = await updateSession(request);
+
+        expect(result.user).toBeNull();
+        expectAuthCookiesCleared(request, result.supabaseResponse.headers.getSetCookie());
+    });
+
     it('refresh_token_already_used も cookie を削除して未ログイン扱いにする', async () => {
         const request = createRequest();
         getUserMock.mockRejectedValue({

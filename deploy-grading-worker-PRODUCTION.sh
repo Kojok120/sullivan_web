@@ -96,6 +96,8 @@ WARM_STOP_JOB_NAME="${WARM_STOP_JOB_NAME:-sullivan-grading-worker-warm-stop}"
 WORKER_MIN_INSTANCES="${WORKER_MIN_INSTANCES:-0}"
 WORKER_MAX_INSTANCES="${WORKER_MAX_INSTANCES:-50}"
 SKIP_INFRA_SETUP="${SKIP_INFRA_SETUP:-0}"
+DATABASE_URL_SECRET_NAME="${DATABASE_URL_SECRET_NAME:-database-url}"
+DIRECT_URL_SECRET_NAME="${DIRECT_URL_SECRET_NAME:-direct-url}"
 GEMINI_API_KEY_SECRET_NAME="${GEMINI_API_KEY_SECRET_NAME:-gemini-api-key}"
 GEMINI_MODEL="${GEMINI_MODEL:-gemini-3.1-pro-preview}"
 GEMINI_CHAT_MODEL="${GEMINI_CHAT_MODEL:-gemini-3.1-pro-preview}"
@@ -105,13 +107,11 @@ GRADING_TASK_QUEUE="${GRADING_TASK_QUEUE:-sullivan-grading}"
 DRIVE_CHECK_TASK_QUEUE="${DRIVE_CHECK_TASK_QUEUE:-sullivan-drive-check}"
 CLOUD_TASKS_CALLER_SERVICE_ACCOUNT="${CLOUD_TASKS_CALLER_SERVICE_ACCOUNT:-$RUNTIME_SA_EMAIL}"
 WORKER_SCHEDULER_CALLER_SERVICE_ACCOUNT="${WORKER_SCHEDULER_CALLER_SERVICE_ACCOUNT:-$RUNTIME_SA_EMAIL}"
-INTERNAL_API_SECRET_VALUE="$(resolve_secret_value "INTERNAL_API_SECRET" "internal-api-secret")"
+INTERNAL_API_SECRET_NAME="${INTERNAL_API_SECRET_NAME:-internal-api-secret}"
 CLOUD_RUN_REGION="${CLOUD_RUN_REGION:-asia-northeast1}"
 CLOUD_BUILD_REGION="${CLOUD_BUILD_REGION:-asia-northeast1}"
 
-if [ "$CLOUD_BUILD_REGION" = "global" ]; then
-  CLOUD_BUILD_REGION="asia-northeast1"
-fi
+normalize_cloud_build_region
 
 if [ -z "${GRADING_WORKER_URL:-}" ]; then
   echo "GRADING_WORKER_URL is required in .env.PRODUCTION for worker self-queue publishing."
@@ -128,6 +128,11 @@ if [ "$SKIP_INFRA_SETUP" != "1" ]; then
 fi
 
 ensure_secret_exists "$GEMINI_API_KEY_SECRET_NAME"
+ensure_secret_exists "$DATABASE_URL_SECRET_NAME"
+ensure_secret_exists "$DIRECT_URL_SECRET_NAME"
+ensure_secret_exists "$INTERNAL_API_SECRET_NAME"
+
+INTERNAL_API_SECRET_VALUE="$(resolve_secret_value "INTERNAL_API_SECRET" "$INTERNAL_API_SECRET_NAME")"
 
 ensure_base_image "$WORKER_BASE_IMAGE_URI" "cloudbuild.worker-base.yaml"
 
@@ -147,9 +152,9 @@ gcloud run deploy sullivan-grading-worker-production \
   --quiet \
   --no-allow-unauthenticated \
   --set-env-vars "NODE_ENV=production,SERVICE_ROLE=worker" \
-  --update-secrets "DATABASE_URL=database-url:latest" \
-  --update-secrets "DIRECT_URL=direct-url:latest" \
-  --update-secrets "INTERNAL_API_SECRET=internal-api-secret:latest" \
+  --update-secrets "DATABASE_URL=${DATABASE_URL_SECRET_NAME}:latest" \
+  --update-secrets "DIRECT_URL=${DIRECT_URL_SECRET_NAME}:latest" \
+  --update-secrets "INTERNAL_API_SECRET=${INTERNAL_API_SECRET_NAME}:latest" \
   --update-secrets "GEMINI_API_KEY=${GEMINI_API_KEY_SECRET_NAME}:latest" \
   --set-env-vars "GEMINI_MODEL=$GEMINI_MODEL" \
   --set-env-vars "GEMINI_CHAT_MODEL=$GEMINI_CHAT_MODEL" \
