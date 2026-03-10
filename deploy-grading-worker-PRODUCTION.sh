@@ -103,6 +103,11 @@ CLOUD_TASKS_CALLER_SERVICE_ACCOUNT="${CLOUD_TASKS_CALLER_SERVICE_ACCOUNT:-$RUNTI
 WORKER_SCHEDULER_CALLER_SERVICE_ACCOUNT="${WORKER_SCHEDULER_CALLER_SERVICE_ACCOUNT:-$RUNTIME_SA_EMAIL}"
 INTERNAL_API_SECRET_VALUE="$(resolve_secret_value "INTERNAL_API_SECRET" "internal-api-secret")"
 CLOUD_RUN_REGION="${CLOUD_RUN_REGION:-asia-northeast1}"
+CLOUD_BUILD_REGION="${CLOUD_BUILD_REGION:-asia-northeast1}"
+
+if [ "$CLOUD_BUILD_REGION" = "global" ]; then
+  CLOUD_BUILD_REGION="asia-northeast1"
+fi
 
 if [ -z "${GRADING_WORKER_URL:-}" ]; then
   echo "GRADING_WORKER_URL is required in .env.PRODUCTION for worker self-queue publishing."
@@ -111,6 +116,7 @@ fi
 
 echo "Deploying grading worker to Project: $GOOGLE_CLOUD_PROJECT_ID"
 echo "Building worker image: $IMAGE_URI"
+echo "Cloud Build region: $CLOUD_BUILD_REGION"
 
 if [ "$SKIP_INFRA_SETUP" != "1" ]; then
   ensure_gcp_service_enabled "cloudscheduler.googleapis.com"
@@ -118,6 +124,7 @@ fi
 
 gcloud builds submit \
   --project "$GOOGLE_CLOUD_PROJECT_ID" \
+  --region "$CLOUD_BUILD_REGION" \
   --config cloudbuild.worker.yaml \
   --substitutions "_IMAGE_URI=$IMAGE_URI" \
   --quiet \

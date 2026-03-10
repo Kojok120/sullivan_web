@@ -143,6 +143,7 @@ gcloud run deploy sullivan-web \
 ```bash
 gcloud builds submit \
   --project "<PROJECT_ID>" \
+  --region asia-northeast1 \
   --config cloudbuild.worker.yaml \
   --substitutions "_IMAGE_URI=asia.gcr.io/<PROJECT_ID>/sullivan-grading-worker-production:<TAG>" \
   .
