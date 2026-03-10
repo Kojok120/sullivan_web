@@ -191,6 +191,11 @@ function normalizeHeaderCell(value: string | undefined) {
     return (value ?? '').trim().replace(/\s+/g, '');
 }
 
+/**
+ * 問題TSVのヘッダー形式を判定する。
+ * ヘッダーを読まない場合や形式を判定できない場合は null を返し、
+ * 呼び出し元では現行の新形式を既定値として扱う。
+ */
 function detectProblemHeaderFormat(cols: string[] | undefined) {
     if (!cols) {
         return null;

@@ -74,7 +74,7 @@ export function SessionListClient({ initialSessions, userId, basePath }: Session
             }
         } catch (error) {
             if (requestId === latestRequestIdRef.current) {
-                console.error("Failed to load sessions", error);
+                console.error('セッション一覧の取得に失敗しました', error);
             }
         } finally {
             if (requestId === latestRequestIdRef.current) {
@@ -92,7 +92,7 @@ export function SessionListClient({ initialSessions, userId, basePath }: Session
         });
     };
 
-    const loadMore = async () => {
+    const loadMore = () => {
         void requestSessions({
             onlyPendingVideoReview: showPendingVideoReviewOnly,
             nextOffset: offset,

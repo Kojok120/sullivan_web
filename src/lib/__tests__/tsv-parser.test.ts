@@ -36,6 +36,27 @@ describe('tsv-parser', () => {
         });
     });
 
+    it('問題 TSV で skipHeader=false のときはヘッダー行もデータとして扱う', () => {
+        const rows = parseProblemTSV([
+            'マスタ内問題番号\t学年\tCoreProblem名\t問題文\t正解',
+            '1\t中1\t方程式\t学年別の考え方を説明する問題\tx=3',
+        ].join('\n'), false);
+
+        expect(rows).toHaveLength(2);
+        expect(rows[0]).toMatchObject({
+            masterNumber: undefined,
+            grade: '学年',
+            coreProblemName: 'CoreProblem名',
+            question: '問題文',
+            answer: '正解',
+        });
+        expect(rows[1]).toMatchObject({
+            masterNumber: 1,
+            grade: '中1',
+            coreProblemName: '方程式',
+        });
+    });
+
     it('問題 TSV の旧ヘッダー形式でも列ずれせずに読み込む', () => {
         const rows = parseProblemTSV([
             '学年\tCoreProblem名\t問題文\t正解\t別解\t動画URL',

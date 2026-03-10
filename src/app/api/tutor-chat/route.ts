@@ -36,6 +36,8 @@ type TutorReplySchema = {
     reply?: unknown;
 };
 
+export const maxDuration = 30;
+
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const CHAT_MODEL = process.env.GEMINI_CHAT_MODEL || 'gemini-3.1-pro-preview';
 const CHAT_FALLBACK_MODEL = process.env.GEMINI_CHAT_FALLBACK_MODEL || CHAT_MODEL;
@@ -45,7 +47,7 @@ const MAX_TRANSCRIPT_CHARS = 8000;
 const MAX_HISTORY_MESSAGES = 12;
 const MAX_API_RETRIES = 2;
 const RETRY_BASE_DELAY_MS = 500;
-const REQUEST_DEADLINE_MS = 28_000;
+const REQUEST_DEADLINE_MS = Math.max(2_000, maxDuration * 1_000 - 2_000);
 const DEADLINE_BUFFER_MS = 1_500;
 const MIN_ATTEMPT_BUDGET_MS = 1_000;
 const DANGLING_END_REGEX = /[、,:：;；]$/;
@@ -94,7 +96,6 @@ const REPLY_SCHEMA = {
 };
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 30;
 
 function loadChatSystemPrompt() {
     try {
