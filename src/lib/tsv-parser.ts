@@ -90,9 +90,8 @@ export interface ParsedProblemRow {
 export function parseProblemTSV(input: string, skipHeader = true): ParsedProblemRow[] {
     const rows = parseTSV(input);
 
-    // 先頭行がヘッダーと完全一致する場合のみ除外する
     const dataRows = skipHeader
-        ? rows.filter((cols) => !isProblemHeaderRow(cols))
+        ? excludeLeadingHeaderRow(rows, isProblemHeaderRow)
         : rows;
 
     return dataRows.map(cols => {
@@ -154,7 +153,7 @@ export function parseCoreProblemTSV(input: string, skipHeader = true): ParsedCor
     const rows = parseTSV(input);
 
     const dataRows = skipHeader
-        ? rows.filter((cols) => !isCoreProblemHeaderRow(cols))
+        ? excludeLeadingHeaderRow(rows, isCoreProblemHeaderRow)
         : rows;
 
     return dataRows.map((cols) => {
@@ -184,6 +183,14 @@ export function parseCoreProblemTSV(input: string, skipHeader = true): ParsedCor
 
 function normalizeHeaderCell(value: string | undefined) {
     return (value ?? '').trim().replace(/\s+/g, '');
+}
+
+function excludeLeadingHeaderRow<T extends string[]>(rows: T[], isHeaderRow: (cols: string[]) => boolean): T[] {
+    if (rows.length === 0) {
+        return rows;
+    }
+
+    return isHeaderRow(rows[0]) ? rows.slice(1) : rows;
 }
 
 function isProblemHeaderRow(cols: string[]) {

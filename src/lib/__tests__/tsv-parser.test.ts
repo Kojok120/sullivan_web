@@ -17,6 +17,25 @@ describe('tsv-parser', () => {
         });
     });
 
+    it('問題 TSV では先頭以外のヘッダー形式の行を自動除外しない', () => {
+        const rows = parseProblemTSV([
+            '1\t中1\t方程式\t通常の問題\tx=3',
+            'マスタ内問題番号\t学年\tCoreProblem名\t問題文\t正解',
+        ].join('\n'));
+
+        expect(rows).toHaveLength(2);
+        expect(rows[0]).toMatchObject({
+            masterNumber: 1,
+            grade: '中1',
+            coreProblemName: '方程式',
+        });
+        expect(rows[1]).toMatchObject({
+            masterNumber: undefined,
+            grade: '学年',
+            coreProblemName: 'CoreProblem名',
+        });
+    });
+
     it('CoreProblem TSV ではデータ行に CoreProblem が含まれても除外しない', () => {
         const rows = parseCoreProblemTSV([
             'マスタNo\tCoreProblem名\t動画タイトル1\t動画URL1',
@@ -33,6 +52,24 @@ describe('tsv-parser', () => {
                     url: 'https://example.com/movie',
                 },
             ],
+        });
+    });
+
+    it('CoreProblem TSV でも先頭以外のヘッダー形式の行は残す', () => {
+        const rows = parseCoreProblemTSV([
+            '1\t一次関数\t導入\thttps://example.com/movie',
+            'マスタNo\tCoreProblem名\t動画タイトル1\t動画URL1',
+        ].join('\n'));
+
+        expect(rows).toHaveLength(2);
+        expect(rows[0]).toMatchObject({
+            masterNumber: 1,
+            name: '一次関数',
+        });
+        expect(rows[1]).toMatchObject({
+            masterNumber: undefined,
+            masterNumberRaw: 'マスタNo',
+            name: 'CoreProblem名',
         });
     });
 });
