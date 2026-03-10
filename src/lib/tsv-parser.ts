@@ -89,7 +89,7 @@ export interface ParsedProblemRow {
 
 export function parseProblemTSV(input: string, skipHeader = true): ParsedProblemRow[] {
     const rows = parseTSV(input);
-    const problemHeaderFormat = skipHeader ? detectProblemHeaderFormat(rows[0]) : null;
+    const problemHeaderFormat = detectProblemHeaderFormat(rows[0]) ?? inferProblemRowFormat(rows[0]);
 
     const dataRows = skipHeader
         ? excludeLeadingHeaderRow(rows, isProblemHeaderRow)
@@ -214,6 +214,40 @@ function detectProblemHeaderFormat(cols: string[] | undefined) {
     }
 
     return null;
+}
+
+function inferProblemRowFormat(cols: string[] | undefined) {
+    if (!cols || cols.length === 0) {
+        return null;
+    }
+
+    const firstCol = (cols[0] ?? '').trim();
+    const secondCol = (cols[1] ?? '').trim();
+
+    if (!firstCol && !secondCol) {
+        return null;
+    }
+
+    if (looksLikeGrade(firstCol)) {
+        return 'old';
+    }
+
+    if (looksLikeGrade(secondCol) || (!firstCol && secondCol.length > 0)) {
+        return 'new';
+    }
+
+    if (firstCol.replace(/[^\d]/g, '').length > 0) {
+        return 'new';
+    }
+
+    return 'old';
+}
+
+function looksLikeGrade(value: string) {
+    const normalized = normalizeHeaderCell(value).replace(/第/g, '');
+
+    return /^(?:小|中|高)(?:[1-6１-６一二三四五六])(?:年)?$/.test(normalized)
+        || /^(?:小学|中学|高校?)(?:[1-6１-６一二三四五六])年$/.test(normalized);
 }
 
 function excludeLeadingHeaderRow<T extends string[]>(rows: T[], isHeaderRow: (cols: string[]) => boolean): T[] {

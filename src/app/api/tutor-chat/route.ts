@@ -395,7 +395,7 @@ async function generateTutorReply({
                 );
 
                 if (!isRetryableError(error)) {
-                    throw error;
+                    break;
                 }
 
                 if (attempt >= MAX_API_RETRIES) {

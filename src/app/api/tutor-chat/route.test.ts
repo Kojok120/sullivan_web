@@ -96,6 +96,10 @@ describe('tutor chat route', () => {
         vi.clearAllMocks();
         vi.resetModules();
         vi.useRealTimers();
+        sendMessageMock.mockReset();
+        createChatMock.mockReset().mockImplementation(() => ({
+            sendMessage: sendMessageMock,
+        }));
         process.env.GEMINI_API_KEY = 'test-api-key';
         process.env.GEMINI_CHAT_MODEL = 'primary-model';
         process.env.GEMINI_CHAT_FALLBACK_MODEL = 'backup-model';
@@ -196,8 +200,12 @@ describe('tutor chat route', () => {
         expect(body.reply).toBe('分配法則を使います。');
     });
 
-    it('non-retryable error の場合は1回で fallback reply に落ちる', async () => {
-        sendMessageMock.mockRejectedValue(Object.assign(new Error('bad request'), { status: 400 }));
+    it('primary model が non-retryable error でも fallback model で応答できれば返す', async () => {
+        sendMessageMock
+            .mockRejectedValueOnce(Object.assign(new Error('bad request'), { status: 400 }))
+            .mockResolvedValueOnce({
+                text: '{"reply":"fallback model の回答です"}',
+            });
 
         const response = await POST(createRequest([
             { role: 'assistant', content: 'こんにちは' },
@@ -206,14 +214,21 @@ describe('tutor chat route', () => {
         const body = await response.json();
 
         expect(response.status).toBe(200);
-        expect(body.reply).toContain('いい質問です。');
-        expect(createChatMock).toHaveBeenCalledTimes(1);
+        expect(body.reply).toBe('fallback model の回答です。');
+        expect(((createChatMock.mock.calls as unknown) as Array<[{ model: string }]>).map(([params]) => params.model)).toEqual([
+            'primary-model',
+            'backup-model',
+        ]);
     });
 
     it('ai.chats.create が同期例外でも fallback reply を返す', async () => {
-        createChatMock.mockImplementationOnce(() => {
-            throw new Error('sync create failed');
-        });
+        createChatMock
+            .mockImplementationOnce(() => {
+                throw new Error('sync create failed');
+            })
+            .mockImplementationOnce(() => {
+                throw new Error('sync create failed again');
+            });
 
         const response = await POST(createRequest([
             { role: 'assistant', content: 'こんにちは' },
@@ -223,7 +238,7 @@ describe('tutor chat route', () => {
 
         expect(response.status).toBe(200);
         expect(body.reply).toContain('いい質問です。');
-        expect(createChatMock).toHaveBeenCalledTimes(1);
+        expect(createChatMock).toHaveBeenCalledTimes(2);
         expect(sendMessageMock).not.toHaveBeenCalled();
     });
 });

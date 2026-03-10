@@ -2,7 +2,7 @@
 
 import { Badge } from '@/components/ui/badge';
 import type { Prisma } from '@prisma/client';
-import { useState, useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { getProblemsByCoreProblem } from '../actions';
 import { LinkIcon, GraduationCap, Hash, KeyRound, BookOpen } from 'lucide-react';
 
@@ -156,17 +156,40 @@ function ProblemItem({ problem }: { problem: ProblemEditorProblem }) {
 export function ProblemEditor({ coreProblemId }: ProblemEditorProps) {
     const [problems, setProblems] = useState<ProblemEditorProblem[]>([]);
     const [loading, setLoading] = useState(false);
+    const requestIdRef = useRef(0);
 
     useEffect(() => {
+        const requestId = requestIdRef.current + 1;
+        requestIdRef.current = requestId;
+
         const fetchProblems = async () => {
             setLoading(true);
-            const res = await getProblemsByCoreProblem(coreProblemId);
-            if (res.success && res.problems) {
-                setProblems(res.problems);
+            try {
+                const res = await getProblemsByCoreProblem(coreProblemId);
+                if (requestIdRef.current !== requestId) {
+                    return;
+                }
+
+                if (res.success && res.problems) {
+                    setProblems(res.problems);
+                    return;
+                }
+
+                setProblems([]);
+            } catch {
+                if (requestIdRef.current !== requestId) {
+                    return;
+                }
+
+                setProblems([]);
+            } finally {
+                if (requestIdRef.current === requestId) {
+                    setLoading(false);
+                }
             }
-            setLoading(false);
         };
-        fetchProblems();
+
+        void fetchProblems();
     }, [coreProblemId]);
 
     if (loading && problems.length === 0) return <div className="p-4 text-muted-foreground text-sm">読み込み中...</div>;
