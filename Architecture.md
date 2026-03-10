@@ -25,7 +25,7 @@ Sullivan は次の分業を前提に設計されています。
 - Next.js 16 App Router
 - UI と通常 API を提供
 - Drive Webhook 受信
-- QStash ジョブ発行
+- Cloud Tasks ジョブ発行
 - Gemini Live 音声連携の WebSocket 中継（`/ws`）
 
 起動エントリーポイント:
@@ -36,7 +36,7 @@ Sullivan は次の分業を前提に設計されています。
 
 - 採点専用 HTTP サーバー
 - `/api/queue/grading` / `/api/queue/drive-check` を処理
-- QStash 署名検証後に採点ジョブを実行
+- Cloud Run IAM で保護された private service として採点ジョブを実行
 
 起動エントリーポイント:
 
@@ -48,8 +48,7 @@ Sullivan は次の分業を前提に設計されています。
 - PostgreSQL（Prisma）
 - Google Gemini（`@google/genai`）
 - Google Drive API（答案受け取り）
-- Upstash QStash（ジョブキュー）
-- Upstash Redis（Drive watch 状態とロック）
+- Google Cloud Tasks（ジョブキュー）
 - Supabase Realtime（イベント配信）
 
 ## 3. 主要データフロー
@@ -64,7 +63,7 @@ Sullivan は次の分業を前提に設計されています。
 ### 3.2 採点フロー
 
 1. Drive Webhook を受信
-2. Web サービスが QStash へジョブ発行
+2. Web サービスが Cloud Tasks へジョブ発行
 3. Worker がジョブ処理
 4. QR 解析（OpenCV -> 失敗時 Gemini）
 5. Gemini 採点
@@ -109,6 +108,8 @@ Sullivan は次の分業を前提に設計されています。
   - `UserCoreProblemState`
 - 運用:
   - `GradingJob`（冪等性/再試行管理）
+  - `DistributedLock`（採点ロック）
+  - `DriveWatchState`（Drive watch 状態）
   - `RealtimeEvent`
 - 情意・習慣:
   - `GuidanceRecord`
@@ -143,4 +144,3 @@ prisma/schema.prisma        # DBスキーマ
 - Drive Watch は定期更新運用（7日失効対策）
 
 実運用手順は [docs/deploy_runbook.md](./docs/deploy_runbook.md) を参照してください。
-

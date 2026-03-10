@@ -4,7 +4,6 @@ on:
   push:
     branches: [dev]
 
-# 同一ブランチでの重複デプロイをキャンセル
 concurrency:
   group: deploy-dev
   cancel-in-progress: true
@@ -14,236 +13,6 @@ env:
   GCP_REGION: asia-northeast1
 
 jobs:
-  deploy-web:
-    name: Deploy Web App (DEV)
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    needs: [migrate-db, deploy-grading-worker]
-    environment: dev
-    permissions:
-      contents: read
-      id-token: write
-
-    steps:
-      - name: チェックアウト
-        uses: actions/checkout@v4
-
-      - name: GCP 認証 (Workload Identity Federation)
-        uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
-          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
-
-      - name: gcloud CLI セットアップ
-        uses: google-github-actions/setup-gcloud@v2
-
-      - name: 必須シークレット検証 (Web)
-        env:
-          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
-          GEMINI_CHAT_MODEL: ${{ secrets.GEMINI_CHAT_MODEL }}
-          GRADING_WORKER_URL: ${{ secrets.GRADING_WORKER_URL }}
-          QSTASH_TOKEN: ${{ secrets.QSTASH_TOKEN }}
-          QSTASH_CURRENT_SIGNING_KEY: ${{ secrets.QSTASH_CURRENT_SIGNING_KEY }}
-          QSTASH_NEXT_SIGNING_KEY: ${{ secrets.QSTASH_NEXT_SIGNING_KEY }}
-        run: |
-          for var in GEMINI_MODEL GEMINI_CHAT_MODEL GRADING_WORKER_URL QSTASH_TOKEN QSTASH_CURRENT_SIGNING_KEY QSTASH_NEXT_SIGNING_KEY; do
-            if [ -z "${!var}" ]; then
-              echo "Missing required secret: ${var}"
-              exit 1
-            fi
-          done
-
-      - name: Docker 認証
-        run: gcloud auth configure-docker asia.gcr.io --quiet
-
-      - name: Docker ビルド (Web)
-        run: |
-          docker build \
-            --build-arg NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }} \
-            --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }} \
-            --build-arg NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS=${{ secrets.NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS }} \
-            --build-arg QSTASH_CURRENT_SIGNING_KEY=${{ secrets.QSTASH_CURRENT_SIGNING_KEY }} \
-            --build-arg QSTASH_NEXT_SIGNING_KEY=${{ secrets.QSTASH_NEXT_SIGNING_KEY }} \
-            -t asia.gcr.io/${{ secrets.GCP_PROJECT_ID }}/sullivan-app-dev:${{ github.sha }} \
-            .
-
-      - name: Docker プッシュ (Web)
-        run: docker push asia.gcr.io/${{ secrets.GCP_PROJECT_ID }}/sullivan-app-dev:${{ github.sha }}
-
-      - name: Cloud Run デプロイ (Web)
-        id: deploy_web
-        run: |
-          gcloud run deploy sullivan-app-dev \
-            --project "${{ secrets.GCP_PROJECT_ID }}" \
-            --service-account "${{ secrets.RUNTIME_SA_EMAIL }}" \
-            --image asia.gcr.io/${{ secrets.GCP_PROJECT_ID }}/sullivan-app-dev:${{ github.sha }} \
-            --platform managed \
-            --region ${{ env.GCP_REGION }} \
-            --port 8080 \
-            --memory 4Gi \
-            --cpu 2 \
-            --concurrency 20 \
-            --allow-unauthenticated \
-            --set-env-vars "BIND_HOST=0.0.0.0,SERVICE_ROLE=web" \
-            --set-env-vars "NODE_ENV=production" \
-            --update-secrets "DATABASE_URL=database-url:latest" \
-            --update-secrets "DIRECT_URL=direct-url:latest" \
-            --set-env-vars "QSTASH_TOKEN=${{ secrets.QSTASH_TOKEN }}" \
-            --set-env-vars "QSTASH_CURRENT_SIGNING_KEY=${{ secrets.QSTASH_CURRENT_SIGNING_KEY }}" \
-            --set-env-vars "QSTASH_NEXT_SIGNING_KEY=${{ secrets.QSTASH_NEXT_SIGNING_KEY }}" \
-            --set-env-vars "UPSTASH_REDIS_REST_URL=${{ secrets.UPSTASH_REDIS_REST_URL }}" \
-            --set-env-vars "UPSTASH_REDIS_REST_TOKEN=${{ secrets.UPSTASH_REDIS_REST_TOKEN }}" \
-            --set-env-vars "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" \
-            --set-env-vars "GEMINI_MODEL=${{ secrets.GEMINI_MODEL }}" \
-            --set-env-vars "GEMINI_CHAT_MODEL=${{ secrets.GEMINI_CHAT_MODEL }}" \
-            --set-env-vars "GEMINI_CHAT_FALLBACK_MODEL=${{ secrets.GEMINI_CHAT_FALLBACK_MODEL }}" \
-            --set-env-vars "GEMINI_LIVE_MODEL=${{ secrets.GEMINI_LIVE_MODEL }}" \
-            --set-env-vars "GEMINI_LIVE_API_VERSION=${{ secrets.GEMINI_LIVE_API_VERSION }}" \
-            --set-env-vars "GEMINI_LIVE_VOICE=${{ secrets.GEMINI_LIVE_VOICE }}" \
-            --set-env-vars "DRIVE_FOLDER_ID=${{ secrets.DRIVE_FOLDER_ID }}" \
-            --set-env-vars "APP_URL=${{ secrets.APP_URL }}" \
-            --set-env-vars "NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" \
-            --set-env-vars "NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" \
-            --set-env-vars "NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS=${{ secrets.NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS }}" \
-            --set-env-vars "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
-            --update-secrets "INTERNAL_API_SECRET=internal-api-secret:latest" \
-            --update-secrets "DRIVE_WEBHOOK_TOKEN=drive-webhook-token:latest" \
-            --set-env-vars "DRIVE_WEBHOOK_CHANNEL_ID=${{ secrets.DRIVE_WEBHOOK_CHANNEL_ID }}" \
-            --set-env-vars "GRADING_WORKER_URL=${{ secrets.GRADING_WORKER_URL }}"
-
-      - name: Cloud Run 起動ログ取得 (Web, 失敗時)
-        if: failure() && steps.deploy_web.outcome == 'failure'
-        run: |
-          echo "Cloud Run web deploy failed. Fetching diagnostic logs..."
-
-          REVISION="$(gcloud run services describe sullivan-app-dev \
-            --project "${{ secrets.GCP_PROJECT_ID }}" \
-            --region ${{ env.GCP_REGION }} \
-            --format='value(status.latestCreatedRevisionName)' 2>/dev/null || true)"
-
-          if [ -z "$REVISION" ]; then
-            echo "Could not determine latest revision."
-            exit 0
-          fi
-
-          echo "latestCreatedRevision=$REVISION"
-
-          gcloud logging read \
-            "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"sullivan-app-dev\" AND resource.labels.revision_name=\"$REVISION\"" \
-            --project "${{ secrets.GCP_PROJECT_ID }}" \
-            --limit=200 \
-            --format='value(timestamp,logName,textPayload,jsonPayload.message,jsonPayload)' \
-            || true
-
-  deploy-grading-worker:
-    name: Deploy Grading Worker (DEV)
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    needs: [migrate-db]
-    environment: dev
-    permissions:
-      contents: read
-      id-token: write
-
-    steps:
-      - name: チェックアウト
-        uses: actions/checkout@v4
-
-      - name: GCP 認証 (Workload Identity Federation)
-        uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
-          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
-
-      - name: gcloud CLI セットアップ
-        uses: google-github-actions/setup-gcloud@v2
-
-      - name: 必須シークレット検証 (Grading Worker)
-        env:
-          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-          RUNTIME_SA_EMAIL: ${{ secrets.RUNTIME_SA_EMAIL }}
-          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
-          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
-          GEMINI_CHAT_MODEL: ${{ secrets.GEMINI_CHAT_MODEL }}
-          GEMINI_LIVE_MODEL: ${{ secrets.GEMINI_LIVE_MODEL }}
-          GEMINI_LIVE_API_VERSION: ${{ secrets.GEMINI_LIVE_API_VERSION }}
-          GEMINI_LIVE_VOICE: ${{ secrets.GEMINI_LIVE_VOICE }}
-          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
-          GRADING_WORKER_URL: ${{ secrets.GRADING_WORKER_URL }}
-          QSTASH_TOKEN: ${{ secrets.QSTASH_TOKEN }}
-          QSTASH_CURRENT_SIGNING_KEY: ${{ secrets.QSTASH_CURRENT_SIGNING_KEY }}
-          QSTASH_NEXT_SIGNING_KEY: ${{ secrets.QSTASH_NEXT_SIGNING_KEY }}
-        run: |
-          for var in \
-            GCP_PROJECT_ID \
-            RUNTIME_SA_EMAIL \
-            UPSTASH_REDIS_REST_URL \
-            UPSTASH_REDIS_REST_TOKEN \
-            GEMINI_API_KEY \
-            GEMINI_MODEL \
-            GEMINI_CHAT_MODEL \
-            GEMINI_LIVE_MODEL \
-            GEMINI_LIVE_API_VERSION \
-            GEMINI_LIVE_VOICE \
-            DRIVE_FOLDER_ID \
-            GRADING_WORKER_URL \
-            QSTASH_TOKEN \
-            QSTASH_CURRENT_SIGNING_KEY \
-            QSTASH_NEXT_SIGNING_KEY; do
-            if [ -z "${!var}" ]; then
-              echo "Missing required secret: ${var}"
-              exit 1
-            fi
-          done
-
-      - name: Docker 認証
-        run: gcloud auth configure-docker asia.gcr.io --quiet
-
-      - name: Docker ビルド (Grading Worker)
-        run: |
-          docker build \
-            -f Dockerfile.worker \
-            -t asia.gcr.io/${{ secrets.GCP_PROJECT_ID }}/sullivan-grading-worker-dev:${{ github.sha }} \
-            .
-
-      - name: Docker プッシュ (Grading Worker)
-        run: docker push asia.gcr.io/${{ secrets.GCP_PROJECT_ID }}/sullivan-grading-worker-dev:${{ github.sha }}
-
-      - name: Cloud Run デプロイ (Grading Worker)
-        run: |
-          gcloud run deploy sullivan-grading-worker-dev \
-            --project "${{ secrets.GCP_PROJECT_ID }}" \
-            --service-account "${{ secrets.RUNTIME_SA_EMAIL }}" \
-            --image asia.gcr.io/${{ secrets.GCP_PROJECT_ID }}/sullivan-grading-worker-dev:${{ github.sha }} \
-            --platform managed \
-            --region ${{ env.GCP_REGION }} \
-            --memory 4Gi \
-            --cpu 2 \
-            --concurrency 1 \
-            --min-instances 0 \
-            --max-instances 10 \
-            --allow-unauthenticated \
-            --set-env-vars "NODE_ENV=development,SERVICE_ROLE=worker" \
-            --update-secrets "DATABASE_URL=database-url:latest" \
-            --update-secrets "DIRECT_URL=direct-url:latest" \
-            --update-secrets "INTERNAL_API_SECRET=internal-api-secret:latest" \
-            --set-env-vars "UPSTASH_REDIS_REST_URL=${{ secrets.UPSTASH_REDIS_REST_URL }}" \
-            --set-env-vars "UPSTASH_REDIS_REST_TOKEN=${{ secrets.UPSTASH_REDIS_REST_TOKEN }}" \
-            --set-env-vars "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" \
-            --set-env-vars "GEMINI_MODEL=${{ secrets.GEMINI_MODEL }}" \
-            --set-env-vars "GEMINI_CHAT_MODEL=${{ secrets.GEMINI_CHAT_MODEL }}" \
-            --set-env-vars "GEMINI_CHAT_FALLBACK_MODEL=${{ secrets.GEMINI_CHAT_FALLBACK_MODEL }}" \
-            --set-env-vars "GEMINI_LIVE_MODEL=${{ secrets.GEMINI_LIVE_MODEL }}" \
-            --set-env-vars "GEMINI_LIVE_API_VERSION=${{ secrets.GEMINI_LIVE_API_VERSION }}" \
-            --set-env-vars "GEMINI_LIVE_VOICE=${{ secrets.GEMINI_LIVE_VOICE }}" \
-            --set-env-vars "DRIVE_FOLDER_ID=${{ secrets.DRIVE_FOLDER_ID }}" \
-            --set-env-vars "GRADING_WORKER_URL=${{ secrets.GRADING_WORKER_URL }}" \
-            --set-env-vars "QSTASH_TOKEN=${{ secrets.QSTASH_TOKEN }}" \
-            --set-env-vars "QSTASH_CURRENT_SIGNING_KEY=${{ secrets.QSTASH_CURRENT_SIGNING_KEY }}" \
-            --set-env-vars "QSTASH_NEXT_SIGNING_KEY=${{ secrets.QSTASH_NEXT_SIGNING_KEY }}"
-
   migrate-db:
     name: DB マイグレーション (DEV)
     runs-on: ubuntu-latest
@@ -268,3 +37,250 @@ jobs:
 
       - name: Prisma マイグレーション実行
         run: npx prisma migrate deploy
+
+  deploy-grading-worker:
+    name: Deploy Grading Worker (DEV)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [migrate-db]
+    environment: dev
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: チェックアウト
+        uses: actions/checkout@v4
+
+      - name: GCP 認証 (Workload Identity Federation)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: gcloud CLI セットアップ
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: デプロイ設定ファイル生成 (DEV Worker)
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          RUNTIME_SA_EMAIL: ${{ secrets.RUNTIME_SA_EMAIL }}
+          INTERNAL_API_SECRET: ${{ secrets.INTERNAL_API_SECRET }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
+          GEMINI_CHAT_MODEL: ${{ secrets.GEMINI_CHAT_MODEL }}
+          GEMINI_CHAT_FALLBACK_MODEL: ${{ secrets.GEMINI_CHAT_FALLBACK_MODEL }}
+          GEMINI_LIVE_MODEL: ${{ secrets.GEMINI_LIVE_MODEL }}
+          GEMINI_LIVE_API_VERSION: ${{ secrets.GEMINI_LIVE_API_VERSION }}
+          GEMINI_LIVE_VOICE: ${{ secrets.GEMINI_LIVE_VOICE }}
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+          GRADING_WORKER_URL: ${{ secrets.GRADING_WORKER_URL }}
+          CLOUD_TASKS_LOCATION: ${{ secrets.CLOUD_TASKS_LOCATION }}
+          GRADING_TASK_QUEUE: ${{ secrets.GRADING_TASK_QUEUE }}
+          DRIVE_CHECK_TASK_QUEUE: ${{ secrets.DRIVE_CHECK_TASK_QUEUE }}
+          CLOUD_TASKS_CALLER_SERVICE_ACCOUNT: ${{ secrets.CLOUD_TASKS_CALLER_SERVICE_ACCOUNT }}
+          WORKER_SCHEDULER_CALLER_SERVICE_ACCOUNT: ${{ secrets.WORKER_SCHEDULER_CALLER_SERVICE_ACCOUNT }}
+        run: |
+          set -euo pipefail
+
+          for var in GCP_PROJECT_ID RUNTIME_SA_EMAIL INTERNAL_API_SECRET GEMINI_API_KEY DRIVE_FOLDER_ID; do
+            if [ -z "${!var}" ]; then
+              echo "Missing required secret: ${var}"
+              exit 1
+            fi
+          done
+
+          WORKER_URL="$(gcloud run services describe sullivan-grading-worker-dev \
+            --project "$GCP_PROJECT_ID" \
+            --region "${{ env.GCP_REGION }}" \
+            --format='value(status.url)' 2>/dev/null || true)"
+
+          if [ -z "$WORKER_URL" ]; then
+            WORKER_URL="${GRADING_WORKER_URL:-}"
+          fi
+
+          if [ -z "$WORKER_URL" ]; then
+            echo "Missing required secret: GRADING_WORKER_URL"
+            exit 1
+          fi
+
+          cat > .env.DEV <<EOF
+          GOOGLE_CLOUD_PROJECT_ID=$GCP_PROJECT_ID
+          RUNTIME_SA_EMAIL=$RUNTIME_SA_EMAIL
+          INTERNAL_API_SECRET=$INTERNAL_API_SECRET
+          GEMINI_API_KEY=$GEMINI_API_KEY
+          GEMINI_MODEL=${GEMINI_MODEL:-}
+          GEMINI_CHAT_MODEL=${GEMINI_CHAT_MODEL:-}
+          GEMINI_CHAT_FALLBACK_MODEL=${GEMINI_CHAT_FALLBACK_MODEL:-}
+          GEMINI_LIVE_MODEL=${GEMINI_LIVE_MODEL:-}
+          GEMINI_LIVE_API_VERSION=${GEMINI_LIVE_API_VERSION:-}
+          GEMINI_LIVE_VOICE=${GEMINI_LIVE_VOICE:-}
+          DRIVE_FOLDER_ID=$DRIVE_FOLDER_ID
+          GRADING_WORKER_URL=$WORKER_URL
+          CLOUD_TASKS_LOCATION=${CLOUD_TASKS_LOCATION:-asia-northeast1}
+          GRADING_TASK_QUEUE=${GRADING_TASK_QUEUE:-sullivan-grading}
+          DRIVE_CHECK_TASK_QUEUE=${DRIVE_CHECK_TASK_QUEUE:-sullivan-drive-check}
+          CLOUD_TASKS_CALLER_SERVICE_ACCOUNT=${CLOUD_TASKS_CALLER_SERVICE_ACCOUNT:-$RUNTIME_SA_EMAIL}
+          WORKER_SCHEDULER_CALLER_SERVICE_ACCOUNT=${WORKER_SCHEDULER_CALLER_SERVICE_ACCOUNT:-$RUNTIME_SA_EMAIL}
+          CLOUD_RUN_REGION=${{ env.GCP_REGION }}
+          SKIP_INFRA_SETUP=1
+          EOF
+
+      - name: Worker デプロイ (DEV)
+        run: ./deploy-grading-worker-DEV.sh
+
+  deploy-web:
+    name: Deploy Web App (DEV)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [migrate-db, deploy-grading-worker]
+    environment: dev
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: チェックアウト
+        uses: actions/checkout@v4
+
+      - name: GCP 認証 (Workload Identity Federation)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: gcloud CLI セットアップ
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: デプロイ設定ファイル生成 (DEV Web)
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          RUNTIME_SA_EMAIL: ${{ secrets.RUNTIME_SA_EMAIL }}
+          INTERNAL_API_SECRET: ${{ secrets.INTERNAL_API_SECRET }}
+          APP_URL: ${{ secrets.APP_URL }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS: ${{ secrets.NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
+          GEMINI_CHAT_MODEL: ${{ secrets.GEMINI_CHAT_MODEL }}
+          GEMINI_CHAT_FALLBACK_MODEL: ${{ secrets.GEMINI_CHAT_FALLBACK_MODEL }}
+          GEMINI_LIVE_MODEL: ${{ secrets.GEMINI_LIVE_MODEL }}
+          GEMINI_LIVE_API_VERSION: ${{ secrets.GEMINI_LIVE_API_VERSION }}
+          GEMINI_LIVE_VOICE: ${{ secrets.GEMINI_LIVE_VOICE }}
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+          DRIVE_WEBHOOK_CHANNEL_ID: ${{ secrets.DRIVE_WEBHOOK_CHANNEL_ID }}
+          DRIVE_WEBHOOK_CHANNEL_ID_FIXED: ${{ secrets.DRIVE_WEBHOOK_CHANNEL_ID_FIXED }}
+          DRIVE_WATCH_RENEW_THRESHOLD_HOURS: ${{ secrets.DRIVE_WATCH_RENEW_THRESHOLD_HOURS }}
+          DRIVE_WATCH_STATE_KEY: ${{ secrets.DRIVE_WATCH_STATE_KEY }}
+          GRADING_WORKER_URL: ${{ secrets.GRADING_WORKER_URL }}
+          CLOUD_TASKS_LOCATION: ${{ secrets.CLOUD_TASKS_LOCATION }}
+          GRADING_TASK_QUEUE: ${{ secrets.GRADING_TASK_QUEUE }}
+          DRIVE_CHECK_TASK_QUEUE: ${{ secrets.DRIVE_CHECK_TASK_QUEUE }}
+          CLOUD_TASKS_CALLER_SERVICE_ACCOUNT: ${{ secrets.CLOUD_TASKS_CALLER_SERVICE_ACCOUNT }}
+        run: |
+          set -euo pipefail
+
+          for var in \
+            GCP_PROJECT_ID \
+            RUNTIME_SA_EMAIL \
+            INTERNAL_API_SECRET \
+            APP_URL \
+            NEXT_PUBLIC_SUPABASE_URL \
+            NEXT_PUBLIC_SUPABASE_ANON_KEY \
+            SUPABASE_SERVICE_ROLE_KEY \
+            GEMINI_API_KEY \
+            DRIVE_FOLDER_ID \
+            DRIVE_WATCH_STATE_KEY; do
+            if [ -z "${!var}" ]; then
+              echo "Missing required secret: ${var}"
+              exit 1
+            fi
+          done
+
+          WORKER_URL="$(gcloud run services describe sullivan-grading-worker-dev \
+            --project "$GCP_PROJECT_ID" \
+            --region "${{ env.GCP_REGION }}" \
+            --format='value(status.url)' 2>/dev/null || true)"
+
+          if [ -z "$WORKER_URL" ]; then
+            WORKER_URL="${GRADING_WORKER_URL:-}"
+          fi
+
+          if [ -z "$WORKER_URL" ]; then
+            echo "Missing required secret: GRADING_WORKER_URL"
+            exit 1
+          fi
+
+          cat > .env.DEV <<EOF
+          GOOGLE_CLOUD_PROJECT_ID=$GCP_PROJECT_ID
+          RUNTIME_SA_EMAIL=$RUNTIME_SA_EMAIL
+          INTERNAL_API_SECRET=$INTERNAL_API_SECRET
+          APP_URL=$APP_URL
+          NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
+          NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS=${NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS:-500}
+          SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY
+          GEMINI_API_KEY=$GEMINI_API_KEY
+          GEMINI_MODEL=${GEMINI_MODEL:-}
+          GEMINI_CHAT_MODEL=${GEMINI_CHAT_MODEL:-}
+          GEMINI_CHAT_FALLBACK_MODEL=${GEMINI_CHAT_FALLBACK_MODEL:-}
+          GEMINI_LIVE_MODEL=${GEMINI_LIVE_MODEL:-}
+          GEMINI_LIVE_API_VERSION=${GEMINI_LIVE_API_VERSION:-}
+          GEMINI_LIVE_VOICE=${GEMINI_LIVE_VOICE:-}
+          DRIVE_FOLDER_ID=$DRIVE_FOLDER_ID
+          DRIVE_WEBHOOK_CHANNEL_ID=${DRIVE_WEBHOOK_CHANNEL_ID:-}
+          DRIVE_WEBHOOK_CHANNEL_ID_FIXED=${DRIVE_WEBHOOK_CHANNEL_ID_FIXED:-false}
+          DRIVE_WATCH_RENEW_THRESHOLD_HOURS=${DRIVE_WATCH_RENEW_THRESHOLD_HOURS:-18}
+          DRIVE_WATCH_STATE_KEY=$DRIVE_WATCH_STATE_KEY
+          GRADING_WORKER_URL=$WORKER_URL
+          CLOUD_TASKS_LOCATION=${CLOUD_TASKS_LOCATION:-asia-northeast1}
+          GRADING_TASK_QUEUE=${GRADING_TASK_QUEUE:-sullivan-grading}
+          DRIVE_CHECK_TASK_QUEUE=${DRIVE_CHECK_TASK_QUEUE:-sullivan-drive-check}
+          CLOUD_TASKS_CALLER_SERVICE_ACCOUNT=${CLOUD_TASKS_CALLER_SERVICE_ACCOUNT:-$RUNTIME_SA_EMAIL}
+          SKIP_INFRA_SETUP=1
+          EOF
+
+      - name: Web デプロイ (DEV)
+        id: deploy_web
+        run: ./deploy-web-DEV.sh
+
+      - name: Drive watch 再作成 (DEV)
+        env:
+          INTERNAL_API_SECRET: ${{ secrets.INTERNAL_API_SECRET }}
+        run: |
+          set -euo pipefail
+
+          SERVICE_URL="$(gcloud run services describe sullivan-app-dev \
+            --project "${{ secrets.GCP_PROJECT_ID }}" \
+            --region "${{ env.GCP_REGION }}" \
+            --format='value(status.url)')"
+
+          curl --fail --silent --show-error \
+            -X POST "${SERVICE_URL}/api/drive/watch/renew?check=1" \
+            -H "Authorization: Bearer ${INTERNAL_API_SECRET}" >/dev/null
+
+      - name: Cloud Run 起動ログ取得 (Web, 失敗時)
+        if: failure() && steps.deploy_web.outcome == 'failure'
+        run: |
+          echo "Cloud Run web deploy failed. Fetching diagnostic logs..."
+
+          REVISION="$(gcloud run services describe sullivan-app-dev \
+            --project "${{ secrets.GCP_PROJECT_ID }}" \
+            --region "${{ env.GCP_REGION }}" \
+            --format='value(status.latestCreatedRevisionName)' 2>/dev/null || true)"
+
+          if [ -z "$REVISION" ]; then
+            echo "Could not determine latest revision."
+            exit 0
+          fi
+
+          echo "latestCreatedRevision=$REVISION"
+
+          gcloud logging read \
+            "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"sullivan-app-dev\" AND resource.labels.revision_name=\"$REVISION\"" \
+            --project "${{ secrets.GCP_PROJECT_ID }}" \
+            --limit=200 \
+            --format='value(timestamp,logName,textPayload,jsonPayload.message,jsonPayload)' \
+            || true

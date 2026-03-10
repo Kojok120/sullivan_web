@@ -9,7 +9,13 @@ import { calculateCoreProblemStatus } from '@/lib/progression';
 import { emitRealtimeEvent } from '@/lib/realtime-events';
 import { incrementStampCount } from '@/lib/stamp-service';
 import { processGamificationUpdates, toGamificationPayload } from '@/lib/gamification-service';
-import { acquireGradingFileLock, isGradingFileLocked, releaseGradingFileLock } from '@/lib/grading-lock';
+import {
+    acquireGradingFileLock,
+    acquireGradingLock,
+    isGradingFileLocked,
+    releaseGradingFileLock,
+    releaseGradingLock,
+} from '@/lib/grading-lock';
 import { claimGradingJob, markGradingJobCompleted, markGradingJobFailed, publishGradingJob } from '@/lib/grading-job';
 import { loadInstructionPrompt as loadPrompt } from '@/lib/instruction-prompt';
 import { getGeminiMediaResolutionForMimeType } from '@/lib/gemini-media-resolution';
@@ -86,12 +92,9 @@ export async function generateQRCode(studentId: string, problemIds: string[], un
     });
 }
 
-// 2. Poll Drive for New Files
-import { acquireGradingLock, releaseGradingLock } from '@/lib/grading-lock';
-
 export async function secureDriveCheck(reason: string) {
-    const lockAcquired = await acquireGradingLock();
-    if (!lockAcquired) {
+    const lockLease = await acquireGradingLock();
+    if (!lockLease) {
         console.log(`[DriveCheck] Skipped (${reason}): lock active.`);
         return;
     }
@@ -102,7 +105,7 @@ export async function secureDriveCheck(reason: string) {
     } catch (error) {
         console.error(`[DriveCheck] Failed (${reason}):`, error);
     } finally {
-        await releaseGradingLock();
+        await releaseGradingLock(lockLease);
     }
 }
 
@@ -221,8 +224,8 @@ async function downloadAndAnalyzeFile(fileId: string, fileName: string): Promise
 }
 
 export async function processFile(fileId: string, fileName: string) {
-    const lockAcquired = await acquireGradingFileLock(fileId);
-    if (!lockAcquired) {
+    const fileLockLease = await acquireGradingFileLock(fileId);
+    if (!fileLockLease) {
         console.log(`[Lock] File ${fileId} is already being processed. Skipping.`);
         return;
     }
@@ -375,7 +378,7 @@ export async function processFile(fileId: string, fileName: string) {
         }
     } finally {
         await cleanupFn();
-        await releaseGradingFileLock(fileId);
+        await releaseGradingFileLock(fileLockLease);
     }
 }
 
@@ -499,7 +502,7 @@ async function archiveProcessedFile(fileId: string, studentId: string, problemId
     }
 }
 
-// Removed triggerGradingJob; QStash publishing is now centralized in publishGradingJob
+// ジョブ発行は Cloud Tasks 経由の publishGradingJob に集約している
 
 // Helper to find or create a folder
 const folderCache = new Map<string, string>(); // Cache folder IDs key="${name}:${parentId}"

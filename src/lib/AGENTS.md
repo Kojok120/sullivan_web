@@ -10,11 +10,12 @@
 | ファイル | 責務 |
 |--|--|
 | `grading-service.ts` | 採点パイプライン全体（Drive取込→QR解析→Gemini採点→DB保存→通知） |
-| `grading-job.ts` | QStash ジョブの発行 |
-| `grading-lock.ts` | Redis による重複採点ロック |
+| `grading-job.ts` | Cloud Tasks ジョブの発行 |
+| `grading-lock.ts` | Postgres lease による重複採点ロック |
 | `drive-client.ts` | Google Drive API クライアント |
 | `drive-webhook-manager.ts` | Drive Watch の登録・停止 |
-| `drive-watch-state.ts` | Watch 状態の Redis 保存 |
+| `drive-watch-state.ts` | Watch 状態の DB 保存 |
+| `cloud-tasks.ts` | Cloud Tasks push/OIDC の組み立て |
 | `qr-utils.ts` | QR コード解析（Python/Gemini フォールバック） |
 
 ### 学習ロジック
@@ -40,7 +41,6 @@
 | ファイル | 責務 |
 |--|--|
 | `prisma.ts` | Prisma シングルトンクライアント |
-| `redis.ts` | Upstash Redis クライアント |
 | `subject-config.ts` | 教科マスタ設定 |
 | `tsv-parser.ts` | TSV ファイルパーサー |
 | `utils.ts` | 汎用ユーティリティ |

@@ -1,4 +1,4 @@
-import { redis } from '@/lib/redis';
+import { prisma } from '@/lib/prisma';
 
 const WATCH_STATE_KEY = (process.env.DRIVE_WATCH_STATE_KEY || 'sullivan:drive:watch:state').trim() || 'sullivan:drive:watch:state';
 
@@ -10,32 +10,51 @@ export interface WatchState {
 }
 
 /**
- * Save the current Drive Watch state to Redis
+ * 現在の Drive Watch 状態を DB に保存する。
  */
 export async function saveWatchState(state: WatchState): Promise<void> {
-    await redis.set(WATCH_STATE_KEY, JSON.stringify(state));
-    console.log(`Watch state saved (key=${WATCH_STATE_KEY}):`, state);
+    await prisma.driveWatchState.upsert({
+        where: { scopeKey: WATCH_STATE_KEY },
+        create: {
+            scopeKey: WATCH_STATE_KEY,
+            channelId: state.channelId,
+            resourceId: state.resourceId,
+            token: state.token ?? null,
+            expiration: new Date(state.expiration),
+        },
+        update: {
+            channelId: state.channelId,
+            resourceId: state.resourceId,
+            token: state.token ?? null,
+            expiration: new Date(state.expiration),
+        },
+    });
+    console.log(`Watch state saved (scopeKey=${WATCH_STATE_KEY}):`, state);
 }
 
 /**
- * Retrieve the current Drive Watch state from Redis
+ * 現在の Drive Watch 状態を DB から取得する。
  */
 export async function getWatchState(): Promise<WatchState | null> {
-    const data = await redis.get<string>(WATCH_STATE_KEY);
-    if (!data) return null;
+    const state = await prisma.driveWatchState.findUnique({
+        where: { scopeKey: WATCH_STATE_KEY },
+    });
+    if (!state) return null;
 
-    try {
-        return typeof data === 'string' ? JSON.parse(data) : data as WatchState;
-    } catch {
-        console.error('Failed to parse watch state from Redis');
-        return null;
-    }
+    return {
+        channelId: state.channelId,
+        resourceId: state.resourceId,
+        token: state.token ?? undefined,
+        expiration: state.expiration.getTime(),
+    };
 }
 
 /**
- * Clear the Drive Watch state from Redis
+ * 現在の Drive Watch 状態を DB から削除する。
  */
 export async function clearWatchState(): Promise<void> {
-    await redis.del(WATCH_STATE_KEY);
-    console.log(`Watch state cleared (key=${WATCH_STATE_KEY})`);
+    await prisma.driveWatchState.deleteMany({
+        where: { scopeKey: WATCH_STATE_KEY },
+    });
+    console.log(`Watch state cleared (scopeKey=${WATCH_STATE_KEY})`);
 }

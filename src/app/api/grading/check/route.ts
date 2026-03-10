@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { acquireGradingLock, releaseGradingLock } from '@/lib/grading-lock';
+import {
+    hasValidInternalApiSecret,
+    INTERNAL_API_SECRET_HEADER_NAME,
+} from '@/lib/internal-api-auth';
 import { isWorkerRuntime } from '@/lib/runtime-utils';
 
 export const dynamic = 'force-dynamic';
@@ -13,17 +17,16 @@ export async function GET(request: NextRequest) {
 
     // SECURITY: Require internal API secret for this endpoint
     const authHeader = request.headers.get('Authorization');
-    const expectedSecret = process.env.INTERNAL_API_SECRET;
-
-    if (!expectedSecret || authHeader !== `Bearer ${expectedSecret}`) {
+    const secretHeader = request.headers.get(INTERNAL_API_SECRET_HEADER_NAME);
+    if (!hasValidInternalApiSecret(secretHeader, authHeader, process.env.INTERNAL_API_SECRET)) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    let lockAcquired = false;
+    let lockLease: Awaited<ReturnType<typeof acquireGradingLock>> = null;
     try {
         // Try to acquire lock using shared mechanism
-        lockAcquired = await acquireGradingLock();
-        if (!lockAcquired) {
+        lockLease = await acquireGradingLock();
+        if (!lockLease) {
             console.log('Grading check skipped: Lock is active.');
             return NextResponse.json({ success: false, message: 'Processing in progress' }, { status: 429 });
         }
@@ -36,8 +39,8 @@ export async function GET(request: NextRequest) {
         console.error('Drive check failed:', error);
         return NextResponse.json({ success: false, error: 'Internal Server Error' }, { status: 500 });
     } finally {
-        if (lockAcquired) {
-            await releaseGradingLock();
+        if (lockLease) {
+            await releaseGradingLock(lockLease);
         }
     }
 }

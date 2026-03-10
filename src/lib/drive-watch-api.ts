@@ -1,4 +1,8 @@
 import { NextResponse } from 'next/server';
+import {
+    hasValidInternalApiSecret,
+    INTERNAL_API_SECRET_HEADER_NAME,
+} from '@/lib/internal-api-auth';
 
 export function getShouldCheckFromRequest(request: Request): boolean {
     const url = new URL(request.url);
@@ -7,7 +11,9 @@ export function getShouldCheckFromRequest(request: Request): boolean {
 
 export function verifyInternalApiAuthorization(request: Request): NextResponse | null {
     const authHeader = request.headers.get('Authorization');
-    if (authHeader !== `Bearer ${process.env.INTERNAL_API_SECRET}`) {
+    const secretHeader = request.headers.get(INTERNAL_API_SECRET_HEADER_NAME);
+
+    if (!hasValidInternalApiSecret(secretHeader, authHeader, process.env.INTERNAL_API_SECRET)) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     return null;
