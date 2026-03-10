@@ -1,4 +1,4 @@
-import { AuthApiError } from '@supabase/supabase-js';
+import { AuthApiError, AuthSessionMissingError } from '@supabase/supabase-js';
 import { NextRequest } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -19,6 +19,14 @@ function createRequest() {
     request.cookies.set('sb-test-auth-token.0', 'refresh-token');
     request.cookies.set('other-cookie', 'keep-me');
     return request;
+}
+
+function expectAuthCookiesCleared(request: NextRequest, setCookieHeader: string) {
+    expect(request.cookies.get('sb-test-auth-token')).toBeUndefined();
+    expect(request.cookies.get('sb-test-auth-token.0')).toBeUndefined();
+    expect(request.cookies.get('other-cookie')?.value).toBe('keep-me');
+    expect(setCookieHeader).toContain('sb-test-auth-token=');
+    expect(setCookieHeader).toContain('sb-test-auth-token.0=');
 }
 
 describe('supabase middleware', () => {
@@ -61,13 +69,33 @@ describe('supabase middleware', () => {
         const result = await updateSession(request);
 
         expect(result.user).toBeNull();
-        expect(request.cookies.get('sb-test-auth-token')).toBeUndefined();
-        expect(request.cookies.get('sb-test-auth-token.0')).toBeUndefined();
-        expect(request.cookies.get('other-cookie')?.value).toBe('keep-me');
-
         const setCookieHeader = result.supabaseResponse.headers.get('set-cookie') ?? '';
-        expect(setCookieHeader).toContain('sb-test-auth-token=');
-        expect(setCookieHeader).toContain('sb-test-auth-token.0=');
+        expectAuthCookiesCleared(request, setCookieHeader);
+    });
+
+    it('AuthSessionMissingError が戻り値 error に入る場合も cookie を削除して未ログイン扱いにする', async () => {
+        const request = createRequest();
+        getUserMock.mockResolvedValue({
+            data: { user: null },
+            error: new AuthSessionMissingError(),
+        });
+
+        const result = await updateSession(request);
+
+        expect(result.user).toBeNull();
+        const setCookieHeader = result.supabaseResponse.headers.get('set-cookie') ?? '';
+        expectAuthCookiesCleared(request, setCookieHeader);
+    });
+
+    it('AuthSessionMissingError が throw される場合も cookie を削除して未ログイン扱いにする', async () => {
+        const request = createRequest();
+        getUserMock.mockRejectedValue(new AuthSessionMissingError());
+
+        const result = await updateSession(request);
+
+        expect(result.user).toBeNull();
+        const setCookieHeader = result.supabaseResponse.headers.get('set-cookie') ?? '';
+        expectAuthCookiesCleared(request, setCookieHeader);
     });
 
     it('refresh token 以外の AuthApiError は再送出する', async () => {

@@ -1,5 +1,5 @@
 import { createServerClient } from '@supabase/ssr';
-import { AuthApiError } from '@supabase/supabase-js';
+import { AuthApiError, isAuthSessionMissingError } from '@supabase/supabase-js';
 import { NextResponse, type NextRequest } from 'next/server';
 
 function isSupabaseAuthCookieName(name: string) {
@@ -27,7 +27,11 @@ function clearSupabaseAuthCookies(request: NextRequest) {
     return response;
 }
 
-function isRecoverableRefreshTokenError(error: unknown) {
+function isRecoverableAuthSessionError(error: unknown) {
+    if (isAuthSessionMissingError(error)) {
+        return true;
+    }
+
     return error instanceof AuthApiError
         && /invalid refresh token|refresh token not found/i.test(error.message);
 }
@@ -66,7 +70,7 @@ export async function updateSession(request: NextRequest) {
             error,
         } = await supabase.auth.getUser();
 
-        if (isRecoverableRefreshTokenError(error)) {
+        if (isRecoverableAuthSessionError(error)) {
             return {
                 supabaseResponse: clearSupabaseAuthCookies(request),
                 user: null,
@@ -81,7 +85,7 @@ export async function updateSession(request: NextRequest) {
         return { supabaseResponse, user, supabase };
     } catch (error) {
         // 失効済み refresh token は未ログイン扱いに戻して先へ進める。
-        if (isRecoverableRefreshTokenError(error)) {
+        if (isRecoverableAuthSessionError(error)) {
             return {
                 supabaseResponse: clearSupabaseAuthCookies(request),
                 user: null,
