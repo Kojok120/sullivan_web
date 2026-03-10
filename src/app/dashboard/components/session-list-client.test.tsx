@@ -129,7 +129,7 @@ describe('SessionListClient', () => {
             expect(fetchUserSessionsMock).toHaveBeenCalledWith(0, 10, { onlyPendingVideoReview: true }, 'user-1');
         });
 
-        expect(screen.getByText(/解説動画未視聴のセッションはありません/)).toBeTruthy();
+        expect(await screen.findByText(/解説動画未視聴のセッションはありません/)).toBeTruthy();
     });
 
     it('セッションリンクのクリックでは既読 action を呼ばない', () => {
