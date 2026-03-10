@@ -14,7 +14,7 @@ function extractBearerToken(authHeader: string | null | undefined): string | nul
     return token || null;
 }
 
-export function extractInternalApiSecret(
+function extractInternalApiSecret(
     secretHeader: string | null | undefined,
     authHeader: string | null | undefined,
 ): string | null {

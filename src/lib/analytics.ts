@@ -238,7 +238,7 @@ export type Weakness = {
     totalAttempts: number;
 };
 
-export async function getStudentWeaknesses(userId: string, limit = 5): Promise<Weakness[]> {
+async function getStudentWeaknesses(userId: string, limit = 5): Promise<Weakness[]> {
     // Updated to use Subject instead of Unit
     // Note: Prisma raw query needs to handle Many-to-Many relation between Problem and CoreProblem.
     // Problem has `coreProblems` (implicit many-to-many).

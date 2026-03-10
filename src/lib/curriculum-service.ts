@@ -1,10 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { getSubjectPrefix } from '@/lib/subject-config';
 
-// Re-export for backward compatibility
-export { getSubjectPrefix, getSubjectConfig } from '@/lib/subject-config';
-export type { SubjectConfig } from '@/lib/subject-config';
-
 type CurriculumServiceClient = Pick<typeof prisma, 'subject' | 'problem' | '$queryRaw'>;
 
 export async function fetchSubjects(options?: { includeCoreProblems?: boolean }) {
@@ -31,7 +27,7 @@ export async function fetchSubjects(options?: { includeCoreProblems?: boolean })
 }
 
 
-export async function getMaxCustomIdNumber(
+async function getMaxCustomIdNumber(
     prefix: string,
     subjectId: string,
     client: CurriculumServiceClient = prisma

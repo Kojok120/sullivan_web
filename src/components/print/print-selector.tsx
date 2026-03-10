@@ -17,7 +17,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 
-export interface PrintSubject {
+interface PrintSubject {
     subjectId: string;
     subjectName: string;
     // progressPercentage は表示ロジックでは未使用だが、上位互換のため許容する

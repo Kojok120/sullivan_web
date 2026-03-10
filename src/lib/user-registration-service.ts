@@ -5,8 +5,6 @@ import { createUser as createPrismaUser } from '@/lib/user-service';
 import { ensureInitialCoreProblemStates } from '@/lib/core-problem-entry-state';
 import { DEFAULT_INITIAL_PASSWORD } from '@/lib/auth-constants';
 
-export { DEFAULT_INITIAL_PASSWORD };
-
 export interface RegisterUserParams {
     name: string;
     role: Role;

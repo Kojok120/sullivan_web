@@ -2,7 +2,7 @@
  * TSVパーサ - Excel/スプレッドシートからの貼り付けに対応
  * 引用符内の改行をサポート
  */
-export function parseTSV(input: string): string[][] {
+function parseTSV(input: string): string[][] {
     const rows: string[][] = [];
     let currentRow: string[] = [];
     let currentField = '';

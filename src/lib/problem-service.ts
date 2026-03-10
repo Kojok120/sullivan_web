@@ -63,7 +63,7 @@ export type BulkCreateOptions = {
  * @param coreProblemIds CoreProblem IDの配列
  * @param tx Prismaトランザクション（オプション）
  */
-export async function fetchCoreProblemMap(
+async function fetchCoreProblemMap(
     coreProblemIds: string[],
     tx: ProblemServiceClient = prisma
 ): Promise<Map<string, { id: string; subjectId: string; subject: { name: string } }>> {
@@ -198,7 +198,7 @@ export async function deleteProblemsWithRelations(
 /**
  * 問題の重複チェック
  */
-export async function checkDuplicateQuestions(
+async function checkDuplicateQuestions(
     questions: string[],
     tx: ProblemServiceClient = prisma
 ): Promise<Set<string>> {
@@ -265,7 +265,7 @@ async function normalizeProblemsForBulk(
 /**
  * 問題の一括作成（重複チェック・customId生成・順序付けを共通化）
  */
-export async function bulkCreateProblemsCore(
+async function bulkCreateProblemsCore(
     problems: CreateProblemData[],
     options: BulkCreateOptions = {},
     client: ProblemServiceClientWithTransaction = prisma
