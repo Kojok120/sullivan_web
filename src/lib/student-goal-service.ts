@@ -190,31 +190,3 @@ export async function getGoalDailyViewPayloadByRange(params: {
         rows,
     };
 }
-
-export async function getStudentActiveGoalCount(studentId: string, timeZone?: string | null): Promise<number> {
-    const safeTimeZone = normalizeTimeZone(timeZone);
-    const today = getTodayDateKey(safeTimeZone);
-
-    return prisma.studentGoal.count({
-        where: {
-            studentId,
-            deletedAt: null,
-            dueDateKey: {
-                gte: today,
-            },
-        },
-    });
-}
-
-export async function getStudentGoalViews(studentId: string, timeZone?: string | null): Promise<StudentGoalView[]> {
-    const safeTimeZone = normalizeTimeZone(timeZone);
-    const { fromDateKey, toDateKey } = getDateRangeAroundToday(safeTimeZone, HALF_YEAR_DAYS, HALF_YEAR_DAYS);
-
-    const goals = await fetchGoals({
-        studentId,
-        fromDateKey,
-        toDateKey,
-    });
-
-    return goals.map(mapGoal);
-}

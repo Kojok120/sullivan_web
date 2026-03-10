@@ -1,11 +1,28 @@
 import { prisma } from '@/lib/prisma';
 import { getSubjectPrefix } from '@/lib/subject-config';
-
-// Re-export for backward compatibility
-export { getSubjectPrefix, getSubjectConfig } from '@/lib/subject-config';
-export type { SubjectConfig } from '@/lib/subject-config';
+import { Prisma } from '@prisma/client';
 
 type CurriculumServiceClient = Pick<typeof prisma, 'subject' | 'problem' | '$queryRaw'>;
+
+function shouldFallbackToCustomIdScan(error: unknown) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        return error.code === 'P2010';
+    }
+
+    if (!(error instanceof Error)) {
+        return false;
+    }
+
+    const normalizedMessage = error.message.toLowerCase();
+    return [
+        'invalid input syntax',
+        'syntax error',
+        'cast',
+        'operator does not exist',
+        'function substring',
+        'unrecognized token',
+    ].some((token) => normalizedMessage.includes(token));
+}
 
 export async function fetchSubjects(options?: { includeCoreProblems?: boolean }) {
     const includeCoreProblems = options?.includeCoreProblems ?? false;
@@ -31,15 +48,14 @@ export async function fetchSubjects(options?: { includeCoreProblems?: boolean })
 }
 
 
-export async function getMaxCustomIdNumber(
+async function getMaxCustomIdNumber(
     prefix: string,
     subjectId: string,
     client: CurriculumServiceClient = prisma
 ): Promise<number> {
     const prefixDash = prefix + '-';
-    // Postgres specific syntax to find max number safely-ish
-    // We assume the format is strictly {prefix}-{number}
-    // Using simple substring might fail if we have "E-10-A" but we assume validation elsewhere.
+    // PostgreSQL の関数で末尾番号を安全寄りに取得する
+    // customId は {prefix}-{number} 形式を前提とする
 
     try {
         const lengthPlusOne = prefixDash.length + 1;
@@ -48,7 +64,7 @@ export async function getMaxCustomIdNumber(
             FROM "Problem"
             WHERE "subjectId" = ${subjectId}
             AND "customId" LIKE ${prefixDash + '%'}
-            -- Ensure we only pick ones that look like number at the end to avoid casting errors
+            -- 末尾が数値のみの customId に限定してキャストエラーを避ける
             AND "customId" ~ ${'^' + prefixDash + '[0-9]+$'}
         `;
 
@@ -56,9 +72,12 @@ export async function getMaxCustomIdNumber(
             return Number(result[0].max_num);
         }
     } catch (e) {
-        console.warn('Optimized Max ID query failed, falling back to safe slow method', e);
-        // Fallback: Fetch all and parse in JS (safe slow method)
-        // This is necessary if someone manually inserted "E-NaN" or strict mode issues
+        if (!shouldFallbackToCustomIdScan(e)) {
+            throw e;
+        }
+
+        console.warn('最大 customId の高速取得に失敗したため、フォールバック処理へ切り替えます', e);
+        // customId を全件取得して JavaScript 側で安全に最大値を求める
         const all = await client.problem.findMany({
             where: {
                 subjectId,
@@ -110,6 +129,3 @@ export async function getNextCustomIds(
 
     return Array.from({ length: count }, (_, i) => `${prefix}-${maxNum + i + 1}`);
 }
-
-// Deprecated wrapper for backward compatibility if widely used, 
-// but we should aim to migrate to getNextCustomId.

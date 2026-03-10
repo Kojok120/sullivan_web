@@ -1,6 +1,12 @@
 import { createServerClient } from '@supabase/ssr';
-import { AuthApiError } from '@supabase/supabase-js';
+import { isAuthApiError, isAuthSessionMissingError } from '@supabase/supabase-js';
 import { NextResponse, type NextRequest } from 'next/server';
+
+const RECOVERABLE_AUTH_SESSION_ERROR_CODES = new Set([
+    'refresh_token_not_found',
+    'refresh_token_already_used',
+    'session_expired',
+]);
 
 function isSupabaseAuthCookieName(name: string) {
     return name.startsWith('sb-') && name.includes('-auth-token');
@@ -27,9 +33,24 @@ function clearSupabaseAuthCookies(request: NextRequest) {
     return response;
 }
 
-function isRecoverableRefreshTokenError(error: unknown) {
-    return error instanceof AuthApiError
-        && /invalid refresh token|refresh token not found/i.test(error.message);
+function isRecoverableAuthSessionError(error: unknown) {
+    if (isAuthSessionMissingError(error)) {
+        return true;
+    }
+
+    if (!isAuthApiError(error)) {
+        return false;
+    }
+
+    const errorCode = typeof error.code === 'string'
+        ? error.code.toLowerCase()
+        : '';
+
+    if (errorCode) {
+        return RECOVERABLE_AUTH_SESSION_ERROR_CODES.has(errorCode);
+    }
+
+    return /invalid refresh token|refresh token not found|refresh token already used|session expired/i.test(error.message);
 }
 
 export async function updateSession(request: NextRequest) {
@@ -66,7 +87,7 @@ export async function updateSession(request: NextRequest) {
             error,
         } = await supabase.auth.getUser();
 
-        if (isRecoverableRefreshTokenError(error)) {
+        if (isRecoverableAuthSessionError(error)) {
             return {
                 supabaseResponse: clearSupabaseAuthCookies(request),
                 user: null,
@@ -81,7 +102,7 @@ export async function updateSession(request: NextRequest) {
         return { supabaseResponse, user, supabase };
     } catch (error) {
         // 失効済み refresh token は未ログイン扱いに戻して先へ進める。
-        if (isRecoverableRefreshTokenError(error)) {
+        if (isRecoverableAuthSessionError(error)) {
             return {
                 supabaseResponse: clearSupabaseAuthCookies(request),
                 user: null,

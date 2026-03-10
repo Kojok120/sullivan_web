@@ -1,10 +1,8 @@
-import QRCode from 'qrcode';
 import { GoogleGenAI } from '@google/genai';
 import { prisma } from '@/lib/prisma';
 import type { Prisma, User } from '@prisma/client';
 import fs from 'fs';
 import path from 'path';
-import os from 'os';
 import { calculateCoreProblemStatus } from '@/lib/progression';
 import { emitRealtimeEvent } from '@/lib/realtime-events';
 import { incrementStampCount } from '@/lib/stamp-service';
@@ -19,6 +17,7 @@ import {
 import { claimGradingJob, markGradingJobCompleted, markGradingJobFailed, publishGradingJob } from '@/lib/grading-job';
 import { loadInstructionPrompt as loadPrompt } from '@/lib/instruction-prompt';
 import { getGeminiMediaResolutionForMimeType } from '@/lib/gemini-media-resolution';
+import { buildGradingTempFileContext } from '@/lib/grading-temp-path';
 
 // Priority adjustment logic (inlined from removed priority-algo.ts)
 type Evaluation = "A" | "B" | "C" | "D";
@@ -55,7 +54,8 @@ function getGenAI() {
     return genAI;
 }
 
-import { QRData, compressProblemIds, decodeUnitToken, expandProblemIds } from '@/lib/qr-utils';
+import type { QRData } from '@/lib/qr-utils';
+import { decodeUnitToken, expandProblemIds } from '@/lib/qr-utils';
 import {
     buildProgressionUpdateScope,
     filterCoreProblemIdsByScope,
@@ -70,26 +70,6 @@ function getDrive() {
 function getStudentIdFromQr(qrData: QRData | null): string | null {
     if (!qrData) return null;
     return qrData.s || null;
-}
-
-// 1. Generate QR Code
-export async function generateQRCode(studentId: string, problemIds: string[], unitToken?: string): Promise<string> {
-    // Attempt compression
-    const compressed = compressProblemIds(problemIds);
-
-    const data: QRData = {
-        s: studentId,
-        ...compressed,
-        ...(unitToken ? { u: unitToken } : {}),
-    };
-
-    const json = JSON.stringify(data);
-    // Balance robustness and density with moderate error correction
-    return await QRCode.toDataURL(json, {
-        errorCorrectionLevel: 'M',
-        width: 300, // Ensure sufficient resolution
-        margin: 4
-    });
 }
 
 export async function secureDriveCheck(reason: string) {
@@ -172,21 +152,19 @@ type AnalyzedFile = {
 };
 
 async function downloadAndAnalyzeFile(fileId: string, fileName: string): Promise<AnalyzedFile> {
-    const destPath = path.join(os.tmpdir(), fileName);
+    const { jobDirPath, filePath: destPath } = buildGradingTempFileContext(fileId, fileName);
 
     const cleanup = async () => {
         try {
-            if (fs.existsSync(destPath)) {
-                await fs.promises.unlink(destPath);
-            }
+            await fs.promises.rm(jobDirPath, { recursive: true, force: true });
         } catch (cleanupError) {
-            console.error(`[Cleanup] Failed to unlink ${destPath}:`, cleanupError);
+            console.error(`[Cleanup] Failed to remove ${jobDirPath}:`, cleanupError);
         }
     };
 
     try {
-        // Ensure parent dir exists
-        await fs.promises.mkdir(path.dirname(destPath), { recursive: true });
+        // fileId ごとに専用ディレクトリを作り、同名ファイルの衝突を防ぐ。
+        await fs.promises.mkdir(jobDirPath, { recursive: true });
 
         const dest = fs.createWriteStream(destPath);
         const driveClient = getDrive();
@@ -1101,7 +1079,7 @@ type GradingBatchSummary = {
     sessionIsPerfect: boolean;
 };
 
-export async function recordGradingResults(results: GradingResult[], qrData: QRData): Promise<GradingBatchSummary | null> {
+async function recordGradingResults(results: GradingResult[], qrData: QRData): Promise<GradingBatchSummary | null> {
     if (results.length === 0) return null;
 
     const userId = results[0].studentId; // Assumes all results are for same student
@@ -1333,7 +1311,7 @@ export async function recordGradingResults(results: GradingResult[], qrData: QRD
     return { groupId, sessionIsPerfect };
 }
 
-export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: string[]) {
+async function checkProgressAndUnlock(userId: string, cpIdsToCheck: string[]) {
     if (cpIdsToCheck.length === 0) return;
 
     // Fetch CP Details (Total Count & Next CP Candidate)
@@ -1544,7 +1522,7 @@ export async function checkProgressAndUnlock(userId: string, cpIdsToCheck: strin
 
 
 // 2.5 Check for Stuck Files (Timeout > 3 mins)
-export async function checkStuckFiles() {
+async function checkStuckFiles() {
     if (!DRIVE_FOLDER_ID) return;
 
     try {

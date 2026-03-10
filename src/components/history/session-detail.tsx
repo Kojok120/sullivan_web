@@ -1,4 +1,4 @@
-import { getSessionDetails, markSessionAsReviewed } from "@/lib/analytics";
+import { getSessionDetails } from "@/lib/analytics";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Link from 'next/link';
@@ -15,6 +15,8 @@ import { checkSurveyEligibility } from "@/actions/survey";
 import { SurveyModal } from "@/components/survey/SurveyModal";
 import { prisma } from "@/lib/prisma";
 import { canUseAiTutor } from "@/lib/plan-entitlements";
+import { SessionReviewTracker } from "@/components/history/session-review-tracker";
+import { getSession } from "@/lib/auth";
 
 type SessionDetailProps = {
     groupId: string;
@@ -35,9 +37,7 @@ export async function SessionDetail({
         return <div className="text-center py-8 text-muted-foreground">履歴が見つかりません</div>;
     }
 
-    if (!isTeacherView) {
-        await markSessionAsReviewed(groupId, userId);
-    }
+    const currentSession = isTeacherView ? null : await getSession();
 
     // Check for survey eligibility
     let showSurvey = false;
@@ -72,9 +72,11 @@ export async function SessionDetail({
             videoUrl: d.problem.videoUrl!,
             question: d.problem.question
         }));
+    const shouldTrackReview = !isTeacherView && currentSession?.userId === userId;
 
     return (
         <div className="container mx-auto max-w-4xl px-4 py-6 sm:py-8">
+            {shouldTrackReview && <SessionReviewTracker groupId={groupId} />}
             {showSurvey && <SurveyModal userId={userId} />}
             <div className="mb-6 flex items-start gap-3 sm:items-center sm:space-x-4">
                 <Link href={backUrl}>

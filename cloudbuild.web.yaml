@@ -1,0 +1,21 @@
+steps:
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      [
+        "build",
+        "-f",
+        "Dockerfile",
+        "--build-arg",
+        "WEB_BASE_IMAGE=$_BASE_IMAGE_URI",
+        "--build-arg",
+        "NEXT_PUBLIC_SUPABASE_URL=$_NEXT_PUBLIC_SUPABASE_URL",
+        "--build-arg",
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY=$_NEXT_PUBLIC_SUPABASE_ANON_KEY",
+        "--build-arg",
+        "NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS=$_NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS",
+        "-t",
+        "$_IMAGE_URI",
+        ".",
+      ]
+images:
+  - "$_IMAGE_URI"

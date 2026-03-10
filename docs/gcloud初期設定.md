@@ -21,6 +21,7 @@
 
   # 3) gcloud 既定設定
   - gcloud config set project "$PROJECT_ID"
+  - gcloud config set builds/region "$REGION"
   - gcloud config set run/region "$REGION"
   - gcloud config set run/platform managed
 

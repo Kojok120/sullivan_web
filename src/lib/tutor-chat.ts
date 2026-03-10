@@ -53,7 +53,7 @@ function sanitizeTutorChatModelContentPart(value: unknown): TutorChatModelConten
     };
 }
 
-export function sanitizeTutorChatModelContent(value: unknown): TutorChatModelContent | undefined {
+function sanitizeTutorChatModelContent(value: unknown): TutorChatModelContent | undefined {
     if (!value || typeof value !== 'object') return undefined;
 
     const record = value as {

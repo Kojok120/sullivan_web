@@ -20,7 +20,7 @@ function normalizeRole(value: unknown): AllowedRole {
  * @param request Request
  * @returns セッション情報（null の場合は認証失敗）
  */
-export async function getSessionFromBearer(
+async function getSessionFromBearer(
     request: Request
 ): Promise<SessionPayload | null> {
     const authHeader = request.headers.get('authorization');

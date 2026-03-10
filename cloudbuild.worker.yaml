@@ -1,5 +1,15 @@
 steps:
   - name: "gcr.io/cloud-builders/docker"
-    args: ["build", "-f", "Dockerfile.worker", "-t", "$_IMAGE_URI", "."]
+    args:
+      [
+        "build",
+        "-f",
+        "Dockerfile.worker",
+        "--build-arg",
+        "WORKER_BASE_IMAGE=$_BASE_IMAGE_URI",
+        "-t",
+        "$_IMAGE_URI",
+        ".",
+      ]
 images:
   - "$_IMAGE_URI"

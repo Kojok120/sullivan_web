@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Printer, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { appendCacheBust } from '@/components/print/cache-bust';
 
 interface Subject {
     id: string;
@@ -56,10 +57,14 @@ export function PrintProblemCard({ userId, subjects }: PrintProblemCardProps) {
     const handlePrint = () => {
         if (!selectedSubjectId) return;
         setLoading(true);
-        let url = `/teacher/students/${userId}/print?subjectId=${selectedSubjectId}&sets=${sets}`;
+        const query = new URLSearchParams({
+            subjectId: selectedSubjectId,
+            sets: String(sets),
+        });
         if (selectedCoreProblemId && selectedCoreProblemId !== 'all') {
-            url += `&coreProblemId=${selectedCoreProblemId}`;
+            query.set('coreProblemId', selectedCoreProblemId);
         }
+        const url = appendCacheBust(`/teacher/students/${userId}/print?${query.toString()}`);
         const opened = window.open(url, '_blank', 'noopener,noreferrer');
         if (!opened) {
             router.push(url);

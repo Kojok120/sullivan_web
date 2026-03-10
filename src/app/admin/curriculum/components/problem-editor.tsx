@@ -1,50 +1,152 @@
 'use client';
 
-import { Problem } from '@prisma/client';
-import { useState, useEffect } from 'react';
+import { Badge } from '@/components/ui/badge';
+import type { Prisma } from '@prisma/client';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { getProblemsByCoreProblem } from '../actions';
-import { LinkIcon, GraduationCap } from 'lucide-react';
-
-
-
+import { LinkIcon, GraduationCap, Hash, KeyRound, BookOpen } from 'lucide-react';
 
 interface ProblemEditorProps {
     coreProblemId: string;
 }
 
-function ProblemItem({ problem }: { problem: Problem }) {
+type ProblemEditorProblem = Prisma.ProblemGetPayload<{
+    select: {
+        id: true;
+        question: true;
+        answer: true;
+        customId: true;
+        grade: true;
+        masterNumber: true;
+        videoUrl: true;
+        coreProblems: {
+            select: {
+                id: true;
+                name: true;
+                subject: {
+                    select: {
+                        name: true;
+                    };
+                };
+            };
+        };
+    };
+}>;
+
+function MetaField({
+    icon,
+    label,
+    children,
+    className = '',
+}: {
+    icon: ReactNode;
+    label: string;
+    children: ReactNode;
+    className?: string;
+}) {
+    return (
+        <div className={`rounded-md border bg-muted/20 p-2 ${className}`}>
+            <div className="mb-1 flex items-center gap-1 text-[11px] text-muted-foreground">
+                {icon}
+                <span>{label}</span>
+            </div>
+            <div className="text-xs">{children}</div>
+        </div>
+    );
+}
+
+function getSafeExternalHref(rawUrl: string | null | undefined) {
+    if (!rawUrl) {
+        return null;
+    }
+
+    try {
+        const parsed = new URL(rawUrl);
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+            return parsed.toString();
+        }
+    } catch {
+        return null;
+    }
+
+    return null;
+}
+
+function ProblemItem({ problem }: { problem: ProblemEditorProblem }) {
+    const safeVideoUrl = getSafeExternalHref(problem.videoUrl);
+
     return (
         <div className="group flex items-start gap-2 p-2 px-3 border-b bg-background hover:bg-muted/30 transition-colors">
-            {/* Inputs Grid */}
             <div className="flex-1 grid gap-2">
-                {/* Row 1: Question & Answer */}
                 <div className="flex flex-col items-stretch gap-2 sm:flex-row">
                     <div className="flex-1 p-2 text-sm font-medium whitespace-pre-wrap border rounded-md bg-transparent">
                         {problem.question}
                     </div>
                     <div className="w-full p-2 text-sm whitespace-pre-wrap border rounded-md bg-transparent sm:w-1/3">
-                        {problem.answer}
+                        {problem.answer || '-'}
                     </div>
                 </div>
 
-                {/* Row 2: Secondary Info */}
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    {problem.videoUrl && (
-                        <div className="relative flex-1">
-                            <LinkIcon className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-                            <div className="h-7 text-xs pl-7 bg-muted/20 border rounded-md flex items-center overflow-hidden whitespace-nowrap">
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
+                    <MetaField
+                        icon={<Hash className="h-3 w-3" />}
+                        label="マスタNo"
+                    >
+                        <span className="font-mono">{problem.masterNumber ?? '-'}</span>
+                    </MetaField>
+
+                    <MetaField
+                        icon={<KeyRound className="h-3 w-3" />}
+                        label="ID"
+                    >
+                        <span className="font-mono">{problem.customId ?? '-'}</span>
+                    </MetaField>
+
+                    <MetaField
+                        icon={<GraduationCap className="h-3 w-3" />}
+                        label="学年"
+                    >
+                        {problem.grade || '-'}
+                    </MetaField>
+
+                    <MetaField
+                        icon={<BookOpen className="h-3 w-3" />}
+                        label="紐付けCoreProblem"
+                        className="sm:col-span-2 xl:col-span-2"
+                    >
+                        {problem.coreProblems.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                                {problem.coreProblems.map((coreProblem) => (
+                                    <Badge key={coreProblem.id} variant="secondary" className="text-[11px]">
+                                        {coreProblem.subject.name} &gt; {coreProblem.name}
+                                    </Badge>
+                                ))}
+                            </div>
+                        ) : (
+                            '-'
+                        )}
+                    </MetaField>
+
+                    <MetaField
+                        icon={<LinkIcon className="h-3 w-3" />}
+                        label="解説動画URL"
+                        className="sm:col-span-2 xl:col-span-3"
+                    >
+                        {safeVideoUrl ? (
+                            <a
+                                href={safeVideoUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="break-all text-blue-600 underline underline-offset-2"
+                            >
                                 {problem.videoUrl}
-                            </div>
-                        </div>
-                    )}
-                    {problem.grade && (
-                        <div className="relative w-24">
-                            <GraduationCap className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-                            <div className="h-7 text-xs pl-7 bg-muted/20 border rounded-md flex items-center">
-                                {problem.grade}
-                            </div>
-                        </div>
-                    )}
+                            </a>
+                        ) : problem.videoUrl ? (
+                            <span className="break-all">{problem.videoUrl}</span>
+                        ) : (
+                            '-'
+                        )}
+                    </MetaField>
                 </div>
             </div>
         </div>
@@ -52,22 +154,48 @@ function ProblemItem({ problem }: { problem: Problem }) {
 }
 
 export function ProblemEditor({ coreProblemId }: ProblemEditorProps) {
-    const [problems, setProblems] = useState<Problem[]>([]);
+    const [problems, setProblems] = useState<ProblemEditorProblem[]>([]);
     const [loading, setLoading] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
+    const requestIdRef = useRef(0);
 
     useEffect(() => {
-        const fetchProblems = async () => {
-            setLoading(true);
-            const res = await getProblemsByCoreProblem(coreProblemId);
-            if (res.success && res.problems) {
-                setProblems(res.problems);
-            }
-            setLoading(false);
-        };
-        fetchProblems();
-    }, [coreProblemId]);
+        const requestId = requestIdRef.current + 1;
+        requestIdRef.current = requestId;
+        setErrorMessage('');
+        setProblems([]);
+        setLoading(true);
 
-    if (loading && problems.length === 0) return <div className="p-4 text-muted-foreground text-sm">読み込み中...</div>;
+        const fetchProblems = async () => {
+            try {
+                const res = await getProblemsByCoreProblem(coreProblemId);
+                if (requestIdRef.current !== requestId) {
+                    return;
+                }
+
+                if (res.success && res.problems) {
+                    setProblems(res.problems);
+                    return;
+                }
+
+                setErrorMessage(res.error ?? '問題の取得に失敗しました。');
+                setProblems([]);
+            } catch {
+                if (requestIdRef.current !== requestId) {
+                    return;
+                }
+
+                setErrorMessage('問題の取得に失敗しました。');
+                setProblems([]);
+            } finally {
+                if (requestIdRef.current === requestId) {
+                    setLoading(false);
+                }
+            }
+        };
+
+        void fetchProblems();
+    }, [coreProblemId]);
 
     return (
         <div className="flex flex-col h-full bg-slate-50/50">
@@ -81,7 +209,13 @@ export function ProblemEditor({ coreProblemId }: ProblemEditorProps) {
 
             {/* List */}
             <div className="flex-1 overflow-y-auto pb-4">
-                {problems.length === 0 ? (
+                {errorMessage ? (
+                    <div className="p-8 text-center text-sm text-red-600">
+                        {errorMessage}
+                    </div>
+                ) : loading ? (
+                    <div className="p-4 text-muted-foreground text-sm">読み込み中...</div>
+                ) : problems.length === 0 ? (
                     <div className="p-8 text-center text-muted-foreground text-sm">
                         問題がありません。
                     </div>
