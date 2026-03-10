@@ -1,0 +1,9 @@
+FROM node:20-bookworm-slim
+
+# Web サービスでは PDF 生成用の Chromium 系依存のみを持たせる。
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    chromium \
+    fonts-noto-cjk \
+    libgl1 \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
