@@ -62,3 +62,14 @@ ensure_base_image() {
 
   echo "Reusing base image: $image_uri"
 }
+
+ensure_secret_exists() {
+  local secret_name="$1"
+
+  if gcloud secrets describe "$secret_name" --project "$GOOGLE_CLOUD_PROJECT_ID" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  echo "Missing required Secret Manager secret: $secret_name"
+  return 1
+}

@@ -96,6 +96,7 @@ WARM_STOP_JOB_NAME="${WARM_STOP_JOB_NAME:-sullivan-grading-worker-warm-stop}"
 WORKER_MIN_INSTANCES="${WORKER_MIN_INSTANCES:-0}"
 WORKER_MAX_INSTANCES="${WORKER_MAX_INSTANCES:-50}"
 SKIP_INFRA_SETUP="${SKIP_INFRA_SETUP:-0}"
+GEMINI_API_KEY_SECRET_NAME="${GEMINI_API_KEY_SECRET_NAME:-gemini-api-key}"
 GEMINI_MODEL="${GEMINI_MODEL:-gemini-3.1-pro-preview}"
 GEMINI_CHAT_MODEL="${GEMINI_CHAT_MODEL:-gemini-3.1-pro-preview}"
 GEMINI_CHAT_FALLBACK_MODEL="${GEMINI_CHAT_FALLBACK_MODEL:-$GEMINI_CHAT_MODEL}"
@@ -126,6 +127,8 @@ if [ "$SKIP_INFRA_SETUP" != "1" ]; then
   ensure_gcp_service_enabled "cloudscheduler.googleapis.com"
 fi
 
+ensure_secret_exists "$GEMINI_API_KEY_SECRET_NAME"
+
 ensure_base_image "$WORKER_BASE_IMAGE_URI" "cloudbuild.worker-base.yaml"
 
 run_cloud_build "cloudbuild.worker.yaml" "_IMAGE_URI=$IMAGE_URI,_BASE_IMAGE_URI=$WORKER_BASE_IMAGE_URI"
@@ -147,7 +150,7 @@ gcloud run deploy sullivan-grading-worker-production \
   --update-secrets "DATABASE_URL=database-url:latest" \
   --update-secrets "DIRECT_URL=direct-url:latest" \
   --update-secrets "INTERNAL_API_SECRET=internal-api-secret:latest" \
-  --set-env-vars "GEMINI_API_KEY=$GEMINI_API_KEY" \
+  --update-secrets "GEMINI_API_KEY=${GEMINI_API_KEY_SECRET_NAME}:latest" \
   --set-env-vars "GEMINI_MODEL=$GEMINI_MODEL" \
   --set-env-vars "GEMINI_CHAT_MODEL=$GEMINI_CHAT_MODEL" \
   --set-env-vars "GEMINI_CHAT_FALLBACK_MODEL=$GEMINI_CHAT_FALLBACK_MODEL" \

@@ -129,6 +129,8 @@ DRIVE_CHECK_TASK_QUEUE="${DRIVE_CHECK_TASK_QUEUE:-sullivan-drive-check}"
 GEMINI_MODEL="${GEMINI_MODEL:-gemini-3.1-pro-preview}"
 GEMINI_CHAT_MODEL="${GEMINI_CHAT_MODEL:-gemini-3.1-pro-preview}"
 GEMINI_CHAT_FALLBACK_MODEL="${GEMINI_CHAT_FALLBACK_MODEL:-$GEMINI_CHAT_MODEL}"
+GEMINI_API_KEY_SECRET_NAME="${GEMINI_API_KEY_SECRET_NAME:-gemini-api-key}"
+SUPABASE_SERVICE_ROLE_KEY_SECRET_NAME="${SUPABASE_SERVICE_ROLE_KEY_SECRET_NAME:-supabase-service-role-key}"
 RUNTIME_SA_EMAIL="${RUNTIME_SA_EMAIL:-sullivan-runtime@${GOOGLE_CLOUD_PROJECT_ID}.iam.gserviceaccount.com}"
 CLOUD_TASKS_CALLER_SERVICE_ACCOUNT="${CLOUD_TASKS_CALLER_SERVICE_ACCOUNT:-$RUNTIME_SA_EMAIL}"
 DRIVE_WEBHOOK_CHANNEL_ID="${DRIVE_WEBHOOK_CHANNEL_ID:-}"
@@ -142,8 +144,6 @@ fi
 require_env "GOOGLE_CLOUD_PROJECT_ID"
 require_env "NEXT_PUBLIC_SUPABASE_URL"
 require_env "NEXT_PUBLIC_SUPABASE_ANON_KEY"
-require_env "SUPABASE_SERVICE_ROLE_KEY"
-require_env "GEMINI_API_KEY"
 require_env "GRADING_WORKER_URL"
 require_env "APP_URL"
 require_env "DRIVE_FOLDER_ID"
@@ -164,6 +164,9 @@ if [ "$SKIP_INFRA_SETUP" != "1" ]; then
   upsert_task_queue "$GRADING_TASK_QUEUE"
   upsert_task_queue "$DRIVE_CHECK_TASK_QUEUE"
 fi
+
+ensure_secret_exists "$GEMINI_API_KEY_SECRET_NAME"
+ensure_secret_exists "$SUPABASE_SERVICE_ROLE_KEY_SECRET_NAME"
 
 ensure_base_image "$WEB_BASE_IMAGE_URI" "cloudbuild.web-base.yaml"
 
@@ -195,7 +198,7 @@ gcloud run deploy "$SERVICE_NAME" \
   --set-env-vars "NODE_ENV=production,SERVICE_ROLE=web" \
   --update-secrets "DATABASE_URL=database-url:latest" \
   --update-secrets "DIRECT_URL=direct-url:latest" \
-  --set-env-vars "GEMINI_API_KEY=$GEMINI_API_KEY" \
+  --update-secrets "GEMINI_API_KEY=${GEMINI_API_KEY_SECRET_NAME}:latest" \
   --set-env-vars "GEMINI_MODEL=$GEMINI_MODEL" \
   --set-env-vars "GEMINI_CHAT_MODEL=$GEMINI_CHAT_MODEL" \
   --set-env-vars "GEMINI_CHAT_FALLBACK_MODEL=$GEMINI_CHAT_FALLBACK_MODEL" \
@@ -214,7 +217,7 @@ gcloud run deploy "$SERVICE_NAME" \
   --set-env-vars "NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL" \
   --set-env-vars "NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
   --set-env-vars "NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS=${NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS:-500}" \
-  --set-env-vars "SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY" \
+  --update-secrets "SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY_SECRET_NAME}:latest" \
   --update-secrets "INTERNAL_API_SECRET=internal-api-secret:latest" \
   --update-secrets "DRIVE_WEBHOOK_TOKEN=drive-webhook-token:latest" \
   --set-env-vars "DRIVE_WEBHOOK_CHANNEL_ID=$DRIVE_WEBHOOK_CHANNEL_ID" \

@@ -40,6 +40,14 @@ function getProblemLabel(problem: Pick<CreateProblemData, 'question' | 'masterNu
     return `【マスタNo: ${masterNumberLabel}】問題文: ${question}`;
 }
 
+function formatProblemServiceError(error: unknown) {
+    if (error instanceof Error) {
+        return error.message;
+    }
+
+    return String(error);
+}
+
 export interface CreateProblemData {
     question: string;
     answer?: string;
@@ -361,7 +369,8 @@ async function bulkCreateProblemsCore(
             await runBatchTransaction(client, createOperations);
             createdCount += batch.length;
         } catch (error) {
-            warnings.push(`バッチ処理エラー (${i + 1}〜${Math.min(i + batchSize, normalizedProblems.length)}件目): ${error}`);
+            const errorMessage = formatProblemServiceError(error);
+            warnings.push(`バッチ処理エラー (${i + 1}〜${Math.min(i + batchSize, normalizedProblems.length)}件目): ${errorMessage}`);
             warnings.push('エラーのため処理を中断しました。');
             break;
         }
@@ -519,7 +528,8 @@ export async function bulkUpsertProblemsCore(
                 await runBatchTransaction(client, updateOperations);
                 updatedCount += batch.length;
             } catch (error) {
-                warnings.push(`更新バッチ処理エラー (${i + 1}〜${Math.min(i + batchSize, toUpdate.length)}件目): ${error}`);
+                const errorMessage = formatProblemServiceError(error);
+                warnings.push(`更新バッチ処理エラー (${i + 1}〜${Math.min(i + batchSize, toUpdate.length)}件目): ${errorMessage}`);
             }
         }
     }
