@@ -73,6 +73,43 @@ describe('supabase middleware', () => {
         expectAuthCookiesCleared(request, setCookieHeader);
     });
 
+    it('plain object の AuthApiError でも cookie を削除して未ログイン扱いにする', async () => {
+        const request = createRequest();
+        getUserMock.mockResolvedValue({
+            data: { user: null },
+            error: {
+                __isAuthError: true,
+                name: 'AuthApiError',
+                message: 'Invalid Refresh Token: Refresh Token Not Found',
+                status: 400,
+                code: 'refresh_token_not_found',
+            },
+        });
+
+        const result = await updateSession(request);
+
+        expect(result.user).toBeNull();
+        const setCookieHeader = result.supabaseResponse.headers.get('set-cookie') ?? '';
+        expectAuthCookiesCleared(request, setCookieHeader);
+    });
+
+    it('refresh_token_already_used も cookie を削除して未ログイン扱いにする', async () => {
+        const request = createRequest();
+        getUserMock.mockRejectedValue({
+            __isAuthError: true,
+            name: 'AuthApiError',
+            message: 'Invalid Refresh Token: Already Used',
+            status: 400,
+            code: 'refresh_token_already_used',
+        });
+
+        const result = await updateSession(request);
+
+        expect(result.user).toBeNull();
+        const setCookieHeader = result.supabaseResponse.headers.get('set-cookie') ?? '';
+        expectAuthCookiesCleared(request, setCookieHeader);
+    });
+
     it('AuthSessionMissingError が戻り値 error に入る場合も cookie を削除して未ログイン扱いにする', async () => {
         const request = createRequest();
         getUserMock.mockResolvedValue({

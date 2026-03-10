@@ -1,6 +1,12 @@
 import { createServerClient } from '@supabase/ssr';
-import { AuthApiError, isAuthSessionMissingError } from '@supabase/supabase-js';
+import { isAuthApiError, isAuthSessionMissingError } from '@supabase/supabase-js';
 import { NextResponse, type NextRequest } from 'next/server';
+
+const RECOVERABLE_REFRESH_TOKEN_ERROR_CODES = new Set([
+    'refresh_token_not_found',
+    'refresh_token_already_used',
+    'session_expired',
+]);
 
 function isSupabaseAuthCookieName(name: string) {
     return name.startsWith('sb-') && name.includes('-auth-token');
@@ -32,8 +38,16 @@ function isRecoverableAuthSessionError(error: unknown) {
         return true;
     }
 
-    return error instanceof AuthApiError
-        && /invalid refresh token|refresh token not found/i.test(error.message);
+    if (!isAuthApiError(error)) {
+        return false;
+    }
+
+    const errorCode = typeof error.code === 'string'
+        ? error.code.toLowerCase()
+        : '';
+
+    return RECOVERABLE_REFRESH_TOKEN_ERROR_CODES.has(errorCode)
+        || /invalid refresh token|refresh token not found|refresh token already used|session expired/i.test(error.message);
 }
 
 export async function updateSession(request: NextRequest) {
