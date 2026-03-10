@@ -110,6 +110,14 @@ describe('print pdf route', () => {
         await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
     });
 
+    it('400 応答でも no-store ヘッダーを返す', async () => {
+        const response = await GET(createRequest('sets=1&cb=initial'));
+
+        expect(response.status).toBe(400);
+        expectNoStoreHeaders(response);
+        await expect(response.json()).resolves.toEqual({ error: 'subjectId is required' });
+    });
+
     it('403 応答でも no-store ヘッダーを返す', async () => {
         getPrintGateMock.mockResolvedValue({
             blocked: true,

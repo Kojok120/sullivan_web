@@ -86,7 +86,7 @@ upsert_scheduler_job() {
 RUNTIME_SA_EMAIL="${RUNTIME_SA_EMAIL:-sullivan-runtime@${GOOGLE_CLOUD_PROJECT_ID}.iam.gserviceaccount.com}"
 IMAGE_TAG="${IMAGE_TAG:-$(date +%Y%m%d-%H%M%S)}"
 IMAGE_URI="${IMAGE_URI:-asia.gcr.io/${GOOGLE_CLOUD_PROJECT_ID}/sullivan-grading-worker-dev:${IMAGE_TAG}}"
-WORKER_BASE_IMAGE_TAG="${WORKER_BASE_IMAGE_TAG:-$(compute_file_hash Dockerfile.worker-base)}"
+WORKER_BASE_IMAGE_TAG="${WORKER_BASE_IMAGE_TAG:-$(compute_file_hash Dockerfile.worker-base cloudbuild.worker-base.yaml)}"
 WORKER_BASE_IMAGE_URI="${WORKER_BASE_IMAGE_URI:-asia.gcr.io/${GOOGLE_CLOUD_PROJECT_ID}/sullivan-grading-worker-base:${WORKER_BASE_IMAGE_TAG}}"
 SERVICE_NAME="sullivan-grading-worker-dev"
 SCHEDULER_LOCATION="${SCHEDULER_LOCATION:-asia-northeast1}"

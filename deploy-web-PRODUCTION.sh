@@ -119,7 +119,7 @@ SKIP_INFRA_SETUP="${SKIP_INFRA_SETUP:-0}"
 SERVICE_NAME="sullivan-app-production"
 IMAGE_TAG="${IMAGE_TAG:-$(date +%Y%m%d-%H%M%S)}"
 IMAGE_URI="${IMAGE_URI:-asia.gcr.io/${GOOGLE_CLOUD_PROJECT_ID}/sullivan-app-production:${IMAGE_TAG}}"
-WEB_BASE_IMAGE_TAG="${WEB_BASE_IMAGE_TAG:-$(compute_file_hash Dockerfile.web-base)}"
+WEB_BASE_IMAGE_TAG="${WEB_BASE_IMAGE_TAG:-$(compute_file_hash Dockerfile.web-base cloudbuild.web-base.yaml)}"
 WEB_BASE_IMAGE_URI="${WEB_BASE_IMAGE_URI:-asia.gcr.io/${GOOGLE_CLOUD_PROJECT_ID}/sullivan-web-base:${WEB_BASE_IMAGE_TAG}}"
 WARM_START_JOB_NAME="sullivan-app-warm-start"
 WARM_STOP_JOB_NAME="sullivan-app-warm-stop"
@@ -131,6 +131,8 @@ GEMINI_CHAT_MODEL="${GEMINI_CHAT_MODEL:-gemini-3.1-pro-preview}"
 GEMINI_CHAT_FALLBACK_MODEL="${GEMINI_CHAT_FALLBACK_MODEL:-$GEMINI_CHAT_MODEL}"
 RUNTIME_SA_EMAIL="${RUNTIME_SA_EMAIL:-sullivan-runtime@${GOOGLE_CLOUD_PROJECT_ID}.iam.gserviceaccount.com}"
 CLOUD_TASKS_CALLER_SERVICE_ACCOUNT="${CLOUD_TASKS_CALLER_SERVICE_ACCOUNT:-$RUNTIME_SA_EMAIL}"
+DRIVE_WEBHOOK_CHANNEL_ID="${DRIVE_WEBHOOK_CHANNEL_ID:-}"
+DRIVE_WATCH_STATE_KEY="${DRIVE_WATCH_STATE_KEY:-sullivan:drive:watch:state:prod}"
 INTERNAL_API_SECRET_VALUE="$(resolve_secret_value "INTERNAL_API_SECRET" "internal-api-secret")"
 
 if [ "$CLOUD_BUILD_REGION" = "global" ]; then
@@ -143,6 +145,8 @@ require_env "NEXT_PUBLIC_SUPABASE_ANON_KEY"
 require_env "SUPABASE_SERVICE_ROLE_KEY"
 require_env "GEMINI_API_KEY"
 require_env "GRADING_WORKER_URL"
+require_env "APP_URL"
+require_env "DRIVE_FOLDER_ID"
 
 cat > .env.build <<EOF
 NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL

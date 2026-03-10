@@ -7,7 +7,6 @@ type PrintSearchParams = {
     subjectId?: string;
     coreProblemId?: string;
     sets?: string;
-    autoprint?: string;
 };
 
 interface StudentPrintPageProps {
@@ -38,8 +37,6 @@ export async function SharedStudentPrintPage({
     if (targetUserIdForApi) {
         query.set('targetUserId', targetUserIdForApi);
     }
-
-    void searchParams.autoprint;
 
     return (
         <PdfPreviewClient

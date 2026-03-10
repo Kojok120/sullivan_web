@@ -78,4 +78,32 @@ describe('ProblemEditor', () => {
         expect(screen.getByText('未設定の問題')).toBeInTheDocument();
         expect(screen.getAllByText('-').length).toBeGreaterThanOrEqual(5);
     });
+
+    it('http/https 以外の動画URLはリンク化しない', async () => {
+        getProblemsByCoreProblemMock.mockResolvedValue({
+            success: true,
+            problems: [
+                {
+                    id: 'problem-unsafe',
+                    question: '危険なURLの問題',
+                    answer: 'x=1',
+                    customId: 'E-2',
+                    grade: '中1',
+                    masterNumber: 102,
+                    videoUrl: 'javascript:alert(1)',
+                    coreProblems: [],
+                },
+            ],
+        });
+
+        render(<ProblemEditor coreProblemId="cp-unsafe" />);
+
+        await waitFor(() => {
+            expect(getProblemsByCoreProblemMock).toHaveBeenCalledWith('cp-unsafe');
+        });
+
+        expect(await screen.findByText('危険なURLの問題')).toBeInTheDocument();
+        expect(screen.getByText('javascript:alert(1)')).toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: 'javascript:alert(1)' })).toBeNull();
+    });
 });

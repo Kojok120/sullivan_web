@@ -1,14 +1,26 @@
 #!/bin/bash
 
 compute_file_hash() {
-  local file_path="$1"
+  local file_hash
+  local file_path
+  local digest_input=""
+
+  for file_path in "$@"; do
+    if command -v sha256sum >/dev/null 2>&1; then
+      file_hash="$(sha256sum "$file_path" | awk '{print $1}')"
+    else
+      file_hash="$(shasum -a 256 "$file_path" | awk '{print $1}')"
+    fi
+
+    digest_input+="${file_path}:${file_hash}"$'\n'
+  done
 
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum "$file_path" | awk '{print substr($1, 1, 16)}'
+    printf '%s' "$digest_input" | sha256sum | awk '{print substr($1, 1, 16)}'
     return 0
   fi
 
-  shasum -a 256 "$file_path" | awk '{print substr($1, 1, 16)}'
+  printf '%s' "$digest_input" | shasum -a 256 | awk '{print substr($1, 1, 16)}'
 }
 
 image_exists() {

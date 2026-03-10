@@ -55,7 +55,26 @@ function MetaField({
     );
 }
 
+function getSafeExternalHref(rawUrl: string | null | undefined) {
+    if (!rawUrl) {
+        return null;
+    }
+
+    try {
+        const parsed = new URL(rawUrl);
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+            return parsed.toString();
+        }
+    } catch {
+        return null;
+    }
+
+    return null;
+}
+
 function ProblemItem({ problem }: { problem: ProblemEditorProblem }) {
+    const safeVideoUrl = getSafeExternalHref(problem.videoUrl);
+
     return (
         <div className="group flex items-start gap-2 p-2 px-3 border-b bg-background hover:bg-muted/30 transition-colors">
             <div className="flex-1 grid gap-2">
@@ -113,15 +132,17 @@ function ProblemItem({ problem }: { problem: ProblemEditorProblem }) {
                         label="解説動画URL"
                         className="sm:col-span-2 xl:col-span-3"
                     >
-                        {problem.videoUrl ? (
+                        {safeVideoUrl ? (
                             <a
-                                href={problem.videoUrl}
+                                href={safeVideoUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="break-all text-blue-600 underline underline-offset-2"
                             >
                                 {problem.videoUrl}
                             </a>
+                        ) : problem.videoUrl ? (
+                            <span className="break-all">{problem.videoUrl}</span>
                         ) : (
                             '-'
                         )}
