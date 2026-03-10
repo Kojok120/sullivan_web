@@ -9,6 +9,8 @@ vi.mock('next/navigation', () => ({
 }))
 
 describe('PDFプレビューの戻る動作', () => {
+    let originalVisibilityStateDescriptor: PropertyDescriptor | undefined
+
     const mockRouter = {
         push: vi.fn(),
         refresh: vi.fn(),
@@ -22,6 +24,7 @@ describe('PDFプレビューの戻る動作', () => {
         vi.clearAllMocks()
         vi.useFakeTimers()
         vi.mocked(useRouter).mockReturnValue(mockRouter)
+        originalVisibilityStateDescriptor = Object.getOwnPropertyDescriptor(document, 'visibilityState')
         Object.defineProperty(window, 'opener', {
             configurable: true,
             writable: true,
@@ -33,6 +36,12 @@ describe('PDFプレビューの戻る動作', () => {
         vi.runOnlyPendingTimers()
         vi.useRealTimers()
         vi.restoreAllMocks()
+
+        if (originalVisibilityStateDescriptor) {
+            Object.defineProperty(document, 'visibilityState', originalVisibilityStateDescriptor)
+        } else {
+            delete (document as { visibilityState?: DocumentVisibilityState }).visibilityState
+        }
     })
 
     it('読み込み完了後も自動印刷を試みない', () => {

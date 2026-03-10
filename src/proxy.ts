@@ -1,24 +1,13 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { applyNoStoreHeaders } from '@/lib/no-store';
 import { updateSession } from '@/lib/supabase/middleware';
 
 const PRINT_PAGE_PATTERN = /^\/teacher\/students\/[^/]+\/print(?:\/)?$/;
-const NO_STORE_HEADERS = {
-    'Cache-Control': 'private, no-store, no-cache, max-age=0, must-revalidate',
-    Pragma: 'no-cache',
-    Expires: '0',
-} as const;
+const DASHBOARD_PRINT_PAGE_PATTERN = /^\/dashboard\/print(?:\/)?$/;
 
 function isPrintPagePath(pathname: string) {
-    return pathname === '/dashboard/print' || PRINT_PAGE_PATTERN.test(pathname);
-}
-
-function applyNoStoreHeaders(response: NextResponse) {
-    Object.entries(NO_STORE_HEADERS).forEach(([name, value]) => {
-        response.headers.set(name, value);
-    });
-
-    return response;
+    return DASHBOARD_PRINT_PAGE_PATTERN.test(pathname) || PRINT_PAGE_PATTERN.test(pathname);
 }
 
 export async function proxy(request: NextRequest) {

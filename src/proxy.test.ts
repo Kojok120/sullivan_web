@@ -67,6 +67,25 @@ describe('proxy', () => {
         expect(result.headers.get('Expires')).toBe('0');
     });
 
+    it('学生向け印刷ページの末尾スラッシュ付き URL にも no-store ヘッダーを付与する', async () => {
+        const request = new NextRequest('http://localhost/dashboard/print/?subjectId=subject-1&sets=1');
+        const supabaseResponse = NextResponse.next({ request });
+
+        updateSessionMock.mockResolvedValue({
+            supabaseResponse,
+            user: {
+                app_metadata: { role: 'STUDENT' },
+                user_metadata: {},
+            },
+        });
+
+        const result = await proxy(request);
+
+        expect(result.headers.get('Cache-Control')).toBe('private, no-store, no-cache, max-age=0, must-revalidate');
+        expect(result.headers.get('Pragma')).toBe('no-cache');
+        expect(result.headers.get('Expires')).toBe('0');
+    });
+
     it('講師向け印刷ページへの redirect にも no-store ヘッダーを付与する', async () => {
         const request = new NextRequest('http://localhost/teacher/students/student-1/print?subjectId=subject-1&sets=1');
         const supabaseResponse = NextResponse.next({ request });

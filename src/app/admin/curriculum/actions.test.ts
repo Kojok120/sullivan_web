@@ -67,10 +67,23 @@ describe('curriculum actions', () => {
                         some: { id: 'cp-1' },
                     },
                 },
-                include: {
+                select: {
+                    id: true,
+                    question: true,
+                    answer: true,
+                    customId: true,
+                    grade: true,
+                    masterNumber: true,
+                    videoUrl: true,
                     coreProblems: {
-                        include: {
-                            subject: true,
+                        select: {
+                            id: true,
+                            name: true,
+                            subject: {
+                                select: {
+                                    name: true,
+                                },
+                            },
                         },
                         orderBy: [{ order: 'asc' }, { id: 'asc' }],
                     },

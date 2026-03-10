@@ -100,7 +100,7 @@ export function SessionListClient({ initialSessions, userId, basePath }: Session
 
             {sessions.map((session) => {
                 const hasPendingVideoReview = session.unwatchedMistakeCount > 0;
-                // Blue/Check condition: No pending explanation videos (either perfect or already watched)
+                // 解説動画の未視聴がなければ完了扱いにする
                 const isCompleted = !hasPendingVideoReview;
 
                 return (
@@ -110,8 +110,8 @@ export function SessionListClient({ initialSessions, userId, basePath }: Session
                     >
                         <Card className={`hover:bg-accent/50 transition-colors cursor-pointer border-2 
                             ${hasPendingVideoReview
-                                ? 'border-red-500 bg-red-50 hover:bg-red-100' // Red for pending explanation videos
-                                : 'border-blue-500 bg-blue-50 hover:bg-blue-100' // Blue for completed/reviewed
+                                ? 'border-red-500 bg-red-50 hover:bg-red-100' // 解説動画の未視聴が残っている状態
+                                : 'border-blue-500 bg-blue-50 hover:bg-blue-100' // 復習完了または視聴済みの状態
                             }`}>
                             <CardHeader className="flex flex-row items-center justify-between p-4">
                                 <div className="flex items-center space-x-4">
@@ -121,7 +121,7 @@ export function SessionListClient({ initialSessions, userId, basePath }: Session
                                         ) : (
                                             <CheckCircle className="h-6 w-6 text-blue-600" />
                                         )}
-                                        {/* Status Badge/Indicator logic can be simplified since the whole card is colored now */}
+                                        {/* カード全体の色で状態を表現するため、個別バッジは置かない */}
                                     </div>
                                     <div>
                                         <div className="flex items-center gap-2">

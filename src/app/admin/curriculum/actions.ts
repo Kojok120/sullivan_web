@@ -530,18 +530,30 @@ export async function reorderCoreProblems(items: { id: string, order: number }[]
 export async function getProblemsByCoreProblem(coreProblemId: string) {
     await requireAdmin();
     try {
-        // Problem now has many-to-many with CoreProblem.
-        // We need to find problems that have this coreProblemId in their coreProblems list.
+        // Problem と CoreProblem は多対多のため、指定 CoreProblem に紐づく問題を取得する。
         const problems = await prisma.problem.findMany({
             where: {
                 coreProblems: {
                     some: { id: coreProblemId }
                 }
             },
-            include: {
+            select: {
+                id: true,
+                question: true,
+                answer: true,
+                customId: true,
+                grade: true,
+                masterNumber: true,
+                videoUrl: true,
                 coreProblems: {
-                    include: {
-                        subject: true,
+                    select: {
+                        id: true,
+                        name: true,
+                        subject: {
+                            select: {
+                                name: true,
+                            },
+                        },
                     },
                     orderBy: [{ order: 'asc' }, { id: 'asc' }],
                 },

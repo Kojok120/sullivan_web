@@ -15,16 +15,12 @@ import {
     buildProblemIdsHash,
     getOrCreatePrintPdf,
 } from '@/lib/print-pdf/render-service';
+import { withNoStoreHeaders } from '@/lib/no-store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const API_TIMEOUT_MS = 60_000;
-const NO_STORE_HEADERS = {
-    'Cache-Control': 'private, no-store, no-cache, max-age=0, must-revalidate',
-    Pragma: 'no-cache',
-    Expires: '0',
-} as const;
 
 export async function GET(request: NextRequest) {
     const startedAt = Date.now();
@@ -254,16 +250,6 @@ function buildFilename(input: { studentLoginId: string; subjectId: string; diges
 
 function sanitizeFilenamePart(value: string): string {
     return value.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 60);
-}
-
-function withNoStoreHeaders(headersInit?: HeadersInit) {
-    const headers = new Headers(headersInit);
-
-    Object.entries(NO_STORE_HEADERS).forEach(([name, value]) => {
-        headers.set(name, value);
-    });
-
-    return headers;
 }
 
 function jsonWithNoStore(body: Record<string, unknown>, init?: ResponseInit) {

@@ -4,6 +4,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
+source "$SCRIPT_DIR/scripts/deploy-common.sh"
 
 # Load .env.PRODUCTION variables for deployment
 if [ -f .env.PRODUCTION ]; then
@@ -87,55 +88,25 @@ upsert_scheduler_job() {
   gcloud "${create_args[@]}"
 }
 
-compute_file_hash() {
-  local file_path="$1"
+upsert_task_queue() {
+  local queue_name="$1"
 
-  if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum "$file_path" | awk '{print substr($1, 1, 16)}'
-    return 0
-  fi
-
-  shasum -a 256 "$file_path" | awk '{print substr($1, 1, 16)}'
-}
-
-image_exists() {
-  local image_uri="$1"
-  gcloud container images describe "$image_uri" >/dev/null 2>&1
-}
-
-run_cloud_build() {
-  local config_path="$1"
-  local substitutions="${2:-}"
-
-  local args=(
-    builds submit
+  local queue_args=(
+    --location "$CLOUD_TASKS_LOCATION"
     --project "$GOOGLE_CLOUD_PROJECT_ID"
-    --region "$CLOUD_BUILD_REGION"
-    --config "$config_path"
-    --quiet
-    --suppress-logs
+    --max-attempts 4
+    --max-retry-duration 0s
+    --min-backoff 5s
+    --max-backoff 300s
+    --max-doublings 4
   )
 
-  if [ -n "$substitutions" ]; then
-    args+=(--substitutions "$substitutions")
-  fi
-
-  args+=(.)
-
-  gcloud "${args[@]}"
-}
-
-ensure_base_image() {
-  local image_uri="$1"
-  local config_path="$2"
-
-  if [ "${FORCE_BASE_IMAGE_REBUILD:-0}" = "1" ] || ! image_exists "$image_uri"; then
-    echo "Building base image: $image_uri"
-    run_cloud_build "$config_path" "_IMAGE_URI=$image_uri"
+  if gcloud tasks queues describe "$queue_name" --location "$CLOUD_TASKS_LOCATION" --project "$GOOGLE_CLOUD_PROJECT_ID" >/dev/null 2>&1; then
+    gcloud tasks queues update "$queue_name" "${queue_args[@]}" >/dev/null
     return 0
   fi
 
-  echo "Reusing base image: $image_uri"
+  gcloud tasks queues create "$queue_name" "${queue_args[@]}" >/dev/null
 }
 
 GOOGLE_CLOUD_PROJECT_ID="${GOOGLE_CLOUD_PROJECT_ID:-sullivan-production-483212}"
@@ -186,27 +157,6 @@ echo "Cloud Build region: $CLOUD_BUILD_REGION"
 
 if [ "$SKIP_INFRA_SETUP" != "1" ]; then
   ensure_gcp_service_enabled "cloudtasks.googleapis.com"
-  upsert_task_queue() {
-    local queue_name="$1"
-
-    local queue_args=(
-      --location "$CLOUD_TASKS_LOCATION"
-      --project "$GOOGLE_CLOUD_PROJECT_ID"
-      --max-attempts 4
-      --max-retry-duration 0s
-      --min-backoff 5s
-      --max-backoff 300s
-      --max-doublings 4
-    )
-
-    if gcloud tasks queues describe "$queue_name" --location "$CLOUD_TASKS_LOCATION" --project "$GOOGLE_CLOUD_PROJECT_ID" >/dev/null 2>&1; then
-      gcloud tasks queues update "$queue_name" "${queue_args[@]}" >/dev/null
-      return 0
-    fi
-
-    gcloud tasks queues create "$queue_name" "${queue_args[@]}" >/dev/null
-  }
-
   upsert_task_queue "$GRADING_TASK_QUEUE"
   upsert_task_queue "$DRIVE_CHECK_TASK_QUEUE"
 fi

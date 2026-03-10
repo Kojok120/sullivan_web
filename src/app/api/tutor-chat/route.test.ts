@@ -63,10 +63,12 @@ vi.mock('@google/genai', () => ({
     },
 }));
 
-process.env.GEMINI_API_KEY = 'test-api-key';
-process.env.GEMINI_CHAT_MODEL = 'primary-model';
-process.env.GEMINI_CHAT_FALLBACK_MODEL = 'backup-model';
-process.env.GEMINI_CHAT_TIMEOUT_MS = '12000';
+const ORIGINAL_GEMINI_ENV = {
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+    GEMINI_CHAT_MODEL: process.env.GEMINI_CHAT_MODEL,
+    GEMINI_CHAT_FALLBACK_MODEL: process.env.GEMINI_CHAT_FALLBACK_MODEL,
+    GEMINI_CHAT_TIMEOUT_MS: process.env.GEMINI_CHAT_TIMEOUT_MS,
+};
 
 let POST: typeof import('@/app/api/tutor-chat/route').POST;
 
@@ -123,6 +125,15 @@ describe('tutor chat route', () => {
     afterEach(() => {
         vi.useRealTimers();
         vi.restoreAllMocks();
+
+        for (const [key, value] of Object.entries(ORIGINAL_GEMINI_ENV)) {
+            if (value === undefined) {
+                delete process.env[key];
+                continue;
+            }
+
+            process.env[key] = value;
+        }
     });
 
     it('retryable error が続いても deadline 超過前に fallback reply を返す', async () => {

@@ -25,8 +25,8 @@ function expectAuthCookiesCleared(request: NextRequest, setCookieHeader: string)
     expect(request.cookies.get('sb-test-auth-token')).toBeUndefined();
     expect(request.cookies.get('sb-test-auth-token.0')).toBeUndefined();
     expect(request.cookies.get('other-cookie')?.value).toBe('keep-me');
-    expect(setCookieHeader).toContain('sb-test-auth-token=');
-    expect(setCookieHeader).toContain('sb-test-auth-token.0=');
+    expect(setCookieHeader).toMatch(/sb-test-auth-token=;[^]*?(Max-Age=0|Expires=Thu, 01 Jan 1970 00:00:00 GMT)/i);
+    expect(setCookieHeader).toMatch(/sb-test-auth-token\.0=;[^]*?(Max-Age=0|Expires=Thu, 01 Jan 1970 00:00:00 GMT)/i);
 }
 
 describe('supabase middleware', () => {

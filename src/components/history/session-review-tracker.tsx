@@ -9,18 +9,21 @@ type SessionReviewTrackerProps = {
 };
 
 export function SessionReviewTracker({ groupId }: SessionReviewTrackerProps) {
-    const hasRequestedRef = useRef(false);
+    const requestedGroupIdRef = useRef<string | null>(null);
 
     useEffect(() => {
-        if (!groupId || hasRequestedRef.current) {
+        if (!groupId || requestedGroupIdRef.current === groupId) {
             return;
         }
 
-        hasRequestedRef.current = true;
-        void Promise.resolve(markSessionReviewed(groupId)).catch((error) => {
+        requestedGroupIdRef.current = groupId;
+        void markSessionReviewed(groupId).catch((error) => {
+            if (requestedGroupIdRef.current === groupId) {
+                requestedGroupIdRef.current = null;
+            }
             console.error('[SessionReviewTracker] 既読更新に失敗しました:', error);
         });
-    }, [groupId]);
+    });
 
     return null;
 }

@@ -11,10 +11,23 @@ interface ProblemEditorProps {
 }
 
 type ProblemEditorProblem = Prisma.ProblemGetPayload<{
-    include: {
+    select: {
+        id: true;
+        question: true;
+        answer: true;
+        customId: true;
+        grade: true;
+        masterNumber: true;
+        videoUrl: true;
         coreProblems: {
-            include: {
-                subject: true;
+            select: {
+                id: true;
+                name: true;
+                subject: {
+                    select: {
+                        name: true;
+                    };
+                };
             };
         };
     };
