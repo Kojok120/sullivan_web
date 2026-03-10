@@ -1,0 +1,83 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const {
+    problemFindManyMock,
+    requireAdminMock,
+    getSessionMock,
+    revalidatePathMock,
+} = vi.hoisted(() => ({
+    problemFindManyMock: vi.fn(),
+    requireAdminMock: vi.fn(),
+    getSessionMock: vi.fn(),
+    revalidatePathMock: vi.fn(),
+}));
+
+vi.mock('@/lib/prisma', () => ({
+    prisma: {
+        problem: {
+            findMany: problemFindManyMock,
+        },
+    },
+}));
+
+vi.mock('@/lib/auth', () => ({
+    requireAdmin: requireAdminMock,
+    getSession: getSessionMock,
+}));
+
+vi.mock('next/cache', () => ({
+    revalidatePath: revalidatePathMock,
+}));
+
+import { getProblemsByCoreProblem } from './actions';
+
+describe('curriculum actions', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        requireAdminMock.mockResolvedValue(undefined);
+    });
+
+    describe('getProblemsByCoreProblem', () => {
+        it('関連CoreProblemとsubjectを含めて問題一覧を取得する', async () => {
+            const problems = [
+                {
+                    id: 'problem-1',
+                    question: '問題文',
+                    coreProblems: [
+                        {
+                            id: 'cp-1',
+                            name: '方程式',
+                            order: 1,
+                            subject: {
+                                id: 'subject-1',
+                                name: '数学',
+                            },
+                        },
+                    ],
+                },
+            ];
+            problemFindManyMock.mockResolvedValue(problems);
+
+            const result = await getProblemsByCoreProblem('cp-1');
+
+            expect(requireAdminMock).toHaveBeenCalledOnce();
+            expect(problemFindManyMock).toHaveBeenCalledWith({
+                where: {
+                    coreProblems: {
+                        some: { id: 'cp-1' },
+                    },
+                },
+                include: {
+                    coreProblems: {
+                        include: {
+                            subject: true,
+                        },
+                        orderBy: [{ order: 'asc' }, { id: 'asc' }],
+                    },
+                },
+                orderBy: [{ order: 'asc' }, { id: 'asc' }],
+            });
+            expect(result).toEqual({ success: true, problems });
+        });
+    });
+});

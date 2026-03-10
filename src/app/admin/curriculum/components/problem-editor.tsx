@@ -1,50 +1,118 @@
 'use client';
 
-import { Problem } from '@prisma/client';
-import { useState, useEffect } from 'react';
+import { Badge } from '@/components/ui/badge';
+import type { Prisma } from '@prisma/client';
+import { useState, useEffect, type ReactNode } from 'react';
 import { getProblemsByCoreProblem } from '../actions';
-import { LinkIcon, GraduationCap } from 'lucide-react';
-
-
-
+import { LinkIcon, GraduationCap, Hash, KeyRound, BookOpen } from 'lucide-react';
 
 interface ProblemEditorProps {
     coreProblemId: string;
 }
 
-function ProblemItem({ problem }: { problem: Problem }) {
+type ProblemEditorProblem = Prisma.ProblemGetPayload<{
+    include: {
+        coreProblems: {
+            include: {
+                subject: true;
+            };
+        };
+    };
+}>;
+
+function MetaField({
+    icon,
+    label,
+    children,
+    className = '',
+}: {
+    icon: ReactNode;
+    label: string;
+    children: ReactNode;
+    className?: string;
+}) {
+    return (
+        <div className={`rounded-md border bg-muted/20 p-2 ${className}`}>
+            <div className="mb-1 flex items-center gap-1 text-[11px] text-muted-foreground">
+                {icon}
+                <span>{label}</span>
+            </div>
+            <div className="text-xs">{children}</div>
+        </div>
+    );
+}
+
+function ProblemItem({ problem }: { problem: ProblemEditorProblem }) {
     return (
         <div className="group flex items-start gap-2 p-2 px-3 border-b bg-background hover:bg-muted/30 transition-colors">
-            {/* Inputs Grid */}
             <div className="flex-1 grid gap-2">
-                {/* Row 1: Question & Answer */}
                 <div className="flex flex-col items-stretch gap-2 sm:flex-row">
                     <div className="flex-1 p-2 text-sm font-medium whitespace-pre-wrap border rounded-md bg-transparent">
                         {problem.question}
                     </div>
                     <div className="w-full p-2 text-sm whitespace-pre-wrap border rounded-md bg-transparent sm:w-1/3">
-                        {problem.answer}
+                        {problem.answer || '-'}
                     </div>
                 </div>
 
-                {/* Row 2: Secondary Info */}
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    {problem.videoUrl && (
-                        <div className="relative flex-1">
-                            <LinkIcon className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-                            <div className="h-7 text-xs pl-7 bg-muted/20 border rounded-md flex items-center overflow-hidden whitespace-nowrap">
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
+                    <MetaField
+                        icon={<Hash className="h-3 w-3" />}
+                        label="マスタNo"
+                    >
+                        <span className="font-mono">{problem.masterNumber ?? '-'}</span>
+                    </MetaField>
+
+                    <MetaField
+                        icon={<KeyRound className="h-3 w-3" />}
+                        label="ID"
+                    >
+                        <span className="font-mono">{problem.customId ?? '-'}</span>
+                    </MetaField>
+
+                    <MetaField
+                        icon={<GraduationCap className="h-3 w-3" />}
+                        label="学年"
+                    >
+                        {problem.grade || '-'}
+                    </MetaField>
+
+                    <MetaField
+                        icon={<BookOpen className="h-3 w-3" />}
+                        label="紐付けCoreProblem"
+                        className="sm:col-span-2 xl:col-span-2"
+                    >
+                        {problem.coreProblems.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                                {problem.coreProblems.map((coreProblem) => (
+                                    <Badge key={coreProblem.id} variant="secondary" className="text-[11px]">
+                                        {coreProblem.subject.name} &gt; {coreProblem.name}
+                                    </Badge>
+                                ))}
+                            </div>
+                        ) : (
+                            '-'
+                        )}
+                    </MetaField>
+
+                    <MetaField
+                        icon={<LinkIcon className="h-3 w-3" />}
+                        label="解説動画URL"
+                        className="sm:col-span-2 xl:col-span-3"
+                    >
+                        {problem.videoUrl ? (
+                            <a
+                                href={problem.videoUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="break-all text-blue-600 underline underline-offset-2"
+                            >
                                 {problem.videoUrl}
-                            </div>
-                        </div>
-                    )}
-                    {problem.grade && (
-                        <div className="relative w-24">
-                            <GraduationCap className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-                            <div className="h-7 text-xs pl-7 bg-muted/20 border rounded-md flex items-center">
-                                {problem.grade}
-                            </div>
-                        </div>
-                    )}
+                            </a>
+                        ) : (
+                            '-'
+                        )}
+                    </MetaField>
                 </div>
             </div>
         </div>
@@ -52,7 +120,7 @@ function ProblemItem({ problem }: { problem: Problem }) {
 }
 
 export function ProblemEditor({ coreProblemId }: ProblemEditorProps) {
-    const [problems, setProblems] = useState<Problem[]>([]);
+    const [problems, setProblems] = useState<ProblemEditorProblem[]>([]);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {

@@ -538,7 +538,15 @@ export async function getProblemsByCoreProblem(coreProblemId: string) {
                     some: { id: coreProblemId }
                 }
             },
-            orderBy: { order: 'asc' },
+            include: {
+                coreProblems: {
+                    include: {
+                        subject: true,
+                    },
+                    orderBy: [{ order: 'asc' }, { id: 'asc' }],
+                },
+            },
+            orderBy: [{ order: 'asc' }, { id: 'asc' }],
         });
         return { success: true, problems };
     } catch (error) {
