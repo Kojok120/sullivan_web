@@ -280,9 +280,9 @@ async function callGeminiWithTimeout(
     systemInstruction: string,
     timeoutMs: number,
 ): Promise<GenerateContentResponse> {
+    const chat = ai.chats.create({ model, history });
     const abortController = new AbortController();
     const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
-    const chat = ai.chats.create({ model, history });
 
     try {
         return await chat.sendMessage({

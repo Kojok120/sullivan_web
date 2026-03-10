@@ -98,12 +98,12 @@ describe('curriculum actions', () => {
 
         it('取得に失敗した場合はエラーメッセージを返す', async () => {
             const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-            problemFindManyMock.mockRejectedValue(new Error('db error'));
+            problemFindManyMock.mockRejectedValueOnce(new Error('db error'));
 
             const result = await getProblemsByCoreProblem('cp-1');
 
             expect(requireAdminMock).toHaveBeenCalledOnce();
-            expect(result).toEqual({ error: '問題の取得に失敗しました' });
+            expect(result).toEqual({ success: false, error: '問題の取得に失敗しました' });
             consoleErrorSpy.mockRestore();
         });
     });

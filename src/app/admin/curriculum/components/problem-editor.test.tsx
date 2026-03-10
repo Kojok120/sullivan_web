@@ -32,7 +32,6 @@ describe('ProblemEditor', () => {
                             id: 'cp-1',
                             name: '一次方程式',
                             subject: {
-                                id: 'subject-1',
                                 name: '数学',
                             },
                         },
@@ -40,7 +39,6 @@ describe('ProblemEditor', () => {
                             id: 'cp-2',
                             name: '文章題',
                             subject: {
-                                id: 'subject-1',
                                 name: '数学',
                             },
                         },

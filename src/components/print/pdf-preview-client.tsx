@@ -30,7 +30,7 @@ function PdfPreviewClientInner({ pdfUrl, backFallbackPath }: PdfPreviewClientPro
     const closeFallbackTimerRef = useRef<number | null>(null);
     const hasLoadedFrameRef = useRef(false);
     const lastReloadAtRef = useRef(0);
-    const [frameUrl, setFrameUrl] = useState(pdfUrl);
+    const [frameUrl, setFrameUrl] = useState(() => appendCacheBust(pdfUrl));
     const [isFrameLoaded, setIsFrameLoaded] = useState(false);
 
     const triggerPrint = useCallback(() => {

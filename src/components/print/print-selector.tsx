@@ -74,7 +74,12 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
     const handlePrint = async () => {
         if (!selectedSubjectId || isCheckingGate) return;
 
-        const printUrl = appendCacheBust(`/dashboard/print?subjectId=${selectedSubjectId}&sets=${sets}&gateChecked=1`);
+        const params = new URLSearchParams({
+            subjectId: selectedSubjectId,
+            sets: String(sets),
+            gateChecked: '1',
+        });
+        const printUrl = appendCacheBust(`/dashboard/print?${params.toString()}`);
         const previewTab = window.open('', '_blank');
         setIsCheckingGate(true);
         setGateErrorMessage(null);

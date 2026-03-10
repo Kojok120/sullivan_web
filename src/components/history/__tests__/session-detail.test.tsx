@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react'
 import { SessionDetail } from '../session-detail'
 import * as analytics from '@/lib/analytics'
 import * as surveyActions from '@/actions/survey'
+import * as auth from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import fs from 'fs'
 import type { MouseEventHandler, ReactNode } from 'react'
@@ -81,6 +82,10 @@ vi.mock('@/lib/analytics', () => ({
 
 vi.mock('@/actions/survey', () => ({
     checkSurveyEligibility: vi.fn(),
+}))
+
+vi.mock('@/lib/auth', () => ({
+    getSession: vi.fn(),
 }))
 
 vi.mock('@/lib/prisma', () => ({
@@ -162,6 +167,11 @@ describe('SessionDetail', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         vi.mocked(fs.readFileSync).mockReturnValue(mockSystemPrompt)
+        vi.mocked(auth.getSession).mockResolvedValue({
+            userId: 'user1',
+            role: 'STUDENT',
+            name: '生徒1',
+        })
         vi.mocked(prisma.user.findUnique).mockResolvedValue({
             classroom: {
                 plan: 'PREMIUM',
@@ -439,6 +449,21 @@ describe('SessionDetail', () => {
             mockSessionDetails(mockDetails)
 
             render(await SessionDetail({ groupId: 'group1', userId: 'user1', isTeacherView: true }))
+
+            expect(screen.queryByTestId('session-review-tracker')).toBeFalsy()
+        })
+
+        it('表示対象が現在ユーザーと異なる場合はSessionReviewTrackerを表示しない', async () => {
+            const mockDetails = [createMockSessionDetail()]
+            mockSessionDetails(mockDetails)
+            vi.mocked(auth.getSession).mockResolvedValue({
+                userId: 'other-user',
+                role: 'STUDENT',
+                name: '別の生徒',
+            })
+            vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
+
+            render(await SessionDetail({ groupId: 'group1', userId: 'user1', isTeacherView: false }))
 
             expect(screen.queryByTestId('session-review-tracker')).toBeFalsy()
         })

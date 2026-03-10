@@ -562,7 +562,7 @@ export async function getProblemsByCoreProblem(coreProblemId: string) {
         });
         return { success: true, problems };
     } catch (error) {
-        console.error('Failed to fetch problems:', error);
-        return { error: '問題の取得に失敗しました' };
+        console.error('問題の取得に失敗しました', error);
+        return { success: false, error: '問題の取得に失敗しました' };
     }
 }

@@ -21,12 +21,18 @@ function createRequest() {
     return request;
 }
 
-function expectAuthCookiesCleared(request: NextRequest, setCookieHeader: string) {
+function expectAuthCookiesCleared(request: NextRequest, setCookieHeaders: string[]) {
     expect(request.cookies.get('sb-test-auth-token')).toBeUndefined();
     expect(request.cookies.get('sb-test-auth-token.0')).toBeUndefined();
     expect(request.cookies.get('other-cookie')?.value).toBe('keep-me');
-    expect(setCookieHeader).toMatch(/sb-test-auth-token=;[^]*?(Max-Age=0|Expires=Thu, 01 Jan 1970 00:00:00 GMT)/i);
-    expect(setCookieHeader).toMatch(/sb-test-auth-token\.0=;[^]*?(Max-Age=0|Expires=Thu, 01 Jan 1970 00:00:00 GMT)/i);
+
+    const accessTokenCookie = setCookieHeaders.find((header) => header.startsWith('sb-test-auth-token='));
+    const refreshTokenCookie = setCookieHeaders.find((header) => header.startsWith('sb-test-auth-token.0='));
+
+    expect(accessTokenCookie).toBeDefined();
+    expect(refreshTokenCookie).toBeDefined();
+    expect(accessTokenCookie).toMatch(/(?:Max-Age=0|Expires=Thu, 01 Jan 1970 00:00:00 GMT)/i);
+    expect(refreshTokenCookie).toMatch(/(?:Max-Age=0|Expires=Thu, 01 Jan 1970 00:00:00 GMT)/i);
 }
 
 describe('supabase middleware', () => {
@@ -69,8 +75,7 @@ describe('supabase middleware', () => {
         const result = await updateSession(request);
 
         expect(result.user).toBeNull();
-        const setCookieHeader = result.supabaseResponse.headers.get('set-cookie') ?? '';
-        expectAuthCookiesCleared(request, setCookieHeader);
+        expectAuthCookiesCleared(request, result.supabaseResponse.headers.getSetCookie());
     });
 
     it('plain object の AuthApiError でも cookie を削除して未ログイン扱いにする', async () => {
@@ -89,8 +94,7 @@ describe('supabase middleware', () => {
         const result = await updateSession(request);
 
         expect(result.user).toBeNull();
-        const setCookieHeader = result.supabaseResponse.headers.get('set-cookie') ?? '';
-        expectAuthCookiesCleared(request, setCookieHeader);
+        expectAuthCookiesCleared(request, result.supabaseResponse.headers.getSetCookie());
     });
 
     it('refresh_token_already_used も cookie を削除して未ログイン扱いにする', async () => {
@@ -106,8 +110,23 @@ describe('supabase middleware', () => {
         const result = await updateSession(request);
 
         expect(result.user).toBeNull();
-        const setCookieHeader = result.supabaseResponse.headers.get('set-cookie') ?? '';
-        expectAuthCookiesCleared(request, setCookieHeader);
+        expectAuthCookiesCleared(request, result.supabaseResponse.headers.getSetCookie());
+    });
+
+    it('session_expired も cookie を削除して未ログイン扱いにする', async () => {
+        const request = createRequest();
+        getUserMock.mockRejectedValue({
+            __isAuthError: true,
+            name: 'AuthApiError',
+            message: 'Session expired',
+            status: 400,
+            code: 'session_expired',
+        });
+
+        const result = await updateSession(request);
+
+        expect(result.user).toBeNull();
+        expectAuthCookiesCleared(request, result.supabaseResponse.headers.getSetCookie());
     });
 
     it('AuthSessionMissingError が戻り値 error に入る場合も cookie を削除して未ログイン扱いにする', async () => {
@@ -120,8 +139,7 @@ describe('supabase middleware', () => {
         const result = await updateSession(request);
 
         expect(result.user).toBeNull();
-        const setCookieHeader = result.supabaseResponse.headers.get('set-cookie') ?? '';
-        expectAuthCookiesCleared(request, setCookieHeader);
+        expectAuthCookiesCleared(request, result.supabaseResponse.headers.getSetCookie());
     });
 
     it('AuthSessionMissingError が throw される場合も cookie を削除して未ログイン扱いにする', async () => {
@@ -131,8 +149,7 @@ describe('supabase middleware', () => {
         const result = await updateSession(request);
 
         expect(result.user).toBeNull();
-        const setCookieHeader = result.supabaseResponse.headers.get('set-cookie') ?? '';
-        expectAuthCookiesCleared(request, setCookieHeader);
+        expectAuthCookiesCleared(request, result.supabaseResponse.headers.getSetCookie());
     });
 
     it('refresh token 以外の AuthApiError は再送出する', async () => {

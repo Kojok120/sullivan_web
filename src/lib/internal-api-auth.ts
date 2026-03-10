@@ -6,11 +6,12 @@ function extractBearerToken(authHeader: string | null | undefined): string | nul
     }
 
     const normalized = authHeader.trim();
-    if (!normalized.startsWith('Bearer ')) {
+    const match = normalized.match(/^Bearer\s+(.+)$/i);
+    if (!match) {
         return null;
     }
 
-    const token = normalized.slice('Bearer '.length).trim();
+    const token = match[1]?.trim();
     return token || null;
 }
 

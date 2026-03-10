@@ -209,4 +209,21 @@ describe('tutor chat route', () => {
         expect(body.reply).toContain('いい質問です。');
         expect(createChatMock).toHaveBeenCalledTimes(1);
     });
+
+    it('ai.chats.create が同期例外でも fallback reply を返す', async () => {
+        createChatMock.mockImplementationOnce(() => {
+            throw new Error('sync create failed');
+        });
+
+        const response = await POST(createRequest([
+            { role: 'assistant', content: 'こんにちは' },
+            { role: 'user', content: 'ここがわかりません' },
+        ]));
+        const body = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(body.reply).toContain('いい質問です。');
+        expect(createChatMock).toHaveBeenCalledTimes(1);
+        expect(sendMessageMock).not.toHaveBeenCalled();
+    });
 });
