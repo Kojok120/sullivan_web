@@ -60,6 +60,17 @@ describe('印刷セレクター', () => {
         close: mockPopupClose,
     } as unknown as Window;
 
+    const createDeferred = <T,>() => {
+        let resolve!: (value: T | PromiseLike<T>) => void;
+        let reject!: (reason?: unknown) => void;
+        const promise = new Promise<T>((res, rej) => {
+            resolve = res;
+            reject = rej;
+        });
+
+        return { promise, resolve, reject };
+    };
+
     beforeEach(() => {
         vi.clearAllMocks();
         vi.mocked(useRouter).mockReturnValue(mockRouter);
@@ -232,6 +243,87 @@ describe('印刷セレクター', () => {
             expect(printUrl.searchParams.get('subjectId')).toBe('subject-1');
             expect(printUrl.searchParams.get('sets')).toBe('2');
             expect(printUrl.searchParams.get('gateChecked')).toBe('1');
+        });
+    });
+
+    it('印刷可否の確認中は科目選択とセット変更を受け付けない', async () => {
+        const gateCheck = createDeferred<{ ok: boolean; json: () => Promise<{ blocked: boolean }> }>();
+        mockFetch.mockReturnValue(gateCheck.promise);
+
+        render(
+            <PrintSelector
+                subjects={[{ subjectId: 'subject-1', subjectName: '英語' }]}
+            />
+        );
+
+        fireEvent.click(screen.getByText('English'));
+        fireEvent.click(screen.getByRole('button', { name: '印刷する' }));
+
+        expect(screen.getByRole('button', { name: '確認中...' })).toBeDisabled();
+        const actionButtons = screen.getAllByRole('button');
+        expect(actionButtons[1]).toBeDisabled();
+        fireEvent.click(actionButtons[1]);
+
+        fireEvent.click(screen.getByText('English'));
+
+        await waitFor(() => {
+            expect(screen.getByText('10問 / 1セット')).toBeInTheDocument();
+        });
+
+        gateCheck.resolve({
+            ok: true,
+            json: async () => ({ blocked: false }),
+        });
+
+        await waitFor(() => {
+            expect(mockFetch).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    it('視聴状態の保存中は閉じる操作を受け付けない', async () => {
+        const watchSave = createDeferred<boolean>();
+        mockFetch.mockResolvedValue({
+            ok: true,
+            json: async () => ({
+                blocked: true,
+                coreProblemId: 'cp-1',
+                coreProblemName: '主語と動詞',
+                lectureVideos: [
+                    { title: '導入', url: 'https://example.com/embed/1' },
+                ],
+            }),
+        });
+        markLectureAsWatchedMock.mockReturnValue(watchSave.promise);
+
+        render(
+            <PrintSelector
+                subjects={[{ subjectId: 'subject-1', subjectName: '英語' }]}
+            />
+        );
+
+        fireEvent.click(screen.getByText('English'));
+        fireEvent.click(screen.getByRole('button', { name: '印刷する' }));
+        await screen.findByText('「主語と動詞」がアンロックされました');
+
+        const previewButton = screen.getByRole('button', { name: '主語と動詞 の講義動画プレビューを再生' });
+        fireEvent.click(previewButton);
+        fireEvent.click(screen.getByText('mock-end-video-0'));
+
+        const closeButton = await screen.findByRole('button', { name: '閉じる' });
+        expect(closeButton).toBeDisabled();
+
+        fireEvent.click(closeButton);
+        fireEvent.click(screen.getByText('mock-close-video'));
+
+        expect(screen.getByText('「主語と動詞」がアンロックされました')).toBeInTheDocument();
+        expect(screen.getByTestId('mock-fullscreen-player')).toBeInTheDocument();
+
+        watchSave.resolve(true);
+
+        await waitFor(() => {
+            expect(markLectureAsWatchedMock).toHaveBeenCalledWith({ coreProblemId: 'cp-1' });
+            expect(screen.queryByText('「主語と動詞」がアンロックされました')).not.toBeInTheDocument();
+            expect(screen.queryByTestId('mock-fullscreen-player')).not.toBeInTheDocument();
         });
     });
 

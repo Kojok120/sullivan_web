@@ -61,14 +61,22 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
     const [isSubmittingWatch, setIsSubmittingWatch] = useState(false);
     const printControlRef = useRef<HTMLDivElement | null>(null);
     const watchedVideoIndicesRef = useRef<Set<number>>(new Set());
+    const isInteractionLocked = isCheckingGate || isSubmittingWatch;
 
     const getSubjectStyle = (name: string) => {
         const config = getSubjectConfig(name);
         return { color: config.bgColor, label: config.letter, full: config.fullName };
     };
 
-    const incrementSets = () => setSets((prev) => Math.min(prev + 1, 10));
-    const decrementSets = () => setSets((prev) => Math.max(prev - 1, 1));
+    const incrementSets = () => {
+        if (isInteractionLocked) return;
+        setSets((prev) => Math.min(prev + 1, 10));
+    };
+
+    const decrementSets = () => {
+        if (isInteractionLocked) return;
+        setSets((prev) => Math.max(prev - 1, 1));
+    };
 
     const resetGatePlaybackState = () => {
         setIsGateVideoOpen(false);
@@ -77,12 +85,14 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
         watchedVideoIndicesRef.current = new Set();
     };
 
-    const closeGateModal = () => {
+    const closeGateModal = (force = false) => {
+        if (isSubmittingWatch && !force) return;
         setGateModal(null);
         resetGatePlaybackState();
     };
 
     const handleSubjectClick = (id: string) => {
+        if (isInteractionLocked) return;
         setGateErrorMessage(null);
         if (selectedSubjectId === id) {
             incrementSets();
@@ -159,6 +169,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
     };
 
     const handleGateVideoClose = () => {
+        if (isSubmittingWatch) return;
         setIsGateVideoOpen(false);
         watchedVideoIndicesRef.current = new Set();
     };
@@ -196,7 +207,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                 return;
             }
 
-            closeGateModal();
+            closeGateModal(true);
             router.refresh();
         } finally {
             setIsSubmittingWatch(false);
@@ -243,8 +254,10 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                         >
                             <Card
                                 data-print-subject-card="true"
+                                aria-disabled={isInteractionLocked}
                                 className={cn(
-                                    'cursor-pointer transition-all duration-300 border-none overflow-hidden h-full shadow-md',
+                                    'transition-all duration-300 border-none overflow-hidden h-full shadow-md',
+                                    isInteractionLocked ? 'cursor-not-allowed opacity-80' : 'cursor-pointer',
                                     isSelected ? 'shadow-xl scale-105 ring-2 ring-offset-2 ring-gray-800' : 'hover:scale-105 hover:shadow-lg'
                                 )}
                                 onClick={() => handleSubjectClick(subject.subjectId)}
@@ -279,7 +292,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                                                             event.stopPropagation();
                                                             decrementSets();
                                                         }}
-                                                        disabled={sets <= 1}
+                                                        disabled={isInteractionLocked || sets <= 1}
                                                         className="h-8 w-8 hover:bg-white hover:shadow-sm"
                                                     >
                                                         <Minus className="h-4 w-4" />
@@ -295,7 +308,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                                                             event.stopPropagation();
                                                             incrementSets();
                                                         }}
-                                                        disabled={sets >= 10}
+                                                        disabled={isInteractionLocked || sets >= 10}
                                                         className="h-8 w-8 hover:bg-white hover:shadow-sm"
                                                     >
                                                         <Plus className="h-4 w-4" />
@@ -305,7 +318,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                                                 <Button
                                                     className="w-full font-bold text-lg h-12 gap-2 shadow-sm hover:shadow-md transition-all active:scale-95"
                                                     size="lg"
-                                                    disabled={isCheckingGate}
+                                                    disabled={isInteractionLocked}
                                                     onClick={(event) => {
                                                         event.stopPropagation();
                                                         void handlePrint();
@@ -332,7 +345,14 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                 })}
             </div>
 
-            <Dialog open={!!gateModal} onOpenChange={(open) => !open && closeGateModal()}>
+            <Dialog
+                open={!!gateModal}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        closeGateModal();
+                    }
+                }}
+            >
                 <DialogContent className="sm:max-w-4xl">
                     <DialogHeader className="space-y-3">
                         <DialogTitle>
@@ -412,7 +432,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                     </div>
 
                     <DialogFooter className="gap-2 sm:justify-between">
-                        <Button type="button" variant="outline" onClick={closeGateModal}>
+                        <Button type="button" variant="outline" onClick={() => closeGateModal()} disabled={isSubmittingWatch}>
                             閉じる
                         </Button>
                         {isSubmittingWatch ? (
