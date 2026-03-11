@@ -12,6 +12,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
+import { Progress } from "@/components/ui/progress";
 import { getEmbedUrl, getYouTubeId } from "@/lib/youtube";
 import { useYouTubePlaybackGuard } from "@/hooks/use-youtube-playback-guard";
 
@@ -36,6 +37,16 @@ interface FullScreenVideoPlayerProps {
 
 type PlayerContentProps = Omit<FullScreenVideoPlayerProps, 'isOpen'>;
 
+function formatVideoTime(totalSeconds: number) {
+    const safeSeconds = Number.isFinite(totalSeconds) && totalSeconds > 0
+        ? Math.floor(totalSeconds)
+        : 0;
+    const minutes = Math.floor(safeSeconds / 60);
+    const seconds = safeSeconds % 60;
+
+    return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+}
+
 function FullScreenVideoPlayerContent({
     onClose,
     playlist,
@@ -54,6 +65,9 @@ function FullScreenVideoPlayerContent({
     const {
         allowedRates,
         currentRate,
+        currentTimeSeconds,
+        durationSeconds,
+        progressPercent,
         stopTracking,
         resetTracking,
         registerPlayer,
@@ -61,6 +75,7 @@ function FullScreenVideoPlayerContent({
         handleStateChange,
         changeSpeed,
         seekRelative,
+        markPlaybackCompleted,
     } = useYouTubePlaybackGuard();
 
     useEffect(() => {
@@ -111,6 +126,7 @@ function FullScreenVideoPlayerContent({
 
     const handleVideoEnd = () => {
         setVideoEnded(true);
+        markPlaybackCompleted();
         stopTracking();
         onVideoEnd?.(currentVideo, currentIndex);
 
@@ -160,7 +176,7 @@ function FullScreenVideoPlayerContent({
                                 playsinline: 1,
                             },
                         }}
-                        onReady={(event: YouTubeEvent) => registerPlayer(event.target)}
+                        onReady={(event: YouTubeEvent) => registerPlayer(event.target, { captureDuration: true })}
                         onEnd={handleVideoEnd}
                         onPlaybackRateChange={handlePlaybackRateChange}
                         onStateChange={handleStateChange}
@@ -223,8 +239,24 @@ function FullScreenVideoPlayerContent({
                 )}
             </div>
 
+            {youTubeId && (
+                <div className="pointer-events-none absolute bottom-6 left-1/2 z-10 w-[min(44rem,calc(100%-2rem))] -translate-x-1/2">
+                    <div className="rounded-2xl border border-white/10 bg-black/60 px-4 py-3 backdrop-blur-sm">
+                        <div className="mb-2 flex items-center justify-between gap-3 text-xs font-medium text-white/80">
+                            <span>再生進捗</span>
+                            <span>{formatVideoTime(currentTimeSeconds)} / {formatVideoTime(durationSeconds)}</span>
+                        </div>
+                        <Progress
+                            value={progressPercent}
+                            aria-label="動画の再生進捗"
+                            className="h-1.5 bg-white/20 [&_[data-slot=progress-indicator]]:bg-white"
+                        />
+                    </div>
+                </div>
+            )}
+
             {!videoEnded && (
-                <div className="absolute bottom-10 left-10 z-10 flex items-center gap-1">
+                <div className={`absolute left-10 z-10 flex items-center gap-1 ${youTubeId ? "bottom-24" : "bottom-10"}`}>
                     {youTubeId && (
                         <Button
                             type="button"
