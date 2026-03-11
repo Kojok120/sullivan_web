@@ -251,26 +251,29 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                             layout
                             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
                             className="relative"
+                            data-print-subject-card="true"
                         >
-                            <Card
-                                data-print-subject-card="true"
-                                aria-disabled={isInteractionLocked}
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                disabled={isInteractionLocked}
                                 className={cn(
-                                    'transition-all duration-300 border-none overflow-hidden h-full shadow-md',
+                                    'relative flex h-full min-h-[160px] w-full flex-col overflow-hidden rounded-xl border-none p-0 shadow-md transition-all duration-300',
+                                    'disabled:pointer-events-auto disabled:cursor-not-allowed disabled:opacity-80',
                                     isInteractionLocked ? 'cursor-not-allowed opacity-80' : 'cursor-pointer',
                                     isSelected ? 'shadow-xl scale-105 ring-2 ring-offset-2 ring-gray-800' : 'hover:scale-105 hover:shadow-lg'
                                 )}
                                 onClick={() => handleSubjectClick(subject.subjectId)}
                             >
-                                <CardContent className={cn('p-6 flex flex-col items-center justify-center min-h-[160px]', style.color)}>
+                                <span className={cn('flex min-h-[160px] w-full flex-1 flex-col items-center justify-center p-6', style.color)}>
                                     <span className="text-6xl font-black text-white mb-2 select-none">{style.label}</span>
                                     <span className="text-white/90 font-medium tracking-wider select-none">{style.full}</span>
-                                </CardContent>
+                                </span>
 
                                 {selectedSubjectId && !isSelected && (
-                                    <div className="absolute inset-0 bg-white/60 z-10" />
+                                    <span aria-hidden="true" className="absolute inset-0 z-10 bg-white/60" />
                                 )}
-                            </Card>
+                            </Button>
 
                             <AnimatePresence>
                                 {isSelected && (
