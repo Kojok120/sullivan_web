@@ -209,6 +209,11 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
 
             closeGateModal(true);
             router.refresh();
+        } catch (error) {
+            console.error('講義動画の視聴状態保存に失敗しました:', error);
+            setIsGateVideoOpen(false);
+            watchedVideoIndicesRef.current = new Set();
+            setGateWatchErrorMessage('視聴状態の保存に失敗しました。もう一度最初から視聴してください。');
         } finally {
             setIsSubmittingWatch(false);
         }
@@ -372,14 +377,10 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
 
                     <div className="grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(260px,1fr)]">
                         <div className="space-y-3">
-                            <button
-                                type="button"
-                                aria-label={`${gateModal?.coreProblemName ?? '講義動画'} の講義動画プレビューを再生`}
-                                onClick={handleOpenGateVideo}
-                                disabled={!canOpenGateVideo}
+                            <div
                                 className={cn(
-                                    'relative aspect-video w-full overflow-hidden rounded-xl border bg-black p-0 text-left ring-offset-background transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 disabled:cursor-default',
-                                    canOpenGateVideo ? 'cursor-pointer hover:ring-2 hover:ring-primary/70' : 'opacity-80'
+                                    'relative aspect-video w-full overflow-hidden rounded-xl border bg-black',
+                                    !canOpenGateVideo && 'opacity-80'
                                 )}
                             >
                                 {previewUrl ? (
@@ -402,9 +403,23 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                                         {canOpenGateVideo ? 'このプレビューを押すと全画面で再生します。' : 'この講義動画は再生できません。'}
                                     </p>
                                 </div>
-                            </button>
+                                <button
+                                    type="button"
+                                    aria-label={`${gateModal?.coreProblemName ?? '講義動画'} の講義動画プレビューを再生`}
+                                    onClick={handleOpenGateVideo}
+                                    disabled={!canOpenGateVideo}
+                                    className={cn(
+                                        'absolute inset-0 z-10 rounded-xl ring-offset-background transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 disabled:cursor-default',
+                                        canOpenGateVideo ? 'cursor-pointer hover:ring-2 hover:ring-primary/70' : 'cursor-default'
+                                    )}
+                                >
+                                    <span className="sr-only">
+                                        {canOpenGateVideo ? 'プレビューを押して全画面で再生する' : '講義動画を再生できない'}
+                                    </span>
+                                </button>
+                            </div>
                             <p className="text-xs text-muted-foreground">
-                                視聴が終わるとこの画面に戻ります。講義動画を見終わった後、同じトップ画面から再度「印刷する」を押してください。
+                                視聴が終わるとトップ画面に戻ります。講義動画を見終わった後、同じトップ画面から再度「印刷する」を押してください。
                             </p>
                         </div>
 

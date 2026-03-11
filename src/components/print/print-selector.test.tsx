@@ -327,6 +327,45 @@ describe('印刷セレクター', () => {
         });
     });
 
+    it('視聴状態の保存が例外で失敗した場合はエラーを表示して再視聴を促す', async () => {
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        mockFetch.mockResolvedValue({
+            ok: true,
+            json: async () => ({
+                blocked: true,
+                coreProblemId: 'cp-1',
+                coreProblemName: '主語と動詞',
+                lectureVideos: [
+                    { title: '導入', url: 'https://example.com/embed/1' },
+                ],
+            }),
+        });
+        markLectureAsWatchedMock.mockRejectedValue(new Error('network error'));
+
+        render(
+            <PrintSelector
+                subjects={[{ subjectId: 'subject-1', subjectName: '英語' }]}
+            />
+        );
+
+        fireEvent.click(screen.getByText('English'));
+        fireEvent.click(screen.getByRole('button', { name: '印刷する' }));
+        await screen.findByText('「主語と動詞」がアンロックされました');
+
+        fireEvent.click(screen.getByRole('button', { name: '主語と動詞 の講義動画プレビューを再生' }));
+        fireEvent.click(screen.getByText('mock-end-video-0'));
+
+        await waitFor(() => {
+            expect(markLectureAsWatchedMock).toHaveBeenCalledWith({ coreProblemId: 'cp-1' });
+            expect(screen.queryByTestId('mock-fullscreen-player')).not.toBeInTheDocument();
+            expect(screen.getByText('視聴状態の保存に失敗しました。もう一度最初から視聴してください。')).toBeInTheDocument();
+            expect(screen.getByText('「主語と動詞」がアンロックされました')).toBeInTheDocument();
+            expect(mockRouter.refresh).not.toHaveBeenCalled();
+        });
+
+        consoleErrorSpy.mockRestore();
+    });
+
     it('印刷ゲート判定APIが失敗した場合は印刷ページへ遷移しない', async () => {
         mockFetch.mockResolvedValue({
             ok: false,
