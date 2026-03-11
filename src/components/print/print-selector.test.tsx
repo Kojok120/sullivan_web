@@ -28,8 +28,8 @@ vi.mock('@/components/full-screen-video-player', () => ({
     }) => (
         isOpen ? (
             <div data-testid="mock-fullscreen-player">
-                <button onClick={onClose}>mock-close-video</button>
-                <button onClick={() => onVideoEnd?.({ title: 'video', url: 'https://example.com/video-1' }, 0)}>
+                <button type="button" onClick={onClose}>mock-close-video</button>
+                <button type="button" onClick={() => onVideoEnd?.({ title: 'video', url: 'https://example.com/video-1' }, 0)}>
                     mock-end-video
                 </button>
             </div>

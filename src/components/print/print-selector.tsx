@@ -346,19 +346,14 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
 
                     <div className="grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(260px,1fr)]">
                         <div className="space-y-3">
-                            <div
-                                role={canOpenGateVideo ? 'button' : undefined}
-                                tabIndex={canOpenGateVideo ? 0 : undefined}
-                                aria-label={canOpenGateVideo ? `${gateModal?.coreProblemName ?? '講義動画'} の講義動画プレビューを再生` : undefined}
-                                onClick={canOpenGateVideo ? handleOpenGateVideo : undefined}
-                                onKeyDown={canOpenGateVideo ? (event) => {
-                                    if (event.key !== 'Enter' && event.key !== ' ') return;
-                                    event.preventDefault();
-                                    handleOpenGateVideo();
-                                } : undefined}
+                            <button
+                                type="button"
+                                aria-label={`${gateModal?.coreProblemName ?? '講義動画'} の講義動画プレビューを再生`}
+                                onClick={handleOpenGateVideo}
+                                disabled={!canOpenGateVideo}
                                 className={cn(
-                                    'relative aspect-video overflow-hidden rounded-xl border bg-black',
-                                    canOpenGateVideo ? 'cursor-pointer ring-offset-background transition hover:ring-2 hover:ring-primary/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70' : 'cursor-default'
+                                    'relative aspect-video w-full overflow-hidden rounded-xl border bg-black p-0 text-left ring-offset-background transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 disabled:cursor-default',
+                                    canOpenGateVideo ? 'cursor-pointer hover:ring-2 hover:ring-primary/70' : 'opacity-80'
                                 )}
                             >
                                 {previewUrl ? (
@@ -381,7 +376,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                                         {canOpenGateVideo ? 'このプレビューを押すと全画面で再生します。' : 'この講義動画は再生できません。'}
                                     </p>
                                 </div>
-                            </div>
+                            </button>
                             <p className="text-xs text-muted-foreground">
                                 視聴が終わるとこの画面に戻ります。講義動画を見終わった後、同じトップ画面から再度「印刷する」を押してください。
                             </p>

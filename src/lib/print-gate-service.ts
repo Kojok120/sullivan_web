@@ -20,49 +20,58 @@ export async function getPrintGate(
     subjectId: string,
     client: PrintGateServiceClient = prisma
 ): Promise<PrintGateResult> {
-    const states = await client.userCoreProblemState.findMany({
-        where: {
-            userId,
-            isUnlocked: true,
-            isLectureWatched: false,
-            coreProblem: {
-                subjectId,
-            },
-        },
-        include: {
-            coreProblem: {
-                select: {
-                    id: true,
-                    name: true,
-                    order: true,
-                    lectureVideos: true,
+    try {
+        const states = await client.userCoreProblemState.findMany({
+            where: {
+                userId,
+                isUnlocked: true,
+                isLectureWatched: false,
+                coreProblem: {
+                    subjectId,
                 },
             },
-        },
-    });
-
-    const pendingLectureStates = states
-        .map((state) => ({
-            ...state,
-            normalizedLectureVideos: normalizeLectureVideos(state.coreProblem.lectureVideos),
-        }))
-        .filter((state) => state.normalizedLectureVideos.length > 0)
-        .sort((a, b) => {
-            if (a.coreProblem.order !== b.coreProblem.order) {
-                return a.coreProblem.order - b.coreProblem.order;
-            }
-            return a.coreProblem.id.localeCompare(b.coreProblem.id);
+            include: {
+                coreProblem: {
+                    select: {
+                        id: true,
+                        name: true,
+                        order: true,
+                        lectureVideos: true,
+                    },
+                },
+            },
         });
 
-    const nextState = pendingLectureStates[0];
-    if (!nextState) {
-        return { blocked: false };
-    }
+        const pendingLectureStates = states
+            .map((state) => ({
+                ...state,
+                normalizedLectureVideos: normalizeLectureVideos(state.coreProblem.lectureVideos),
+            }))
+            .filter((state) => state.normalizedLectureVideos.length > 0)
+            .sort((a, b) => {
+                if (a.coreProblem.order !== b.coreProblem.order) {
+                    return a.coreProblem.order - b.coreProblem.order;
+                }
+                return a.coreProblem.id.localeCompare(b.coreProblem.id);
+            });
 
-    return {
-        blocked: true,
-        coreProblemId: nextState.coreProblem.id,
-        coreProblemName: nextState.coreProblem.name,
-        lectureVideos: nextState.normalizedLectureVideos,
-    };
+        const nextState = pendingLectureStates[0];
+        if (!nextState) {
+            return { blocked: false };
+        }
+
+        return {
+            blocked: true,
+            coreProblemId: nextState.coreProblem.id,
+            coreProblemName: nextState.coreProblem.name,
+            lectureVideos: nextState.normalizedLectureVideos,
+        };
+    } catch (error) {
+        console.error('印刷ゲート判定の取得に失敗しました', {
+            userId,
+            subjectId,
+            error,
+        });
+        throw error;
+    }
 }
