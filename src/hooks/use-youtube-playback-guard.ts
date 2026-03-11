@@ -24,6 +24,7 @@ export function useYouTubePlaybackGuard(allowedRates: number[] = DEFAULT_ALLOWED
     const [currentTimeSeconds, setCurrentTimeSeconds] = useState(0);
     const [durationSeconds, setDurationSeconds] = useState(0);
     const playerRef = useRef<YouTubePlayerLike | null>(null);
+    const captureDurationRef = useRef(false);
     const watchedTimeRef = useRef(0);
     const lastTimeRef = useRef(0);
     const trackingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -40,12 +41,15 @@ export function useYouTubePlaybackGuard(allowedRates: number[] = DEFAULT_ALLOWED
         const currentTime = player.getCurrentTime();
         setCurrentTimeSeconds(currentTime);
 
-        if (typeof player.getDuration === 'function') {
+        if (captureDurationRef.current && typeof player.getDuration === 'function') {
             const duration = player.getDuration();
             if (Number.isFinite(duration) && duration >= 0) {
                 videoDurationRef.current = duration;
                 setDurationSeconds(duration);
             }
+        } else {
+            videoDurationRef.current = 0;
+            setDurationSeconds(0);
         }
 
         return currentTime;
@@ -53,6 +57,7 @@ export function useYouTubePlaybackGuard(allowedRates: number[] = DEFAULT_ALLOWED
 
     const resetTracking = useCallback(() => {
         stopTracking();
+        captureDurationRef.current = false;
         watchedTimeRef.current = 0;
         lastTimeRef.current = 0;
         videoDurationRef.current = 0;
@@ -80,15 +85,19 @@ export function useYouTubePlaybackGuard(allowedRates: number[] = DEFAULT_ALLOWED
 
     const registerPlayer = useCallback((player: YouTubePlayerLike, options: RegisterPlayerOptions = {}) => {
         playerRef.current = player;
+        captureDurationRef.current = options.captureDuration ?? false;
         player.setPlaybackRate(1);
         setCurrentRate(1);
         lastTimeRef.current = 0;
         setCurrentTimeSeconds(0);
 
-        if (options.captureDuration && typeof player.getDuration === 'function') {
+        if (captureDurationRef.current && typeof player.getDuration === 'function') {
             const duration = player.getDuration();
             videoDurationRef.current = duration;
             setDurationSeconds(duration);
+        } else {
+            videoDurationRef.current = 0;
+            setDurationSeconds(0);
         }
 
         try {
@@ -151,12 +160,15 @@ export function useYouTubePlaybackGuard(allowedRates: number[] = DEFAULT_ALLOWED
         lastTimeRef.current = currentTime;
         setCurrentTimeSeconds(currentTime);
 
-        if (typeof event.target.getDuration === 'function') {
+        if (captureDurationRef.current && typeof event.target.getDuration === 'function') {
             const duration = event.target.getDuration();
             if (Number.isFinite(duration) && duration >= 0) {
                 videoDurationRef.current = duration;
                 setDurationSeconds(duration);
             }
+        } else {
+            videoDurationRef.current = 0;
+            setDurationSeconds(0);
         }
     }, []);
 

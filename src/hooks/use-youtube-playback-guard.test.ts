@@ -107,4 +107,24 @@ describe("useYouTubePlaybackGuard", () => {
         expect(player.seekTo).toHaveBeenLastCalledWith(1, true);
         expect(result.current.currentTimeSeconds).toBe(1);
     });
+
+    it("captureDuration が false のときは duration を公開しない", () => {
+        const { result } = renderHook(() => useYouTubePlaybackGuard());
+        const { player, state } = createMockPlayer({ duration: 180 });
+
+        act(() => {
+            result.current.registerPlayer(player);
+        });
+
+        act(() => {
+            state.currentTime = 45;
+            vi.advanceTimersByTime(1000);
+            result.current.handleStateChange({ data: 1, target: player });
+        });
+
+        expect(result.current.currentTimeSeconds).toBe(45);
+        expect(result.current.durationSeconds).toBe(0);
+        expect(result.current.videoDurationRef.current).toBe(0);
+        expect(result.current.progressPercent).toBe(0);
+    });
 });

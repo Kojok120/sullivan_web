@@ -256,7 +256,7 @@ function FullScreenVideoPlayerContent({
             )}
 
             {!videoEnded && (
-                <div className="absolute bottom-24 left-10 z-10 flex items-center gap-1">
+                <div className={`absolute left-10 z-10 flex items-center gap-1 ${youTubeId ? "bottom-24" : "bottom-10"}`}>
                     {youTubeId && (
                         <Button
                             type="button"

@@ -79,6 +79,7 @@ describe("FullScreenVideoPlayer", () => {
         expect(screen.getByText("00:30 / 02:00")).toBeInTheDocument();
         expect(screen.getByRole("progressbar", { name: "動画の再生進捗" })).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "10秒戻す" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "1x" }).parentElement).toHaveClass("bottom-24");
     });
 
     it("YouTube以外の動画では進捗バーを表示しない", () => {
@@ -93,5 +94,6 @@ describe("FullScreenVideoPlayer", () => {
         expect(screen.queryByText("再生進捗")).not.toBeInTheDocument();
         expect(screen.queryByRole("progressbar", { name: "動画の再生進捗" })).not.toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "10秒戻す" })).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "1x" }).parentElement).toHaveClass("bottom-10");
     });
 });
