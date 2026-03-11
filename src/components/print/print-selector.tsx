@@ -58,9 +58,9 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
     const [gateErrorMessage, setGateErrorMessage] = useState<string | null>(null);
     const [gateWatchErrorMessage, setGateWatchErrorMessage] = useState<string | null>(null);
     const [isGateVideoOpen, setIsGateVideoOpen] = useState(false);
-    const [watchedCount, setWatchedCount] = useState(0);
     const [isSubmittingWatch, setIsSubmittingWatch] = useState(false);
     const printControlRef = useRef<HTMLDivElement | null>(null);
+    const watchedVideoIndicesRef = useRef<Set<number>>(new Set());
 
     const getSubjectStyle = (name: string) => {
         const config = getSubjectConfig(name);
@@ -72,9 +72,9 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
 
     const resetGatePlaybackState = () => {
         setIsGateVideoOpen(false);
-        setWatchedCount(0);
         setIsSubmittingWatch(false);
         setGateWatchErrorMessage(null);
+        watchedVideoIndicesRef.current = new Set();
     };
 
     const closeGateModal = () => {
@@ -154,28 +154,31 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
     const handleOpenGateVideo = () => {
         if (!gateModal?.lectureVideos.length || isSubmittingWatch) return;
         setGateWatchErrorMessage(null);
-        setWatchedCount(0);
+        watchedVideoIndicesRef.current = new Set();
         setIsGateVideoOpen(true);
     };
 
     const handleGateVideoClose = () => {
         setIsGateVideoOpen(false);
-        setWatchedCount(0);
+        watchedVideoIndicesRef.current = new Set();
     };
 
-    const handleGateVideoEnd = async () => {
+    const handleGateVideoEnd = async (_video: { title: string; url: string }, index: number) => {
         if (!gateModal) return;
 
-        const nextCount = watchedCount + 1;
-        setWatchedCount(nextCount);
+        if (watchedVideoIndicesRef.current.has(index)) {
+            return;
+        }
 
-        if (nextCount < gateModal.lectureVideos.length || isSubmittingWatch) {
+        watchedVideoIndicesRef.current.add(index);
+
+        if (watchedVideoIndicesRef.current.size < gateModal.lectureVideos.length || isSubmittingWatch) {
             return;
         }
 
         if (!gateModal.coreProblemId) {
             setIsGateVideoOpen(false);
-            setWatchedCount(0);
+            watchedVideoIndicesRef.current = new Set();
             setGateWatchErrorMessage('講義動画の視聴状態を保存できませんでした。時間をおいて再度お試しください。');
             return;
         }
@@ -188,7 +191,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
 
             if (!success) {
                 setIsGateVideoOpen(false);
-                setWatchedCount(0);
+                watchedVideoIndicesRef.current = new Set();
                 setGateWatchErrorMessage('視聴状態の保存に失敗しました。もう一度最初から視聴してください。');
                 return;
             }
@@ -201,7 +204,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
     };
 
     useEffect(() => {
-        if (!selectedSubjectId) return;
+        if (!selectedSubjectId || gateModal) return;
 
         const handlePointerDownOutside = (event: PointerEvent) => {
             const target = event.target;
@@ -218,7 +221,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
         return () => {
             document.removeEventListener('pointerdown', handlePointerDownOutside);
         };
-    }, [selectedSubjectId]);
+    }, [gateModal, selectedSubjectId]);
 
     const previewVideo = gateModal?.lectureVideos[0];
     const previewUrl = previewVideo ? getEmbedUrl(previewVideo.url) : null;

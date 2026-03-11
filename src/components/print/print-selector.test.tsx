@@ -21,16 +21,21 @@ vi.mock('@/components/full-screen-video-player', () => ({
         isOpen,
         onClose,
         onVideoEnd,
+        playlist,
     }: {
         isOpen: boolean;
         onClose: () => void;
+        playlist: Array<{ title: string; url: string }>;
         onVideoEnd?: (video: { title: string; url: string }, index: number) => void;
     }) => (
         isOpen ? (
             <div data-testid="mock-fullscreen-player">
                 <button type="button" onClick={onClose}>mock-close-video</button>
-                <button type="button" onClick={() => onVideoEnd?.({ title: 'video', url: 'https://example.com/video-1' }, 0)}>
-                    mock-end-video
+                <button type="button" onClick={() => onVideoEnd?.(playlist[0], 0)}>
+                    mock-end-video-0
+                </button>
+                <button type="button" onClick={() => onVideoEnd?.(playlist[1] ?? playlist[0], 1)}>
+                    mock-end-video-1
                 </button>
             </div>
         ) : null
@@ -156,7 +161,9 @@ describe('印刷セレクター', () => {
 
         await screen.findByText('「主語と動詞」がアンロックされました');
 
-        fireEvent.click(screen.getByRole('button', { name: '主語と動詞 の講義動画プレビューを再生' }));
+        const previewButton = screen.getByRole('button', { name: '主語と動詞 の講義動画プレビューを再生' });
+        fireEvent.pointerDown(previewButton);
+        fireEvent.click(previewButton);
         expect(screen.getByTestId('mock-fullscreen-player')).toBeInTheDocument();
 
         fireEvent.click(screen.getByText('mock-close-video'));
@@ -200,11 +207,16 @@ describe('印刷セレクター', () => {
         fireEvent.click(screen.getByRole('button', { name: '印刷する' }));
         await screen.findByText('「主語と動詞」がアンロックされました');
 
-        fireEvent.click(screen.getByRole('button', { name: '主語と動詞 の講義動画プレビューを再生' }));
-        fireEvent.click(screen.getByText('mock-end-video'));
+        const previewButton = screen.getByRole('button', { name: '主語と動詞 の講義動画プレビューを再生' });
+        fireEvent.pointerDown(previewButton);
+        fireEvent.click(previewButton);
+        fireEvent.click(screen.getByText('mock-end-video-0'));
         expect(markLectureAsWatchedMock).not.toHaveBeenCalled();
 
-        fireEvent.click(screen.getByText('mock-end-video'));
+        fireEvent.click(screen.getByText('mock-end-video-0'));
+        expect(markLectureAsWatchedMock).not.toHaveBeenCalled();
+
+        fireEvent.click(screen.getByText('mock-end-video-1'));
 
         await waitFor(() => {
             expect(markLectureAsWatchedMock).toHaveBeenCalledWith({ coreProblemId: 'cp-1' });
