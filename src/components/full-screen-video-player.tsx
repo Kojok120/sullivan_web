@@ -274,7 +274,10 @@ function FullScreenVideoPlayerContent({
             )}
 
             {!videoEnded && youTubeId && (
-                <div className="absolute bottom-24 left-10 z-10 flex items-center gap-1">
+                <div
+                    data-testid="playback-rate-container"
+                    className="absolute bottom-24 left-10 z-10 flex items-center gap-1"
+                >
                     <Button
                         type="button"
                         variant="ghost"
