@@ -37,23 +37,32 @@ export function useYouTubePlaybackGuard(allowedRates: number[] = DEFAULT_ALLOWED
         }
     }, []);
 
+    const updateDurationFromPlayer = useCallback((player: YouTubePlayerLike) => {
+        if (!captureDurationRef.current || typeof player.getDuration !== 'function') {
+            videoDurationRef.current = 0;
+            setDurationSeconds(0);
+            return 0;
+        }
+
+        const duration = player.getDuration();
+        if (Number.isFinite(duration) && duration >= 0) {
+            videoDurationRef.current = duration;
+            setDurationSeconds(duration);
+            return duration;
+        }
+
+        videoDurationRef.current = 0;
+        setDurationSeconds(0);
+        return 0;
+    }, []);
+
     const syncPlaybackProgress = useCallback((player: YouTubePlayerLike) => {
         const currentTime = player.getCurrentTime();
         setCurrentTimeSeconds(currentTime);
-
-        if (captureDurationRef.current && typeof player.getDuration === 'function') {
-            const duration = player.getDuration();
-            if (Number.isFinite(duration) && duration >= 0) {
-                videoDurationRef.current = duration;
-                setDurationSeconds(duration);
-            }
-        } else {
-            videoDurationRef.current = 0;
-            setDurationSeconds(0);
-        }
+        updateDurationFromPlayer(player);
 
         return currentTime;
-    }, []);
+    }, [updateDurationFromPlayer]);
 
     const resetTracking = useCallback(() => {
         stopTracking();
@@ -91,14 +100,7 @@ export function useYouTubePlaybackGuard(allowedRates: number[] = DEFAULT_ALLOWED
         lastTimeRef.current = 0;
         setCurrentTimeSeconds(0);
 
-        if (captureDurationRef.current && typeof player.getDuration === 'function') {
-            const duration = player.getDuration();
-            videoDurationRef.current = duration;
-            setDurationSeconds(duration);
-        } else {
-            videoDurationRef.current = 0;
-            setDurationSeconds(0);
-        }
+        updateDurationFromPlayer(player);
 
         try {
             syncPlaybackProgress(player);
@@ -107,7 +109,7 @@ export function useYouTubePlaybackGuard(allowedRates: number[] = DEFAULT_ALLOWED
         }
 
         startTracking(player);
-    }, [startTracking, syncPlaybackProgress]);
+    }, [startTracking, syncPlaybackProgress, updateDurationFromPlayer]);
 
     const handlePlaybackRateChange = useCallback((event: YouTubeLikeEvent) => {
         const rate = event.target.getPlaybackRate();
@@ -160,23 +162,16 @@ export function useYouTubePlaybackGuard(allowedRates: number[] = DEFAULT_ALLOWED
         lastTimeRef.current = currentTime;
         setCurrentTimeSeconds(currentTime);
 
-        if (captureDurationRef.current && typeof event.target.getDuration === 'function') {
-            const duration = event.target.getDuration();
-            if (Number.isFinite(duration) && duration >= 0) {
-                videoDurationRef.current = duration;
-                setDurationSeconds(duration);
-            }
-        } else {
-            videoDurationRef.current = 0;
-            setDurationSeconds(0);
-        }
-    }, []);
+        updateDurationFromPlayer(event.target);
+    }, [updateDurationFromPlayer]);
 
     const markPlaybackCompleted = useCallback(() => {
         const duration = videoDurationRef.current;
         if (!duration) {
             return;
         }
+        watchedTimeRef.current = Math.max(watchedTimeRef.current, duration);
+        videoDurationRef.current = duration;
         setCurrentTimeSeconds(duration);
         setDurationSeconds(duration);
         lastTimeRef.current = duration;

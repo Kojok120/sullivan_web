@@ -37,9 +37,9 @@ vi.mock("@/components/ui/button", () => ({
 
 vi.mock("@/components/ui/dialog", () => ({
     Dialog: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-    DialogContent: ({ children, ...props }: DivProps & { showCloseButton?: boolean }) => {
-        const { showCloseButton: _showCloseButton, ...rest } = props;
-        return <div {...rest}>{children}</div>;
+    DialogContent: ({ children, showCloseButton, ...props }: DivProps & { showCloseButton?: boolean }) => {
+        void showCloseButton;
+        return <div {...props}>{children}</div>;
     },
     DialogHeader: ({ children, ...props }: DivProps) => <div {...props}>{children}</div>,
     DialogTitle: ({ children, ...props }: DivProps) => <div {...props}>{children}</div>,
@@ -55,6 +55,8 @@ describe("FullScreenVideoPlayer", () => {
             currentTimeSeconds: 30,
             durationSeconds: 120,
             progressPercent: 25,
+            watchedTimeRef: { current: 120 },
+            videoDurationRef: { current: 120 },
             stopTracking: vi.fn(),
             resetTracking: vi.fn(),
             registerPlayer: vi.fn(),

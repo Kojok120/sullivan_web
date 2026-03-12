@@ -26,15 +26,15 @@ vi.mock('@/components/full-screen-video-player', () => ({
         isOpen: boolean;
         onClose: () => void;
         playlist: Array<{ title: string; url: string }>;
-        onVideoEnd?: (video: { title: string; url: string }, index: number) => void;
+        onVideoEnd?: (video: { title: string; url: string }, index: number, watchedDurationSeconds?: number, videoDurationSeconds?: number) => void;
     }) => (
         isOpen ? (
             <div data-testid="mock-fullscreen-player">
                 <button type="button" onClick={onClose}>mock-close-video</button>
-                <button type="button" onClick={() => onVideoEnd?.(playlist[0], 0)}>
+                <button type="button" onClick={() => onVideoEnd?.(playlist[0], 0, 120, 120)}>
                     mock-end-video-0
                 </button>
-                <button type="button" onClick={() => onVideoEnd?.(playlist[1] ?? playlist[0], 1)}>
+                <button type="button" onClick={() => onVideoEnd?.(playlist[1] ?? playlist[0], 1, 240, 240)}>
                     mock-end-video-1
                 </button>
             </div>
@@ -230,7 +230,11 @@ describe('印刷セレクター', () => {
         fireEvent.click(screen.getByText('mock-end-video-1'));
 
         await waitFor(() => {
-            expect(markLectureAsWatchedMock).toHaveBeenCalledWith({ coreProblemId: 'cp-1' });
+            expect(markLectureAsWatchedMock).toHaveBeenCalledWith({
+                coreProblemId: 'cp-1',
+                watchedDurationSeconds: 240,
+                videoDurationSeconds: 240,
+            });
             expect(mockRouter.refresh).toHaveBeenCalledTimes(1);
             expect(screen.queryByText('「主語と動詞」がアンロックされました')).not.toBeInTheDocument();
         });
@@ -321,7 +325,11 @@ describe('印刷セレクター', () => {
         watchSave.resolve(true);
 
         await waitFor(() => {
-            expect(markLectureAsWatchedMock).toHaveBeenCalledWith({ coreProblemId: 'cp-1' });
+            expect(markLectureAsWatchedMock).toHaveBeenCalledWith({
+                coreProblemId: 'cp-1',
+                watchedDurationSeconds: 120,
+                videoDurationSeconds: 120,
+            });
             expect(screen.queryByText('「主語と動詞」がアンロックされました')).not.toBeInTheDocument();
             expect(screen.queryByTestId('mock-fullscreen-player')).not.toBeInTheDocument();
         });
@@ -356,7 +364,11 @@ describe('印刷セレクター', () => {
         fireEvent.click(screen.getByText('mock-end-video-0'));
 
         await waitFor(() => {
-            expect(markLectureAsWatchedMock).toHaveBeenCalledWith({ coreProblemId: 'cp-1' });
+            expect(markLectureAsWatchedMock).toHaveBeenCalledWith({
+                coreProblemId: 'cp-1',
+                watchedDurationSeconds: 120,
+                videoDurationSeconds: 120,
+            });
             expect(screen.queryByTestId('mock-fullscreen-player')).not.toBeInTheDocument();
             expect(screen.getByText('視聴状態の保存に失敗しました。もう一度最初から視聴してください。')).toBeInTheDocument();
             expect(screen.getByText('「主語と動詞」がアンロックされました')).toBeInTheDocument();

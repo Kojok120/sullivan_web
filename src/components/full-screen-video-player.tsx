@@ -27,7 +27,7 @@ interface FullScreenVideoPlayerProps {
     onClose: () => void;
     playlist: VideoData[];
     initialIndex?: number;
-    onVideoEnd?: (video: VideoData, index: number) => void;
+    onVideoEnd?: (video: VideoData, index: number, watchedDurationSeconds?: number, videoDurationSeconds?: number) => void;
     onNext?: (currentIndex: number, nextIndex: number) => void;
     autoCloseOnLastVideoEnd?: boolean;
     showNextButton?: boolean;
@@ -68,6 +68,8 @@ function FullScreenVideoPlayerContent({
         currentTimeSeconds,
         durationSeconds,
         progressPercent,
+        watchedTimeRef,
+        videoDurationRef,
         stopTracking,
         resetTracking,
         registerPlayer,
@@ -128,7 +130,9 @@ function FullScreenVideoPlayerContent({
         setVideoEnded(true);
         markPlaybackCompleted();
         stopTracking();
-        onVideoEnd?.(currentVideo, currentIndex);
+        const watchedDurationSeconds = watchedTimeRef.current > 0 ? watchedTimeRef.current : undefined;
+        const videoDurationSeconds = videoDurationRef.current > 0 ? videoDurationRef.current : undefined;
+        onVideoEnd?.(currentVideo, currentIndex, watchedDurationSeconds, videoDurationSeconds);
 
         if (autoCloseOnLastVideoEnd && isLastVideo) {
             closePlayer();

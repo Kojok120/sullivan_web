@@ -174,7 +174,12 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
         watchedVideoIndicesRef.current = new Set();
     };
 
-    const handleGateVideoEnd = async (_video: { title: string; url: string }, index: number) => {
+    const handleGateVideoEnd = async (
+        _video: { title: string; url: string },
+        index: number,
+        watchedDurationSeconds?: number,
+        videoDurationSeconds?: number,
+    ) => {
         if (!gateModal) return;
 
         if (watchedVideoIndicesRef.current.has(index)) {
@@ -198,7 +203,11 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
         setGateWatchErrorMessage(null);
 
         try {
-            const success = await markLectureAsWatched({ coreProblemId: gateModal.coreProblemId });
+            const success = await markLectureAsWatched({
+                coreProblemId: gateModal.coreProblemId,
+                watchedDurationSeconds,
+                videoDurationSeconds,
+            });
 
             if (!success) {
                 setIsGateVideoOpen(false);

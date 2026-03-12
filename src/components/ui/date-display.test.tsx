@@ -1,7 +1,7 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { FALLBACK_TIME_ZONE } from '@/lib/date-key';
+import { FALLBACK_TIME_ZONE, normalizeTimeZone } from '@/lib/date-key';
 
 import { DateDisplay } from './date-display';
 
@@ -43,6 +43,23 @@ describe('DateDisplay', () => {
         const { container } = render(<DateDisplay date={date} showTime timeZone="UTC" />);
         const actual = normalizeTextContent(container.textContent);
 
+        expect(actual).toContain(`${expectedDate} ${expectedTime}`);
+    });
+
+    it('不正な timeZone 指定時はフォールバックを使う', () => {
+        const date = new Date('2024-01-15T18:30:00.000Z');
+        const resolvedTimeZone = normalizeTimeZone('Invalid/Zone');
+        const expectedDate = date.toLocaleDateString('ja-JP', { timeZone: FALLBACK_TIME_ZONE });
+        const expectedTime = date.toLocaleTimeString('ja-JP', {
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: FALLBACK_TIME_ZONE,
+        });
+
+        const { container } = render(<DateDisplay date={date} showTime timeZone="Invalid/Zone" />);
+        const actual = normalizeTextContent(container.textContent);
+
+        expect(resolvedTimeZone).toBe(FALLBACK_TIME_ZONE);
         expect(actual).toContain(`${expectedDate} ${expectedTime}`);
     });
 });
