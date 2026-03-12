@@ -8,6 +8,10 @@ const { markLectureAsWatchedMock } = vi.hoisted(() => ({
     markLectureAsWatchedMock: vi.fn(),
 }));
 
+const YOUTUBE_URL_1 = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+const YOUTUBE_URL_2 = 'https://www.youtube.com/watch?v=9bZkp7q19f0';
+const UNSUPPORTED_URL = 'https://example.com/embed/1';
+
 vi.mock('next/navigation', () => ({
     useRouter: vi.fn(),
 }));
@@ -22,14 +26,17 @@ vi.mock('@/components/full-screen-video-player', () => ({
         onClose,
         onVideoEnd,
         playlist,
+        requiresTrackedCompletion,
     }: {
         isOpen: boolean;
         onClose: () => void;
         playlist: Array<{ title: string; url: string }>;
         onVideoEnd?: (video: { title: string; url: string }, index: number, watchedDurationSeconds?: number, videoDurationSeconds?: number) => void;
+        requiresTrackedCompletion?: boolean;
     }) => (
         isOpen ? (
             <div data-testid="mock-fullscreen-player">
+                <span data-testid="mock-requires-tracked-completion">{String(requiresTrackedCompletion)}</span>
                 <button type="button" onClick={onClose}>mock-close-video</button>
                 <button type="button" onClick={() => onVideoEnd?.(playlist[0], 0, 120, 120)}>
                     mock-end-video-0
@@ -124,8 +131,8 @@ describe('印刷セレクター', () => {
                 coreProblemId: 'cp-1',
                 coreProblemName: '主語と動詞',
                 lectureVideos: [
-                    { title: '導入', url: 'https://example.com/embed/1' },
-                    { title: '基本', url: 'https://example.com/embed/2' },
+                    { title: '導入', url: YOUTUBE_URL_1 },
+                    { title: '基本', url: YOUTUBE_URL_2 },
                 ],
             }),
         });
@@ -148,6 +155,39 @@ describe('印刷セレクター', () => {
         });
     });
 
+    it('印刷ゲート動画が YouTube 以外の場合は再生を無効化して案内する', async () => {
+        mockFetch.mockResolvedValue({
+            ok: true,
+            json: async () => ({
+                blocked: true,
+                coreProblemId: 'cp-1',
+                coreProblemName: '主語と動詞',
+                lectureVideos: [
+                    { title: '導入', url: UNSUPPORTED_URL },
+                ],
+            }),
+        });
+
+        render(
+            <PrintSelector
+                subjects={[{ subjectId: 'subject-1', subjectName: '英語' }]}
+            />
+        );
+
+        fireEvent.click(screen.getByText('English'));
+        fireEvent.click(screen.getByRole('button', { name: '印刷する' }));
+
+        await screen.findByText('「主語と動詞」がアンロックされました');
+
+        const previewButton = screen.getByRole('button', { name: '主語と動詞 の講義動画プレビューを再生' });
+        expect(previewButton).toBeDisabled();
+        expect(screen.getAllByText('講義動画の URL が YouTube ではないため、視聴完了を自動判定できません。管理者に設定をご確認ください。').length).toBeGreaterThan(0);
+
+        fireEvent.click(previewButton);
+
+        expect(screen.queryByTestId('mock-fullscreen-player')).not.toBeInTheDocument();
+    });
+
     it('途中で閉じた場合は視聴済みにならずモーダルを維持する', async () => {
         mockFetch.mockResolvedValue({
             ok: true,
@@ -156,7 +196,7 @@ describe('印刷セレクター', () => {
                 coreProblemId: 'cp-1',
                 coreProblemName: '主語と動詞',
                 lectureVideos: [
-                    { title: '導入', url: 'https://example.com/embed/1' },
+                    { title: '導入', url: YOUTUBE_URL_1 },
                 ],
             }),
         });
@@ -195,8 +235,8 @@ describe('印刷セレクター', () => {
                     coreProblemId: 'cp-1',
                     coreProblemName: '主語と動詞',
                     lectureVideos: [
-                        { title: '導入', url: 'https://example.com/embed/1' },
-                        { title: '基本', url: 'https://example.com/embed/2' },
+                        { title: '導入', url: YOUTUBE_URL_1 },
+                        { title: '基本', url: YOUTUBE_URL_2 },
                     ],
                 }),
             })
@@ -262,6 +302,7 @@ describe('印刷セレクター', () => {
 
         fireEvent.click(screen.getByText('English'));
         fireEvent.click(screen.getByRole('button', { name: '印刷する' }));
+        fireEvent.pointerDown(document.body);
 
         expect(screen.getByRole('button', { name: '確認中...' })).toBeDisabled();
         const actionButtons = screen.getAllByRole('button');
@@ -293,7 +334,7 @@ describe('印刷セレクター', () => {
                 coreProblemId: 'cp-1',
                 coreProblemName: '主語と動詞',
                 lectureVideos: [
-                    { title: '導入', url: 'https://example.com/embed/1' },
+                    { title: '導入', url: YOUTUBE_URL_1 },
                 ],
             }),
         });
@@ -337,45 +378,47 @@ describe('印刷セレクター', () => {
 
     it('視聴状態の保存が例外で失敗した場合はエラーを表示して再視聴を促す', async () => {
         const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-        mockFetch.mockResolvedValue({
-            ok: true,
-            json: async () => ({
-                blocked: true,
-                coreProblemId: 'cp-1',
-                coreProblemName: '主語と動詞',
-                lectureVideos: [
-                    { title: '導入', url: 'https://example.com/embed/1' },
-                ],
-            }),
-        });
-        markLectureAsWatchedMock.mockRejectedValue(new Error('network error'));
-
-        render(
-            <PrintSelector
-                subjects={[{ subjectId: 'subject-1', subjectName: '英語' }]}
-            />
-        );
-
-        fireEvent.click(screen.getByText('English'));
-        fireEvent.click(screen.getByRole('button', { name: '印刷する' }));
-        await screen.findByText('「主語と動詞」がアンロックされました');
-
-        fireEvent.click(screen.getByRole('button', { name: '主語と動詞 の講義動画プレビューを再生' }));
-        fireEvent.click(screen.getByText('mock-end-video-0'));
-
-        await waitFor(() => {
-            expect(markLectureAsWatchedMock).toHaveBeenCalledWith({
-                coreProblemId: 'cp-1',
-                watchedDurationSeconds: 120,
-                videoDurationSeconds: 120,
+        try {
+            mockFetch.mockResolvedValue({
+                ok: true,
+                json: async () => ({
+                    blocked: true,
+                    coreProblemId: 'cp-1',
+                    coreProblemName: '主語と動詞',
+                    lectureVideos: [
+                        { title: '導入', url: YOUTUBE_URL_1 },
+                    ],
+                }),
             });
-            expect(screen.queryByTestId('mock-fullscreen-player')).not.toBeInTheDocument();
-            expect(screen.getByText('視聴状態の保存に失敗しました。もう一度最初から視聴してください。')).toBeInTheDocument();
-            expect(screen.getByText('「主語と動詞」がアンロックされました')).toBeInTheDocument();
-            expect(mockRouter.refresh).not.toHaveBeenCalled();
-        });
+            markLectureAsWatchedMock.mockRejectedValue(new Error('network error'));
 
-        consoleErrorSpy.mockRestore();
+            render(
+                <PrintSelector
+                    subjects={[{ subjectId: 'subject-1', subjectName: '英語' }]}
+                />
+            );
+
+            fireEvent.click(screen.getByText('English'));
+            fireEvent.click(screen.getByRole('button', { name: '印刷する' }));
+            await screen.findByText('「主語と動詞」がアンロックされました');
+
+            fireEvent.click(screen.getByRole('button', { name: '主語と動詞 の講義動画プレビューを再生' }));
+            fireEvent.click(screen.getByText('mock-end-video-0'));
+
+            await waitFor(() => {
+                expect(markLectureAsWatchedMock).toHaveBeenCalledWith({
+                    coreProblemId: 'cp-1',
+                    watchedDurationSeconds: 120,
+                    videoDurationSeconds: 120,
+                });
+                expect(screen.queryByTestId('mock-fullscreen-player')).not.toBeInTheDocument();
+                expect(screen.getByText('視聴状態の保存に失敗しました。もう一度最初から視聴してください。')).toBeInTheDocument();
+                expect(screen.getByText('「主語と動詞」がアンロックされました')).toBeInTheDocument();
+                expect(mockRouter.refresh).not.toHaveBeenCalled();
+            });
+        } finally {
+            consoleErrorSpy.mockRestore();
+        }
     });
 
     it('印刷ゲート判定APIが失敗した場合は印刷ページへ遷移しない', async () => {

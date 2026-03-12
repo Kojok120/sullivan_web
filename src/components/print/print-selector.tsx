@@ -21,7 +21,7 @@ import { markLectureAsWatched } from '@/lib/api/lecture-watched-client';
 import type { LectureVideo } from '@/lib/lecture-videos';
 import { getSubjectConfig } from '@/lib/subject-config';
 import { cn } from '@/lib/utils';
-import { getEmbedUrl } from '@/lib/youtube';
+import { getEmbedUrl, getYouTubeId } from '@/lib/youtube';
 
 interface PrintSubject {
     subjectId: string;
@@ -229,9 +229,11 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
     };
 
     useEffect(() => {
-        if (!selectedSubjectId || gateModal) return;
+        if (!selectedSubjectId || gateModal || isInteractionLocked) return;
 
         const handlePointerDownOutside = (event: PointerEvent) => {
+            if (isInteractionLocked) return;
+
             const target = event.target;
             if (!(target instanceof Element)) return;
 
@@ -246,11 +248,23 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
         return () => {
             document.removeEventListener('pointerdown', handlePointerDownOutside);
         };
-    }, [gateModal, selectedSubjectId]);
+    }, [gateModal, isInteractionLocked, selectedSubjectId]);
 
     const previewVideo = gateModal?.lectureVideos[0];
-    const previewUrl = previewVideo ? getEmbedUrl(previewVideo.url) : null;
-    const canOpenGateVideo = Boolean(gateModal?.coreProblemId && gateModal.lectureVideos.length > 0);
+    const hasGateVideos = (gateModal?.lectureVideos.length ?? 0) > 0;
+    const hasTrackableGateVideos = hasGateVideos
+        && (gateModal?.lectureVideos.every((video) => Boolean(getYouTubeId(video.url))) ?? false);
+    const previewUrl = previewVideo && hasTrackableGateVideos
+        ? getEmbedUrl(previewVideo.url)
+        : null;
+    const canOpenGateVideo = Boolean(gateModal?.coreProblemId && hasTrackableGateVideos);
+    const gateVideoSupportMessage = !hasGateVideos
+        ? '講義動画情報を取得できませんでした。時間をおいて再度お試しください。'
+        : !hasTrackableGateVideos
+            ? '講義動画の URL が YouTube ではないため、視聴完了を自動判定できません。管理者に設定をご確認ください。'
+            : !gateModal?.coreProblemId
+                ? '講義動画情報を取得できませんでした。時間をおいて再度お試しください。'
+                : null;
 
     return (
         <>
@@ -402,18 +416,21 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                                     />
                                 ) : (
                                     <div className="flex h-full items-center justify-center bg-slate-950 px-6 text-center text-sm text-slate-200">
-                                        この講義動画のプレビューを読み込めませんでした。
+                                        {gateVideoSupportMessage ?? 'この講義動画のプレビューを読み込めませんでした。'}
                                     </div>
                                 )}
                                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-black/25" />
                                 <div className="pointer-events-none absolute inset-x-0 bottom-0 p-4 text-white">
                                     <p className="text-sm font-semibold">{previewVideo?.title || gateModal?.coreProblemName || '講義動画'}</p>
                                     <p className="text-xs text-white/80">
-                                        {canOpenGateVideo ? 'このプレビューを押すと全画面で再生します。' : 'この講義動画は再生できません。'}
+                                        {canOpenGateVideo
+                                            ? 'このプレビューを押すと全画面で再生します。'
+                                            : gateVideoSupportMessage ?? 'この講義動画は再生できません。'}
                                     </p>
                                 </div>
-                                <button
+                                <Button
                                     type="button"
+                                    variant="ghost"
                                     aria-label={`${gateModal?.coreProblemName ?? '講義動画'} の講義動画プレビューを再生`}
                                     onClick={handleOpenGateVideo}
                                     disabled={!canOpenGateVideo}
@@ -425,7 +442,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                                     <span className="sr-only">
                                         {canOpenGateVideo ? 'プレビューを押して全画面で再生する' : '講義動画を再生できない'}
                                     </span>
-                                </button>
+                                </Button>
                             </div>
                             <p className="text-xs text-muted-foreground">
                                 視聴が終わるとトップ画面に戻ります。講義動画を見終わった後、同じトップ画面から再度「印刷する」を押してください。
@@ -447,7 +464,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                             </div>
                             {!canOpenGateVideo && (
                                 <p className="text-sm text-red-600">
-                                    講義動画情報を取得できませんでした。時間をおいて再度お試しください。
+                                    {gateVideoSupportMessage}
                                 </p>
                             )}
                             {gateWatchErrorMessage && (
@@ -480,6 +497,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                     }))}
                     onVideoEnd={handleGateVideoEnd}
                     autoCloseOnLastVideoEnd={false}
+                    requiresTrackedCompletion
                 />
             )}
         </>

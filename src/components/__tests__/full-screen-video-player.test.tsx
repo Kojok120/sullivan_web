@@ -84,7 +84,7 @@ describe("FullScreenVideoPlayer", () => {
         expect(screen.getByRole("button", { name: "1x" }).parentElement).toHaveClass("bottom-24");
     });
 
-    it("YouTube以外の動画では進捗バーを表示しない", () => {
+    it("YouTube以外の動画では進捗バーと速度変更を表示しない", () => {
         render(
             <FullScreenVideoPlayer
                 isOpen
@@ -96,6 +96,20 @@ describe("FullScreenVideoPlayer", () => {
         expect(screen.queryByText("再生進捗")).not.toBeInTheDocument();
         expect(screen.queryByRole("progressbar", { name: "動画の再生進捗" })).not.toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "10秒戻す" })).not.toBeInTheDocument();
-        expect(screen.getByRole("button", { name: "1x" }).parentElement).toHaveClass("bottom-10");
+        expect(screen.queryByRole("button", { name: "1x" })).not.toBeInTheDocument();
+    });
+
+    it("追跡必須の非YouTube動画では案内メッセージを表示する", () => {
+        render(
+            <FullScreenVideoPlayer
+                isOpen
+                onClose={vi.fn()}
+                playlist={[{ title: "外部動画", url: "https://example.com/video.mp4" }]}
+                onVideoEnd={vi.fn()}
+                requiresTrackedCompletion
+            />
+        );
+
+        expect(screen.getByRole("alert")).toHaveTextContent("この動画 URL では視聴完了を自動判定できません。管理者に YouTube URL の設定をご確認ください。");
     });
 });

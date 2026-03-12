@@ -33,6 +33,7 @@ interface FullScreenVideoPlayerProps {
     showNextButton?: boolean;
     nextButtonLabel?: string;
     closeButtonLabel?: string;
+    requiresTrackedCompletion?: boolean;
 }
 
 type PlayerContentProps = Omit<FullScreenVideoPlayerProps, 'isOpen'>;
@@ -57,6 +58,7 @@ function FullScreenVideoPlayerContent({
     showNextButton = true,
     nextButtonLabel = "次の動画へ",
     closeButtonLabel = "閉じる",
+    requiresTrackedCompletion = false,
 }: PlayerContentProps) {
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
     const [videoEnded, setVideoEnded] = useState(false);
@@ -98,6 +100,7 @@ function FullScreenVideoPlayerContent({
     const youTubeId = getYouTubeId(currentVideo.url);
     const embedUrl = getEmbedUrl(currentVideo.url);
     const isLastVideo = currentIndex >= playlist.length - 1;
+    const isTrackedCompletionUnavailable = requiresTrackedCompletion && !youTubeId;
 
     const closePlayer = () => {
         resetTracking();
@@ -185,6 +188,13 @@ function FullScreenVideoPlayerContent({
                         onPlaybackRateChange={handlePlaybackRateChange}
                         onStateChange={handleStateChange}
                     />
+                ) : isTrackedCompletionUnavailable ? (
+                    <div
+                        role="alert"
+                        className="flex h-full w-full items-center justify-center bg-slate-950 px-6 text-center text-sm text-slate-200"
+                    >
+                        この動画 URL では視聴完了を自動判定できません。管理者に YouTube URL の設定をご確認ください。
+                    </div>
                 ) : (
                     <iframe
                         key={`${currentVideo.url}-${instanceKey}`}
@@ -263,31 +273,32 @@ function FullScreenVideoPlayerContent({
                 </div>
             )}
 
-            {!videoEnded && (
-                <div className={`absolute left-10 z-10 flex items-center gap-1 ${youTubeId ? "bottom-24" : "bottom-10"}`}>
-                    {youTubeId && (
+            {!videoEnded && youTubeId && (
+                <div className="absolute bottom-24 left-10 z-10 flex items-center gap-1">
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => seekRelative(-10)}
+                        className="h-8 px-3 text-sm font-medium transition-colors bg-white/20 text-white/80 hover:bg-white/30 hover:text-white flex items-center gap-1"
+                    >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        10秒戻す
+                    </Button>
+                    {allowedRates.map((rate) => (
                         <Button
+                            key={rate}
                             type="button"
                             variant="ghost"
                             size="sm"
-                            onClick={() => seekRelative(-10)}
-                            className="h-8 px-3 text-sm font-medium transition-colors bg-white/20 text-white/80 hover:bg-white/30 hover:text-white flex items-center gap-1"
-                        >
-                            <RotateCcw className="h-3.5 w-3.5" />
-                            10秒戻す
-                        </Button>
-                    )}
-                    {allowedRates.map((rate) => (
-                        <button
-                            key={rate}
                             onClick={() => changeSpeed(rate)}
-                            className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${currentRate === rate
-                                ? "bg-white text-black"
-                                : "bg-white/20 text-white/70 hover:bg-white/30"
-                                }`}
+                            className={currentRate === rate
+                                ? "bg-white text-black hover:bg-white"
+                                : "bg-white/20 text-white/70 hover:bg-white/30 hover:text-white"
+                            }
                         >
                             {rate}x
-                        </button>
+                        </Button>
                     ))}
                 </div>
             )}
