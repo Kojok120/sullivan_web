@@ -1,0 +1,99 @@
+name: Sync Dev From Main
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: sync-dev-from-main
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync-dev:
+    name: main 反映後に dev を同期
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: チェックアウト
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Git 設定
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: main の内容を dev に同期
+        id: sync
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git fetch origin main dev
+          git checkout -B sync-dev origin/dev
+
+          if git merge-base --is-ancestor origin/main HEAD; then
+            echo "result=noop" >> "$GITHUB_OUTPUT"
+            echo "mode=already-contained" >> "$GITHUB_OUTPUT"
+            echo "dev はすでに main を含んでいます。" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          sync_mode="fast-forward"
+
+          if ! git merge --ff-only origin/main; then
+            sync_mode="merge"
+
+            if ! git merge --no-ff --no-edit -m "chore: main を dev に同期" origin/main; then
+              git merge --abort || true
+              echo "result=pr" >> "$GITHUB_OUTPUT"
+              echo "mode=conflict" >> "$GITHUB_OUTPUT"
+              echo "自動マージで競合したため、main -> dev の同期PRを作成します。" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+          fi
+
+          if git push origin HEAD:dev; then
+            echo "result=pushed" >> "$GITHUB_OUTPUT"
+            echo "mode=${sync_mode}" >> "$GITHUB_OUTPUT"
+            echo "dev を ${sync_mode} で同期しました。" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo "result=pr" >> "$GITHUB_OUTPUT"
+          echo "mode=${sync_mode}" >> "$GITHUB_OUTPUT"
+          echo "dev への直接 push が拒否されたため、main -> dev の同期PRを作成します。" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: main -> dev の同期PRを作成
+        if: steps.sync.outputs.result == 'pr'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          existing_pr="$(gh pr list \
+            --base dev \
+            --head main \
+            --state open \
+            --json number \
+            --jq '.[0].number // ""')"
+
+          if [ -n "$existing_pr" ]; then
+            echo "既存の同期PR #${existing_pr} を継続利用します。" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          created_pr_url="$(gh pr create \
+            --base dev \
+            --head main \
+            --title "chore: main を dev に同期" \
+            --body "main へのマージ後に dev の履歴を同期し、GitHub 上の behind 表示を解消するための自動PRです。")"
+
+          echo "同期PRを作成しました: ${created_pr_url}" >> "$GITHUB_STEP_SUMMARY"
