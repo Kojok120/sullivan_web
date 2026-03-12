@@ -6,6 +6,7 @@ import { ActivityChart } from '@/app/dashboard/activity-chart';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { SubjectProgressList } from '@/components/subject-progress-list';
+import { DateDisplay } from '@/components/ui/date-display';
 
 interface PageProps {
     params: Promise<{
@@ -88,7 +89,7 @@ export default async function StudentAnalyticsPage({ params }: PageProps) {
                         {recentHistory.map((history) => (
                             <div key={history.id} className="rounded-lg border bg-card p-4">
                                 <div className="mb-2 flex items-center justify-between gap-2">
-                                    <p className="text-xs text-muted-foreground">{new Date(history.answeredAt).toLocaleString('ja-JP')}</p>
+                                    <p className="text-xs text-muted-foreground"><DateDisplay date={history.answeredAt} showTime /></p>
                                     <Badge variant={['A', 'B'].includes(history.evaluation) ? 'default' : 'destructive'}>
                                         {history.evaluation}
                                     </Badge>
@@ -120,7 +121,7 @@ export default async function StudentAnalyticsPage({ params }: PageProps) {
                                 {recentHistory.map((history) => (
                                     <TableRow key={history.id}>
                                         <TableCell className="whitespace-nowrap">
-                                            {new Date(history.answeredAt).toLocaleString('ja-JP')}
+                                            <DateDisplay date={history.answeredAt} showTime />
                                         </TableCell>
                                         <TableCell>
                                             <div className="text-sm font-medium">

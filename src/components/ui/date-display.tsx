@@ -1,3 +1,5 @@
+import { FALLBACK_TIME_ZONE, normalizeTimeZone } from '@/lib/date-key';
+
 interface DateDisplayProps {
     date: Date | string | number | null | undefined;
     showTime?: boolean;
@@ -11,7 +13,7 @@ export function DateDisplay({ date, showTime = false, className, timeZone }: Dat
     const d = new Date(date);
     if (isNaN(d.getTime())) return <span className={className}>-</span>;
 
-    const resolvedTimeZone = timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Tokyo';
+    const resolvedTimeZone = normalizeTimeZone(timeZone) || FALLBACK_TIME_ZONE;
     const dateStr = d.toLocaleDateString('ja-JP', { timeZone: resolvedTimeZone });
 
     if (!showTime) {
