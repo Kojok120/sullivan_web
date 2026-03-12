@@ -19,7 +19,7 @@ type MockPlayerProps = {
     onClose: () => void;
     playlist: MockVideoData[];
     initialIndex?: number;
-    onVideoEnd?: (video: MockVideoData, index: number) => void;
+    onVideoEnd?: (video: MockVideoData, index: number, watchedDurationSeconds?: number, videoDurationSeconds?: number) => void;
 };
 
 const { refreshMock, markVideoWatchedMock } = vi.hoisted(() => ({

@@ -21,7 +21,10 @@ const DEFAULT_ALLOWED_RATES = [1, 1.25, 1.5];
 
 export function useYouTubePlaybackGuard(allowedRates: number[] = DEFAULT_ALLOWED_RATES) {
     const [currentRate, setCurrentRate] = useState(1);
+    const [currentTimeSeconds, setCurrentTimeSeconds] = useState(0);
+    const [durationSeconds, setDurationSeconds] = useState(0);
     const playerRef = useRef<YouTubePlayerLike | null>(null);
+    const captureDurationRef = useRef(false);
     const watchedTimeRef = useRef(0);
     const lastTimeRef = useRef(0);
     const trackingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -34,11 +37,41 @@ export function useYouTubePlaybackGuard(allowedRates: number[] = DEFAULT_ALLOWED
         }
     }, []);
 
+    const updateDurationFromPlayer = useCallback((player: YouTubePlayerLike) => {
+        if (!captureDurationRef.current || typeof player.getDuration !== 'function') {
+            videoDurationRef.current = 0;
+            setDurationSeconds(0);
+            return 0;
+        }
+
+        const duration = player.getDuration();
+        if (Number.isFinite(duration) && duration >= 0) {
+            videoDurationRef.current = duration;
+            setDurationSeconds(duration);
+            return duration;
+        }
+
+        videoDurationRef.current = 0;
+        setDurationSeconds(0);
+        return 0;
+    }, []);
+
+    const syncPlaybackProgress = useCallback((player: YouTubePlayerLike) => {
+        const currentTime = player.getCurrentTime();
+        setCurrentTimeSeconds(currentTime);
+        updateDurationFromPlayer(player);
+
+        return currentTime;
+    }, [updateDurationFromPlayer]);
+
     const resetTracking = useCallback(() => {
         stopTracking();
+        captureDurationRef.current = false;
         watchedTimeRef.current = 0;
         lastTimeRef.current = 0;
         videoDurationRef.current = 0;
+        setCurrentTimeSeconds(0);
+        setDurationSeconds(0);
         setCurrentRate(1);
     }, [stopTracking]);
 
@@ -46,7 +79,7 @@ export function useYouTubePlaybackGuard(allowedRates: number[] = DEFAULT_ALLOWED
         stopTracking();
         trackingIntervalRef.current = setInterval(() => {
             try {
-                const currentTime = player.getCurrentTime();
+                const currentTime = syncPlaybackProgress(player);
                 const diff = currentTime - lastTimeRef.current;
                 // 通常の再生進行（0〜3秒の範囲）のみカウント
                 if (diff > 0 && diff < 3) {
@@ -57,20 +90,26 @@ export function useYouTubePlaybackGuard(allowedRates: number[] = DEFAULT_ALLOWED
                 // プレイヤー状態更新直後など、瞬間的に取得できないケースは無視する
             }
         }, 1000);
-    }, [stopTracking]);
+    }, [stopTracking, syncPlaybackProgress]);
 
     const registerPlayer = useCallback((player: YouTubePlayerLike, options: RegisterPlayerOptions = {}) => {
         playerRef.current = player;
+        captureDurationRef.current = options.captureDuration ?? false;
         player.setPlaybackRate(1);
         setCurrentRate(1);
         lastTimeRef.current = 0;
+        setCurrentTimeSeconds(0);
 
-        if (options.captureDuration && typeof player.getDuration === 'function') {
-            videoDurationRef.current = player.getDuration();
+        updateDurationFromPlayer(player);
+
+        try {
+            syncPlaybackProgress(player);
+        } catch {
+            // onReady直後に再生情報を取得できない場合があるため無視する
         }
 
         startTracking(player);
-    }, [startTracking]);
+    }, [startTracking, syncPlaybackProgress, updateDurationFromPlayer]);
 
     const handlePlaybackRateChange = useCallback((event: YouTubeLikeEvent) => {
         const rate = event.target.getPlaybackRate();
@@ -100,6 +139,7 @@ export function useYouTubePlaybackGuard(allowedRates: number[] = DEFAULT_ALLOWED
             const nextTime = Math.max(0, currentTime + offsetSeconds);
             playerRef.current.seekTo(nextTime, true);
             lastTimeRef.current = nextTime;
+            setCurrentTimeSeconds(nextTime);
             return true;
         } catch {
             return false;
@@ -116,16 +156,39 @@ export function useYouTubePlaybackGuard(allowedRates: number[] = DEFAULT_ALLOWED
         // 5秒以上の前方ジャンプはシーク判定
         if (diff > 5 && lastTimeRef.current > 0 && watchedTimeRef.current > 0) {
             event.target.seekTo(lastTimeRef.current, true);
+            setCurrentTimeSeconds(lastTimeRef.current);
             return;
         }
         lastTimeRef.current = currentTime;
+        setCurrentTimeSeconds(currentTime);
+
+        updateDurationFromPlayer(event.target);
+    }, [updateDurationFromPlayer]);
+
+    const markPlaybackCompleted = useCallback(() => {
+        const duration = videoDurationRef.current;
+        if (!duration) {
+            return;
+        }
+        watchedTimeRef.current = Math.max(watchedTimeRef.current, duration);
+        videoDurationRef.current = duration;
+        setCurrentTimeSeconds(duration);
+        setDurationSeconds(duration);
+        lastTimeRef.current = duration;
     }, []);
+
+    const progressPercent = durationSeconds > 0
+        ? Math.min(100, Math.max(0, (currentTimeSeconds / durationSeconds) * 100))
+        : 0;
 
     useEffect(() => () => stopTracking(), [stopTracking]);
 
     return {
         allowedRates,
         currentRate,
+        currentTimeSeconds,
+        durationSeconds,
+        progressPercent,
         watchedTimeRef,
         videoDurationRef,
         stopTracking,
@@ -135,5 +198,6 @@ export function useYouTubePlaybackGuard(allowedRates: number[] = DEFAULT_ALLOWED
         handleStateChange,
         changeSpeed,
         seekRelative,
+        markPlaybackCompleted,
     };
 }

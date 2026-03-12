@@ -12,6 +12,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
+import { Progress } from "@/components/ui/progress";
 import { getEmbedUrl, getYouTubeId } from "@/lib/youtube";
 import { useYouTubePlaybackGuard } from "@/hooks/use-youtube-playback-guard";
 
@@ -26,15 +27,26 @@ interface FullScreenVideoPlayerProps {
     onClose: () => void;
     playlist: VideoData[];
     initialIndex?: number;
-    onVideoEnd?: (video: VideoData, index: number) => void;
+    onVideoEnd?: (video: VideoData, index: number, watchedDurationSeconds?: number, videoDurationSeconds?: number) => void;
     onNext?: (currentIndex: number, nextIndex: number) => void;
     autoCloseOnLastVideoEnd?: boolean;
     showNextButton?: boolean;
     nextButtonLabel?: string;
     closeButtonLabel?: string;
+    requiresTrackedCompletion?: boolean;
 }
 
 type PlayerContentProps = Omit<FullScreenVideoPlayerProps, 'isOpen'>;
+
+function formatVideoTime(totalSeconds: number) {
+    const safeSeconds = Number.isFinite(totalSeconds) && totalSeconds > 0
+        ? Math.floor(totalSeconds)
+        : 0;
+    const minutes = Math.floor(safeSeconds / 60);
+    const seconds = safeSeconds % 60;
+
+    return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+}
 
 function FullScreenVideoPlayerContent({
     onClose,
@@ -46,6 +58,7 @@ function FullScreenVideoPlayerContent({
     showNextButton = true,
     nextButtonLabel = "次の動画へ",
     closeButtonLabel = "閉じる",
+    requiresTrackedCompletion = false,
 }: PlayerContentProps) {
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
     const [videoEnded, setVideoEnded] = useState(false);
@@ -54,6 +67,11 @@ function FullScreenVideoPlayerContent({
     const {
         allowedRates,
         currentRate,
+        currentTimeSeconds,
+        durationSeconds,
+        progressPercent,
+        watchedTimeRef,
+        videoDurationRef,
         stopTracking,
         resetTracking,
         registerPlayer,
@@ -61,6 +79,7 @@ function FullScreenVideoPlayerContent({
         handleStateChange,
         changeSpeed,
         seekRelative,
+        markPlaybackCompleted,
     } = useYouTubePlaybackGuard();
 
     useEffect(() => {
@@ -81,6 +100,7 @@ function FullScreenVideoPlayerContent({
     const youTubeId = getYouTubeId(currentVideo.url);
     const embedUrl = getEmbedUrl(currentVideo.url);
     const isLastVideo = currentIndex >= playlist.length - 1;
+    const isTrackedCompletionUnavailable = requiresTrackedCompletion && !youTubeId;
 
     const closePlayer = () => {
         resetTracking();
@@ -111,8 +131,11 @@ function FullScreenVideoPlayerContent({
 
     const handleVideoEnd = () => {
         setVideoEnded(true);
+        markPlaybackCompleted();
         stopTracking();
-        onVideoEnd?.(currentVideo, currentIndex);
+        const watchedDurationSeconds = watchedTimeRef.current > 0 ? watchedTimeRef.current : undefined;
+        const videoDurationSeconds = videoDurationRef.current > 0 ? videoDurationRef.current : undefined;
+        onVideoEnd?.(currentVideo, currentIndex, watchedDurationSeconds, videoDurationSeconds);
 
         if (autoCloseOnLastVideoEnd && isLastVideo) {
             closePlayer();
@@ -160,11 +183,18 @@ function FullScreenVideoPlayerContent({
                                 playsinline: 1,
                             },
                         }}
-                        onReady={(event: YouTubeEvent) => registerPlayer(event.target)}
+                        onReady={(event: YouTubeEvent) => registerPlayer(event.target, { captureDuration: true })}
                         onEnd={handleVideoEnd}
                         onPlaybackRateChange={handlePlaybackRateChange}
                         onStateChange={handleStateChange}
                     />
+                ) : isTrackedCompletionUnavailable ? (
+                    <div
+                        role="alert"
+                        className="flex h-full w-full items-center justify-center bg-slate-950 px-6 text-center text-sm text-slate-200"
+                    >
+                        この動画 URL では視聴完了を自動判定できません。管理者に YouTube URL の設定をご確認ください。
+                    </div>
                 ) : (
                     <iframe
                         key={`${currentVideo.url}-${instanceKey}`}
@@ -176,8 +206,12 @@ function FullScreenVideoPlayerContent({
                 )}
                 {/* YouTubeタイトルリンクなど上部クリック領域をブロック */}
                 <div aria-hidden="true" className="absolute top-0 inset-x-0 h-24 z-[4]" style={{ pointerEvents: "auto" }} />
-                <div className="absolute inset-y-0 right-0 w-1/2 z-[4]" style={{ pointerEvents: "auto" }} />
-                <div className="absolute bottom-0 right-0 w-40 h-16 z-[5]" style={{ pointerEvents: "auto" }} />
+                <div
+                    aria-hidden="true"
+                    className="absolute inset-y-0 right-0 z-[4]"
+                    style={{ pointerEvents: "auto", left: "calc(50% + 4rem)" }}
+                />
+                <div aria-hidden="true" className="absolute bottom-0 right-0 w-40 h-16 z-[5]" style={{ pointerEvents: "auto" }} />
                 {videoEnded && (
                     <div className="absolute inset-0 z-[6] bg-black">
                         {showButton ? (
@@ -223,31 +257,52 @@ function FullScreenVideoPlayerContent({
                 )}
             </div>
 
-            {!videoEnded && (
-                <div className="absolute bottom-10 left-10 z-10 flex items-center gap-1">
-                    {youTubeId && (
+            {youTubeId && (
+                <div className="pointer-events-none absolute bottom-6 left-1/2 z-10 w-[min(44rem,calc(100%-2rem))] -translate-x-1/2">
+                    <div className="rounded-2xl border border-white/10 bg-black/60 px-4 py-3 backdrop-blur-sm">
+                        <div className="mb-2 flex items-center justify-between gap-3 text-xs font-medium text-white/80">
+                            <span>再生進捗</span>
+                            <span>{formatVideoTime(currentTimeSeconds)} / {formatVideoTime(durationSeconds)}</span>
+                        </div>
+                        <Progress
+                            value={progressPercent}
+                            aria-label="動画の再生進捗"
+                            className="h-1.5 bg-white/20 [&_[data-slot=progress-indicator]]:bg-white"
+                        />
+                    </div>
+                </div>
+            )}
+
+            {!videoEnded && youTubeId && (
+                <div
+                    data-testid="playback-rate-container"
+                    className="absolute bottom-24 left-10 z-10 flex items-center gap-1"
+                >
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => seekRelative(-10)}
+                        className="h-8 px-3 text-sm font-medium transition-colors bg-white/20 text-white/80 hover:bg-white/30 hover:text-white flex items-center gap-1"
+                    >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        10秒戻す
+                    </Button>
+                    {allowedRates.map((rate) => (
                         <Button
+                            key={rate}
                             type="button"
                             variant="ghost"
                             size="sm"
-                            onClick={() => seekRelative(-10)}
-                            className="h-8 px-3 text-sm font-medium transition-colors bg-white/20 text-white/80 hover:bg-white/30 hover:text-white flex items-center gap-1"
-                        >
-                            <RotateCcw className="h-3.5 w-3.5" />
-                            10秒戻す
-                        </Button>
-                    )}
-                    {allowedRates.map((rate) => (
-                        <button
-                            key={rate}
+                            aria-pressed={currentRate === rate}
                             onClick={() => changeSpeed(rate)}
-                            className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${currentRate === rate
-                                ? "bg-white text-black"
-                                : "bg-white/20 text-white/70 hover:bg-white/30"
-                                }`}
+                            className={currentRate === rate
+                                ? "bg-white text-black hover:bg-white"
+                                : "bg-white/20 text-white/70 hover:bg-white/30 hover:text-white"
+                            }
                         >
                             {rate}x
-                        </button>
+                        </Button>
                     ))}
                 </div>
             )}

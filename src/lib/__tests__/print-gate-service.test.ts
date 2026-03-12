@@ -58,7 +58,10 @@ describe('print-gate-service', () => {
                     id: 'cp-1',
                     name: '主語と動詞',
                     order: 1,
-                    lectureVideos: [{ title: 'v1', url: 'https://example.com/1' }],
+                    lectureVideos: [
+                        { title: 'v1', url: 'https://example.com/1' },
+                        { title: '', url: '' },
+                    ],
                 },
             },
         ] as unknown as Awaited<ReturnType<typeof prisma.userCoreProblemState.findMany>>)
@@ -69,6 +72,7 @@ describe('print-gate-service', () => {
             blocked: true,
             coreProblemId: 'cp-1',
             coreProblemName: '主語と動詞',
+            lectureVideos: [{ title: 'v1', url: 'https://example.com/1' }],
         })
     })
 

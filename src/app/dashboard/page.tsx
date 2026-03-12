@@ -7,7 +7,6 @@ import { getDailyActivity, getStudentStats, getSubjectProgress, getUnwatchedCoun
 import { getGoalDailyViewPayload } from '@/lib/student-goal-service';
 import { GoalReadonlyPanel } from '@/components/goals/goal-readonly-panel';
 import { Heatmap } from '@/components/gamification/heatmap';
-import { PrintSelector } from '@/components/print/print-selector';
 import { SubjectProgressList } from '@/components/subject-progress-list';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -163,15 +162,6 @@ export default async function DashboardPage() {
                 </Card>
 
                 <div className="space-y-4 lg:col-span-4">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>学習プリント印刷</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <PrintSelector subjects={subjectProgress} />
-                        </CardContent>
-                    </Card>
-
                     <Card>
                         <CardHeader>
                             <CardTitle>教科別進捗</CardTitle>
