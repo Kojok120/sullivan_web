@@ -305,9 +305,9 @@ describe('印刷セレクター', () => {
         fireEvent.pointerDown(document.body);
 
         expect(screen.getByRole('button', { name: '確認中...' })).toBeDisabled();
-        const actionButtons = screen.getAllByRole('button');
-        expect(actionButtons[1]).toBeDisabled();
-        fireEvent.click(actionButtons[1]);
+        const incrementButton = screen.getByRole('button', { name: 'セット数を増やす' });
+        expect(incrementButton).toBeDisabled();
+        fireEvent.click(incrementButton);
 
         fireEvent.click(screen.getByText('English'));
 

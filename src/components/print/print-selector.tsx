@@ -319,6 +319,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
+                                                        aria-label="セット数を減らす"
                                                         onClick={(event) => {
                                                             event.stopPropagation();
                                                             decrementSets();
@@ -335,6 +336,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
+                                                        aria-label="セット数を増やす"
                                                         onClick={(event) => {
                                                             event.stopPropagation();
                                                             incrementSets();

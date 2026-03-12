@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from "react";
 import { FullScreenVideoPlayer } from "../full-screen-video-player";
 
@@ -11,13 +11,29 @@ type DivProps = HTMLAttributes<HTMLDivElement> & {
     children?: ReactNode;
 };
 
-const { useYouTubePlaybackGuardMock } = vi.hoisted(() => ({
+const { useYouTubePlaybackGuardMock, youtubePlayerTargetMock } = vi.hoisted(() => ({
     useYouTubePlaybackGuardMock: vi.fn(),
+    youtubePlayerTargetMock: { getDuration: vi.fn(() => 120) },
 }));
 
 vi.mock("react-youtube", () => ({
-    default: ({ videoId }: { videoId: string }) => (
-        <div data-testid="mock-youtube" data-video-id={videoId} />
+    default: ({
+        videoId,
+        onReady,
+        onEnd,
+    }: {
+        videoId: string;
+        onReady?: (event: { target: typeof youtubePlayerTargetMock }) => void;
+        onEnd?: () => void;
+    }) => (
+        <div data-testid="mock-youtube" data-video-id={videoId}>
+            <button type="button" onClick={() => onReady?.({ target: youtubePlayerTargetMock })}>
+                mock-youtube-ready
+            </button>
+            <button type="button" onClick={() => onEnd?.()}>
+                mock-youtube-end
+            </button>
+        </div>
     ),
 }));
 
@@ -49,6 +65,7 @@ vi.mock("@/components/ui/dialog", () => ({
 describe("FullScreenVideoPlayer", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        youtubePlayerTargetMock.getDuration.mockClear();
         useYouTubePlaybackGuardMock.mockReturnValue({
             allowedRates: [1, 1.25, 1.5],
             currentRate: 1,
@@ -81,7 +98,47 @@ describe("FullScreenVideoPlayer", () => {
         expect(screen.getByText("00:30 / 02:00")).toBeInTheDocument();
         expect(screen.getByRole("progressbar", { name: "動画の再生進捗" })).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "10秒戻す" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "1x" })).toHaveAttribute("aria-pressed", "true");
         expect(screen.getByRole("button", { name: "1x" }).parentElement).toHaveClass("bottom-24");
+    });
+
+    it("YouTube動画では ready と end から再生時間を通知する", () => {
+        const registerPlayer = vi.fn();
+        const onVideoEnd = vi.fn();
+        const playlist = [{ title: "講義動画", url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" }];
+
+        useYouTubePlaybackGuardMock.mockReturnValue({
+            allowedRates: [1, 1.25, 1.5],
+            currentRate: 1,
+            currentTimeSeconds: 30,
+            durationSeconds: 120,
+            progressPercent: 25,
+            watchedTimeRef: { current: 95 },
+            videoDurationRef: { current: 120 },
+            stopTracking: vi.fn(),
+            resetTracking: vi.fn(),
+            registerPlayer,
+            handlePlaybackRateChange: vi.fn(),
+            handleStateChange: vi.fn(),
+            changeSpeed: vi.fn(),
+            seekRelative: vi.fn(),
+            markPlaybackCompleted: vi.fn(),
+        });
+
+        render(
+            <FullScreenVideoPlayer
+                isOpen
+                onClose={vi.fn()}
+                playlist={playlist}
+                onVideoEnd={onVideoEnd}
+            />
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: "mock-youtube-ready" }));
+        expect(registerPlayer).toHaveBeenCalledWith(youtubePlayerTargetMock, { captureDuration: true });
+
+        fireEvent.click(screen.getByRole("button", { name: "mock-youtube-end" }));
+        expect(onVideoEnd).toHaveBeenCalledWith(playlist[0], 0, 95, 120);
     });
 
     it("YouTube以外の動画では進捗バーと速度変更を表示しない", () => {

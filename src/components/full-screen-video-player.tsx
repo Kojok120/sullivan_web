@@ -291,6 +291,7 @@ function FullScreenVideoPlayerContent({
                             type="button"
                             variant="ghost"
                             size="sm"
+                            aria-pressed={currentRate === rate}
                             onClick={() => changeSpeed(rate)}
                             className={currentRate === rate
                                 ? "bg-white text-black hover:bg-white"
