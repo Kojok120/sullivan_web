@@ -192,8 +192,12 @@ function FullScreenVideoPlayerContent({
                 )}
                 {/* YouTubeタイトルリンクなど上部クリック領域をブロック */}
                 <div aria-hidden="true" className="absolute top-0 inset-x-0 h-24 z-[4]" style={{ pointerEvents: "auto" }} />
-                <div className="absolute inset-y-0 right-0 w-1/2 z-[4]" style={{ pointerEvents: "auto" }} />
-                <div className="absolute bottom-0 right-0 w-40 h-16 z-[5]" style={{ pointerEvents: "auto" }} />
+                <div
+                    aria-hidden="true"
+                    className="absolute inset-y-0 right-0 z-[4]"
+                    style={{ pointerEvents: "auto", left: "calc(50% + 4rem)" }}
+                />
+                <div aria-hidden="true" className="absolute bottom-0 right-0 w-40 h-16 z-[5]" style={{ pointerEvents: "auto" }} />
                 {videoEnded && (
                     <div className="absolute inset-0 z-[6] bg-black">
                         {showButton ? (
