@@ -1,158 +1,297 @@
 # Sullivan
 
-Sullivan は、**AI伴走 × 人の支援**で「伸び悩み層」の学習を支える学習支援プラットフォームです。  
-プリント学習を基盤に、AIによる自動採点・復習最適化と、講師による情意面サポートを両立し、
-**低価格でも高密度な個別最適学習**を成立させることを目指しています。
+Sullivan は、AI による個別最適化と講師の伴走支援を組み合わせた学習管理システム（LMS）です。  
+プリント学習を起点に、問題選定、採点、復習優先度更新、学習履歴可視化、講師による支援記録までを一気通貫で扱います。
 
-## プロダクト意図
+## プロダクトの狙い
 
-Sullivan が解こうとしている中心課題は、次のループです。
+Sullivan が解いている中心課題は、次の悪循環です。
 
 - 基礎未定着で授業がわからない
-- 恥・恐怖・比較で自己効力感が低下する
-- 「明日しのぎ」の行動に最適化される
+- 失敗体験の蓄積で自己効力感が下がる
+- その場しのぎの学習行動に寄る
 - さらに基礎未定着が進む
 
-このループを断ち切るために、以下の分業を採用しています。
+この循環を断ち切るため、役割を明確に分けています。
 
-- AI: 出題最適化、採点、誤答分析、次の学習提案
-- 人: 見守り、声かけ、習慣化支援、面談記録に基づく伴走
+- AI: 出題最適化、採点、誤答分析、復習提案、目標草案生成
+- 人: 見守り、声かけ、面談、習慣化支援、学習背景の把握
 
-## 実装済みの主要機能
+## 主要機能
 
-### 1. プリント学習サイクル
+### 学習サイクル
 
-- 生徒ごとの状態に応じた問題を自動選出して印刷
-- QRコードで「生徒ID × 問題セット」を埋め込み
-- 解答後は Google Drive 連携で採点キューへ投入
+- 生徒ごとの状態に応じて問題を自動選出して印刷
+- 問題セットを QR コードで出力し、生徒 ID と紐付け
+- Google Drive に投入された答案を検知して採点キューへ連携
 
-### 2. AI採点・復習最適化
+### AI 採点と学習最適化
 
 - Gemini による A/B/C/D 評価と日本語フィードバック
-- `UserProblemState` / `UserCoreProblemState` の優先度を更新
-- 忘却曲線と単元進捗に基づく再出題
-- 条件達成で次単元をアンロック
+- `LearningHistory`、`UserProblemState`、`UserCoreProblemState` を更新
+- 忘却曲線と回答履歴をもとに再出題優先度を計算
+- 条件達成時に次単元を自動アンロック
 
-### 3. 学習ゲート制御
+### 学習順序の制御
 
-- 単元に講義動画がある場合、未視聴状態では印刷を制御（Print Gate）
-- 単元フォーカス画面へ誘導し、学習順序を担保
+- 単元に講義動画がある場合、未視聴なら印刷をブロック
+- `unit-focus` 画面へ誘導して先に講義視聴を促進
 
-### 4. 人の支援を支える機能
+### 講師支援
 
-- 指導記録（面談・指導メモ）の登録/参照
-- 教室単位の生徒一覧・検索・学習状況確認
+- 生徒プロフィール・講師メモの管理
+- 指導記録（面談、指導、その他）の登録
+- 担当教室内での生徒進捗確認
+- 学習目標の作成、マイルストーン設計、AI による草案生成
 
-### 5. AI家庭教師（PREMIUMプラン）
+### 生徒向け体験
 
-- チャット相談: `/api/tutor-chat`
-- 音声通話相談: Gemini Live を `/ws` 経由で中継
-- 教室プランが `PREMIUM` の生徒のみ利用可能
+- 学習履歴、ランキング、実績、連続学習日数の可視化
+- 90 日ごとの非認知アンケート
+- PREMIUM 教室向け AI 家庭教師
+  - チャット: `/api/tutor-chat`
+  - 音声: `/api/gemini-live/token` + `/ws`
 
-### 6. 非認知アンケート
+### 管理・外部連携
 
-- 90日ごとの定期アンケート
-- カテゴリ: `GRIT`, `SELF_EFFICACY`, `SELF_REGULATION`, `GROWTH_MINDSET`, `EMOTIONAL_REGULATION`
-- 学習行動の背景を可視化するための基盤データを保存
-
-### 7. ゲーミフィケーション
-
-- XP/レベル/連続学習日数
-- 実績（Achievements）
-- Realtime 通知でレベルアップや採点完了を反映
+- 管理画面でのユーザー、教室、カリキュラム、問題管理
+- Drive Watch のセットアップ/更新 API
+- iOS 向け API
+  - `/api/ios/goals`
+  - `/api/ios/rankings`
+  - `/api/ios/vocabulary`
+  - `/api/ios/vocabulary-scores`
 
 ## ロール
 
-- `STUDENT`: 学習・履歴・印刷・AIフィードバック閲覧
-- `TEACHER`: 担当教室の生徒管理、指導記録、印刷支援
-- `HEAD_TEACHER`: `TEACHER` 権限 + 教師ユーザー作成
-- `ADMIN`: 全体管理（ユーザー/教室/カリキュラム/問題）
-- `PARENT`: スキーマ上定義あり（現時点で専用UIは限定的）
+- `STUDENT`: 学習、履歴、復習、印刷、ランキング、AI フィードバック閲覧
+- `TEACHER`: 担当教室の生徒管理、印刷支援、指導記録、目標管理
+- `HEAD_TEACHER`: `TEACHER` 権限 + 講師ユーザー作成
+- `ADMIN`: 全体管理（ユーザー、教室、教材、問題、分析）
+- `PARENT`: スキーマ上は定義済み。現時点の専用 UI は限定的
+
+## システム構成
+
+### Web サービス
+
+- Next.js 16 App Router ベースの UI / API サービス
+- カスタムサーバー `server.ts` で起動
+- Drive Webhook 受信
+- Cloud Tasks ジョブ発行
+- Gemini Live 用 WebSocket `/ws` を中継
+- PDF 出力用ブラウザのウォームアップを起動時に実行
+
+### Worker サービス
+
+- 採点専用の HTTP サーバー `worker/server.ts` で起動
+- `/api/queue/grading` と `/api/queue/drive-check` を処理
+- Cloud Run IAM で保護された private service として運用
+
+### 主な外部サービス
+
+- Supabase Auth
+- PostgreSQL + Prisma
+- Google Gemini
+- Google Drive API
+- Google Cloud Tasks
+- Supabase Realtime
 
 ## 技術スタック
 
-- フロント/アプリ: Next.js 16 (App Router), React 19, TypeScript
-- UI: Tailwind CSS v4, shadcn/ui (Radix UI), Recharts
-- DB: PostgreSQL + Prisma
-- 認証: Supabase Auth (`@supabase/ssr`)
-- AI: Google Gemini (`@google/genai`)
-- 外部連携: Google Drive API, Google Cloud Tasks, Supabase Realtime
-- デプロイ: Google Cloud Run (Webサービス + Workerサービス)
+- フレームワーク: Next.js 16, React 19, TypeScript
+- UI: Tailwind CSS v4, shadcn/ui, Radix UI, Recharts
+- ORM: Prisma 7
+- 認証: `@supabase/ssr`
+- AI: `@google/genai`
+- リアルタイム/外部連携: Supabase Realtime, Google Drive API, Google Cloud Tasks
+- テスト: Vitest, Playwright
+- デプロイ: Google Cloud Run（Web / Worker 分離）
 
-## システム構成（実運用）
+## セットアップ
 
-- `web` サービス
-  - Next.js UI/API
-  - Drive Webhook受信
-  - Cloud Tasks へのジョブ発行
-  - `/ws` で Gemini Live 音声中継
-- `worker` サービス
-  - `/api/queue/grading`, `/api/queue/drive-check` を処理
-  - 重い採点処理を分離
-  - Cloud Run IAM で保護された private service
+### 前提
 
-## クイックスタート
+- Node.js 20 以上
+- npm
+- PostgreSQL
+- Supabase プロジェクト
+- Gemini API キー
+- Python 3
+  - QR のローカル解析を使う場合は OpenCV (`cv2`) が必要
 
-詳細は [環境構築.md](./環境構築.md) を参照してください。
+### 1. 依存関係をインストール
 
 ```bash
 npm install
-npx prisma generate
+```
+
+`postinstall` で Prisma Client は自動生成されます。スキーマ変更後に明示的に再生成したい場合は `npx prisma generate` を実行してください。
+
+### 2. 環境変数を用意
+
+ローカル開発は `.env.local` を使います。デプロイスクリプトでは `.env.DEV` / `.env.PRODUCTION` を参照します。
+
+最小構成:
+
+```env
+DATABASE_URL="postgresql://..."
+DIRECT_URL="postgresql://..."
+
+NEXT_PUBLIC_SUPABASE_URL="https://...supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="..."
+SUPABASE_SERVICE_ROLE_KEY="..."
+
+GEMINI_API_KEY="..."
+GEMINI_MODEL="gemini-3.1-pro-preview"
+GEMINI_CHAT_MODEL="gemini-3.1-pro-preview"
+GEMINI_CHAT_FALLBACK_MODEL="gemini-3.1-pro-preview"
+```
+
+プリント採点フローまで使う場合:
+
+```env
+APP_URL="http://localhost:3000"
+GRADING_WORKER_URL="http://localhost:8080"
+INTERNAL_API_SECRET="..."
+
+DRIVE_FOLDER_ID="..."
+DRIVE_WEBHOOK_TOKEN="..."
+DRIVE_WEBHOOK_CHANNEL_ID="..." # 任意
+DRIVE_WEBHOOK_CHANNEL_ID_FIXED="false" # 任意
+DRIVE_WATCH_STATE_KEY="sullivan:drive:watch:state"
+DRIVE_WATCH_RENEW_THRESHOLD_HOURS="18"
+
+GOOGLE_CLOUD_PROJECT_ID="..."
+CLOUD_TASKS_LOCATION="asia-northeast1"
+GRADING_TASK_QUEUE="sullivan-grading"
+DRIVE_CHECK_TASK_QUEUE="sullivan-drive-check"
+CLOUD_TASKS_CALLER_SERVICE_ACCOUNT="..."
+GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account.json" # ローカルで必要な場合のみ
+```
+
+Gemini Live 音声チューターを使う場合:
+
+```env
+GEMINI_LIVE_SESSION_SECRET="..."
+GEMINI_LIVE_MODEL="..."
+GEMINI_LIVE_API_VERSION="..."
+GEMINI_LIVE_VOICE="..."
+NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS="..."
+NEXT_PUBLIC_GEMINI_MAX_TURN_MS="..."
+```
+
+補足:
+
+- `DIRECT_URL` は Prisma マイグレーション用です。未設定なら `DATABASE_URL` が使われます
+- `PUPPETEER_EXECUTABLE_PATH` は PDF 出力用ブラウザの自動検出が失敗した場合のみ使います
+- `PORT` と `BIND_HOST` で Web / Worker の待受先を変更できます
+
+### 3. DB をセットアップ
+
+```bash
 npx prisma migrate dev
+npx prisma db seed
+```
+
+### 4. 開発サーバーを起動
+
+Web:
+
+```bash
 npm run dev
 ```
 
-Worker もローカルで検証する場合:
+Worker:
 
 ```bash
 npm run dev:worker
 ```
+
+デフォルトの待受先:
+
+- Web: `http://localhost:3000`
+- Worker: `http://localhost:8080`
+
+ヘルスチェック:
+
+- Web: `GET /healthz`
+- Worker: `GET /healthz`
 
 ## 主要コマンド
 
 ```bash
 npm run dev             # Web 開発サーバー
 npm run dev:worker      # Worker 開発サーバー
-npm run build           # 本番ビルド
+npm run build           # Web 本番ビルド
 npm run start           # Web 本番起動
 npm run start:worker    # Worker 本番起動
 npm run lint            # ESLint
 npm run type-check      # TypeScript 型チェック
 npm run test            # Vitest
+npm run test:watch      # Vitest watch
+npm run test:coverage   # カバレッジ付き Vitest
 npm run test:e2e        # Playwright
+npm run test:e2e:ui     # Playwright UI
 ```
 
-## 主要な環境変数
+## 代表的な API / エンドポイント
 
-### 基本（必須）
+- `GET /api/print/pdf`: PDF 生成
+- `POST /api/grading/webhook`: Drive Webhook 受信
+- `POST /api/queue/grading`: 採点ジョブ処理
+- `POST /api/queue/drive-check`: Drive 再確認ジョブ処理
+- `GET /api/grading/check`: 手動 Drive チェック
+- `POST /api/drive/watch/setup`: Drive Watch 開始
+- `POST /api/drive/watch/renew`: Drive Watch 更新
+- `POST /api/tutor-chat`: AI チャット家庭教師
+- `POST /api/gemini-live/token`: Gemini Live 接続トークン発行
+- `GET /api/rankings`: ランキング取得
 
-- `DATABASE_URL`, `DIRECT_URL`
-- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `GEMINI_API_KEY`
-- `GEMINI_MODEL`, `GEMINI_CHAT_MODEL`
+## ディレクトリ構成
 
-### 採点/キュー/Drive（運用時）
+```text
+src/
+├── app/                  # App Router ページ / Route Handlers / Server Actions
+├── actions/              # 共有 Server Action
+├── components/           # UI コンポーネント
+├── hooks/                # クライアントフック
+├── lib/                  # ドメインロジック、外部 API 連携、認可、採点処理
+├── prompts/              # AI 用プロンプト
+└── types/                # 型定義
 
-- `DRIVE_FOLDER_ID`
-- `GRADING_WORKER_URL`
-- `GOOGLE_CLOUD_PROJECT_ID`, `CLOUD_TASKS_LOCATION`
-- `GRADING_TASK_QUEUE`, `DRIVE_CHECK_TASK_QUEUE`
-- `CLOUD_TASKS_CALLER_SERVICE_ACCOUNT`
-- `APP_URL`, `INTERNAL_API_SECRET`, `DRIVE_WEBHOOK_TOKEN`
-- `DRIVE_WATCH_STATE_KEY`, `DRIVE_WATCH_RENEW_THRESHOLD_HOURS`
+prisma/
+├── schema.prisma         # データベーススキーマ
+└── migrations/           # Prisma マイグレーション
 
-### AI音声チューター（任意）
+worker/
+└── server.ts             # Worker サービス起動
 
-- `GEMINI_LIVE_SESSION_SECRET`
-- `GEMINI_CHAT_FALLBACK_MODEL`
-- `GEMINI_LIVE_MODEL`, `GEMINI_LIVE_API_VERSION`, `GEMINI_LIVE_VOICE`
-- `NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS`, `NEXT_PUBLIC_GEMINI_MAX_TURN_MS`
+scripts/                  # 補助スクリプト
+docs/                     # 運用・設計ドキュメント
+server.ts                 # Web サービス起動
+```
 
-## ドキュメント
+## デプロイ
 
-- [機能一覧.md](./機能一覧.md)
+Cloud Run に Web / Worker を分離してデプロイします。
+
+- DEV: `./deploy-web-DEV.sh`, `./deploy-grading-worker-DEV.sh`
+- PRODUCTION: `./deploy-web-PRODUCTION.sh`, `./deploy-grading-worker-PRODUCTION.sh`
+
+運用時は以下も前提になります。
+
+- Cloud Tasks キュー作成
+- Secret Manager による内部シークレット管理
+- Drive Watch の登録と定期更新
+- Supabase Realtime publication 設定
+
+詳細は `docs/deploy_runbook.md` を参照してください。
+
+## 関連ドキュメント
+
 - [Architecture.md](./Architecture.md)
+- [機能一覧.md](./機能一覧.md)
 - [環境構築.md](./環境構築.md)
-- [デプロイ手順](./docs/deploy_runbook.md)
-- [問題出力ロジック](./docs/problem-output-logic.md)
+- [docs/deploy_runbook.md](./docs/deploy_runbook.md)
+- [docs/problem-output-logic.md](./docs/problem-output-logic.md)
+- [docs/gcloud初期設定.md](./docs/gcloud初期設定.md)
