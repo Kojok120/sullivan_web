@@ -70,7 +70,7 @@ describe("useYouTubePlaybackGuard", () => {
 
     it("10秒戻し時に進捗表示も更新する", () => {
         const { result } = renderHook(() => useYouTubePlaybackGuard());
-        const { player, state } = createMockPlayer({ currentTime: 50, duration: 120 });
+        const { player } = createMockPlayer({ currentTime: 50, duration: 120 });
 
         act(() => {
             result.current.registerPlayer(player, { captureDuration: true });
