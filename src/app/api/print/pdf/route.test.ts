@@ -97,53 +97,7 @@ describe('print pdf route', () => {
         expectNoStoreHeaders(response);
         expect(response.headers.get('ETag')).toBeNull();
         expect(response.headers.get('Content-Type')).toBe('application/pdf');
-        expect(getPrintGateMock).toHaveBeenCalledWith('student-1', 'subject-1');
         expect(getOrCreatePrintPdfMock).toHaveBeenCalledTimes(1);
-    });
-
-    it('groupId 付きでは印刷ゲートをスキップし、getPrintData に groupId を渡す', async () => {
-        getPrintDataMock.mockResolvedValue({
-            studentName: '生徒',
-            studentLoginId: 'S0007',
-            subjectName: '英語',
-            problems: [{ id: 'problem-1', customId: 'E-1', question: '問題1', order: 1 }],
-            problemSets: [[{ id: 'problem-1', customId: 'E-1', question: '問題1', order: 1 }]],
-            unitToken: undefined,
-        });
-
-        const response = await GET(createRequest('subjectId=subject-1&groupId=group-1&sets=1&cb=initial'));
-
-        expect(response.status).toBe(200);
-        expect(getPrintGateMock).not.toHaveBeenCalled();
-        expect(getPrintDataMock).toHaveBeenCalledWith('student-1', 'subject-1', undefined, 1, 'group-1');
-    });
-
-    it('groupId 付きでは problemSets.length をキャッシュキーの sets に使う', async () => {
-        getPrintDataMock.mockResolvedValue({
-            studentName: '生徒',
-            studentLoginId: 'S0007',
-            subjectName: '英語',
-            problems: [
-                { id: 'problem-1', customId: 'E-1', question: '問題1', order: 1 },
-                { id: 'problem-2', customId: 'E-2', question: '問題2', order: 2 },
-            ],
-            problemSets: [
-                [{ id: 'problem-1', customId: 'E-1', question: '問題1', order: 1 }],
-                [{ id: 'problem-2', customId: 'E-2', question: '問題2', order: 2 }],
-            ],
-            unitToken: undefined,
-        });
-
-        const response = await GET(createRequest('subjectId=subject-1&groupId=group-1&sets=1&cb=initial'));
-
-        expect(response.status).toBe(200);
-        expect(buildPrintPdfCacheKeyMock).toHaveBeenCalledWith({
-            targetUserId: 'student-1',
-            subjectId: 'subject-1',
-            coreProblemId: undefined,
-            sets: 2,
-            problemIdsHash: 'problem-hash',
-        });
     });
 
     it('401 応答でも no-store ヘッダーを返す', async () => {

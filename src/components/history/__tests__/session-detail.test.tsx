@@ -6,7 +6,7 @@ import * as surveyActions from '@/actions/survey'
 import * as auth from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import fs from 'fs'
-import { cloneElement, isValidElement, type MouseEventHandler, type ReactNode } from 'react'
+import type { MouseEventHandler, ReactNode } from 'react'
 
 type LinkProps = {
     children?: ReactNode
@@ -26,7 +26,6 @@ type BadgeProps = {
 type ButtonProps = {
     children?: ReactNode
     onClick?: MouseEventHandler<HTMLButtonElement>
-    asChild?: boolean
 }
 
 type VideoPlayerDialogProps = {
@@ -59,7 +58,6 @@ type SessionDetailMock = {
     answeredAt: Date
     isVideoWatched: boolean
     problem: {
-        subjectId: string
         question: string
         answer: string | null
         customId: string | null
@@ -120,12 +118,7 @@ vi.mock('@/components/ui/badge', () => ({
 }))
 
 vi.mock('@/components/ui/button', () => ({
-    Button: ({ children, onClick, asChild }: ButtonProps) => {
-        if (asChild && isValidElement(children)) {
-            return cloneElement(children)
-        }
-        return <button onClick={onClick}>{children}</button>
-    },
+    Button: ({ children, onClick }: ButtonProps) => <button onClick={onClick}>{children}</button>,
 }))
 
 vi.mock('@/components/video-player-dialog', () => ({
@@ -194,7 +187,6 @@ describe('SessionDetail', () => {
         answeredAt: new Date('2024-01-15T10:00:00Z'),
         isVideoWatched: false,
         problem: {
-            subjectId: 'subject-1',
             question: '問題文',
             answer: '正答',
             customId: 'E-1',
@@ -546,55 +538,6 @@ describe('SessionDetail', () => {
 
             const link = container.querySelector('a[href="/custom-back"]')
             expect(link).toBeTruthy()
-        })
-    })
-
-    describe('復習再印刷', () => {
-        it('生徒ビューでは学習履歴から再印刷リンクを表示する', async () => {
-            const mockDetails = [createMockSessionDetail()]
-            mockSessionDetails(mockDetails)
-            vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
-
-            render(await SessionDetail({ groupId: 'group1', userId: 'user1', isTeacherView: false }))
-
-            const reviewLink = screen.getByRole('link', { name: '復習する' }) as HTMLAnchorElement
-            const reviewUrl = new URL(reviewLink.href, 'http://localhost')
-
-            expect(reviewUrl.pathname).toBe('/dashboard/print')
-            expect(reviewUrl.searchParams.get('subjectId')).toBe('subject-1')
-            expect(reviewUrl.searchParams.get('groupId')).toBe('group1')
-            expect(reviewUrl.searchParams.get('sets')).toBe('1')
-            expect(reviewUrl.searchParams.get('cb')).toBeTruthy()
-            expect(reviewLink.target).toBe('_blank')
-        })
-
-        it('教師ビューでは対象生徒の再印刷リンクを表示する', async () => {
-            const mockDetails = [
-                createMockSessionDetail({ id: 'h1' }),
-                createMockSessionDetail({ id: 'h2' }),
-                createMockSessionDetail({ id: 'h3' }),
-                createMockSessionDetail({ id: 'h4' }),
-                createMockSessionDetail({ id: 'h5' }),
-                createMockSessionDetail({ id: 'h6' }),
-                createMockSessionDetail({ id: 'h7' }),
-                createMockSessionDetail({ id: 'h8' }),
-                createMockSessionDetail({ id: 'h9' }),
-                createMockSessionDetail({ id: 'h10' }),
-                createMockSessionDetail({ id: 'h11' }),
-            ]
-            mockSessionDetails(mockDetails)
-
-            render(await SessionDetail({ groupId: 'group1', userId: 'student-42', isTeacherView: true }))
-
-            const reviewLink = screen.getByRole('link', { name: '復習する' }) as HTMLAnchorElement
-            const reviewUrl = new URL(reviewLink.href, 'http://localhost')
-
-            expect(reviewUrl.pathname).toBe('/teacher/students/student-42/print')
-            expect(reviewUrl.searchParams.get('subjectId')).toBe('subject-1')
-            expect(reviewUrl.searchParams.get('groupId')).toBe('group1')
-            expect(reviewUrl.searchParams.get('sets')).toBe('2')
-            expect(reviewUrl.searchParams.get('cb')).toBeTruthy()
-            expect(reviewLink.target).toBe('_blank')
         })
     })
 

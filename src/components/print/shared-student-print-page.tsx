@@ -6,7 +6,6 @@ import { PdfPreviewClient } from '@/components/print/pdf-preview-client';
 type PrintSearchParams = {
     subjectId?: string;
     coreProblemId?: string;
-    groupId?: string;
     sets?: string;
 };
 
@@ -33,10 +32,6 @@ export async function SharedStudentPrintPage({
 
     if (searchParams.coreProblemId) {
         query.set('coreProblemId', searchParams.coreProblemId);
-    }
-
-    if (searchParams.groupId) {
-        query.set('groupId', searchParams.groupId);
     }
 
     if (targetUserIdForApi) {

@@ -6,14 +6,14 @@ import { getPrintGate } from '@/lib/print-gate-service';
 export default async function StudentPrintPage({
     searchParams,
 }: {
-    searchParams: Promise<{ subjectId?: string; coreProblemId?: string; groupId?: string; sets?: string; autoprint?: string; gateChecked?: string }>;
+    searchParams: Promise<{ subjectId?: string; coreProblemId?: string; sets?: string; autoprint?: string; gateChecked?: string }>;
 }) {
     const session = await getSession();
     if (!session) redirect('/login');
     if (session.role !== 'STUDENT') redirect('/dashboard');
 
     const params = await searchParams;
-    if (params.subjectId && !params.coreProblemId && !params.groupId && params.gateChecked !== '1') {
+    if (params.subjectId && !params.coreProblemId && params.gateChecked !== '1') {
         const gate = await getPrintGate(session.userId, params.subjectId);
         if (gate.blocked) {
             const safeSets = Math.min(Math.max(Number.parseInt(params.sets ?? '1', 10) || 1, 1), 10);

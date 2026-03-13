@@ -2,7 +2,7 @@ import { getSessionDetails } from "@/lib/analytics";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Link from 'next/link';
-import { ArrowLeft, CheckCircle, Printer } from "lucide-react";
+import { ArrowLeft, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VideoPlayerDialog } from "@/components/video-player-dialog";
 import { LectureVideoButton } from "@/components/lecture-video-button";
@@ -17,7 +17,6 @@ import { prisma } from "@/lib/prisma";
 import { canUseAiTutor } from "@/lib/plan-entitlements";
 import { SessionReviewTracker } from "@/components/history/session-review-tracker";
 import { getSession } from "@/lib/auth";
-import { appendCacheBust } from "@/components/print/cache-bust";
 
 type SessionDetailProps = {
     groupId: string;
@@ -65,13 +64,6 @@ export async function SessionDetail({
 
     const firstItem = details[0];
     const subjectName = firstItem.problem.coreProblems[0]?.subject.name || '教科不明';
-    const reviewBasePath = isTeacherView ? `/teacher/students/${userId}/print` : '/dashboard/print';
-    const reviewQuery = new URLSearchParams({
-        subjectId: firstItem.problem.subjectId,
-        groupId,
-        sets: String(Math.max(1, Math.ceil(details.length / 10))),
-    });
-    const reviewUrl = appendCacheBust(`${reviewBasePath}?${reviewQuery.toString()}`);
 
     const requiredVideos = details
         .filter(d => (d.evaluation === 'C' || d.evaluation === 'D') && d.problem.videoUrl)
@@ -86,24 +78,16 @@ export async function SessionDetail({
         <div className="container mx-auto max-w-4xl px-4 py-6 sm:py-8">
             {shouldTrackReview && <SessionReviewTracker groupId={groupId} />}
             {showSurvey && <SurveyModal userId={userId} />}
-            <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-start gap-3 sm:items-center sm:space-x-4">
-                    <Link href={backUrl}>
-                        <Button variant="ghost" size="icon">
-                            <ArrowLeft className="h-4 w-4" />
-                        </Button>
-                    </Link>
-                    <div>
-                        <h1 className="text-2xl font-bold">{subjectName} 採点結果</h1>
-                        <p className="text-muted-foreground text-sm"><DateDisplay date={firstItem.answeredAt} showTime /></p>
-                    </div>
+            <div className="mb-6 flex items-start gap-3 sm:items-center sm:space-x-4">
+                <Link href={backUrl}>
+                    <Button variant="ghost" size="icon">
+                        <ArrowLeft className="h-4 w-4" />
+                    </Button>
+                </Link>
+                <div>
+                    <h1 className="text-2xl font-bold">{subjectName} 採点結果</h1>
+                    <p className="text-muted-foreground text-sm"><DateDisplay date={firstItem.answeredAt} showTime /></p>
                 </div>
-                <Button variant="outline" asChild>
-                    <a href={reviewUrl} target="_blank" rel="noopener noreferrer">
-                        <Printer className="h-4 w-4" />
-                        復習する
-                    </a>
-                </Button>
             </div>
 
             <div className="space-y-6">
