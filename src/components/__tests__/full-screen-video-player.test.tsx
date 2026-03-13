@@ -100,6 +100,7 @@ describe("FullScreenVideoPlayer", () => {
         expect(screen.getByRole("button", { name: "10秒戻す" })).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "1x" })).toHaveAttribute("aria-pressed", "true");
         expect(screen.getByTestId("playback-rate-container")).toHaveClass("bottom-24");
+        expect(screen.getByTestId("player-right-guard")).toHaveClass("w-[35%]");
     });
 
     it("YouTube動画では ready と end から再生時間を通知する", () => {
