@@ -32,6 +32,7 @@ function compareLoginId(a: string, b: string) {
     return loginIdCollator.compare(a, b);
 }
 
+// 最終学習日が未設定の生徒は、並び順に関係なく常に末尾へ寄せる。
 function compareNullableDate(a: Date | null, b: Date | null, sortOrder: StudentSortOrder) {
     if (!a && !b) return 0;
     if (!a) return 1;
@@ -48,13 +49,23 @@ export function sortStudents<T extends SortableStudent>(
     sortOrder: StudentSortOrder,
 ) {
     return [...students].sort((a, b) => {
-        const result = sortBy === 'loginId'
-            ? compareLoginId(a.loginId, b.loginId) * (sortOrder === 'asc' ? 1 : -1)
-            : sortBy === 'totalProblemsSolved'
-                ? (a.stats.totalProblemsSolved - b.stats.totalProblemsSolved) * (sortOrder === 'asc' ? 1 : -1)
-                : sortBy === 'currentStreak'
-                    ? (a.stats.currentStreak - b.stats.currentStreak) * (sortOrder === 'asc' ? 1 : -1)
-                    : compareNullableDate(a.stats.lastActivity, b.stats.lastActivity, sortOrder);
+        const direction = sortOrder === 'asc' ? 1 : -1;
+        let result: number;
+
+        switch (sortBy) {
+            case 'loginId':
+                result = compareLoginId(a.loginId, b.loginId) * direction;
+                break;
+            case 'totalProblemsSolved':
+                result = (a.stats.totalProblemsSolved - b.stats.totalProblemsSolved) * direction;
+                break;
+            case 'currentStreak':
+                result = (a.stats.currentStreak - b.stats.currentStreak) * direction;
+                break;
+            case 'lastActivity':
+                result = compareNullableDate(a.stats.lastActivity, b.stats.lastActivity, sortOrder);
+                break;
+        }
 
         if (result !== 0) return result;
 

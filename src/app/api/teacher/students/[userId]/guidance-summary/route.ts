@@ -42,6 +42,17 @@ function formatDateTimeForPrompt(date: Date, timeZone: string | undefined): stri
     }
 }
 
+function parseStringArray(value: unknown): string[] {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    return value
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => item.trim())
+        .filter(Boolean);
+}
+
 function parseSummaryResponse(rawText: string): GuidanceSummary {
     const normalized = rawText
         .trim()
@@ -60,24 +71,12 @@ function parseSummaryResponse(rawText: string): GuidanceSummary {
     };
 
     const summary = typeof parsed.summary === 'string' ? parsed.summary.trim() : '';
-    const topics = Array.isArray(parsed.topics)
-        ? parsed.topics.filter((item): item is string => typeof item === 'string').map((item) => item.trim()).filter(Boolean)
-        : [];
-    const currentStatus = Array.isArray(parsed.currentStatus)
-        ? parsed.currentStatus.filter((item): item is string => typeof item === 'string').map((item) => item.trim()).filter(Boolean)
-        : [];
-    const concerns = Array.isArray(parsed.concerns)
-        ? parsed.concerns.filter((item): item is string => typeof item === 'string').map((item) => item.trim()).filter(Boolean)
-        : [];
-    const agreements = Array.isArray(parsed.agreements)
-        ? parsed.agreements.filter((item): item is string => typeof item === 'string').map((item) => item.trim()).filter(Boolean)
-        : [];
-    const nextActions = Array.isArray(parsed.nextActions)
-        ? parsed.nextActions.filter((item): item is string => typeof item === 'string').map((item) => item.trim()).filter(Boolean)
-        : [];
-    const followUpPoints = Array.isArray(parsed.followUpPoints)
-        ? parsed.followUpPoints.filter((item): item is string => typeof item === 'string').map((item) => item.trim()).filter(Boolean)
-        : [];
+    const topics = parseStringArray(parsed.topics);
+    const currentStatus = parseStringArray(parsed.currentStatus);
+    const concerns = parseStringArray(parsed.concerns);
+    const agreements = parseStringArray(parsed.agreements);
+    const nextActions = parseStringArray(parsed.nextActions);
+    const followUpPoints = parseStringArray(parsed.followUpPoints);
 
     if (!summary) {
         throw new Error('summary is empty');

@@ -36,6 +36,7 @@ export default async function TeacherDashboardPage({
         : sortBy
             ? DEFAULT_STUDENT_SORT_ORDER[sortBy]
             : 'asc';
+    const take = sortBy ? undefined : 50;
 
     const actor = await prisma.user.findUnique({
         where: { id: session.userId },
@@ -49,9 +50,9 @@ export default async function TeacherDashboardPage({
         },
     });
     const studentStats = session.role === 'ADMIN'
-        ? await getStudentsWithStats(query, 0, 50)
+        ? await getStudentsWithStats(query, 0, take)
         : actor?.classroomId
-            ? await getStudentsWithStats(query, 0, 50, actor.classroomId)
+            ? await getStudentsWithStats(query, 0, take, actor.classroomId)
             : [];
     const sortedStudentStats = sortBy
         ? sortStudents(studentStats, sortBy, sortOrder)

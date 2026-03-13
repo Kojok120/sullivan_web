@@ -430,20 +430,21 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                                             : gateVideoSupportMessage ?? 'この講義動画は再生できません。'}
                                     </p>
                                 </div>
-                                <button
+                                <Button
                                     type="button"
+                                    variant="ghost"
                                     aria-label={`${gateModal?.coreProblemName ?? '講義動画'} の講義動画プレビューを再生`}
                                     onClick={handleOpenGateVideo}
                                     disabled={!canOpenGateVideo}
                                     className={cn(
-                                        'absolute inset-0 z-10 rounded-xl border-0 bg-transparent p-0 appearance-none ring-offset-background transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 disabled:cursor-default',
+                                        'absolute inset-0 z-10 h-full w-full rounded-xl border-0 bg-transparent p-0 appearance-none ring-offset-background transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 disabled:cursor-default',
                                         canOpenGateVideo ? 'cursor-pointer hover:ring-2 hover:ring-primary/70' : 'cursor-default'
                                     )}
                                 >
                                     <span className="sr-only">
                                         {canOpenGateVideo ? 'プレビューを押して全画面で再生する' : '講義動画を再生できない'}
                                     </span>
-                                </button>
+                                </Button>
                             </div>
                             <p className="text-xs text-muted-foreground">
                                 視聴が終わるとトップ画面に戻ります。講義動画を見終わった後、同じトップ画面から再度「印刷する」を押してください。
