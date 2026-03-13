@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
 
         const sets = sanitizeSets(request.nextUrl.searchParams.get('sets'));
         const coreProblemId = toOptionalString(request.nextUrl.searchParams.get('coreProblemId'));
+        const groupId = toOptionalString(request.nextUrl.searchParams.get('groupId'));
         const targetUserIdParam = toOptionalString(request.nextUrl.searchParams.get('targetUserId'));
         // クライアントの挙動用フラグ。API側では入力互換のため受け付けるだけにする。
         void request.nextUrl.searchParams.get('autoprint');
@@ -65,7 +66,7 @@ export async function GET(request: NextRequest) {
             return jsonWithNoStore({ error: targetUserId.errorMessage }, { status: targetUserId.statusCode });
         }
 
-        if (session.role === 'STUDENT' && !coreProblemId) {
+        if (session.role === 'STUDENT' && !coreProblemId && !groupId) {
             const gateStartedAt = Date.now();
             const gate = await getPrintGate(session.userId, subjectId);
             timings.gateMs = Date.now() - gateStartedAt;
@@ -84,7 +85,7 @@ export async function GET(request: NextRequest) {
 
         const dataStartedAt = Date.now();
         const data = await withDeadline(
-            getPrintData(targetUserId.userId, subjectId, coreProblemId, sets),
+            getPrintData(targetUserId.userId, subjectId, coreProblemId, sets, groupId),
             deadlineAt,
             'print data load timeout',
         );
@@ -95,11 +96,12 @@ export async function GET(request: NextRequest) {
         }
 
         const problemIdsHash = buildProblemIdsHash(data.problemSets);
+        const cacheSets = groupId ? data.problemSets.length : sets;
         const cacheKey = buildPrintPdfCacheKey({
             targetUserId: targetUserId.userId,
             subjectId,
             coreProblemId: coreProblemId ?? undefined,
-            sets,
+            sets: cacheSets,
             problemIdsHash,
         });
 
@@ -131,7 +133,8 @@ export async function GET(request: NextRequest) {
             actorRole: session.role,
             subjectId,
             coreProblemId,
-            sets,
+            groupId,
+            sets: cacheSets,
             cacheStatus: pdf.cacheStatus,
             pageCount: pdf.pageCount,
             pdfSizeBytes: pdf.buffer.length,
