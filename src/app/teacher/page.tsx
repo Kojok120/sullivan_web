@@ -10,11 +10,10 @@ import { StudentList } from './components/student-list';
 import {
     DEFAULT_STUDENT_SORT_ORDER,
     STUDENT_SORT_OPTIONS,
-    type StudentSortKey,
-    type StudentSortOrder,
 } from './components/student-list-sort';
 import { prisma } from '@/lib/prisma';
 import { CreateUserDialog } from './components/create-user-dialog';
+import type { StudentSortKey, StudentSortOrder } from '@/lib/student-sort';
 
 const DEFAULT_STUDENT_LIST_TAKE = 50;
 const MAX_SORT_FETCH = 500;

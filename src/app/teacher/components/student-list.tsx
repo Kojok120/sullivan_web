@@ -11,10 +11,9 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { KeyboardEvent } from 'react';
 import type { StudentStats } from '@/lib/analytics';
 import type { User } from '@prisma/client';
+import type { StudentSortKey, StudentSortOrder } from '@/lib/student-sort';
 import {
     DEFAULT_STUDENT_SORT_ORDER,
-    type StudentSortKey,
-    type StudentSortOrder,
     STUDENT_SORT_OPTIONS,
 } from './student-list-sort';
 

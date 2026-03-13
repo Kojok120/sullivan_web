@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
+import type { StudentSortKey, StudentSortOrder } from '@/lib/student-sort';
 
 export type StudentStats = {
     totalProblemsSolved: number;
@@ -23,9 +24,6 @@ export type DailyActivity = {
     date: string;
     count: number;
 };
-
-type StudentSortKey = 'loginId' | 'totalProblemsSolved' | 'currentStreak' | 'lastActivity';
-type StudentSortOrder = 'asc' | 'desc';
 
 function compareStudentLoginId(a: string, b: string) {
     return new Intl.Collator('ja', {
@@ -204,9 +202,11 @@ export async function getStudentsWithStats(
         stats: statsMap.get(student.id)!,
     }));
 
-    return sortBy
-        ? sortStudentsWithStats(studentsWithStats, sortBy, sortOrder)
-        : studentsWithStats;
+    if (!sortBy || sortBy === 'loginId' || sortBy === 'currentStreak') {
+        return studentsWithStats;
+    }
+
+    return sortStudentsWithStats(studentsWithStats, sortBy, sortOrder);
 }
 
 export async function getSubjectProgress(userId: string): Promise<SubjectProgress[]> {

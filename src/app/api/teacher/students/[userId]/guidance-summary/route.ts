@@ -320,6 +320,13 @@ export async function POST(
         });
 
         if (record.error || !record.recordId || !record.content) {
+            console.error('[guidance-summary] saveGeneratedGuidanceRecord failed:', {
+                studentId: userId,
+                teacherId: session.userId,
+                error: record.error,
+                hasRecordId: Boolean(record.recordId),
+                hasContent: Boolean(record.content),
+            });
             throw new Error(record.error ?? 'failed to save guidance record');
         }
 

@@ -1,7 +1,5 @@
 import type { StudentStats } from '@/lib/analytics';
-
-export type StudentSortKey = 'loginId' | 'totalProblemsSolved' | 'currentStreak' | 'lastActivity';
-export type StudentSortOrder = 'asc' | 'desc';
+import type { StudentSortKey, StudentSortOrder } from '@/lib/student-sort';
 
 export type SortableStudent = {
     id: string;
