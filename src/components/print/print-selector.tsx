@@ -437,7 +437,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                                     onClick={handleOpenGateVideo}
                                     disabled={!canOpenGateVideo}
                                     className={cn(
-                                        'absolute inset-0 z-10 rounded-xl ring-offset-background transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 disabled:cursor-default',
+                                        'absolute inset-0 z-10 h-full w-full rounded-xl border-0 bg-transparent p-0 appearance-none ring-offset-background transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 disabled:cursor-default',
                                         canOpenGateVideo ? 'cursor-pointer hover:ring-2 hover:ring-primary/70' : 'cursor-default'
                                     )}
                                 >

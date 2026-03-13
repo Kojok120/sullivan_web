@@ -1,32 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { revalidatePath } from 'next/cache';
 import { GoogleGenAI, createPartFromUri } from '@google/genai';
 import { z } from 'zod';
 
+import { saveGeneratedGuidanceRecord } from '@/app/teacher/students/[userId]/actions';
 import { getSession } from '@/lib/auth';
 import { canAccessUserWithinClassroomScope, isTeacherOrAdminRole } from '@/lib/authorization';
+import {
+    GeminiGuidanceAudioMimeType,
+    prepareGuidanceAudioForGemini,
+} from '@/lib/guidance-audio-transcoder';
+import {
+    formatGuidanceSummaryAsPlainText,
+    GuidanceSummary,
+    isSupportedGuidanceAudioMimeType,
+    MAX_GUIDANCE_AUDIO_SIZE_LIMIT_BYTES,
+    MAX_GUIDANCE_AUDIO_SIZE_LIMIT_LABEL,
+    normalizeGuidanceAudioMimeType,
+} from '@/lib/guidance-recording';
 import { loadInstructionPrompt } from '@/lib/instruction-prompt';
 import { prisma } from '@/lib/prisma';
 
-const ACCEPTED_AUDIO_MIME = 'audio/ogg';
-const INLINE_AUDIO_SIZE_LIMIT_BYTES = 20 * 1024 * 1024;
-const MAX_AUDIO_SIZE_LIMIT_BYTES = 100 * 1024 * 1024;
+// Base64 展開でペイロードが膨らむため、インライン送信は小さめの閾値に分ける。
+const INLINE_AUDIO_SIZE_LIMIT_BYTES = 8 * 1024 * 1024;
 
 const payloadSchema = z.object({
     startedAtIso: z.string().datetime().optional(),
     endedAtIso: z.string().datetime().optional(),
     timeZone: z.string().optional(),
 });
-
-type InterviewSummary = {
-    summary: string;
-    decisions: string[];
-    nextActions: string[];
-};
-
-function normalizeMimeType(value: string | null | undefined): string {
-    return value?.split(';')[0]?.trim().toLowerCase() ?? '';
-}
 
 function formatDateTimeForPrompt(date: Date, timeZone: string | undefined): string {
     try {
@@ -43,7 +44,18 @@ function formatDateTimeForPrompt(date: Date, timeZone: string | undefined): stri
     }
 }
 
-function parseSummaryResponse(rawText: string): InterviewSummary {
+function parseStringArray(value: unknown): string[] {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    return value
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => item.trim())
+        .filter(Boolean);
+}
+
+function parseSummaryResponse(rawText: string): GuidanceSummary {
     const normalized = rawText
         .trim()
         .replace(/^```(?:json)?\s*/i, '')
@@ -52,17 +64,21 @@ function parseSummaryResponse(rawText: string): InterviewSummary {
 
     const parsed = JSON.parse(normalized) as {
         summary?: unknown;
-        decisions?: unknown;
+        topics?: unknown;
+        currentStatus?: unknown;
+        concerns?: unknown;
+        agreements?: unknown;
         nextActions?: unknown;
+        followUpPoints?: unknown;
     };
 
     const summary = typeof parsed.summary === 'string' ? parsed.summary.trim() : '';
-    const decisions = Array.isArray(parsed.decisions)
-        ? parsed.decisions.filter((item): item is string => typeof item === 'string').map((item) => item.trim()).filter(Boolean)
-        : [];
-    const nextActions = Array.isArray(parsed.nextActions)
-        ? parsed.nextActions.filter((item): item is string => typeof item === 'string').map((item) => item.trim()).filter(Boolean)
-        : [];
+    const topics = parseStringArray(parsed.topics);
+    const currentStatus = parseStringArray(parsed.currentStatus);
+    const concerns = parseStringArray(parsed.concerns);
+    const agreements = parseStringArray(parsed.agreements);
+    const nextActions = parseStringArray(parsed.nextActions);
+    const followUpPoints = parseStringArray(parsed.followUpPoints);
 
     if (!summary) {
         throw new Error('summary is empty');
@@ -70,35 +86,20 @@ function parseSummaryResponse(rawText: string): InterviewSummary {
 
     return {
         summary,
-        decisions,
+        topics,
+        currentStatus,
+        concerns,
+        agreements,
         nextActions,
+        followUpPoints,
     };
-}
-
-function toGuidanceContent(summary: InterviewSummary): string {
-    const decisionsText = summary.decisions.length > 0
-        ? summary.decisions.map((item) => `- ${item}`).join('\n')
-        : '- なし';
-    const nextActionsText = summary.nextActions.length > 0
-        ? summary.nextActions.map((item) => `- ${item}`).join('\n')
-        : '- なし';
-
-    return [
-        '## 要約',
-        summary.summary,
-        '',
-        '## 決定事項',
-        decisionsText,
-        '',
-        '## 次回アクション',
-        nextActionsText,
-    ].join('\n');
 }
 
 async function generateInterviewSummary(params: {
     audioFile: File;
+    audioMimeType: GeminiGuidanceAudioMimeType;
     prompt: string;
-}): Promise<InterviewSummary> {
+}): Promise<GuidanceSummary> {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
         throw new Error('GEMINI_API_KEY is not set');
@@ -111,7 +112,19 @@ async function generateInterviewSummary(params: {
         type: 'object',
         properties: {
             summary: { type: 'string' },
-            decisions: {
+            topics: {
+                type: 'array',
+                items: { type: 'string' },
+            },
+            currentStatus: {
+                type: 'array',
+                items: { type: 'string' },
+            },
+            concerns: {
+                type: 'array',
+                items: { type: 'string' },
+            },
+            agreements: {
                 type: 'array',
                 items: { type: 'string' },
             },
@@ -119,8 +132,20 @@ async function generateInterviewSummary(params: {
                 type: 'array',
                 items: { type: 'string' },
             },
+            followUpPoints: {
+                type: 'array',
+                items: { type: 'string' },
+            },
         },
-        required: ['summary', 'decisions', 'nextActions'],
+        required: [
+            'summary',
+            'topics',
+            'currentStatus',
+            'concerns',
+            'agreements',
+            'nextActions',
+            'followUpPoints',
+        ],
         additionalProperties: false,
     };
 
@@ -136,7 +161,7 @@ async function generateInterviewSummary(params: {
                 { text: params.prompt },
                 {
                     inlineData: {
-                        mimeType: ACCEPTED_AUDIO_MIME,
+                        mimeType: params.audioMimeType,
                         data: base64,
                     },
                 },
@@ -145,8 +170,8 @@ async function generateInterviewSummary(params: {
             const uploaded = await ai.files.upload({
                 file: params.audioFile,
                 config: {
-                    mimeType: ACCEPTED_AUDIO_MIME,
-                    displayName: `guidance-audio-${Date.now()}.ogg`,
+                    mimeType: params.audioMimeType,
+                    displayName: `guidance-audio-${Date.now()}`,
                 },
             });
 
@@ -157,7 +182,7 @@ async function generateInterviewSummary(params: {
             uploadedFileName = uploaded.name;
             parts = [
                 { text: params.prompt },
-                createPartFromUri(uploaded.uri, ACCEPTED_AUDIO_MIME),
+                createPartFromUri(uploaded.uri, params.audioMimeType),
             ];
         }
 
@@ -230,13 +255,13 @@ export async function POST(
         return NextResponse.json({ error: '音声ファイルが必要です' }, { status: 400 });
     }
 
-    const mimeType = normalizeMimeType(audio.type);
-    if (mimeType !== ACCEPTED_AUDIO_MIME) {
-        return NextResponse.json({ error: 'audio/ogg 形式の音声のみ対応しています' }, { status: 400 });
+    const recordedMimeType = normalizeGuidanceAudioMimeType(audio.type);
+    if (!isSupportedGuidanceAudioMimeType(recordedMimeType)) {
+        return NextResponse.json({ error: 'audio/webm, audio/ogg, audio/mp4 形式の音声のみ対応しています' }, { status: 400 });
     }
 
-    if (audio.size <= 0 || audio.size > MAX_AUDIO_SIZE_LIMIT_BYTES) {
-        return NextResponse.json({ error: '音声サイズが上限を超えています' }, { status: 400 });
+    if (audio.size <= 0 || audio.size > MAX_GUIDANCE_AUDIO_SIZE_LIMIT_BYTES) {
+        return NextResponse.json({ error: `音声サイズは${MAX_GUIDANCE_AUDIO_SIZE_LIMIT_LABEL}以下にしてください` }, { status: 400 });
     }
 
     const endedAt = parsedPayload.data.endedAtIso ? new Date(parsedPayload.data.endedAtIso) : new Date();
@@ -279,26 +304,36 @@ export async function POST(
     });
 
     try {
-        const summary = await generateInterviewSummary({
+        const geminiAudio = await prepareGuidanceAudioForGemini({
             audioFile: audio,
+            mimeType: recordedMimeType,
+        });
+
+        const summary = await generateInterviewSummary({
+            audioFile: geminiAudio.audioFile,
+            audioMimeType: geminiAudio.mimeType,
             prompt,
         });
-
-        const record = await prisma.guidanceRecord.create({
-            data: {
-                studentId: userId,
-                teacherId: session.userId,
-                date: endedAt,
-                type: 'INTERVIEW',
-                content: toGuidanceContent(summary),
-            },
+        const record = await saveGeneratedGuidanceRecord({
+            studentId: userId,
+            date: endedAt,
+            content: formatGuidanceSummaryAsPlainText(summary),
         });
 
-        revalidatePath(`/teacher/students/${userId}`);
+        if (record.error || !record.recordId || !record.content) {
+            console.error('[guidance-summary] saveGeneratedGuidanceRecord failed:', {
+                studentId: userId,
+                teacherId: session.userId,
+                error: record.error,
+                hasRecordId: Boolean(record.recordId),
+                hasContent: Boolean(record.content),
+            });
+            throw new Error(record.error ?? 'failed to save guidance record');
+        }
 
         return NextResponse.json({
             success: true,
-            recordId: record.id,
+            recordId: record.recordId,
             content: record.content,
         });
     } catch (error) {
@@ -306,6 +341,7 @@ export async function POST(
             studentId: userId,
             teacherId: session.userId,
             audioBytes: audio.size,
+            audioMimeType: recordedMimeType,
             message: error instanceof Error ? error.message : String(error),
         });
 

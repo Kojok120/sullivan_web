@@ -148,7 +148,9 @@ describe('印刷セレクター', () => {
 
         await waitFor(() => {
             expect(screen.getByText('「主語と動詞」がアンロックされました')).toBeInTheDocument();
-            expect(screen.getByRole('button', { name: '主語と動詞 の講義動画プレビューを再生' })).toBeInTheDocument();
+            const previewButton = screen.getByRole('button', { name: '主語と動詞 の講義動画プレビューを再生' });
+            expect(previewButton).toBeInTheDocument();
+            expect(previewButton).toBeEnabled();
             expect(screen.getByTitle('主語と動詞 のプレビュー')).toBeInTheDocument();
             expect(mockPopupClose).toHaveBeenCalledTimes(1);
             expect(mockRouter.push).not.toHaveBeenCalled();

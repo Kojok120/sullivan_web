@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { GuidanceRecord } from '@prisma/client';
 import {
@@ -23,14 +23,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import {
+    getGuidanceAudioFileExtension,
+    GuidanceRecordingFormat,
+    isSupportedGuidanceAudioMimeType,
+    MAX_GUIDANCE_AUDIO_AUTO_STOP_BYTES,
+    MAX_GUIDANCE_AUDIO_SIZE_LIMIT_LABEL,
+    normalizeGuidanceAudioMimeType,
+    pickGuidanceRecordingFormat,
+} from '@/lib/guidance-recording';
 
 interface GuidanceListProps {
     userId: string;
     records: (GuidanceRecord & { teacher: { name: string | null } })[];
 }
 
-const RECORDING_MIME_TYPE = 'audio/ogg;codecs=opus';
-const RECORDING_UPLOAD_MIME_TYPE = 'audio/ogg';
 const MAX_RECORDING_MS = 60 * 60 * 1000;
 
 type RecordingSessionState = {
@@ -54,19 +61,42 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
     const [isSaving, setIsSaving] = useState(false);
     const [recordingStatus, setRecordingStatus] = useState<'idle' | 'recording' | 'paused' | 'summarizing'>('idle');
     const [elapsedMs, setElapsedMs] = useState(0);
+    const [supportedRecordingFormat, setSupportedRecordingFormat] = useState<GuidanceRecordingFormat | null>(null);
+    const [hasResolvedRecordingSupport, setHasResolvedRecordingSupport] = useState(false);
 
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
     const chunksRef = useRef<Blob[]>([]);
     const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const sessionRef = useRef<RecordingSessionState | null>(null);
+    const recordingFormatRef = useRef<GuidanceRecordingFormat | null>(null);
+    const recordedBytesRef = useRef(0);
+    const isStoppingRecordingRef = useRef(false);
+    const hasReachedSizeLimitRef = useRef(false);
 
-    const canRecordInChrome = useMemo(() => {
-        if (typeof window === 'undefined') return false;
-        if (typeof MediaRecorder === 'undefined') return false;
-        if (typeof MediaRecorder.isTypeSupported !== 'function') return false;
-        return MediaRecorder.isTypeSupported(RECORDING_MIME_TYPE);
+    useEffect(() => {
+        if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+            setSupportedRecordingFormat(null);
+            setHasResolvedRecordingSupport(true);
+            return;
+        }
+        if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') {
+            setSupportedRecordingFormat(null);
+            setHasResolvedRecordingSupport(true);
+            return;
+        }
+
+        setSupportedRecordingFormat(
+            pickGuidanceRecordingFormat((mimeType) => MediaRecorder.isTypeSupported(mimeType)),
+        );
+        setHasResolvedRecordingSupport(true);
     }, []);
+
+    const recordingButtonLabel = !hasResolvedRecordingSupport
+        ? '録音機能を確認中'
+        : supportedRecordingFormat
+            ? '録音開始'
+            : '手動入力を開く';
 
     function getCurrentElapsedMs(): number {
         if (!sessionRef.current) return 0;
@@ -92,8 +122,12 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
             streamRef.current = null;
         }
         mediaRecorderRef.current = null;
+        recordingFormatRef.current = null;
         sessionRef.current = null;
         chunksRef.current = [];
+        recordedBytesRef.current = 0;
+        isStoppingRecordingRef.current = false;
+        hasReachedSizeLimitRef.current = false;
     }
 
     async function handleAdd(formData: FormData) {
@@ -123,8 +157,11 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
     }
 
     async function startRecording() {
-        if (!canRecordInChrome) {
-            toast.error('このChrome環境では audio/ogg 録音に対応していません');
+        let stream: MediaStream | null = null;
+        const preferredFormat = supportedRecordingFormat || null;
+        if (!preferredFormat) {
+            setIsAdding(true);
+            toast.error('このブラウザでは録音に対応していません。手動入力をご利用ください。');
             return;
         }
 
@@ -133,7 +170,7 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
         }
 
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({
+            stream = await navigator.mediaDevices.getUserMedia({
                 audio: {
                     channelCount: 1,
                     echoCancellation: true,
@@ -141,18 +178,40 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
                     autoGainControl: true,
                 },
             });
+            streamRef.current = stream;
 
-            const recorder = new MediaRecorder(stream, { mimeType: RECORDING_MIME_TYPE });
+            const recorder = new MediaRecorder(stream, { mimeType: preferredFormat.mediaRecorderMimeType });
+            const actualMimeType = normalizeGuidanceAudioMimeType(recorder.mimeType);
+            const uploadMimeType = isSupportedGuidanceAudioMimeType(actualMimeType)
+                ? actualMimeType
+                : preferredFormat.uploadMimeType;
+
             chunksRef.current = [];
+            recordedBytesRef.current = 0;
+            isStoppingRecordingRef.current = false;
+            hasReachedSizeLimitRef.current = false;
             recorder.ondataavailable = (event) => {
                 if (event.data.size > 0) {
                     chunksRef.current.push(event.data);
+                    recordedBytesRef.current += event.data.size;
+
+                    if (!isStoppingRecordingRef.current && !hasReachedSizeLimitRef.current && recordedBytesRef.current >= MAX_GUIDANCE_AUDIO_AUTO_STOP_BYTES) {
+                        hasReachedSizeLimitRef.current = true;
+                        clearTimer();
+                        queueMicrotask(() => {
+                            void stopAndSummarize('size');
+                        });
+                    }
                 }
             };
 
             recorder.start(1000);
             mediaRecorderRef.current = recorder;
-            streamRef.current = stream;
+            recordingFormatRef.current = {
+                mediaRecorderMimeType: recorder.mimeType || preferredFormat.mediaRecorderMimeType,
+                uploadMimeType,
+                fileExtension: getGuidanceAudioFileExtension(uploadMimeType),
+            };
             sessionRef.current = {
                 startedAtMs: Date.now(),
                 accumulatedPausedMs: 0,
@@ -164,6 +223,7 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
             console.error('[guidance-list] startRecording failed:', error);
             cleanupMediaResources();
             setRecordingStatus('idle');
+            setIsAdding(true);
             toast.error('マイクの利用に失敗しました。権限設定をご確認ください。');
         }
     }
@@ -213,7 +273,8 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
             };
 
             recorder.onstop = () => {
-                const blob = new Blob(chunksRef.current, { type: RECORDING_UPLOAD_MIME_TYPE });
+                const uploadMimeType = recordingFormatRef.current?.uploadMimeType ?? 'audio/webm';
+                const blob = new Blob(chunksRef.current, { type: uploadMimeType });
                 resolve(blob);
             };
 
@@ -221,16 +282,22 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
                 recorder.requestData();
                 recorder.stop();
             } else {
-                const blob = new Blob(chunksRef.current, { type: RECORDING_UPLOAD_MIME_TYPE });
+                const uploadMimeType = recordingFormatRef.current?.uploadMimeType ?? 'audio/webm';
+                const blob = new Blob(chunksRef.current, { type: uploadMimeType });
                 resolve(blob);
             }
         });
     }
 
-    async function stopAndSummarize(forceByLimit = false) {
+    async function stopAndSummarize(limitReason: 'time' | 'size' | null = null) {
         if (recordingStatus === 'idle' || recordingStatus === 'summarizing') {
             return;
         }
+
+        if (isStoppingRecordingRef.current) {
+            return;
+        }
+        isStoppingRecordingRef.current = true;
 
         const session = sessionRef.current;
         if (!session) {
@@ -257,7 +324,16 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
                 throw new Error('empty audio blob');
             }
 
-            const file = new File([blob], `guidance-${Date.now()}.ogg`, { type: RECORDING_UPLOAD_MIME_TYPE });
+            const recordingFormat = recordingFormatRef.current;
+            if (!recordingFormat) {
+                throw new Error('recording format not found');
+            }
+
+            const file = new File(
+                [blob],
+                `guidance-${Date.now()}.${recordingFormat.fileExtension}`,
+                { type: recordingFormat.uploadMimeType },
+            );
             const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Tokyo';
 
             const formData = new FormData();
@@ -276,7 +352,13 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
                 throw new Error(payload.error || 'AI要約に失敗しました');
             }
 
-            toast.success(forceByLimit ? '録音上限に到達したため要約を保存しました' : 'AI要約を保存しました');
+            toast.success(
+                limitReason === 'size'
+                    ? `音声サイズが${MAX_GUIDANCE_AUDIO_SIZE_LIMIT_LABEL}に近づいたため要約を保存しました`
+                    : limitReason === 'time'
+                        ? '録音時間の上限に到達したため要約を保存しました'
+                        : 'AI要約を保存しました',
+            );
             router.refresh();
             setIsAdding(false);
             setElapsedMs(0);
@@ -301,7 +383,7 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
 
                 if (nextElapsed >= MAX_RECORDING_MS) {
                     clearTimer();
-                    void stopAndSummarize(true);
+                    void stopAndSummarize('time');
                 }
             }, 500);
         }
@@ -355,10 +437,10 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
                     <Button
                         size="icon"
                         variant={recordingStatus === 'idle' ? 'outline' : 'default'}
-                        aria-label="録音開始"
-                        title="録音開始"
+                        aria-label={recordingButtonLabel}
+                        title={recordingButtonLabel}
                         onClick={() => void startRecording()}
-                        disabled={recordingStatus !== 'idle' || !canRecordInChrome}
+                        disabled={recordingStatus !== 'idle' || !hasResolvedRecordingSupport}
                     >
                         <Mic className="h-4 w-4" />
                     </Button>
@@ -366,6 +448,12 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
             </CardHeader>
 
             <CardContent className="space-y-6 pt-4">
+                {hasResolvedRecordingSupport && !supportedRecordingFormat ? (
+                    <div className="rounded-lg border border-dashed bg-muted/20 p-3 text-xs text-muted-foreground">
+                        このブラウザでは録音に対応していません。右上の新規記録から手動入力するか、録音対応ブラウザをご利用ください。
+                    </div>
+                ) : null}
+
                 {recordingStatus !== 'idle' ? (
                     <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
                         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -395,7 +483,7 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
 
                             <Button
                                 type="button"
-                                onClick={() => void stopAndSummarize(false)}
+                                onClick={() => void stopAndSummarize()}
                                 disabled={recordingStatus === 'summarizing'}
                             >
                                 {recordingStatus === 'summarizing' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
@@ -404,7 +492,8 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
                         </div>
 
                         <p className="text-xs text-muted-foreground">
-                            録音上限は60分です。上限到達時は自動で録音を終了して要約します。
+                            録音は {MAX_GUIDANCE_AUDIO_SIZE_LIMIT_LABEL} 以内で保存されます。長時間の録音は
+                            {MAX_GUIDANCE_AUDIO_SIZE_LIMIT_LABEL} 手前で自動終了し、安全のため60分でも終了します。
                         </p>
                     </div>
                 ) : null}
