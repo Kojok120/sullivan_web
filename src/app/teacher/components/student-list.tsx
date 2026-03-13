@@ -94,6 +94,7 @@ export function StudentList({
             return;
         }
 
+        // STUDENT_SORT_OPTIONS 由来の値のみを受け取るため、StudentSortKey への変換は安全。
         const nextSortBy = value as StudentSortKey;
         updateSortParams(nextSortBy, DEFAULT_STUDENT_SORT_ORDER[nextSortBy]);
     };
@@ -128,13 +129,8 @@ export function StudentList({
                     <span>{label}</span>
                     <SortIcon active={isActive} sortOrder={currentSortOrder} className="ml-1" />
                     {isActive && (
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-xs text-muted-foreground" aria-hidden="true">
                             {currentSortOrder === 'asc' ? '昇' : '降'}
-                        </span>
-                    )}
-                    {isActive && (
-                        <span className="sr-only">
-                            {currentSortOrder === 'asc' ? '昇順' : '降順'}
                         </span>
                     )}
                 </button>

@@ -27,6 +27,8 @@ import {
     getGuidanceAudioFileExtension,
     GuidanceRecordingFormat,
     isSupportedGuidanceAudioMimeType,
+    MAX_GUIDANCE_AUDIO_AUTO_STOP_BYTES,
+    MAX_GUIDANCE_AUDIO_SIZE_LIMIT_LABEL,
     normalizeGuidanceAudioMimeType,
     pickGuidanceRecordingFormat,
 } from '@/lib/guidance-recording';
@@ -68,6 +70,9 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
     const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const sessionRef = useRef<RecordingSessionState | null>(null);
     const recordingFormatRef = useRef<GuidanceRecordingFormat | null>(null);
+    const recordedBytesRef = useRef(0);
+    const isStoppingRecordingRef = useRef(false);
+    const hasReachedSizeLimitRef = useRef(false);
 
     useEffect(() => {
         if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
@@ -120,6 +125,9 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
         recordingFormatRef.current = null;
         sessionRef.current = null;
         chunksRef.current = [];
+        recordedBytesRef.current = 0;
+        isStoppingRecordingRef.current = false;
+        hasReachedSizeLimitRef.current = false;
     }
 
     async function handleAdd(formData: FormData) {
@@ -177,9 +185,21 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
                 : preferredFormat.uploadMimeType;
 
             chunksRef.current = [];
+            recordedBytesRef.current = 0;
+            isStoppingRecordingRef.current = false;
+            hasReachedSizeLimitRef.current = false;
             recorder.ondataavailable = (event) => {
                 if (event.data.size > 0) {
                     chunksRef.current.push(event.data);
+                    recordedBytesRef.current += event.data.size;
+
+                    if (!isStoppingRecordingRef.current && !hasReachedSizeLimitRef.current && recordedBytesRef.current >= MAX_GUIDANCE_AUDIO_AUTO_STOP_BYTES) {
+                        hasReachedSizeLimitRef.current = true;
+                        clearTimer();
+                        queueMicrotask(() => {
+                            void stopAndSummarize('size');
+                        });
+                    }
                 }
             };
 
@@ -268,10 +288,15 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
         });
     }
 
-    async function stopAndSummarize(forceByLimit = false) {
+    async function stopAndSummarize(limitReason: 'time' | 'size' | null = null) {
         if (recordingStatus === 'idle' || recordingStatus === 'summarizing') {
             return;
         }
+
+        if (isStoppingRecordingRef.current) {
+            return;
+        }
+        isStoppingRecordingRef.current = true;
 
         const session = sessionRef.current;
         if (!session) {
@@ -326,7 +351,13 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
                 throw new Error(payload.error || 'AI要約に失敗しました');
             }
 
-            toast.success(forceByLimit ? '録音上限に到達したため要約を保存しました' : 'AI要約を保存しました');
+            toast.success(
+                limitReason === 'size'
+                    ? `音声サイズが${MAX_GUIDANCE_AUDIO_SIZE_LIMIT_LABEL}に近づいたため要約を保存しました`
+                    : limitReason === 'time'
+                        ? '録音時間の上限に到達したため要約を保存しました'
+                        : 'AI要約を保存しました',
+            );
             router.refresh();
             setIsAdding(false);
             setElapsedMs(0);
@@ -351,7 +382,7 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
 
                 if (nextElapsed >= MAX_RECORDING_MS) {
                     clearTimer();
-                    void stopAndSummarize(true);
+                    void stopAndSummarize('time');
                 }
             }, 500);
         }
@@ -451,7 +482,7 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
 
                             <Button
                                 type="button"
-                                onClick={() => void stopAndSummarize(false)}
+                                onClick={() => void stopAndSummarize()}
                                 disabled={recordingStatus === 'summarizing'}
                             >
                                 {recordingStatus === 'summarizing' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
@@ -460,7 +491,8 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
                         </div>
 
                         <p className="text-xs text-muted-foreground">
-                            録音上限は60分です。上限到達時は自動で録音を終了して要約します。
+                            録音は {MAX_GUIDANCE_AUDIO_SIZE_LIMIT_LABEL} 以内で保存されます。長時間の録音は
+                            {MAX_GUIDANCE_AUDIO_SIZE_LIMIT_LABEL} 手前で自動終了し、安全のため60分でも終了します。
                         </p>
                     </div>
                 ) : null}

@@ -16,6 +16,10 @@ export type GuidanceRecordingFormat = {
     fileExtension: 'webm' | 'ogg' | 'm4a';
 };
 
+export const MAX_GUIDANCE_AUDIO_SIZE_LIMIT_BYTES = 20 * 1024 * 1024;
+export const MAX_GUIDANCE_AUDIO_AUTO_STOP_BYTES = MAX_GUIDANCE_AUDIO_SIZE_LIMIT_BYTES - (512 * 1024);
+export const MAX_GUIDANCE_AUDIO_SIZE_LIMIT_LABEL = `${MAX_GUIDANCE_AUDIO_SIZE_LIMIT_BYTES / (1024 * 1024)}MB`;
+
 const SUPPORTED_GUIDANCE_AUDIO_MIME_TYPES = new Set<GuidanceAudioMimeType>([
     'audio/webm',
     'audio/ogg',

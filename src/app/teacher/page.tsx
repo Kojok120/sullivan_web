@@ -17,6 +17,9 @@ import {
 import { prisma } from '@/lib/prisma';
 import { CreateUserDialog } from './components/create-user-dialog';
 
+const DEFAULT_STUDENT_LIST_TAKE = 50;
+const MAX_SORT_FETCH = 500;
+
 function isStudentSortKey(value: string | undefined): value is StudentSortKey {
     return STUDENT_SORT_OPTIONS.some((option) => option.value === value);
 }
@@ -36,7 +39,6 @@ export default async function TeacherDashboardPage({
         : sortBy
             ? DEFAULT_STUDENT_SORT_ORDER[sortBy]
             : 'asc';
-    const take = sortBy ? undefined : 50;
 
     const actor = await prisma.user.findUnique({
         where: { id: session.userId },
@@ -49,14 +51,30 @@ export default async function TeacherDashboardPage({
             },
         },
     });
-    const studentStats = session.role === 'ADMIN'
-        ? await getStudentsWithStats(query, 0, take)
-        : actor?.classroomId
-            ? await getStudentsWithStats(query, 0, take, actor.classroomId)
-            : [];
+    const classroomId = session.role === 'ADMIN' ? undefined : actor?.classroomId ?? null;
+    const canLoadStudents = session.role === 'ADMIN' || Boolean(classroomId);
+    const studentWhere = canLoadStudents ? {
+        role: 'STUDENT' as const,
+        classroomId: classroomId ?? undefined,
+        OR: query ? [
+            { name: { contains: query, mode: 'insensitive' as const } },
+            { loginId: { contains: query, mode: 'insensitive' as const } },
+            { group: { contains: query, mode: 'insensitive' as const } },
+        ] : undefined,
+    } : null;
+    const totalStudentCount = studentWhere
+        ? await prisma.user.count({ where: studentWhere })
+        : 0;
+    const take = sortBy ? Math.min(MAX_SORT_FETCH, totalStudentCount || MAX_SORT_FETCH) : DEFAULT_STUDENT_LIST_TAKE;
+    const studentStats = !canLoadStudents
+        ? []
+        : session.role === 'ADMIN'
+            ? await getStudentsWithStats(query, 0, take)
+            : await getStudentsWithStats(query, 0, take, classroomId);
     const sortedStudentStats = sortBy
         ? sortStudents(studentStats, sortBy, sortOrder)
         : studentStats;
+    const isSortResultLimited = Boolean(sortBy) && totalStudentCount > MAX_SORT_FETCH;
 
     return (
         <div className="container mx-auto px-4 py-6 sm:py-8">
@@ -99,7 +117,12 @@ export default async function TeacherDashboardPage({
 
             <Card>
                 <CardHeader>
-                    <CardTitle>生徒一覧 ({sortedStudentStats.length}名)</CardTitle>
+                    <CardTitle>生徒一覧 ({sortedStudentStats.length}名表示)</CardTitle>
+                    {isSortResultLimited && (
+                        <p className="text-sm text-muted-foreground">
+                            並び替え中は最大 {MAX_SORT_FETCH} 名まで表示しています。検索条件に一致する生徒は全 {totalStudentCount} 名です。
+                        </p>
+                    )}
                 </CardHeader>
                 <CardContent>
                     <StudentList

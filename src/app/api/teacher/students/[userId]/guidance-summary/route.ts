@@ -13,13 +13,14 @@ import {
     formatGuidanceSummaryAsPlainText,
     GuidanceSummary,
     isSupportedGuidanceAudioMimeType,
+    MAX_GUIDANCE_AUDIO_SIZE_LIMIT_BYTES,
+    MAX_GUIDANCE_AUDIO_SIZE_LIMIT_LABEL,
     normalizeGuidanceAudioMimeType,
 } from '@/lib/guidance-recording';
 import { loadInstructionPrompt } from '@/lib/instruction-prompt';
 import { prisma } from '@/lib/prisma';
 
-const INLINE_AUDIO_SIZE_LIMIT_BYTES = 20 * 1024 * 1024;
-const MAX_AUDIO_SIZE_LIMIT_BYTES = 20 * 1024 * 1024;
+const INLINE_AUDIO_SIZE_LIMIT_BYTES = MAX_GUIDANCE_AUDIO_SIZE_LIMIT_BYTES;
 
 const payloadSchema = z.object({
     startedAtIso: z.string().datetime().optional(),
@@ -258,8 +259,8 @@ export async function POST(
         return NextResponse.json({ error: 'audio/webm, audio/ogg, audio/mp4 形式の音声のみ対応しています' }, { status: 400 });
     }
 
-    if (audio.size <= 0 || audio.size > MAX_AUDIO_SIZE_LIMIT_BYTES) {
-        return NextResponse.json({ error: '音声サイズは20MB以下にしてください' }, { status: 400 });
+    if (audio.size <= 0 || audio.size > MAX_GUIDANCE_AUDIO_SIZE_LIMIT_BYTES) {
+        return NextResponse.json({ error: `音声サイズは${MAX_GUIDANCE_AUDIO_SIZE_LIMIT_LABEL}以下にしてください` }, { status: 400 });
     }
 
     const endedAt = parsedPayload.data.endedAtIso ? new Date(parsedPayload.data.endedAtIso) : new Date();

@@ -38,6 +38,10 @@ describe('guidance-recording', () => {
         });
     });
 
+    it('全候補が非対応なら null を返す', () => {
+        expect(pickGuidanceRecordingFormat(() => false)).toBeNull();
+    });
+
     it('対応 MIME は codec 付きでも判定できる', () => {
         expect(isSupportedGuidanceAudioMimeType('audio/webm;codecs=opus')).toBe(true);
         expect(isSupportedGuidanceAudioMimeType('audio/mp4;codecs=mp4a.40.2')).toBe(true);
