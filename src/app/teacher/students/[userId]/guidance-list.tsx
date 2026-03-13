@@ -157,6 +157,7 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
     }
 
     async function startRecording() {
+        let stream: MediaStream | null = null;
         const preferredFormat = supportedRecordingFormat || null;
         if (!preferredFormat) {
             setIsAdding(true);
@@ -169,7 +170,7 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
         }
 
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({
+            stream = await navigator.mediaDevices.getUserMedia({
                 audio: {
                     channelCount: 1,
                     echoCancellation: true,
@@ -177,6 +178,7 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
                     autoGainControl: true,
                 },
             });
+            streamRef.current = stream;
 
             const recorder = new MediaRecorder(stream, { mimeType: preferredFormat.mediaRecorderMimeType });
             const actualMimeType = normalizeGuidanceAudioMimeType(recorder.mimeType);
@@ -205,7 +207,6 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
 
             recorder.start(1000);
             mediaRecorderRef.current = recorder;
-            streamRef.current = stream;
             recordingFormatRef.current = {
                 mediaRecorderMimeType: recorder.mimeType || preferredFormat.mediaRecorderMimeType,
                 uploadMimeType,

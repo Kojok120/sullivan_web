@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { revalidatePath } from 'next/cache';
 import { GoogleGenAI, createPartFromUri } from '@google/genai';
 import { z } from 'zod';
 
+import { saveGeneratedGuidanceRecord } from '@/app/teacher/students/[userId]/actions';
 import { getSession } from '@/lib/auth';
 import { canAccessUserWithinClassroomScope, isTeacherOrAdminRole } from '@/lib/authorization';
 import {
@@ -313,22 +313,19 @@ export async function POST(
             audioMimeType: geminiAudio.mimeType,
             prompt,
         });
-
-        const record = await prisma.guidanceRecord.create({
-            data: {
-                studentId: userId,
-                teacherId: session.userId,
-                date: endedAt,
-                type: 'INTERVIEW',
-                content: formatGuidanceSummaryAsPlainText(summary),
-            },
+        const record = await saveGeneratedGuidanceRecord({
+            studentId: userId,
+            date: endedAt,
+            content: formatGuidanceSummaryAsPlainText(summary),
         });
 
-        revalidatePath(`/teacher/students/${userId}`);
+        if (record.error || !record.recordId || !record.content) {
+            throw new Error(record.error ?? 'failed to save guidance record');
+        }
 
         return NextResponse.json({
             success: true,
-            recordId: record.id,
+            recordId: record.recordId,
             content: record.content,
         });
     } catch (error) {

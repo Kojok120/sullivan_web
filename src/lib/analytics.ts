@@ -24,6 +24,63 @@ export type DailyActivity = {
     count: number;
 };
 
+type StudentSortKey = 'loginId' | 'totalProblemsSolved' | 'currentStreak' | 'lastActivity';
+type StudentSortOrder = 'asc' | 'desc';
+
+function compareStudentLoginId(a: string, b: string) {
+    return new Intl.Collator('ja', {
+        numeric: true,
+        sensitivity: 'base',
+    }).compare(a, b);
+}
+
+function compareNullableDate(a: Date | null, b: Date | null, sortOrder: StudentSortOrder) {
+    if (!a && !b) return 0;
+    if (!a) return 1;
+    if (!b) return -1;
+
+    return sortOrder === 'asc'
+        ? a.getTime() - b.getTime()
+        : b.getTime() - a.getTime();
+}
+
+function sortStudentsWithStats<T extends {
+    id: string;
+    loginId: string;
+    stats: Pick<StudentStats, 'totalProblemsSolved' | 'currentStreak' | 'lastActivity'>;
+}>(
+    students: T[],
+    sortBy: StudentSortKey,
+    sortOrder: StudentSortOrder,
+) {
+    return [...students].sort((a, b) => {
+        const direction = sortOrder === 'asc' ? 1 : -1;
+        let result: number;
+
+        switch (sortBy) {
+            case 'loginId':
+                result = compareStudentLoginId(a.loginId, b.loginId) * direction;
+                break;
+            case 'totalProblemsSolved':
+                result = (a.stats.totalProblemsSolved - b.stats.totalProblemsSolved) * direction;
+                break;
+            case 'currentStreak':
+                result = (a.stats.currentStreak - b.stats.currentStreak) * direction;
+                break;
+            case 'lastActivity':
+                result = compareNullableDate(a.stats.lastActivity, b.stats.lastActivity, sortOrder);
+                break;
+        }
+
+        if (result !== 0) return result;
+
+        const loginIdResult = compareStudentLoginId(a.loginId, b.loginId);
+        if (loginIdResult !== 0) return loginIdResult;
+
+        return a.id.localeCompare(b.id);
+    });
+}
+
 export async function getStudentStats(userId: string): Promise<StudentStats> {
     // 1. Get Aggregates using shared helper
     const statsMap = await fetchInternalStudentStats([userId]);
@@ -112,7 +169,9 @@ export async function getStudentsWithStats(
     query?: string,
     skip = 0,
     take = 50,
-    classroomId?: string | null
+    classroomId?: string | null,
+    sortBy?: StudentSortKey | null,
+    sortOrder: StudentSortOrder = 'asc',
 ) {
     const students = await prisma.user.findMany({
         skip,
@@ -126,7 +185,11 @@ export async function getStudentsWithStats(
                 { group: { contains: query, mode: 'insensitive' } },
             ] : undefined,
         },
-        orderBy: { name: 'asc' },
+        orderBy: sortBy === 'loginId'
+            ? { loginId: sortOrder }
+            : sortBy === 'currentStreak'
+                ? { currentStreak: sortOrder }
+                : { name: 'asc' },
     });
 
     if (students.length === 0) return [];
@@ -136,10 +199,14 @@ export async function getStudentsWithStats(
     // Bulk fetch stats
     const statsMap = await fetchInternalStudentStats(studentIds);
 
-    return students.map(student => ({
+    const studentsWithStats = students.map(student => ({
         ...student,
         stats: statsMap.get(student.id)!,
     }));
+
+    return sortBy
+        ? sortStudentsWithStats(studentsWithStats, sortBy, sortOrder)
+        : studentsWithStats;
 }
 
 export async function getSubjectProgress(userId: string): Promise<SubjectProgress[]> {

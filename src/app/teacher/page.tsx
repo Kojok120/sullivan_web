@@ -9,7 +9,6 @@ import { Search } from 'lucide-react';
 import { StudentList } from './components/student-list';
 import {
     DEFAULT_STUDENT_SORT_ORDER,
-    sortStudents,
     STUDENT_SORT_OPTIONS,
     type StudentSortKey,
     type StudentSortOrder,
@@ -69,11 +68,8 @@ export default async function TeacherDashboardPage({
     const studentStats = !canLoadStudents
         ? []
         : session.role === 'ADMIN'
-            ? await getStudentsWithStats(query, 0, take)
-            : await getStudentsWithStats(query, 0, take, classroomId);
-    const sortedStudentStats = sortBy
-        ? sortStudents(studentStats, sortBy, sortOrder)
-        : studentStats;
+            ? await getStudentsWithStats(query, 0, take, undefined, sortBy, sortOrder)
+            : await getStudentsWithStats(query, 0, take, classroomId, sortBy, sortOrder);
     const isSortResultLimited = Boolean(sortBy) && totalStudentCount > MAX_SORT_FETCH;
 
     return (
@@ -117,7 +113,7 @@ export default async function TeacherDashboardPage({
 
             <Card>
                 <CardHeader>
-                    <CardTitle>生徒一覧 ({sortedStudentStats.length}名表示)</CardTitle>
+                    <CardTitle>生徒一覧 ({studentStats.length}名表示)</CardTitle>
                     {isSortResultLimited && (
                         <p className="text-sm text-muted-foreground">
                             並び替え中は最大 {MAX_SORT_FETCH} 名まで表示しています。検索条件に一致する生徒は全 {totalStudentCount} 名です。
@@ -126,7 +122,7 @@ export default async function TeacherDashboardPage({
                 </CardHeader>
                 <CardContent>
                     <StudentList
-                        students={sortedStudentStats}
+                        students={studentStats}
                         enableSorting
                         sortBy={sortBy}
                         sortOrder={sortOrder}
