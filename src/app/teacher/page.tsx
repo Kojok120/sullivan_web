@@ -1,7 +1,6 @@
 import { getSession, isTeacherOrAdmin } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-// Table imports removed as they are unused
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Link from 'next/link';
@@ -80,7 +79,7 @@ export default async function TeacherDashboardPage({
                     <CardTitle>生徒一覧 ({studentStats.length}名)</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <StudentList students={studentStats} />
+                    <StudentList students={studentStats} enableSorting />
                 </CardContent>
             </Card>
         </div>
