@@ -116,6 +116,10 @@ Sullivan が解いている中心課題は、次の悪循環です。
 - PostgreSQL
 - Supabase プロジェクト
 - Gemini API キー
+- ffmpeg
+  - macOS: `brew install ffmpeg`
+  - Ubuntu / Debian: `sudo apt-get install ffmpeg`
+  - Windows (Chocolatey): `choco install ffmpeg`
 - Python 3
   - QR のローカル解析を使う場合は OpenCV (`cv2`) が必要
 
@@ -145,6 +149,7 @@ GEMINI_API_KEY="..."
 GEMINI_MODEL="gemini-3.1-pro-preview"
 GEMINI_CHAT_MODEL="gemini-3.1-pro-preview"
 GEMINI_CHAT_FALLBACK_MODEL="gemini-3.1-pro-preview"
+FFMPEG_PATH="/absolute/path/to/ffmpeg" # PATH 上にない場合のみ
 ```
 
 プリント採点フローまで使う場合:
@@ -183,8 +188,10 @@ NEXT_PUBLIC_GEMINI_MAX_TURN_MS="..."
 補足:
 
 - `DIRECT_URL` は Prisma マイグレーション用です。未設定なら `DATABASE_URL` が使われます
+- `FFMPEG_PATH` は面談録音要約で使う `ffmpeg` 実行ファイルのパスです。Unix 系は `export FFMPEG_PATH=/path/to/ffmpeg`、Windows PowerShell は `$env:FFMPEG_PATH="C:\\ffmpeg\\bin\\ffmpeg.exe"` の形式で設定できます
 - `PUPPETEER_EXECUTABLE_PATH` は PDF 出力用ブラウザの自動検出が失敗した場合のみ使います
 - `PORT` と `BIND_HOST` で Web / Worker の待受先を変更できます
+- 面談録音要約が 500 で失敗する場合は、`ffmpeg` が PATH に通っているか、`FFMPEG_PATH` が正しい実行ファイルを指しているか確認してください
 
 ### 3. DB をセットアップ
 

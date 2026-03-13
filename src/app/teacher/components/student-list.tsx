@@ -7,13 +7,12 @@ import { SortIcon } from '@/components/ui/sort-icon';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useState, type KeyboardEvent } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import type { KeyboardEvent } from 'react';
 import type { StudentStats } from '@/lib/analytics';
 import type { User } from '@prisma/client';
 import {
     DEFAULT_STUDENT_SORT_ORDER,
-    sortStudents,
     type StudentSortKey,
     type StudentSortOrder,
     STUDENT_SORT_OPTIONS,
@@ -32,6 +31,10 @@ interface StudentListProps {
     showDetailButton?: boolean;
     /** ソートUIを表示するか（デフォルト: false） */
     enableSorting?: boolean;
+    /** 現在のソートキー */
+    sortBy?: StudentSortKey | null;
+    /** 現在のソート順 */
+    sortOrder?: StudentSortOrder;
 }
 
 export function StudentList({
@@ -39,14 +42,14 @@ export function StudentList({
     linkPrefix = '/teacher/students/',
     showDetailButton = false,
     enableSorting = false,
+    sortBy = null,
+    sortOrder = 'asc',
 }: StudentListProps) {
     const router = useRouter();
-    const [sortBy, setSortBy] = useState<StudentSortKey | null>(null);
-    const [sortOrder, setSortOrder] = useState<StudentSortOrder>('asc');
-
-    const displayedStudents = sortBy
-        ? sortStudents(students, sortBy, sortOrder)
-        : students;
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
+    const currentSortBy = enableSorting ? sortBy : null;
+    const currentSortOrder = currentSortBy ? sortOrder : 'asc';
 
     const handleNavigateToStudent = (studentId: string) => {
         router.push(`${linkPrefix}${studentId}`);
@@ -59,33 +62,45 @@ export function StudentList({
         }
     };
 
+    const updateSortParams = (nextSortBy: StudentSortKey | null, nextSortOrder: StudentSortOrder) => {
+        const params = new URLSearchParams(searchParams.toString());
+
+        if (nextSortBy) {
+            params.set('sortBy', nextSortBy);
+            params.set('sortOrder', nextSortOrder);
+        } else {
+            params.delete('sortBy');
+            params.delete('sortOrder');
+        }
+
+        const nextQuery = params.toString();
+        router.push(nextQuery ? `${pathname}?${nextQuery}` : pathname);
+    };
+
     const handleSort = (column: StudentSortKey) => {
         if (!enableSorting) return;
 
-        if (sortBy === column) {
-            setSortOrder((currentOrder) => currentOrder === 'asc' ? 'desc' : 'asc');
+        if (currentSortBy === column) {
+            updateSortParams(column, currentSortOrder === 'asc' ? 'desc' : 'asc');
             return;
         }
 
-        setSortBy(column);
-        setSortOrder(DEFAULT_STUDENT_SORT_ORDER[column]);
+        updateSortParams(column, DEFAULT_STUDENT_SORT_ORDER[column]);
     };
 
     const handleSortSelection = (value: string) => {
         if (value === 'default') {
-            setSortBy(null);
-            setSortOrder('asc');
+            updateSortParams(null, 'asc');
             return;
         }
 
         const nextSortBy = value as StudentSortKey;
-        setSortBy(nextSortBy);
-        setSortOrder(DEFAULT_STUDENT_SORT_ORDER[nextSortBy]);
+        updateSortParams(nextSortBy, DEFAULT_STUDENT_SORT_ORDER[nextSortBy]);
     };
 
     const toggleSortOrder = () => {
-        if (!sortBy) return;
-        setSortOrder((currentOrder) => currentOrder === 'asc' ? 'desc' : 'asc');
+        if (!currentSortBy) return;
+        updateSortParams(currentSortBy, currentSortOrder === 'asc' ? 'desc' : 'asc');
     };
 
     const renderSortableHead = (
@@ -93,8 +108,8 @@ export function StudentList({
         column: StudentSortKey,
         align: 'left' | 'right' = 'left',
     ) => {
-        const isActive = sortBy === column;
-        const ariaSort = isActive ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none';
+        const isActive = currentSortBy === column;
+        const ariaSort = isActive ? (currentSortOrder === 'asc' ? 'ascending' : 'descending') : 'none';
 
         if (!enableSorting) {
             return <TableHead className={align === 'right' ? 'text-right' : undefined}>{label}</TableHead>;
@@ -111,15 +126,15 @@ export function StudentList({
                     onClick={() => handleSort(column)}
                 >
                     <span>{label}</span>
-                    <SortIcon active={isActive} sortOrder={sortOrder} className="ml-1" />
+                    <SortIcon active={isActive} sortOrder={currentSortOrder} className="ml-1" />
                     {isActive && (
                         <span className="text-xs text-muted-foreground">
-                            {sortOrder === 'asc' ? '昇' : '降'}
+                            {currentSortOrder === 'asc' ? '昇' : '降'}
                         </span>
                     )}
                     {isActive && (
                         <span className="sr-only">
-                            {sortOrder === 'asc' ? '昇順' : '降順'}
+                            {currentSortOrder === 'asc' ? '昇順' : '降順'}
                         </span>
                     )}
                 </button>
@@ -137,7 +152,7 @@ export function StudentList({
         <div className="space-y-3">
             {enableSorting && (
                 <div className="flex items-center gap-2 md:hidden">
-                    <Select value={sortBy ?? 'default'} onValueChange={handleSortSelection}>
+                    <Select value={currentSortBy ?? 'default'} onValueChange={handleSortSelection}>
                         <SelectTrigger className="w-full bg-background">
                             <SelectValue placeholder="並び順" />
                         </SelectTrigger>
@@ -156,18 +171,18 @@ export function StudentList({
                         size="sm"
                         className="min-w-20"
                         onClick={toggleSortOrder}
-                        disabled={!sortBy}
+                        disabled={!currentSortBy}
                     >
-                        {sortOrder === 'asc' ? '昇順' : '降順'}
+                        {currentSortOrder === 'asc' ? '昇順' : '降順'}
                     </Button>
                 </div>
             )}
 
             <div className="space-y-3 md:hidden">
-                {displayedStudents.length === 0 ? (
+                {students.length === 0 ? (
                     renderEmpty()
                 ) : (
-                    displayedStudents.map((student) => (
+                    students.map((student) => (
                         <div
                             key={student.id}
                             className={`rounded-lg border bg-card p-4 ${showDetailButton ? '' : 'cursor-pointer'}`}
@@ -239,7 +254,7 @@ export function StudentList({
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {displayedStudents.map((student) => (
+                        {students.map((student) => (
                             <TableRow
                                 key={student.id}
                                 className={showDetailButton ? '' : 'cursor-pointer hover:bg-muted/50 transition-colors'}
@@ -277,7 +292,7 @@ export function StudentList({
                                 )}
                             </TableRow>
                         ))}
-                        {displayedStudents.length === 0 && (
+                        {students.length === 0 && (
                             <TableRow>
                                 <TableCell colSpan={showDetailButton ? 8 : 7} className="text-center py-8 text-muted-foreground">
                                     条件に一致する生徒が見つかりません

@@ -30,6 +30,16 @@ const FILE_EXTENSION_BY_MIME_TYPE: Record<GuidanceAudioMimeType, GuidanceRecordi
 
 export const GUIDANCE_RECORDING_FORMAT_CANDIDATES: readonly GuidanceRecordingFormat[] = [
     {
+        mediaRecorderMimeType: 'audio/ogg;codecs=opus',
+        uploadMimeType: 'audio/ogg',
+        fileExtension: 'ogg',
+    },
+    {
+        mediaRecorderMimeType: 'audio/ogg',
+        uploadMimeType: 'audio/ogg',
+        fileExtension: 'ogg',
+    },
+    {
         mediaRecorderMimeType: 'audio/webm;codecs=opus',
         uploadMimeType: 'audio/webm',
         fileExtension: 'webm',
@@ -48,16 +58,6 @@ export const GUIDANCE_RECORDING_FORMAT_CANDIDATES: readonly GuidanceRecordingFor
         mediaRecorderMimeType: 'audio/mp4',
         uploadMimeType: 'audio/mp4',
         fileExtension: 'm4a',
-    },
-    {
-        mediaRecorderMimeType: 'audio/ogg;codecs=opus',
-        uploadMimeType: 'audio/ogg',
-        fileExtension: 'ogg',
-    },
-    {
-        mediaRecorderMimeType: 'audio/ogg',
-        uploadMimeType: 'audio/ogg',
-        fileExtension: 'ogg',
     },
 ];
 

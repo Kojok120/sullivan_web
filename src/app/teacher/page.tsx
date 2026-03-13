@@ -7,18 +7,35 @@ import Link from 'next/link';
 import { getStudentsWithStats } from '@/lib/analytics';
 import { Search } from 'lucide-react';
 import { StudentList } from './components/student-list';
+import {
+    DEFAULT_STUDENT_SORT_ORDER,
+    sortStudents,
+    STUDENT_SORT_OPTIONS,
+    type StudentSortKey,
+    type StudentSortOrder,
+} from './components/student-list-sort';
 import { prisma } from '@/lib/prisma';
 import { CreateUserDialog } from './components/create-user-dialog';
+
+function isStudentSortKey(value: string | undefined): value is StudentSortKey {
+    return STUDENT_SORT_OPTIONS.some((option) => option.value === value);
+}
 
 export default async function TeacherDashboardPage({
     searchParams,
 }: {
-    searchParams: Promise<{ q?: string }>;
+    searchParams: Promise<{ q?: string; sortBy?: string; sortOrder?: string }>;
 }) {
     const session = await getSession();
     if (!isTeacherOrAdmin(session)) redirect('/login');
 
-    const { q: query } = await searchParams;
+    const { q: query, sortBy: rawSortBy, sortOrder: rawSortOrder } = await searchParams;
+    const sortBy = isStudentSortKey(rawSortBy) ? rawSortBy : null;
+    const sortOrder: StudentSortOrder = rawSortOrder === 'desc'
+        ? 'desc'
+        : sortBy
+            ? DEFAULT_STUDENT_SORT_ORDER[sortBy]
+            : 'asc';
 
     const actor = await prisma.user.findUnique({
         where: { id: session.userId },
@@ -36,6 +53,9 @@ export default async function TeacherDashboardPage({
         : actor?.classroomId
             ? await getStudentsWithStats(query, 0, 50, actor.classroomId)
             : [];
+    const sortedStudentStats = sortBy
+        ? sortStudents(studentStats, sortBy, sortOrder)
+        : studentStats;
 
     return (
         <div className="container mx-auto px-4 py-6 sm:py-8">
@@ -64,6 +84,8 @@ export default async function TeacherDashboardPage({
                                 defaultValue={query}
                             />
                         </div>
+                        {sortBy && <input type="hidden" name="sortBy" value={sortBy} />}
+                        {sortBy && <input type="hidden" name="sortOrder" value={sortOrder} />}
                         <Button type="submit" className="min-h-11 sm:min-h-10">検索</Button>
                         {query && (
                             <Button variant="ghost" asChild className="min-h-11 sm:min-h-10">
@@ -76,10 +98,15 @@ export default async function TeacherDashboardPage({
 
             <Card>
                 <CardHeader>
-                    <CardTitle>生徒一覧 ({studentStats.length}名)</CardTitle>
+                    <CardTitle>生徒一覧 ({sortedStudentStats.length}名)</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <StudentList students={studentStats} enableSorting />
+                    <StudentList
+                        students={sortedStudentStats}
+                        enableSorting
+                        sortBy={sortBy}
+                        sortOrder={sortOrder}
+                    />
                 </CardContent>
             </Card>
         </div>

@@ -8,6 +8,16 @@ import {
 } from '@/lib/guidance-recording';
 
 describe('guidance-recording', () => {
+    it('ogg が使える環境では ogg を優先する', () => {
+        const format = pickGuidanceRecordingFormat(() => true);
+
+        expect(format).toEqual({
+            mediaRecorderMimeType: 'audio/ogg;codecs=opus',
+            uploadMimeType: 'audio/ogg',
+            fileExtension: 'ogg',
+        });
+    });
+
     it('録音形式は webm を優先する', () => {
         const format = pickGuidanceRecordingFormat((mimeType) => mimeType.startsWith('audio/webm'));
 

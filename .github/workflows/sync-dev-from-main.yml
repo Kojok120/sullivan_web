@@ -60,7 +60,8 @@ jobs:
             fi
           fi
 
-          if git push origin HEAD:dev; then
+          push_output=""
+          if push_output=$(git push origin HEAD:dev 2>&1); then
             echo "result=pushed" >> "$GITHUB_OUTPUT"
             echo "mode=${sync_mode}" >> "$GITHUB_OUTPUT"
             echo "dev を ${sync_mode} で同期しました。" >> "$GITHUB_STEP_SUMMARY"
@@ -70,6 +71,11 @@ jobs:
           echo "result=pr" >> "$GITHUB_OUTPUT"
           echo "mode=${sync_mode}" >> "$GITHUB_OUTPUT"
           echo "dev への直接 push が拒否されたため、main -> dev の同期PRを作成します。" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "push 失敗ログ:" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "$push_output" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
 
       - name: main -> dev の同期PRを作成
         if: steps.sync.outputs.result == 'pr'

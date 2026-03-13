@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { GuidanceRecord } from '@prisma/client';
 import {
@@ -59,6 +59,8 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
     const [isSaving, setIsSaving] = useState(false);
     const [recordingStatus, setRecordingStatus] = useState<'idle' | 'recording' | 'paused' | 'summarizing'>('idle');
     const [elapsedMs, setElapsedMs] = useState(0);
+    const [supportedRecordingFormat, setSupportedRecordingFormat] = useState<GuidanceRecordingFormat | null>(null);
+    const [hasResolvedRecordingSupport, setHasResolvedRecordingSupport] = useState(false);
 
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
@@ -67,13 +69,29 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
     const sessionRef = useRef<RecordingSessionState | null>(null);
     const recordingFormatRef = useRef<GuidanceRecordingFormat | null>(null);
 
-    const supportedRecordingFormat = useMemo<GuidanceRecordingFormat | null>(() => {
-        if (typeof window === 'undefined') return null;
-        if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) return null;
-        if (typeof MediaRecorder === 'undefined') return null;
-        if (typeof MediaRecorder.isTypeSupported !== 'function') return null;
-        return pickGuidanceRecordingFormat((mimeType) => MediaRecorder.isTypeSupported(mimeType));
+    useEffect(() => {
+        if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+            setSupportedRecordingFormat(null);
+            setHasResolvedRecordingSupport(true);
+            return;
+        }
+        if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') {
+            setSupportedRecordingFormat(null);
+            setHasResolvedRecordingSupport(true);
+            return;
+        }
+
+        setSupportedRecordingFormat(
+            pickGuidanceRecordingFormat((mimeType) => MediaRecorder.isTypeSupported(mimeType)),
+        );
+        setHasResolvedRecordingSupport(true);
     }, []);
+
+    const recordingButtonLabel = !hasResolvedRecordingSupport
+        ? '録音機能を確認中'
+        : supportedRecordingFormat
+            ? '録音開始'
+            : '手動入力を開く';
 
     function getCurrentElapsedMs(): number {
         if (!sessionRef.current) return 0;
@@ -387,10 +405,10 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
                     <Button
                         size="icon"
                         variant={recordingStatus === 'idle' ? 'outline' : 'default'}
-                        aria-label="録音開始"
-                        title={supportedRecordingFormat ? '録音開始' : 'このブラウザでは録音を利用できません'}
+                        aria-label={recordingButtonLabel}
+                        title={recordingButtonLabel}
                         onClick={() => void startRecording()}
-                        disabled={recordingStatus !== 'idle'}
+                        disabled={recordingStatus !== 'idle' || !hasResolvedRecordingSupport}
                     >
                         <Mic className="h-4 w-4" />
                     </Button>
@@ -398,7 +416,7 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
             </CardHeader>
 
             <CardContent className="space-y-6 pt-4">
-                {!supportedRecordingFormat ? (
+                {hasResolvedRecordingSupport && !supportedRecordingFormat ? (
                     <div className="rounded-lg border border-dashed bg-muted/20 p-3 text-xs text-muted-foreground">
                         このブラウザでは録音に対応していません。右上の新規記録から手動入力するか、録音対応ブラウザをご利用ください。
                     </div>

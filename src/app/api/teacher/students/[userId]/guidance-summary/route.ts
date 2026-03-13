@@ -19,7 +19,7 @@ import { loadInstructionPrompt } from '@/lib/instruction-prompt';
 import { prisma } from '@/lib/prisma';
 
 const INLINE_AUDIO_SIZE_LIMIT_BYTES = 20 * 1024 * 1024;
-const MAX_AUDIO_SIZE_LIMIT_BYTES = 100 * 1024 * 1024;
+const MAX_AUDIO_SIZE_LIMIT_BYTES = 20 * 1024 * 1024;
 
 const payloadSchema = z.object({
     startedAtIso: z.string().datetime().optional(),
@@ -260,7 +260,7 @@ export async function POST(
     }
 
     if (audio.size <= 0 || audio.size > MAX_AUDIO_SIZE_LIMIT_BYTES) {
-        return NextResponse.json({ error: '音声サイズが上限を超えています' }, { status: 400 });
+        return NextResponse.json({ error: '音声サイズは20MB以下にしてください' }, { status: 400 });
     }
 
     const endedAt = parsedPayload.data.endedAtIso ? new Date(parsedPayload.data.endedAtIso) : new Date();
