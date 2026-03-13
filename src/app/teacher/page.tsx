@@ -22,6 +22,10 @@ function isStudentSortKey(value: string | undefined): value is StudentSortKey {
     return STUDENT_SORT_OPTIONS.some((option) => option.value === value);
 }
 
+function isStudentSortOrder(value: string | undefined): value is StudentSortOrder {
+    return value === 'asc' || value === 'desc';
+}
+
 export default async function TeacherDashboardPage({
     searchParams,
 }: {
@@ -32,11 +36,9 @@ export default async function TeacherDashboardPage({
 
     const { q: query, sortBy: rawSortBy, sortOrder: rawSortOrder } = await searchParams;
     const sortBy = isStudentSortKey(rawSortBy) ? rawSortBy : null;
-    const sortOrder: StudentSortOrder = rawSortOrder === 'desc'
-        ? 'desc'
-        : sortBy
-            ? DEFAULT_STUDENT_SORT_ORDER[sortBy]
-            : 'asc';
+    const sortOrder: StudentSortOrder = sortBy
+        ? (isStudentSortOrder(rawSortOrder) ? rawSortOrder : DEFAULT_STUDENT_SORT_ORDER[sortBy])
+        : 'asc';
 
     const actor = await prisma.user.findUnique({
         where: { id: session.userId },

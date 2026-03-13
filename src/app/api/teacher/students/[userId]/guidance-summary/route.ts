@@ -20,7 +20,8 @@ import {
 import { loadInstructionPrompt } from '@/lib/instruction-prompt';
 import { prisma } from '@/lib/prisma';
 
-const INLINE_AUDIO_SIZE_LIMIT_BYTES = MAX_GUIDANCE_AUDIO_SIZE_LIMIT_BYTES;
+// Base64 展開でペイロードが膨らむため、インライン送信は小さめの閾値に分ける。
+const INLINE_AUDIO_SIZE_LIMIT_BYTES = 8 * 1024 * 1024;
 
 const payloadSchema = z.object({
     startedAtIso: z.string().datetime().optional(),

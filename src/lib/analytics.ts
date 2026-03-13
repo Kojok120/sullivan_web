@@ -25,11 +25,13 @@ export type DailyActivity = {
     count: number;
 };
 
+const studentLoginIdCollator = new Intl.Collator('ja', {
+    numeric: true,
+    sensitivity: 'base',
+});
+
 function compareStudentLoginId(a: string, b: string) {
-    return new Intl.Collator('ja', {
-        numeric: true,
-        sensitivity: 'base',
-    }).compare(a, b);
+    return studentLoginIdCollator.compare(a, b);
 }
 
 function compareNullableDate(a: Date | null, b: Date | null, sortOrder: StudentSortOrder) {
@@ -171,9 +173,10 @@ export async function getStudentsWithStats(
     sortBy?: StudentSortKey | null,
     sortOrder: StudentSortOrder = 'asc',
 ) {
+    const requiresComputedStatsSort = sortBy === 'totalProblemsSolved' || sortBy === 'lastActivity';
     const students = await prisma.user.findMany({
-        skip,
-        take,
+        skip: requiresComputedStatsSort ? 0 : skip,
+        take: requiresComputedStatsSort ? undefined : take,
         where: {
             role: 'STUDENT',
             classroomId: classroomId ?? undefined,
@@ -206,7 +209,8 @@ export async function getStudentsWithStats(
         return studentsWithStats;
     }
 
-    return sortStudentsWithStats(studentsWithStats, sortBy, sortOrder);
+    const sortedStudents = sortStudentsWithStats(studentsWithStats, sortBy, sortOrder);
+    return sortedStudents.slice(skip, skip + take);
 }
 
 export async function getSubjectProgress(userId: string): Promise<SubjectProgress[]> {
