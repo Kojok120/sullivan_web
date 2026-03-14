@@ -35,7 +35,7 @@ function PdfPreviewClientInner({ pdfUrl, htmlViewUrl, backFallbackPath }: PdfPre
     const lastReloadAtRef = useRef(0);
     const [frameUrl, setFrameUrl] = useState(pdfUrl);
     const [isFrameLoaded, setIsFrameLoaded] = useState(false);
-    const [prefersHtmlPrintView, setPrefersHtmlPrintView] = useState(false);
+    const prefersHtmlPrintView = htmlViewUrl ? getPreferredPrintView() === 'html' : false;
 
     const triggerPrint = useCallback(() => {
         const frame = iframeRef.current;
@@ -98,10 +98,6 @@ function PdfPreviewClientInner({ pdfUrl, htmlViewUrl, backFallbackPath }: PdfPre
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, [reloadFrame]);
-
-    useEffect(() => {
-        setPrefersHtmlPrintView(htmlViewUrl ? getPreferredPrintView() === 'html' : false);
-    }, [htmlViewUrl]);
 
     useEffect(() => {
         return () => {

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useRouter } from 'next/navigation';
@@ -25,7 +26,7 @@ vi.mock('@/components/ui/select', async () => {
             children,
             onValueChange,
         }: {
-            children: any;
+            children: ReactNode;
             onValueChange?: (value: string) => void;
         }) => (
             <SelectContext.Provider value={{ onValueChange }}>
@@ -36,26 +37,41 @@ vi.mock('@/components/ui/select', async () => {
             children,
             disabled,
         }: {
-            children: any;
+            children: ReactNode;
             disabled?: boolean;
         }) => (
-            <button type="button" role="combobox" disabled={disabled}>
+            <button
+                type="button"
+                role="combobox"
+                aria-controls="mock-select-content"
+                aria-expanded="false"
+                disabled={disabled}
+            >
                 {children}
             </button>
         ),
         SelectValue: ({ placeholder }: { placeholder?: string }) => <span>{placeholder}</span>,
-        SelectContent: ({ children }: { children: any }) => <div>{children}</div>,
+        SelectContent: ({ children }: { children: ReactNode }) => (
+            <div id="mock-select-content">
+                {children}
+            </div>
+        ),
         SelectItem: ({
             value,
             children,
         }: {
             value: string;
-            children: any;
+            children: ReactNode;
         }) => {
             const context = React.useContext(SelectContext);
 
             return (
-                <button type="button" role="option" onClick={() => context.onValueChange?.(value)}>
+                <button
+                    type="button"
+                    role="option"
+                    aria-selected="false"
+                    onClick={() => context.onValueChange?.(value)}
+                >
                     {children}
                 </button>
             );
