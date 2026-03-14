@@ -10,6 +10,7 @@ vi.mock('next/navigation', () => ({
 
 describe('PDFプレビューの戻る動作', () => {
     let originalVisibilityStateDescriptor: PropertyDescriptor | undefined
+    let originalMatchMediaDescriptor: PropertyDescriptor | undefined
 
     const mockRouter = {
         push: vi.fn(),
@@ -25,6 +26,7 @@ describe('PDFプレビューの戻る動作', () => {
         vi.useFakeTimers()
         vi.mocked(useRouter).mockReturnValue(mockRouter)
         originalVisibilityStateDescriptor = Object.getOwnPropertyDescriptor(document, 'visibilityState')
+        originalMatchMediaDescriptor = Object.getOwnPropertyDescriptor(window, 'matchMedia')
         Object.defineProperty(window, 'opener', {
             configurable: true,
             writable: true,
@@ -33,7 +35,11 @@ describe('PDFプレビューの戻る動作', () => {
     })
 
     afterEach(() => {
-        vi.runOnlyPendingTimers()
+        try {
+            vi.runOnlyPendingTimers()
+        } catch {
+            // 実タイマーに切り替えたケースでは pending timers を処理しない
+        }
         vi.useRealTimers()
         vi.restoreAllMocks()
 
@@ -41,6 +47,12 @@ describe('PDFプレビューの戻る動作', () => {
             Object.defineProperty(document, 'visibilityState', originalVisibilityStateDescriptor)
         } else {
             delete (document as { visibilityState?: DocumentVisibilityState }).visibilityState
+        }
+
+        if (originalMatchMediaDescriptor) {
+            Object.defineProperty(window, 'matchMedia', originalMatchMediaDescriptor)
+        } else {
+            delete (window as { matchMedia?: typeof window.matchMedia }).matchMedia
         }
     })
 
@@ -148,6 +160,38 @@ describe('PDFプレビューの戻る動作', () => {
         expect(iframe.getAttribute('src')).toContain('subjectId=subject-2')
         expect(iframe.getAttribute('src')).toContain('sets=2')
         expect(screen.getByText('PDFを読み込み中です...')).toBeTruthy()
+    })
+
+    it('タッチ端末では HTML 印刷ページへの導線を表示する', async () => {
+        vi.useRealTimers()
+        Object.defineProperty(window, 'matchMedia', {
+            configurable: true,
+            writable: true,
+            value: vi.fn().mockReturnValue({
+                matches: true,
+                media: '(pointer: coarse)',
+                onchange: null,
+                addListener: vi.fn(),
+                removeListener: vi.fn(),
+                addEventListener: vi.fn(),
+                removeEventListener: vi.fn(),
+                dispatchEvent: vi.fn(),
+            }),
+        })
+
+        render(
+            <PdfPreviewClient
+                pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
+                htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
+                backFallbackPath="/dashboard"
+            />
+        )
+
+        expect(await screen.findByRole('link', { name: '印刷ページで開く' })).toHaveAttribute(
+            'href',
+            '/dashboard/print?subjectId=subject-1&sets=1&view=html',
+        )
+        expect(screen.queryByTitle('印刷プレビュー')).not.toBeInTheDocument()
     })
 
     it('openerがある場合は元タブをフォーカスして現在タブを閉じる', () => {

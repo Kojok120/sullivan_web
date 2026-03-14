@@ -6,25 +6,28 @@ import { ArrowLeft, ExternalLink, Loader2, Printer } from 'lucide-react';
 
 import { appendCacheBust } from '@/components/print/cache-bust';
 import { Button } from '@/components/ui/button';
+import { getPreferredPrintView } from '@/lib/print-view';
 
 type PdfPreviewClientProps = {
     pdfUrl: string;
+    htmlViewUrl?: string;
     backFallbackPath: string;
 };
 
 const RESTORE_RELOAD_THROTTLE_MS = 250;
 
-export function PdfPreviewClient({ pdfUrl, backFallbackPath }: PdfPreviewClientProps) {
+export function PdfPreviewClient({ pdfUrl, htmlViewUrl, backFallbackPath }: PdfPreviewClientProps) {
     return (
         <PdfPreviewClientInner
             key={pdfUrl}
             pdfUrl={pdfUrl}
+            htmlViewUrl={htmlViewUrl}
             backFallbackPath={backFallbackPath}
         />
     );
 }
 
-function PdfPreviewClientInner({ pdfUrl, backFallbackPath }: PdfPreviewClientProps) {
+function PdfPreviewClientInner({ pdfUrl, htmlViewUrl, backFallbackPath }: PdfPreviewClientProps) {
     const router = useRouter();
     const iframeRef = useRef<HTMLIFrameElement | null>(null);
     const closeFallbackTimerRef = useRef<number | null>(null);
@@ -32,6 +35,7 @@ function PdfPreviewClientInner({ pdfUrl, backFallbackPath }: PdfPreviewClientPro
     const lastReloadAtRef = useRef(0);
     const [frameUrl, setFrameUrl] = useState(pdfUrl);
     const [isFrameLoaded, setIsFrameLoaded] = useState(false);
+    const [prefersHtmlPrintView, setPrefersHtmlPrintView] = useState(false);
 
     const triggerPrint = useCallback(() => {
         const frame = iframeRef.current;
@@ -96,6 +100,10 @@ function PdfPreviewClientInner({ pdfUrl, backFallbackPath }: PdfPreviewClientPro
     }, [reloadFrame]);
 
     useEffect(() => {
+        setPrefersHtmlPrintView(htmlViewUrl ? getPreferredPrintView() === 'html' : false);
+    }, [htmlViewUrl]);
+
+    useEffect(() => {
         return () => {
             if (closeFallbackTimerRef.current !== null) {
                 window.clearTimeout(closeFallbackTimerRef.current);
@@ -141,6 +149,47 @@ function PdfPreviewClientInner({ pdfUrl, backFallbackPath }: PdfPreviewClientPro
 
         router.back();
     }, [closeTabOrFallback, router]);
+
+    if (prefersHtmlPrintView && htmlViewUrl) {
+        return (
+            <div className="min-h-screen bg-gray-100 px-4 py-4 md:px-6 md:py-6">
+                <div className="mx-auto flex w-full max-w-[720px] flex-col gap-4">
+                    <div className="rounded-md bg-white p-5 shadow-sm">
+                        <div className="flex flex-col gap-4">
+                            <div className="flex items-center gap-2">
+                                <Button variant="outline" onClick={handleBack}>
+                                    <ArrowLeft className="mr-2 h-4 w-4" />
+                                    戻る
+                                </Button>
+                            </div>
+
+                            <div className="space-y-2">
+                                <h1 className="text-lg font-semibold">スマホでは専用の印刷画面を開いてください</h1>
+                                <p className="text-sm text-muted-foreground">
+                                    PDF 埋め込みプレビューはスマホ・タブレットで正しく印刷できない場合があります。
+                                </p>
+                            </div>
+
+                            <div className="flex flex-col gap-2 sm:flex-row">
+                                <Button asChild>
+                                    <a href={htmlViewUrl}>
+                                        <Printer className="mr-2 h-4 w-4" />
+                                        印刷ページで開く
+                                    </a>
+                                </Button>
+                                <Button variant="ghost" asChild>
+                                    <a href={frameUrl} target="_blank" rel="noopener noreferrer">
+                                        PDFを別タブで開く
+                                        <ExternalLink className="ml-2 h-4 w-4" />
+                                    </a>
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gray-100 px-4 py-4 md:px-6 md:py-6">
