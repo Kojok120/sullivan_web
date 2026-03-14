@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 
 import { appendCacheBust } from '@/components/print/cache-bust';
 import { HtmlPrintClient } from '@/components/print/html-print-client';
+import { PrintAssistClient } from '@/components/print/print-assist-client';
 import { PdfPreviewClient } from '@/components/print/pdf-preview-client';
 import {
     buildPrintDocumentMarkup,
@@ -65,11 +66,25 @@ export async function SharedStudentPrintPage({
     }
 
     const pdfUrl = appendCacheBust(`/api/print/pdf?${apiQuery.toString()}`);
+    const assistViewUrl = buildPrintPageUrl({
+        printPagePath,
+        query: pageQuery,
+        view: 'assist',
+    });
     const htmlViewUrl = buildPrintPageUrl({
         printPagePath,
         query: pageQuery,
         view: 'html',
     });
+
+    if (pageView === 'assist') {
+        return (
+            <PrintAssistClient
+                backFallbackPath={redirectPathIfMissing}
+                pdfUrl={pdfUrl}
+            />
+        );
+    }
 
     if (pageView === 'html') {
         const data = await getPrintData(
@@ -119,6 +134,7 @@ export async function SharedStudentPrintPage({
     return (
         <PdfPreviewClient
             pdfUrl={pdfUrl}
+            assistViewUrl={assistViewUrl}
             htmlViewUrl={htmlViewUrl}
             backFallbackPath={redirectPathIfMissing}
         />
@@ -148,6 +164,11 @@ const HTML_PRINT_PAGE_CSS = `
 }
 
 @media print {
+    @page {
+        size: A4;
+        margin: 6mm;
+    }
+
     body > header,
     body > [data-sonner-toaster],
     .print-toolbar {
@@ -160,6 +181,16 @@ const HTML_PRINT_PAGE_CSS = `
         padding: 0 !important;
     }
 
+    .sullivan-print-document,
+    .sullivan-print-document .sheet,
+    .sullivan-print-document .sheet-inner,
+    .sullivan-print-document .question-list,
+    .sullivan-print-document .answer-list,
+    .sullivan-print-document .question-row,
+    .sullivan-print-document .answer-row {
+        overflow: visible !important;
+    }
+
     .print-html-page > div,
     .print-html-document {
         max-width: none !important;
@@ -167,6 +198,118 @@ const HTML_PRINT_PAGE_CSS = `
         padding: 0 !important;
         margin: 0 !important;
         gap: 0 !important;
+    }
+
+    .sullivan-print-document .sheet-header {
+        display: table !important;
+        width: 100%;
+        table-layout: fixed;
+        margin-bottom: 4mm;
+    }
+
+    .sullivan-print-document .sheet-title-wrap {
+        display: table-cell !important;
+        vertical-align: bottom;
+        padding-right: 6mm;
+    }
+
+    .sullivan-print-document .sheet-title {
+        font-size: 18px;
+        line-height: 1.15;
+    }
+
+    .sullivan-print-document .student-info {
+        display: block;
+        margin-top: 1.5mm;
+        font-size: 14px;
+        line-height: 1.3;
+    }
+
+    .sullivan-print-document .sheet-type {
+        display: table-cell !important;
+        width: 24mm;
+        text-align: right;
+        vertical-align: bottom;
+        font-size: 12px;
+    }
+
+    .sullivan-print-document .question-row {
+        display: table !important;
+        width: 100%;
+        table-layout: fixed;
+        margin-bottom: 2.75mm;
+        break-inside: avoid-page;
+        page-break-inside: avoid;
+    }
+
+    .sullivan-print-document .question-id {
+        display: table-cell !important;
+        width: 18mm;
+        min-width: 0;
+        font-size: 14px;
+        line-height: 1.25;
+        padding: 0.15mm 2.5mm 0 0;
+        vertical-align: top;
+    }
+
+    .sullivan-print-document .question-text {
+        display: table-cell !important;
+        font-size: 14px;
+        line-height: 1.35;
+        padding: 0 0 2mm;
+        min-height: 0;
+        vertical-align: top;
+    }
+
+    .sullivan-print-document .answer-sheet .sheet-inner {
+        min-height: 0 !important;
+        display: block !important;
+    }
+
+    .sullivan-print-document .qr-image {
+        width: 20mm;
+        height: 20mm;
+    }
+
+    .sullivan-print-document .answer-list {
+        margin-top: 4.5mm;
+    }
+
+    .sullivan-print-document .answer-row {
+        display: table !important;
+        width: 100%;
+        table-layout: fixed;
+        margin-bottom: 4.75mm;
+        break-inside: avoid-page;
+        page-break-inside: avoid;
+    }
+
+    .sullivan-print-document .answer-id {
+        display: table-cell !important;
+        width: 20mm;
+        min-width: 0;
+        font-size: 16px;
+        padding-right: 2.5mm;
+        vertical-align: bottom;
+    }
+
+    .sullivan-print-document .answer-prefix {
+        display: table-cell !important;
+        width: 10mm;
+        min-width: 0;
+        font-size: 16px;
+        padding-right: 2mm;
+        vertical-align: bottom;
+    }
+
+    .sullivan-print-document .answer-line {
+        display: table-cell !important;
+        min-height: 5.5mm;
+        vertical-align: bottom;
+    }
+
+    .sullivan-print-document .sheet-footer {
+        margin-top: 6mm;
     }
 }
 `;

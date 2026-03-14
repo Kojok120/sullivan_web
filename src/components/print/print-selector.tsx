@@ -106,13 +106,13 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
     const handlePrint = async () => {
         if (!selectedSubjectId || isCheckingGate || isSubmittingWatch) return;
 
-        const params = new URLSearchParams({
+        const pageParams = new URLSearchParams({
             subjectId: selectedSubjectId,
             sets: String(sets),
             gateChecked: '1',
             view: getPreferredPrintView(),
         });
-        const printUrl = appendCacheBust(`/dashboard/print?${params.toString()}`);
+        const printPageUrl = appendCacheBust(`/dashboard/print?${pageParams.toString()}`);
         const previewTab = window.open('', '_blank');
         setIsCheckingGate(true);
         setGateErrorMessage(null);
@@ -148,9 +148,9 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
             }
 
             if (previewTab && !previewTab.closed) {
-                previewTab.location.href = printUrl;
+                previewTab.location.href = printPageUrl;
             } else {
-                window.open(printUrl, '_blank');
+                window.open(printPageUrl, '_blank');
             }
         } catch (error) {
             if (previewTab && !previewTab.closed) {

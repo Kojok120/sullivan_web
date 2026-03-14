@@ -3,9 +3,14 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import { useRouter } from 'next/navigation'
 
 import { PdfPreviewClient } from './pdf-preview-client'
+import { getPreferredPrintView } from '@/lib/print-view'
 
 vi.mock('next/navigation', () => ({
     useRouter: vi.fn(),
+}))
+
+vi.mock('@/lib/print-view', () => ({
+    getPreferredPrintView: vi.fn(() => 'pdf'),
 }))
 
 describe('PDFプレビューの戻る動作', () => {
@@ -25,6 +30,7 @@ describe('PDFプレビューの戻る動作', () => {
         vi.clearAllMocks()
         vi.useFakeTimers()
         vi.mocked(useRouter).mockReturnValue(mockRouter)
+        vi.mocked(getPreferredPrintView).mockReturnValue('pdf')
         originalVisibilityStateDescriptor = Object.getOwnPropertyDescriptor(document, 'visibilityState')
         originalMatchMediaDescriptor = Object.getOwnPropertyDescriptor(window, 'matchMedia')
         Object.defineProperty(window, 'opener', {
@@ -164,24 +170,12 @@ describe('PDFプレビューの戻る動作', () => {
 
     it('タッチ端末では HTML 印刷ページへの導線を表示する', async () => {
         vi.useRealTimers()
-        Object.defineProperty(window, 'matchMedia', {
-            configurable: true,
-            writable: true,
-            value: vi.fn().mockReturnValue({
-                matches: true,
-                media: '(pointer: coarse)',
-                onchange: null,
-                addListener: vi.fn(),
-                removeListener: vi.fn(),
-                addEventListener: vi.fn(),
-                removeEventListener: vi.fn(),
-                dispatchEvent: vi.fn(),
-            }),
-        })
+        vi.mocked(getPreferredPrintView).mockReturnValue('html')
 
         render(
             <PdfPreviewClient
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
+                assistViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=assist"
                 htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
                 backFallbackPath="/dashboard"
             />
@@ -190,6 +184,30 @@ describe('PDFプレビューの戻る動作', () => {
         expect(await screen.findByRole('link', { name: '印刷ページで開く' })).toHaveAttribute(
             'href',
             '/dashboard/print?subjectId=subject-1&sets=1&view=html',
+        )
+        expect(screen.queryByTitle('印刷プレビュー')).not.toBeInTheDocument()
+    })
+
+    it('iPhone/iPad では印刷アシスト画面への導線を表示する', async () => {
+        vi.useRealTimers()
+        vi.mocked(getPreferredPrintView).mockReturnValue('assist')
+
+        render(
+            <PdfPreviewClient
+                pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
+                assistViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=assist"
+                htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
+                backFallbackPath="/dashboard"
+            />
+        )
+
+        expect(await screen.findByRole('link', { name: '印刷アシストを開く' })).toHaveAttribute(
+            'href',
+            '/dashboard/print?subjectId=subject-1&sets=1&view=assist',
+        )
+        expect(screen.getByRole('link', { name: 'PDFを開く' })).toHaveAttribute(
+            'href',
+            '/api/print/pdf?subjectId=subject-1&sets=1',
         )
         expect(screen.queryByTitle('印刷プレビュー')).not.toBeInTheDocument()
     })
