@@ -40,15 +40,27 @@ describe('print-document', () => {
     });
 
     it('QRコード生成に失敗した場合は文脈付きのエラーを投げる', async () => {
+        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
         const qrSpy = vi.spyOn(QRCode, 'toDataURL').mockRejectedValueOnce(new Error('boom'));
 
-        await expect(buildPrintDocumentMarkup({
+        const { markup } = await buildPrintDocumentMarkup({
             studentName: '生徒C',
             studentLoginId: 'student-c',
             subjectName: '国語',
             problemSets: [[{ id: '1', customId: 'J-1', question: 'question', order: 1 }]],
-        })).rejects.toThrow('QRコード生成に失敗しました');
+        });
 
+        expect(markup).toContain('data:image/svg+xml');
+        expect(markup).toContain('QR%20unavailable');
+        expect(consoleSpy).toHaveBeenCalledWith(
+            '[print-document] QRコード生成に失敗しました',
+            expect.objectContaining({
+                studentLoginId: 'student-c',
+                problemIds: ['J-1'],
+            }),
+        );
+
+        consoleSpy.mockRestore();
         qrSpy.mockRestore();
     });
 });

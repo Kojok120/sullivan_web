@@ -239,10 +239,11 @@ export async function buildPrintDocumentMarkup(input: PrintDocumentInput): Promi
             });
         } catch (error) {
             console.error('[print-document] QRコード生成に失敗しました', {
+                error,
                 studentLoginId: input.studentLoginId,
                 problemIds,
             });
-            throw new Error('QRコード生成に失敗しました', { cause: error });
+            return buildQrFallbackDataUrl();
         }
     }));
 
@@ -360,6 +361,22 @@ function renderSheetHeader(input: {
 
 export function getProblemDisplayId(problem: PrintableProblem): string {
     return problem.customId || problem.id;
+}
+
+function buildQrFallbackDataUrl(): string {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="280" height="280" viewBox="0 0 280 280">
+    <rect width="280" height="280" rx="18" fill="#ffffff" stroke="#111827" stroke-width="8" />
+    <text x="50%" y="46%" text-anchor="middle" font-family="Arial, sans-serif" font-size="34" font-weight="700" fill="#111827">
+        QR unavailable
+    </text>
+    <text x="50%" y="62%" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" fill="#4b5563">
+        Please regenerate
+    </text>
+</svg>
+`.trim();
+
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
 function escapeHtml(value: string): string {
