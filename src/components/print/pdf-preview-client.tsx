@@ -1,37 +1,40 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { ArrowLeft, ExternalLink, Loader2, Printer } from 'lucide-react';
 
 import { appendCacheBust } from '@/components/print/cache-bust';
 import { Button } from '@/components/ui/button';
+import { usePrintNavigation } from '@/hooks/use-print-navigation';
+import { getPreferredPrintView } from '@/lib/print-view';
 
 type PdfPreviewClientProps = {
     pdfUrl: string;
+    htmlViewUrl?: string;
     backFallbackPath: string;
 };
 
 const RESTORE_RELOAD_THROTTLE_MS = 250;
 
-export function PdfPreviewClient({ pdfUrl, backFallbackPath }: PdfPreviewClientProps) {
+export function PdfPreviewClient({ pdfUrl, htmlViewUrl, backFallbackPath }: PdfPreviewClientProps) {
     return (
         <PdfPreviewClientInner
             key={pdfUrl}
             pdfUrl={pdfUrl}
+            htmlViewUrl={htmlViewUrl}
             backFallbackPath={backFallbackPath}
         />
     );
 }
 
-function PdfPreviewClientInner({ pdfUrl, backFallbackPath }: PdfPreviewClientProps) {
-    const router = useRouter();
+function PdfPreviewClientInner({ pdfUrl, htmlViewUrl, backFallbackPath }: PdfPreviewClientProps) {
     const iframeRef = useRef<HTMLIFrameElement | null>(null);
-    const closeFallbackTimerRef = useRef<number | null>(null);
     const hasLoadedFrameRef = useRef(false);
     const lastReloadAtRef = useRef(0);
     const [frameUrl, setFrameUrl] = useState(pdfUrl);
     const [isFrameLoaded, setIsFrameLoaded] = useState(false);
+    const prefersHtmlPrintView = htmlViewUrl ? getPreferredPrintView() === 'html' : false;
+    const { handleBack } = usePrintNavigation(backFallbackPath);
 
     const triggerPrint = useCallback(() => {
         const frame = iframeRef.current;
@@ -95,52 +98,46 @@ function PdfPreviewClientInner({ pdfUrl, backFallbackPath }: PdfPreviewClientPro
         };
     }, [reloadFrame]);
 
-    useEffect(() => {
-        return () => {
-            if (closeFallbackTimerRef.current !== null) {
-                window.clearTimeout(closeFallbackTimerRef.current);
-            }
-        };
-    }, []);
+    if (prefersHtmlPrintView && htmlViewUrl) {
+        return (
+            <div className="min-h-screen bg-gray-100 px-4 py-4 md:px-6 md:py-6">
+                <div className="mx-auto flex w-full max-w-[720px] flex-col gap-4">
+                    <div className="rounded-md bg-white p-5 shadow-sm">
+                        <div className="flex flex-col gap-4">
+                            <div className="flex items-center gap-2">
+                                <Button variant="outline" onClick={handleBack}>
+                                    <ArrowLeft className="mr-2 h-4 w-4" />
+                                    戻る
+                                </Button>
+                            </div>
 
-    const closeTabOrFallback = useCallback(() => {
-        window.close();
-        if (closeFallbackTimerRef.current !== null) {
-            window.clearTimeout(closeFallbackTimerRef.current);
-        }
-        closeFallbackTimerRef.current = window.setTimeout(() => {
-            if (!window.closed) {
-                router.push(backFallbackPath);
-            }
-        }, 120);
-    }, [backFallbackPath, router]);
+                            <div className="space-y-2">
+                                <h1 className="text-lg font-semibold">スマホでは専用の印刷画面を開いてください</h1>
+                                <p className="text-sm text-muted-foreground">
+                                    PDF 埋め込みプレビューはスマホ・タブレットで正しく印刷できない場合があります。
+                                </p>
+                            </div>
 
-    const handleBack = useCallback(() => {
-        const hasOpener = (() => {
-            try {
-                return !!window.opener && !window.opener.closed;
-            } catch {
-                return false;
-            }
-        })();
-
-        if (hasOpener) {
-            try {
-                window.opener?.focus();
-            } catch {
-                // opener のフォーカス権限がない場合は無視して閉じる処理を続行
-            }
-            closeTabOrFallback();
-            return;
-        }
-
-        if (window.history.length <= 1) {
-            closeTabOrFallback();
-            return;
-        }
-
-        router.back();
-    }, [closeTabOrFallback, router]);
+                            <div className="flex flex-col gap-2 sm:flex-row">
+                                <Button asChild>
+                                    <a href={htmlViewUrl}>
+                                        <Printer className="mr-2 h-4 w-4" />
+                                        印刷ページで開く
+                                    </a>
+                                </Button>
+                                <Button variant="ghost" asChild>
+                                    <a href={frameUrl} target="_blank" rel="noopener noreferrer">
+                                        PDFを別タブで開く
+                                        <ExternalLink className="ml-2 h-4 w-4" />
+                                    </a>
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gray-100 px-4 py-4 md:px-6 md:py-6">

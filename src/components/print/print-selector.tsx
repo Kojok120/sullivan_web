@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dialog';
 import { markLectureAsWatched } from '@/lib/api/lecture-watched-client';
 import type { LectureVideo } from '@/lib/lecture-videos';
+import { getPreferredPrintView } from '@/lib/print-view';
 import { getSubjectConfig } from '@/lib/subject-config';
 import { cn } from '@/lib/utils';
 import { getEmbedUrl, getYouTubeId } from '@/lib/youtube';
@@ -109,6 +110,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
             subjectId: selectedSubjectId,
             sets: String(sets),
             gateChecked: '1',
+            view: getPreferredPrintView(),
         });
         const printUrl = appendCacheBust(`/dashboard/print?${params.toString()}`);
         const previewTab = window.open('', '_blank');

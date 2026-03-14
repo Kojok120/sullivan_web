@@ -6,7 +6,7 @@ import { getPrintGate } from '@/lib/print-gate-service';
 export default async function StudentPrintPage({
     searchParams,
 }: {
-    searchParams: Promise<{ subjectId?: string; coreProblemId?: string; sets?: string; autoprint?: string; gateChecked?: string }>;
+    searchParams: Promise<{ subjectId?: string; coreProblemId?: string; sets?: string; autoprint?: string; gateChecked?: string; view?: string }>;
 }) {
     const session = await getSession();
     if (!session) redirect('/login');
@@ -33,6 +33,8 @@ export default async function StudentPrintPage({
         <SharedStudentPrintPage
             searchParams={params}
             redirectPathIfMissing="/dashboard"
+            printPagePath="/dashboard/print"
+            targetUserId={session.userId}
         />
     );
 }
