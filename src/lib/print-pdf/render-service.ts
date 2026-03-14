@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import {
     buildPrintDocumentMarkup,
     buildStandalonePrintDocumentHtml,
+    getProblemDisplayId,
 } from '@/lib/print-document';
 import type { PrintableProblem } from '@/lib/print-types';
 import { getPdfBrowser } from '@/lib/print-pdf/browser';
@@ -186,10 +187,6 @@ function estimatePdfPageCount(buffer: Buffer): number {
     const raw = buffer.toString('latin1');
     const matches = raw.match(/\/Type\s*\/Page\b/g);
     return matches ? matches.length : 0;
-}
-
-function getProblemDisplayId(problem: PrintableProblem): string {
-    return problem.customId || problem.id;
 }
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {

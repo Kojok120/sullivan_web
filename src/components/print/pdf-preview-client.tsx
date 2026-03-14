@@ -1,11 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { ArrowLeft, ExternalLink, Loader2, Printer } from 'lucide-react';
 
 import { appendCacheBust } from '@/components/print/cache-bust';
 import { Button } from '@/components/ui/button';
+import { usePrintNavigation } from '@/hooks/use-print-navigation';
 import { getPreferredPrintView } from '@/lib/print-view';
 
 type PdfPreviewClientProps = {
@@ -28,14 +28,13 @@ export function PdfPreviewClient({ pdfUrl, htmlViewUrl, backFallbackPath }: PdfP
 }
 
 function PdfPreviewClientInner({ pdfUrl, htmlViewUrl, backFallbackPath }: PdfPreviewClientProps) {
-    const router = useRouter();
     const iframeRef = useRef<HTMLIFrameElement | null>(null);
-    const closeFallbackTimerRef = useRef<number | null>(null);
     const hasLoadedFrameRef = useRef(false);
     const lastReloadAtRef = useRef(0);
     const [frameUrl, setFrameUrl] = useState(pdfUrl);
     const [isFrameLoaded, setIsFrameLoaded] = useState(false);
     const prefersHtmlPrintView = htmlViewUrl ? getPreferredPrintView() === 'html' : false;
+    const { handleBack } = usePrintNavigation(backFallbackPath);
 
     const triggerPrint = useCallback(() => {
         const frame = iframeRef.current;
@@ -98,53 +97,6 @@ function PdfPreviewClientInner({ pdfUrl, htmlViewUrl, backFallbackPath }: PdfPre
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, [reloadFrame]);
-
-    useEffect(() => {
-        return () => {
-            if (closeFallbackTimerRef.current !== null) {
-                window.clearTimeout(closeFallbackTimerRef.current);
-            }
-        };
-    }, []);
-
-    const closeTabOrFallback = useCallback(() => {
-        window.close();
-        if (closeFallbackTimerRef.current !== null) {
-            window.clearTimeout(closeFallbackTimerRef.current);
-        }
-        closeFallbackTimerRef.current = window.setTimeout(() => {
-            if (!window.closed) {
-                router.push(backFallbackPath);
-            }
-        }, 120);
-    }, [backFallbackPath, router]);
-
-    const handleBack = useCallback(() => {
-        const hasOpener = (() => {
-            try {
-                return !!window.opener && !window.opener.closed;
-            } catch {
-                return false;
-            }
-        })();
-
-        if (hasOpener) {
-            try {
-                window.opener?.focus();
-            } catch {
-                // opener のフォーカス権限がない場合は無視して閉じる処理を続行
-            }
-            closeTabOrFallback();
-            return;
-        }
-
-        if (window.history.length <= 1) {
-            closeTabOrFallback();
-            return;
-        }
-
-        router.back();
-    }, [closeTabOrFallback, router]);
 
     if (prefersHtmlPrintView && htmlViewUrl) {
         return (

@@ -231,11 +231,19 @@ export async function buildPrintDocumentMarkup(input: PrintDocumentInput): Promi
             ...(input.unitToken ? { u: input.unitToken } : {}),
         };
 
-        return await QRCode.toDataURL(JSON.stringify(qrPayload), {
-            errorCorrectionLevel: 'M',
-            width: 280,
-            margin: 2,
-        });
+        try {
+            return await QRCode.toDataURL(JSON.stringify(qrPayload), {
+                errorCorrectionLevel: 'M',
+                width: 280,
+                margin: 2,
+            });
+        } catch (error) {
+            console.error('[print-document] QRコード生成に失敗しました', {
+                studentLoginId: input.studentLoginId,
+                problemIds,
+            });
+            throw new Error('QRコード生成に失敗しました', { cause: error });
+        }
     }));
 
     const sections = input.problemSets.map((setProblems, setIndex) => {
@@ -350,7 +358,7 @@ function renderSheetHeader(input: {
     `;
 }
 
-function getProblemDisplayId(problem: PrintableProblem): string {
+export function getProblemDisplayId(problem: PrintableProblem): string {
     return problem.customId || problem.id;
 }
 

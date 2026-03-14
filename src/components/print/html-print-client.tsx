@@ -1,10 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
 import { ArrowLeft, ExternalLink, Printer } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { usePrintNavigation } from '@/hooks/use-print-navigation';
 
 type HtmlPrintClientProps = {
     backFallbackPath: string;
@@ -12,55 +11,7 @@ type HtmlPrintClientProps = {
 };
 
 export function HtmlPrintClient({ backFallbackPath, pdfUrl }: HtmlPrintClientProps) {
-    const router = useRouter();
-    const closeFallbackTimerRef = useRef<number | null>(null);
-
-    useEffect(() => {
-        return () => {
-            if (closeFallbackTimerRef.current !== null) {
-                window.clearTimeout(closeFallbackTimerRef.current);
-            }
-        };
-    }, []);
-
-    const closeTabOrFallback = useCallback(() => {
-        window.close();
-        if (closeFallbackTimerRef.current !== null) {
-            window.clearTimeout(closeFallbackTimerRef.current);
-        }
-        closeFallbackTimerRef.current = window.setTimeout(() => {
-            if (!window.closed) {
-                router.push(backFallbackPath);
-            }
-        }, 120);
-    }, [backFallbackPath, router]);
-
-    const handleBack = useCallback(() => {
-        const hasOpener = (() => {
-            try {
-                return !!window.opener && !window.opener.closed;
-            } catch {
-                return false;
-            }
-        })();
-
-        if (hasOpener) {
-            try {
-                window.opener?.focus();
-            } catch {
-                // opener のフォーカス権限がない場合は無視して閉じる処理を続行する
-            }
-            closeTabOrFallback();
-            return;
-        }
-
-        if (window.history.length <= 1) {
-            closeTabOrFallback();
-            return;
-        }
-
-        router.back();
-    }, [closeTabOrFallback, router]);
+    const { handleBack } = usePrintNavigation(backFallbackPath);
 
     return (
         <div className="print-toolbar mx-auto flex w-full max-w-[1200px] flex-col gap-3 rounded-md bg-white p-3 shadow-sm md:flex-row md:items-center md:justify-between">

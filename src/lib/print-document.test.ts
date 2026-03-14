@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import QRCode from 'qrcode';
+import { describe, expect, it, vi } from 'vitest';
 
 import { buildPrintDocumentMarkup } from './print-document';
 
@@ -36,5 +37,18 @@ describe('print-document', () => {
         expect(markup).toContain('sheet answer-sheet sheet-break');
         expect(markup).toContain('sheet sheet-break');
         expect(markup).toContain('Set 2');
+    });
+
+    it('QRコード生成に失敗した場合は文脈付きのエラーを投げる', async () => {
+        const qrSpy = vi.spyOn(QRCode, 'toDataURL').mockRejectedValueOnce(new Error('boom'));
+
+        await expect(buildPrintDocumentMarkup({
+            studentName: '生徒C',
+            studentLoginId: 'student-c',
+            subjectName: '国語',
+            problemSets: [[{ id: '1', customId: 'J-1', question: 'question', order: 1 }]],
+        })).rejects.toThrow('QRコード生成に失敗しました');
+
+        qrSpy.mockRestore();
     });
 });

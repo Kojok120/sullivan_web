@@ -19,9 +19,10 @@ export function detectPreferredPrintViewFromEnvironment(environment: PrintViewEn
 
     const isIPhone = /iPhone/i.test(userAgent);
     const isIPad = /iPad/i.test(userAgent) || (platform === 'MacIntel' && maxTouchPoints > 1);
-    const isAndroidMobile = /Android/i.test(userAgent) || /Mobile/i.test(userAgent);
+    // Android に加えて、iPhone/iPad 以外で Mobile を含む UA も HTML 印刷へ寄せる。
+    const isMobileDevice = /Android/i.test(userAgent) || /Mobile/i.test(userAgent);
 
-    return isIPhone || isIPad || isAndroidMobile || coarsePointer ? 'html' : 'pdf';
+    return isIPhone || isIPad || isMobileDevice || coarsePointer ? 'html' : 'pdf';
 }
 
 export function getPreferredPrintView(): PrintView {
