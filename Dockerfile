@@ -51,6 +51,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/server.ts ./server.ts
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/src ./src
 COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
+COPY --from=builder --chown=nextjs:nodejs /app/instructions ./instructions
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
 
 USER nextjs
