@@ -119,6 +119,7 @@ describe('印刷セレクター', () => {
             expect(printUrl.searchParams.get('subjectId')).toBe('subject-1');
             expect(printUrl.searchParams.get('sets')).toBe('1');
             expect(printUrl.searchParams.get('gateChecked')).toBe('1');
+            expect(printUrl.searchParams.get('view')).toBe('pdf');
             expect(printUrl.searchParams.get('cb')).toBeTruthy();
         });
     });
@@ -148,7 +149,9 @@ describe('印刷セレクター', () => {
 
         await waitFor(() => {
             expect(screen.getByText('「主語と動詞」がアンロックされました')).toBeInTheDocument();
-            expect(screen.getByRole('button', { name: '主語と動詞 の講義動画プレビューを再生' })).toBeInTheDocument();
+            const previewButton = screen.getByRole('button', { name: '主語と動詞 の講義動画プレビューを再生' });
+            expect(previewButton).toBeInTheDocument();
+            expect(previewButton).toBeEnabled();
             expect(screen.getByTitle('主語と動詞 のプレビュー')).toBeInTheDocument();
             expect(mockPopupClose).toHaveBeenCalledTimes(1);
             expect(mockRouter.push).not.toHaveBeenCalled();
@@ -287,6 +290,39 @@ describe('印刷セレクター', () => {
             expect(printUrl.searchParams.get('subjectId')).toBe('subject-1');
             expect(printUrl.searchParams.get('sets')).toBe('2');
             expect(printUrl.searchParams.get('gateChecked')).toBe('1');
+            expect(printUrl.searchParams.get('view')).toBe('pdf');
+        });
+    });
+
+    it('タッチ端末では HTML 印刷ページへ遷移する', async () => {
+        mockFetch.mockResolvedValue({
+            ok: true,
+            json: async () => ({ blocked: false }),
+        });
+
+        window.matchMedia = vi.fn().mockReturnValue({
+            matches: true,
+            media: '(pointer: coarse)',
+            onchange: null,
+            addListener: vi.fn(),
+            removeListener: vi.fn(),
+            addEventListener: vi.fn(),
+            removeEventListener: vi.fn(),
+            dispatchEvent: vi.fn(),
+        }) as unknown as typeof window.matchMedia;
+
+        render(
+            <PrintSelector
+                subjects={[{ subjectId: 'subject-1', subjectName: '英語' }]}
+            />
+        );
+
+        fireEvent.click(screen.getByText('English'));
+        fireEvent.click(screen.getByRole('button', { name: '印刷する' }));
+
+        await waitFor(() => {
+            const printUrl = new URL(mockPopup.location.href, 'http://localhost');
+            expect(printUrl.searchParams.get('view')).toBe('html');
         });
     });
 

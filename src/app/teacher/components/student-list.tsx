@@ -3,11 +3,19 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { DateDisplay } from '@/components/ui/date-display';
+import { SortIcon } from '@/components/ui/sort-icon';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { KeyboardEvent } from 'react';
-import { StudentStats } from '@/lib/analytics';
-import { User } from '@prisma/client';
+import type { StudentStats } from '@/lib/analytics';
+import type { User } from '@prisma/client';
+import type { StudentSortKey, StudentSortOrder } from '@/lib/student-sort';
+import {
+    DEFAULT_STUDENT_SORT_ORDER,
+    STUDENT_SORT_OPTIONS,
+} from './student-list-sort';
 
 type StudentWithStats = User & {
     group: string | null;
@@ -20,14 +28,28 @@ interface StudentListProps {
     linkPrefix?: string;
     /** 詳細ボタンを表示するか（デフォルト: false、クリックでナビゲーション） */
     showDetailButton?: boolean;
+    /** ソートUIを表示するか（デフォルト: false） */
+    enableSorting?: boolean;
+    /** 現在のソートキー */
+    sortBy?: StudentSortKey | null;
+    /** 現在のソート順 */
+    sortOrder?: StudentSortOrder;
 }
 
 export function StudentList({
     students,
     linkPrefix = '/teacher/students/',
     showDetailButton = false,
+    enableSorting = false,
+    sortBy = null,
+    sortOrder = 'asc',
 }: StudentListProps) {
     const router = useRouter();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
+    const currentSortBy = enableSorting ? sortBy : null;
+    const currentSortOrder = currentSortBy ? sortOrder : 'asc';
+
     const handleNavigateToStudent = (studentId: string) => {
         router.push(`${linkPrefix}${studentId}`);
     };
@@ -39,6 +61,82 @@ export function StudentList({
         }
     };
 
+    const updateSortParams = (nextSortBy: StudentSortKey | null, nextSortOrder: StudentSortOrder) => {
+        const params = new URLSearchParams(searchParams.toString());
+
+        if (nextSortBy) {
+            params.set('sortBy', nextSortBy);
+            params.set('sortOrder', nextSortOrder);
+        } else {
+            params.delete('sortBy');
+            params.delete('sortOrder');
+        }
+
+        const nextQuery = params.toString();
+        router.push(nextQuery ? `${pathname}?${nextQuery}` : pathname);
+    };
+
+    const handleSort = (column: StudentSortKey) => {
+        if (!enableSorting) return;
+
+        if (currentSortBy === column) {
+            updateSortParams(column, currentSortOrder === 'asc' ? 'desc' : 'asc');
+            return;
+        }
+
+        updateSortParams(column, DEFAULT_STUDENT_SORT_ORDER[column]);
+    };
+
+    const handleSortSelection = (value: string) => {
+        if (value === 'default') {
+            updateSortParams(null, 'asc');
+            return;
+        }
+
+        // STUDENT_SORT_OPTIONS 由来の値のみを受け取るため、StudentSortKey への変換は安全。
+        const nextSortBy = value as StudentSortKey;
+        updateSortParams(nextSortBy, DEFAULT_STUDENT_SORT_ORDER[nextSortBy]);
+    };
+
+    const toggleSortOrder = () => {
+        if (!currentSortBy) return;
+        updateSortParams(currentSortBy, currentSortOrder === 'asc' ? 'desc' : 'asc');
+    };
+
+    const renderSortableHead = (
+        label: string,
+        column: StudentSortKey,
+        align: 'left' | 'right' = 'left',
+    ) => {
+        const isActive = currentSortBy === column;
+        const ariaSort = isActive ? (currentSortOrder === 'asc' ? 'ascending' : 'descending') : 'none';
+
+        if (!enableSorting) {
+            return <TableHead className={align === 'right' ? 'text-right' : undefined}>{label}</TableHead>;
+        }
+
+        return (
+            <TableHead aria-sort={ariaSort} className={align === 'right' ? 'text-right' : undefined}>
+                <button
+                    type="button"
+                    className={cn(
+                        'inline-flex w-full items-center gap-1 font-medium hover:text-foreground',
+                        align === 'right' ? 'justify-end' : 'justify-start',
+                    )}
+                    onClick={() => handleSort(column)}
+                >
+                    <span>{label}</span>
+                    <SortIcon active={isActive} sortOrder={currentSortOrder} className="ml-1" />
+                    {isActive && (
+                        <span className="text-xs text-muted-foreground" aria-hidden="true">
+                            {currentSortOrder === 'asc' ? '昇' : '降'}
+                        </span>
+                    )}
+                </button>
+            </TableHead>
+        );
+    };
+
     const renderEmpty = () => (
         <div className="rounded-md border py-8 text-center text-sm text-muted-foreground">
             条件に一致する生徒が見つかりません
@@ -47,6 +145,34 @@ export function StudentList({
 
     return (
         <div className="space-y-3">
+            {enableSorting && (
+                <div className="flex items-center gap-2 md:hidden">
+                    <Select value={currentSortBy ?? 'default'} onValueChange={handleSortSelection}>
+                        <SelectTrigger className="w-full bg-background">
+                            <SelectValue placeholder="並び順" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="default">標準（現在の表示順）</SelectItem>
+                            {STUDENT_SORT_OPTIONS.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="min-w-20"
+                        onClick={toggleSortOrder}
+                        disabled={!currentSortBy}
+                    >
+                        {currentSortOrder === 'asc' ? '昇順' : '降順'}
+                    </Button>
+                </div>
+            )}
+
             <div className="space-y-3 md:hidden">
                 {students.length === 0 ? (
                     renderEmpty()
@@ -62,9 +188,12 @@ export function StudentList({
                         >
                             <div className="mb-3">
                                 <p className="text-base font-semibold">{student.name || '未設定'}</p>
-                                <p className="text-xs text-muted-foreground">{student.loginId}</p>
                             </div>
                             <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+                                <div>
+                                    <p className="text-xs text-muted-foreground">生徒ID</p>
+                                    <p>{student.loginId}</p>
+                                </div>
                                 <div>
                                     <p className="text-xs text-muted-foreground">グループ</p>
                                     <p>{student.group || '-'}</p>
@@ -110,11 +239,12 @@ export function StudentList({
                     <TableHeader>
                         <TableRow>
                             <TableHead>名前</TableHead>
+                            {renderSortableHead('生徒ID', 'loginId')}
                             <TableHead>グループ</TableHead>
-                            <TableHead className="text-right">総回答数</TableHead>
+                            {renderSortableHead('総回答数', 'totalProblemsSolved', 'right')}
                             <TableHead className="text-right">正答率</TableHead>
-                            <TableHead className="text-right">連続学習</TableHead>
-                            <TableHead className="text-right">最終学習日</TableHead>
+                            {renderSortableHead('連続学習', 'currentStreak', 'right')}
+                            {renderSortableHead('最終学習日', 'lastActivity', 'right')}
                             {showDetailButton && <TableHead className="text-right">詳細</TableHead>}
                         </TableRow>
                     </TableHeader>
@@ -129,9 +259,9 @@ export function StudentList({
                                 onKeyDown={showDetailButton ? undefined : (event) => handleInteractiveKeyDown(event, student.id)}
                             >
                                 <TableCell className="font-medium">
-                                    <div>{student.name || '未設定'}</div>
-                                    <div className="text-xs text-muted-foreground">{student.loginId}</div>
+                                    {student.name || '未設定'}
                                 </TableCell>
+                                <TableCell>{student.loginId}</TableCell>
                                 <TableCell>{student.group || '-'}</TableCell>
                                 <TableCell className="text-right">{student.stats.totalProblemsSolved}問</TableCell>
                                 <TableCell className="text-right">
@@ -159,7 +289,7 @@ export function StudentList({
                         ))}
                         {students.length === 0 && (
                             <TableRow>
-                                <TableCell colSpan={showDetailButton ? 7 : 6} className="text-center py-8 text-muted-foreground">
+                                <TableCell colSpan={showDetailButton ? 8 : 7} className="text-center py-8 text-muted-foreground">
                                     条件に一致する生徒が見つかりません
                                 </TableCell>
                             </TableRow>

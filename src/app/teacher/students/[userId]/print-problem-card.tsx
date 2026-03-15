@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Printer, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { appendCacheBust } from '@/components/print/cache-bust';
+import { getPreferredPrintView } from '@/lib/print-view';
 
 interface Subject {
     id: string;
@@ -60,6 +61,7 @@ export function PrintProblemCard({ userId, subjects }: PrintProblemCardProps) {
         const query = new URLSearchParams({
             subjectId: selectedSubjectId,
             sets: String(sets),
+            view: getPreferredPrintView(),
         });
         if (selectedCoreProblemId && selectedCoreProblemId !== 'all') {
             query.set('coreProblemId', selectedCoreProblemId);

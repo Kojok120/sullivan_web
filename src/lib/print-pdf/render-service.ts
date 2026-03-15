@@ -1,9 +1,11 @@
 import crypto from 'node:crypto';
 
-import QRCode from 'qrcode';
-
+import {
+    buildPrintDocumentMarkup,
+    buildStandalonePrintDocumentHtml,
+    getProblemDisplayId,
+} from '@/lib/print-document';
 import type { PrintableProblem } from '@/lib/print-types';
-import { compressProblemIds } from '@/lib/qr-utils';
 import { getPdfBrowser } from '@/lib/print-pdf/browser';
 
 const PDF_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -114,28 +116,14 @@ export async function getOrCreatePrintPdf(input: PrintPdfInput): Promise<PrintPd
 }
 
 async function renderPdfEntry(input: PrintPdfInput): Promise<PdfCacheEntry> {
-    const qrCodeBySet = await Promise.all(input.problemSets.map(async (setProblems) => {
-        const problemIds = setProblems.map((problem) => getProblemDisplayId(problem));
-        const compressed = compressProblemIds(problemIds);
-        const qrPayload = {
-            s: input.studentLoginId,
-            ...compressed,
-            ...(input.unitToken ? { u: input.unitToken } : {}),
-        };
-        return await QRCode.toDataURL(JSON.stringify(qrPayload), {
-            errorCorrectionLevel: 'M',
-            width: 280,
-            margin: 2,
-        });
-    }));
-
-    const html = buildPrintHtml({
+    const { markup, cssText } = await buildPrintDocumentMarkup({
         studentName: input.studentName,
         studentLoginId: input.studentLoginId,
         subjectName: input.subjectName,
         problemSets: input.problemSets,
-        qrCodeBySet,
+        unitToken: input.unitToken,
     });
+    const html = buildStandalonePrintDocumentHtml({ markup, cssText });
 
     const browser = await getPdfBrowser();
     const page = await browser.newPage();
@@ -193,280 +181,6 @@ async function renderPdfEntry(input: PrintPdfInput): Promise<PdfCacheEntry> {
             // 既に閉じられている場合は無視する。
         });
     }
-}
-
-function buildPrintHtml(input: {
-    studentName: string;
-    studentLoginId: string;
-    subjectName: string;
-    problemSets: PrintableProblem[][];
-    qrCodeBySet: string[];
-}): string {
-    const sections = input.problemSets.map((setProblems, setIndex) => {
-        const setLabel = input.problemSets.length > 1 ? ` (Set ${setIndex + 1})` : '';
-
-        const questionRows = setProblems.map((problem) => {
-            const displayId = getProblemDisplayId(problem);
-            const questionText = escapeHtml(problem.question ?? '').replace(/\n/g, '<br />');
-            return `
-                <article class="question-row">
-                    <div class="question-id">${escapeHtml(displayId)}.</div>
-                    <div class="question-text">${questionText}</div>
-                </article>
-            `;
-        }).join('');
-
-        const answerRows = setProblems.map((problem) => {
-            const displayId = getProblemDisplayId(problem);
-            return `
-                <div class="answer-row">
-                    <div class="answer-id">${escapeHtml(displayId)}.</div>
-                    <div class="answer-prefix">A.</div>
-                    <div class="answer-line"></div>
-                </div>
-            `;
-        }).join('');
-
-        return `
-            <section class="sheet ${setIndex > 0 ? 'sheet-break' : ''}">
-                ${renderSheetHeader({
-                    title: `${input.subjectName}${setLabel}`,
-                    studentName: input.studentName,
-                    studentLoginId: input.studentLoginId,
-                    sheetType: '問題',
-                })}
-                <div class="question-list">
-                    ${questionRows}
-                </div>
-                <div class="sheet-footer">Sullivan</div>
-            </section>
-
-            <section class="sheet answer-sheet sheet-break">
-                ${renderSheetHeader({
-                    title: `${input.subjectName}${setLabel}`,
-                    studentName: input.studentName,
-                    studentLoginId: input.studentLoginId,
-                    sheetType: '解答用紙',
-                })}
-                <img class="qr-image" src="${input.qrCodeBySet[setIndex] || ''}" alt="QRコード" />
-                <div class="answer-list">
-                    ${answerRows}
-                </div>
-                <div class="sheet-footer">Sullivan</div>
-            </section>
-        `;
-    }).join('');
-
-    return `
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Sullivan Print PDF</title>
-    <style>
-        @page {
-            size: A4;
-            margin: 12mm;
-        }
-
-        * {
-            box-sizing: border-box;
-        }
-
-        body {
-            margin: 0;
-            color: #111827;
-            background: #ffffff;
-            font-family: "Noto Sans CJK JP", "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
-            font-size: 14px;
-            line-height: 1.5;
-            print-color-adjust: exact;
-            -webkit-print-color-adjust: exact;
-        }
-
-        .sheet {
-            width: 100%;
-            break-inside: auto;
-            page-break-inside: auto;
-        }
-
-        .sheet-break {
-            break-before: page;
-            page-break-before: always;
-        }
-
-        .sheet-header {
-            border-bottom: 2px solid #111827;
-            padding-bottom: 3mm;
-            margin-bottom: 6mm;
-            display: flex;
-            align-items: flex-end;
-            justify-content: space-between;
-            gap: 6mm;
-        }
-
-        .sheet-title-wrap {
-            display: flex;
-            align-items: flex-end;
-            gap: 8mm;
-            flex-wrap: wrap;
-            padding-right: 32mm;
-        }
-
-        .sheet-title {
-            font-size: 22px;
-            font-weight: 700;
-            line-height: 1.2;
-        }
-
-        .student-info {
-            font-size: 18px;
-            font-weight: 700;
-            line-height: 1.25;
-        }
-
-        .sheet-type {
-            font-size: 14px;
-            color: #374151;
-            font-weight: 600;
-            white-space: nowrap;
-            padding-bottom: 1mm;
-        }
-
-        .question-list {
-            display: block;
-        }
-
-        .question-row {
-            display: flex;
-            align-items: flex-start;
-            gap: 4mm;
-            margin-bottom: 5.5mm;
-            break-inside: avoid-page;
-            page-break-inside: avoid;
-        }
-
-        .question-id {
-            width: 26mm;
-            min-width: 26mm;
-            text-align: right;
-            font-size: 17px;
-            font-weight: 700;
-            line-height: 1.45;
-            padding-top: 0.5mm;
-        }
-
-        .question-text {
-            flex: 1;
-            border-bottom: 1px solid #d1d5db;
-            font-size: 18px;
-            font-weight: 500;
-            line-height: 1.72;
-            white-space: pre-wrap;
-            padding: 0.5mm 0 4mm;
-            min-height: 14mm;
-        }
-
-        .answer-sheet {
-            position: relative;
-            min-height: calc(297mm - 24mm);
-            display: flex;
-            flex-direction: column;
-        }
-
-        .qr-image {
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 26mm;
-            height: 26mm;
-            object-fit: contain;
-        }
-
-        .answer-list {
-            margin-top: 8mm;
-            flex: 1;
-        }
-
-        .answer-row {
-            display: flex;
-            align-items: flex-end;
-            gap: 4mm;
-            margin-bottom: 9mm;
-            break-inside: avoid-page;
-            page-break-inside: avoid;
-        }
-
-        .answer-id {
-            width: 28mm;
-            min-width: 28mm;
-            text-align: right;
-            font-size: 20px;
-            font-weight: 700;
-            line-height: 1.1;
-        }
-
-        .answer-prefix {
-            font-size: 22px;
-            font-weight: 700;
-            line-height: 1;
-            min-width: 12mm;
-            padding-bottom: 1.5mm;
-        }
-
-        .answer-line {
-            flex: 1;
-            border-bottom: 2px solid #111827;
-            min-height: 9mm;
-        }
-
-        .sheet-footer {
-            margin-top: 10mm;
-            border-top: 1px solid #d1d5db;
-            padding-top: 2.5mm;
-            text-align: center;
-            color: #6b7280;
-            font-size: 11px;
-            letter-spacing: 0.2px;
-        }
-    </style>
-</head>
-<body>
-    ${sections}
-</body>
-</html>
-`;
-}
-
-function renderSheetHeader(input: {
-    title: string;
-    studentName: string;
-    studentLoginId: string;
-    sheetType: '問題' | '解答用紙';
-}): string {
-    return `
-        <header class="sheet-header">
-            <div class="sheet-title-wrap">
-                <div class="sheet-title">${escapeHtml(input.title)} ${input.sheetType}</div>
-                <div class="student-info">氏名: ${escapeHtml(input.studentName)} (ID: ${escapeHtml(input.studentLoginId)})</div>
-            </div>
-            <div class="sheet-type">${input.sheetType}</div>
-        </header>
-    `;
-}
-
-function getProblemDisplayId(problem: PrintableProblem): string {
-    return problem.customId || problem.id;
-}
-
-function escapeHtml(value: string): string {
-    return value
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/\"/g, '&quot;')
-        .replace(/'/g, '&#39;');
 }
 
 function estimatePdfPageCount(buffer: Buffer): number {
