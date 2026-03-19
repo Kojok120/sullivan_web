@@ -152,21 +152,26 @@ export default async function DashboardPage() {
             </section>
 
             <section className="grid gap-4 lg:grid-cols-12">
-                <Card className="lg:col-span-8">
-                    <CardHeader>
+                <Card className="min-w-0 lg:col-span-8">
+                    <CardHeader className="px-4 pb-3 sm:px-6">
                         <CardTitle>学習ヒートマップ</CardTitle>
                     </CardHeader>
-                    <CardContent>
-                        <Heatmap data={dailyActivity} />
+                    <CardContent className="px-4 pb-5 sm:px-6">
+                        <div className="sm:hidden">
+                            <Heatmap data={dailyActivity} days={90} />
+                        </div>
+                        <div className="hidden sm:block">
+                            <Heatmap data={dailyActivity} />
+                        </div>
                     </CardContent>
                 </Card>
 
-                <div className="space-y-4 lg:col-span-4">
-                    <Card>
+                <div className="min-w-0 space-y-4 lg:col-span-4">
+                    <Card className="min-w-0">
                         <CardHeader>
                             <CardTitle>教科別進捗</CardTitle>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="px-4 pb-5 sm:px-6">
                             <SubjectProgressList items={subjectProgress} />
                         </CardContent>
                     </Card>
