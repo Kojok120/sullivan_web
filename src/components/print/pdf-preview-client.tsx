@@ -6,7 +6,7 @@ import { ArrowLeft, ExternalLink, Loader2, Printer } from 'lucide-react';
 import { appendCacheBust } from '@/components/print/cache-bust';
 import { Button } from '@/components/ui/button';
 import { usePrintNavigation } from '@/hooks/use-print-navigation';
-import { type PrintView } from '@/lib/print-view';
+import { getPreferredPrintView, type PrintView } from '@/lib/print-view';
 
 type PdfPreviewClientProps = {
     pdfUrl: string;
@@ -49,8 +49,12 @@ function PdfPreviewClientInner({
     const lastReloadAtRef = useRef(0);
     const [frameUrl, setFrameUrl] = useState(pdfUrl);
     const [isFrameLoaded, setIsFrameLoaded] = useState(false);
-    const prefersAssistView = preferredPrintView === 'assist' && Boolean(assistViewUrl);
-    const prefersHtmlPrintView = preferredPrintView === 'html' && Boolean(htmlViewUrl);
+    const [clientPreferredPrintView, setClientPreferredPrintView] = useState<PrintView | null>(null);
+    const resolvedPreferredPrintView = preferredPrintView === 'pdf'
+        ? clientPreferredPrintView ?? preferredPrintView
+        : preferredPrintView;
+    const prefersAssistView = resolvedPreferredPrintView === 'assist' && Boolean(assistViewUrl);
+    const prefersHtmlPrintView = resolvedPreferredPrintView === 'html' && Boolean(htmlViewUrl);
     const { handleBack } = usePrintNavigation(backFallbackPath);
 
     const triggerPrint = useCallback(() => {
@@ -84,6 +88,20 @@ function PdfPreviewClientInner({
         setIsFrameLoaded(false);
         setFrameUrl(appendCacheBust(pdfUrl));
     }, [pdfUrl]);
+
+    useEffect(() => {
+        if (preferredPrintView !== 'pdf' || typeof window.requestAnimationFrame !== 'function') {
+            return;
+        }
+
+        const animationFrameId = window.requestAnimationFrame(() => {
+            setClientPreferredPrintView(getPreferredPrintView());
+        });
+
+        return () => {
+            window.cancelAnimationFrame(animationFrameId);
+        };
+    }, [preferredPrintView]);
 
     useEffect(() => {
         const handlePageShow = (event: PageTransitionEvent) => {
