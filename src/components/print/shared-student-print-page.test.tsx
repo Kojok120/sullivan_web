@@ -7,13 +7,19 @@ import { buildPrintDocumentMarkup } from '@/lib/print-document';
 
 const {
     redirectMock,
+    headersMock,
     htmlPrintClientMock,
     printAssistClientMock,
     pdfPreviewClientMock,
     getPrintDataMock,
     buildPrintDocumentMarkupMock,
 } = vi.hoisted(() => ({
-    redirectMock: vi.fn(),
+    redirectMock: vi.fn((path?: string) => {
+        throw new Error(`NEXT_REDIRECT:${path ?? ''}`);
+    }),
+    headersMock: vi.fn(async () => new Headers({
+        'user-agent': 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0 Mobile Safari/537.36',
+    })),
     htmlPrintClientMock: vi.fn(({ pdfUrl }: { pdfUrl: string }) => <div data-testid="html-print-client">{pdfUrl}</div>),
     printAssistClientMock: vi.fn(({ pdfUrl, htmlViewUrl }: { pdfUrl: string; htmlViewUrl: string }) => (
         <div
@@ -22,12 +28,18 @@ const {
             data-html-url={htmlViewUrl}
         />
     )),
-    pdfPreviewClientMock: vi.fn((props: { pdfUrl: string; assistViewUrl?: string; htmlViewUrl?: string }) => (
+    pdfPreviewClientMock: vi.fn((props: {
+        pdfUrl: string;
+        assistViewUrl?: string;
+        htmlViewUrl?: string;
+        preferredPrintView?: string;
+    }) => (
         <div
             data-testid="pdf-preview-client"
             data-pdf-url={props.pdfUrl}
             data-assist-url={props.assistViewUrl}
             data-html-url={props.htmlViewUrl}
+            data-preferred-view={props.preferredPrintView}
         />
     )),
     getPrintDataMock: vi.fn(),
@@ -36,6 +48,10 @@ const {
 
 vi.mock('next/navigation', () => ({
     redirect: redirectMock,
+}));
+
+vi.mock('next/headers', () => ({
+    headers: headersMock,
 }));
 
 vi.mock('@/components/print/html-print-client', () => ({
@@ -95,6 +111,20 @@ describe('SharedStudentPrintPage', () => {
         expect(buildPrintDocumentMarkup).not.toHaveBeenCalled();
     });
 
+    it('subjectId が無い場合は redirect を発生させる', async () => {
+        await expect(SharedStudentPrintPage({
+            searchParams: {
+                sets: '2',
+                view: 'pdf',
+            },
+            redirectPathIfMissing: '/dashboard',
+            printPagePath: '/dashboard/print',
+            targetUserId: 'student-1',
+        })).rejects.toThrow('NEXT_REDIRECT:/dashboard');
+
+        expect(redirectMock).toHaveBeenCalledWith('/dashboard');
+    });
+
     it('view=html では印刷データを構築して HTML 印刷画面を描画する', async () => {
         render(await SharedStudentPrintPage({
             searchParams: {
@@ -129,6 +159,7 @@ describe('SharedStudentPrintPage', () => {
         expect(pdfClient.getAttribute('data-pdf-url')).toContain('/api/print/pdf?subjectId=subject-1&sets=2');
         expect(pdfClient.getAttribute('data-assist-url')).toContain('/dashboard/print?subjectId=subject-1&sets=2&view=assist');
         expect(pdfClient.getAttribute('data-html-url')).toContain('/dashboard/print?subjectId=subject-1&sets=2&view=html');
+        expect(pdfClient.getAttribute('data-preferred-view')).toBe('html');
         expect(getPrintData).not.toHaveBeenCalled();
     });
 });

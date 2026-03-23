@@ -44,7 +44,7 @@ export function Heatmap({ data, days = 365 }: Props) {
         currentResponseDate.setDate(currentResponseDate.getDate() + 1);
     }
     if (currentWeek.length > 0) {
-        // Fill remaining days
+        // 残りの日を埋める
         while (currentWeek.length < 7) {
             currentWeek.push(null);
         }

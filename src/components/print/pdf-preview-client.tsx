@@ -6,18 +6,25 @@ import { ArrowLeft, ExternalLink, Loader2, Printer } from 'lucide-react';
 import { appendCacheBust } from '@/components/print/cache-bust';
 import { Button } from '@/components/ui/button';
 import { usePrintNavigation } from '@/hooks/use-print-navigation';
-import { getPreferredPrintView } from '@/lib/print-view';
+import { type PrintView } from '@/lib/print-view';
 
 type PdfPreviewClientProps = {
     pdfUrl: string;
     assistViewUrl?: string;
     htmlViewUrl?: string;
     backFallbackPath: string;
+    preferredPrintView?: PrintView;
 };
 
 const RESTORE_RELOAD_THROTTLE_MS = 250;
 
-export function PdfPreviewClient({ pdfUrl, assistViewUrl, htmlViewUrl, backFallbackPath }: PdfPreviewClientProps) {
+export function PdfPreviewClient({
+    pdfUrl,
+    assistViewUrl,
+    htmlViewUrl,
+    backFallbackPath,
+    preferredPrintView,
+}: PdfPreviewClientProps) {
     return (
         <PdfPreviewClientInner
             key={pdfUrl}
@@ -25,17 +32,23 @@ export function PdfPreviewClient({ pdfUrl, assistViewUrl, htmlViewUrl, backFallb
             assistViewUrl={assistViewUrl}
             htmlViewUrl={htmlViewUrl}
             backFallbackPath={backFallbackPath}
+            preferredPrintView={preferredPrintView}
         />
     );
 }
 
-function PdfPreviewClientInner({ pdfUrl, assistViewUrl, htmlViewUrl, backFallbackPath }: PdfPreviewClientProps) {
+function PdfPreviewClientInner({
+    pdfUrl,
+    assistViewUrl,
+    htmlViewUrl,
+    backFallbackPath,
+    preferredPrintView = 'pdf',
+}: PdfPreviewClientProps) {
     const iframeRef = useRef<HTMLIFrameElement | null>(null);
     const hasLoadedFrameRef = useRef(false);
     const lastReloadAtRef = useRef(0);
     const [frameUrl, setFrameUrl] = useState(pdfUrl);
     const [isFrameLoaded, setIsFrameLoaded] = useState(false);
-    const preferredPrintView = getPreferredPrintView();
     const prefersAssistView = preferredPrintView === 'assist' && Boolean(assistViewUrl);
     const prefersHtmlPrintView = preferredPrintView === 'html' && Boolean(htmlViewUrl);
     const { handleBack } = usePrintNavigation(backFallbackPath);

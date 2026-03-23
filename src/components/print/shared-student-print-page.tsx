@@ -1,3 +1,4 @@
+import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 
 import { appendCacheBust } from '@/components/print/cache-bust';
@@ -10,6 +11,7 @@ import {
 } from '@/lib/print-document';
 import { getPrintData } from '@/lib/print-service';
 import {
+    detectPreferredPrintViewFromEnvironment,
     type PrintView,
     sanitizePrintView,
 } from '@/lib/print-view';
@@ -132,12 +134,18 @@ export async function SharedStudentPrintPage({
         );
     }
 
+    const requestHeaders = await headers();
+    const preferredPrintView = detectPreferredPrintViewFromEnvironment({
+        userAgent: requestHeaders.get('user-agent') ?? undefined,
+    });
+
     return (
         <PdfPreviewClient
             pdfUrl={pdfUrl}
             assistViewUrl={assistViewUrl}
             htmlViewUrl={htmlViewUrl}
             backFallbackPath={redirectPathIfMissing}
+            preferredPrintView={preferredPrintView}
         />
     );
 }

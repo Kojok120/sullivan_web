@@ -3,14 +3,9 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import { useRouter } from 'next/navigation'
 
 import { PdfPreviewClient } from './pdf-preview-client'
-import { getPreferredPrintView } from '@/lib/print-view'
 
 vi.mock('next/navigation', () => ({
     useRouter: vi.fn(),
-}))
-
-vi.mock('@/lib/print-view', () => ({
-    getPreferredPrintView: vi.fn(() => 'pdf'),
 }))
 
 describe('PDFプレビューの戻る動作', () => {
@@ -30,7 +25,6 @@ describe('PDFプレビューの戻る動作', () => {
         vi.clearAllMocks()
         vi.useFakeTimers()
         vi.mocked(useRouter).mockReturnValue(mockRouter)
-        vi.mocked(getPreferredPrintView).mockReturnValue('pdf')
         originalVisibilityStateDescriptor = Object.getOwnPropertyDescriptor(document, 'visibilityState')
         originalMatchMediaDescriptor = Object.getOwnPropertyDescriptor(window, 'matchMedia')
         Object.defineProperty(window, 'opener', {
@@ -170,7 +164,6 @@ describe('PDFプレビューの戻る動作', () => {
 
     it('タッチ端末では HTML 印刷ページへの導線を表示する', async () => {
         vi.useRealTimers()
-        vi.mocked(getPreferredPrintView).mockReturnValue('html')
 
         render(
             <PdfPreviewClient
@@ -178,6 +171,7 @@ describe('PDFプレビューの戻る動作', () => {
                 assistViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=assist"
                 htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
                 backFallbackPath="/dashboard"
+                preferredPrintView="html"
             />
         )
 
@@ -190,7 +184,6 @@ describe('PDFプレビューの戻る動作', () => {
 
     it('iPhone/iPad では印刷アシスト画面への導線を表示する', async () => {
         vi.useRealTimers()
-        vi.mocked(getPreferredPrintView).mockReturnValue('assist')
 
         render(
             <PdfPreviewClient
@@ -198,6 +191,7 @@ describe('PDFプレビューの戻る動作', () => {
                 assistViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=assist"
                 htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
                 backFallbackPath="/dashboard"
+                preferredPrintView="assist"
             />
         )
 
