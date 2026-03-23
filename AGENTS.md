@@ -39,6 +39,12 @@ Sullivan は Next.js 16 (App Router) ベースの**学習管理システム（LM
 - UI コンポーネントは `shadcn/ui` + Radix UI をベースに構築
 - フォームには `react-hook-form` + `zod` バリデーションを使用
 
+## Review guidelines
+
+- `head=dev` かつ `base=main` のPRは、リリース反映用の同期PRとして扱う
+- 上記の同期PRでは Codex のレビューを実行せず、指摘コメントや修正提案を投稿しない
+- 上記以外のPRでは通常どおりコードレビューを行う
+
 ## 主要ディレクトリ
 
 ```

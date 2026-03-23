@@ -9,7 +9,6 @@ reviews:
     drafts: false
     base_branches:
       - "dev"
-      - "main"
     ignore_title_keywords:
       - WIP
       - DO NOT MERGE
