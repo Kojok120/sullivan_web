@@ -81,6 +81,7 @@ export async function SharedStudentPrintPage({
         return (
             <PrintAssistClient
                 backFallbackPath={redirectPathIfMissing}
+                htmlViewUrl={htmlViewUrl}
                 pdfUrl={pdfUrl}
             />
         );

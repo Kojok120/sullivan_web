@@ -15,7 +15,13 @@ const {
 } = vi.hoisted(() => ({
     redirectMock: vi.fn(),
     htmlPrintClientMock: vi.fn(({ pdfUrl }: { pdfUrl: string }) => <div data-testid="html-print-client">{pdfUrl}</div>),
-    printAssistClientMock: vi.fn(({ pdfUrl }: { pdfUrl: string }) => <div data-testid="print-assist-client">{pdfUrl}</div>),
+    printAssistClientMock: vi.fn(({ pdfUrl, htmlViewUrl }: { pdfUrl: string; htmlViewUrl: string }) => (
+        <div
+            data-testid="print-assist-client"
+            data-pdf-url={pdfUrl}
+            data-html-url={htmlViewUrl}
+        />
+    )),
     pdfPreviewClientMock: vi.fn((props: { pdfUrl: string; assistViewUrl?: string; htmlViewUrl?: string }) => (
         <div
             data-testid="pdf-preview-client"
@@ -82,7 +88,9 @@ describe('SharedStudentPrintPage', () => {
             targetUserId: 'student-1',
         }));
 
-        expect(screen.getByTestId('print-assist-client')).toHaveTextContent('/api/print/pdf?subjectId=subject-1&sets=2');
+        const assistClient = screen.getByTestId('print-assist-client');
+        expect(assistClient.getAttribute('data-pdf-url')).toContain('/api/print/pdf?subjectId=subject-1&sets=2');
+        expect(assistClient.getAttribute('data-html-url')).toContain('/dashboard/print?subjectId=subject-1&sets=2&view=html');
         expect(getPrintData).not.toHaveBeenCalled();
         expect(buildPrintDocumentMarkup).not.toHaveBeenCalled();
     });

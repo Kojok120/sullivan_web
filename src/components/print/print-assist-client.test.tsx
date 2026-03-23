@@ -118,6 +118,7 @@ describe('印刷アシストクライアント', () => {
         render(
             <PrintAssistClient
                 backFallbackPath="/dashboard"
+                htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
             />
         );
@@ -148,6 +149,7 @@ describe('印刷アシストクライアント', () => {
         render(
             <PrintAssistClient
                 backFallbackPath="/dashboard"
+                htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
             />
         );
@@ -196,6 +198,7 @@ describe('印刷アシストクライアント', () => {
         render(
             <PrintAssistClient
                 backFallbackPath="/dashboard"
+                htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
             />
         );
@@ -231,6 +234,7 @@ describe('印刷アシストクライアント', () => {
         render(
             <PrintAssistClient
                 backFallbackPath="/dashboard"
+                htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
             />
         );
@@ -248,7 +252,7 @@ describe('印刷アシストクライアント', () => {
         expect(toastErrorMock).not.toHaveBeenCalled();
     });
 
-    it('共有失敗時は toast を表示し、PDFを開くリンクは常に残す', async () => {
+    it('共有失敗時は toast を表示し、PDF と HTML の退避リンクは常に残す', async () => {
         const shareMock = vi.fn().mockRejectedValue(new Error('boom'));
         Object.defineProperty(navigator, 'share', {
             configurable: true,
@@ -259,6 +263,7 @@ describe('印刷アシストクライアント', () => {
         render(
             <PrintAssistClient
                 backFallbackPath="/dashboard"
+                htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
             />
         );
@@ -276,9 +281,13 @@ describe('印刷アシストクライアント', () => {
             'href',
             '/api/print/pdf?subjectId=subject-1&sets=1',
         );
+        expect(screen.getByRole('link', { name: 'HTML印刷を開く' })).toHaveAttribute(
+            'href',
+            '/dashboard/print?subjectId=subject-1&sets=1&view=html',
+        );
     });
 
-    it('ファイル共有非対応時は toast を表示する', async () => {
+    it('ファイル共有非対応時は toast を表示し、HTML 印刷へ退避できる', async () => {
         const canShareMock = vi.fn().mockReturnValue(false);
         Object.defineProperty(navigator, 'canShare', {
             configurable: true,
@@ -289,6 +298,7 @@ describe('印刷アシストクライアント', () => {
         render(
             <PrintAssistClient
                 backFallbackPath="/dashboard"
+                htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
             />
         );
@@ -299,7 +309,11 @@ describe('印刷アシストクライアント', () => {
 
         fireEvent.click(screen.getByRole('button', { name: '印刷メニューを開く' }));
 
-        expect(toastErrorMock).toHaveBeenCalledWith('この端末では共有メニューを開けません。');
+        expect(toastErrorMock).toHaveBeenCalledWith('この端末では共有メニューを開けません。HTML印刷をお試しください。');
+        expect(screen.getByRole('link', { name: 'HTML印刷を開く' })).toHaveAttribute(
+            'href',
+            '/dashboard/print?subjectId=subject-1&sets=1&view=html',
+        );
     });
 
     it('opener がある場合は元タブをフォーカスして現在タブを閉じる', async () => {
@@ -315,6 +329,7 @@ describe('印刷アシストクライアント', () => {
         render(
             <PrintAssistClient
                 backFallbackPath="/dashboard"
+                htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
             />
         );
@@ -334,6 +349,7 @@ describe('印刷アシストクライアント', () => {
         render(
             <PrintAssistClient
                 backFallbackPath="/dashboard"
+                htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
             />
         );
