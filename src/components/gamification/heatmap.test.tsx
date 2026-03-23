@@ -21,4 +21,10 @@ describe('Heatmap', () => {
         expect(container.querySelector('.overflow-x-auto')).toBeInTheDocument();
         expect(container.querySelector('.w-max')).toBeInTheDocument();
     });
+
+    it('days が無限大でも安全な上限に丸める', () => {
+        const { container } = render(<Heatmap data={[]} days={Number.POSITIVE_INFINITY} />);
+
+        expect(container.querySelectorAll('[title]:not([title=""])')).toHaveLength(365);
+    });
 });

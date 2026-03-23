@@ -1,5 +1,3 @@
-'use client';
-
 type Props = {
     data: { date: string; count: number }[];
     days?: number;
@@ -10,8 +8,12 @@ type HeatmapCell = {
     count: number;
 } | null;
 
+const DEFAULT_HEATMAP_DAYS = 365;
+const MAX_HEATMAP_DAYS = 3650;
+
 export function Heatmap({ data, days = 365 }: Props) {
-    const totalDays = Math.max(1, Math.floor(days));
+    const normalizedDays = Number.isFinite(days) ? Math.floor(days) : DEFAULT_HEATMAP_DAYS;
+    const totalDays = Math.min(MAX_HEATMAP_DAYS, Math.max(1, normalizedDays));
     const today = new Date();
     const startDate = new Date(today);
     startDate.setDate(today.getDate() - (totalDays - 1));
