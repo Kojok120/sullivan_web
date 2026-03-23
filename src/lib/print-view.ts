@@ -1,4 +1,4 @@
-export type PrintView = 'html' | 'pdf';
+export type PrintView = 'assist' | 'html' | 'pdf';
 
 type PrintViewEnvironment = {
     userAgent?: string;
@@ -8,10 +8,25 @@ type PrintViewEnvironment = {
 };
 
 export function sanitizePrintView(raw?: string | null): PrintView {
+    if (raw === 'assist') return 'assist';
     return raw === 'html' ? 'html' : 'pdf';
 }
 
 export function detectPreferredPrintViewFromEnvironment(environment: PrintViewEnvironment): PrintView {
+    const signals = detectPrintEnvironmentSignals(environment);
+
+    if (signals.isIOSLike) return 'assist';
+    return signals.prefersTouchPrintPage ? 'html' : 'pdf';
+}
+
+export function getPreferredPrintView(): PrintView {
+    return detectPreferredPrintViewFromEnvironment(getBrowserPrintViewEnvironment());
+}
+
+function detectPrintEnvironmentSignals(environment: PrintViewEnvironment): {
+    isIOSLike: boolean;
+    prefersTouchPrintPage: boolean;
+} {
     const userAgent = environment.userAgent ?? '';
     const platform = environment.platform ?? '';
     const maxTouchPoints = environment.maxTouchPoints ?? 0;
@@ -22,20 +37,23 @@ export function detectPreferredPrintViewFromEnvironment(environment: PrintViewEn
     // Android に加えて、iPhone/iPad 以外で Mobile を含む UA も HTML 印刷へ寄せる。
     const isMobileDevice = /Android/i.test(userAgent) || /Mobile/i.test(userAgent);
 
-    return isIPhone || isIPad || isMobileDevice || coarsePointer ? 'html' : 'pdf';
+    return {
+        isIOSLike: isIPhone || isIPad,
+        prefersTouchPrintPage: isIPhone || isIPad || isMobileDevice || coarsePointer,
+    };
 }
 
-export function getPreferredPrintView(): PrintView {
+function getBrowserPrintViewEnvironment(): PrintViewEnvironment {
     if (typeof window === 'undefined' || typeof navigator === 'undefined') {
-        return 'pdf';
+        return {};
     }
 
-    return detectPreferredPrintViewFromEnvironment({
+    return {
         userAgent: navigator.userAgent,
         platform: navigator.platform,
         maxTouchPoints: navigator.maxTouchPoints,
         coarsePointer: typeof window.matchMedia === 'function'
             ? window.matchMedia('(pointer: coarse)').matches
             : false,
-    });
+    };
 }

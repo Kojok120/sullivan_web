@@ -4,13 +4,28 @@ import { useRouter } from 'next/navigation'
 
 import { PdfPreviewClient } from './pdf-preview-client'
 
+const { getPreferredPrintViewMock } = vi.hoisted(() => ({
+    getPreferredPrintViewMock: vi.fn(() => 'pdf'),
+}))
+
 vi.mock('next/navigation', () => ({
     useRouter: vi.fn(),
 }))
 
+vi.mock('@/lib/print-view', async () => {
+    const actual = await vi.importActual<typeof import('@/lib/print-view')>('@/lib/print-view')
+
+    return {
+        ...actual,
+        getPreferredPrintView: getPreferredPrintViewMock,
+    }
+})
+
 describe('PDFプレビューの戻る動作', () => {
     let originalVisibilityStateDescriptor: PropertyDescriptor | undefined
     let originalMatchMediaDescriptor: PropertyDescriptor | undefined
+    let originalRequestAnimationFrameDescriptor: PropertyDescriptor | undefined
+    let originalCancelAnimationFrameDescriptor: PropertyDescriptor | undefined
 
     const mockRouter = {
         push: vi.fn(),
@@ -24,13 +39,26 @@ describe('PDFプレビューの戻る動作', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         vi.useFakeTimers()
+        getPreferredPrintViewMock.mockReturnValue('pdf')
         vi.mocked(useRouter).mockReturnValue(mockRouter)
         originalVisibilityStateDescriptor = Object.getOwnPropertyDescriptor(document, 'visibilityState')
         originalMatchMediaDescriptor = Object.getOwnPropertyDescriptor(window, 'matchMedia')
+        originalRequestAnimationFrameDescriptor = Object.getOwnPropertyDescriptor(window, 'requestAnimationFrame')
+        originalCancelAnimationFrameDescriptor = Object.getOwnPropertyDescriptor(window, 'cancelAnimationFrame')
         Object.defineProperty(window, 'opener', {
             configurable: true,
             writable: true,
             value: null,
+        })
+        Object.defineProperty(window, 'requestAnimationFrame', {
+            configurable: true,
+            writable: true,
+            value: vi.fn(() => 1),
+        })
+        Object.defineProperty(window, 'cancelAnimationFrame', {
+            configurable: true,
+            writable: true,
+            value: vi.fn(),
         })
     })
 
@@ -53,6 +81,18 @@ describe('PDFプレビューの戻る動作', () => {
             Object.defineProperty(window, 'matchMedia', originalMatchMediaDescriptor)
         } else {
             delete (window as { matchMedia?: typeof window.matchMedia }).matchMedia
+        }
+
+        if (originalRequestAnimationFrameDescriptor) {
+            Object.defineProperty(window, 'requestAnimationFrame', originalRequestAnimationFrameDescriptor)
+        } else {
+            delete (window as { requestAnimationFrame?: typeof window.requestAnimationFrame }).requestAnimationFrame
+        }
+
+        if (originalCancelAnimationFrameDescriptor) {
+            Object.defineProperty(window, 'cancelAnimationFrame', originalCancelAnimationFrameDescriptor)
+        } else {
+            delete (window as { cancelAnimationFrame?: typeof window.cancelAnimationFrame }).cancelAnimationFrame
         }
     })
 
@@ -164,26 +204,14 @@ describe('PDFプレビューの戻る動作', () => {
 
     it('タッチ端末では HTML 印刷ページへの導線を表示する', async () => {
         vi.useRealTimers()
-        Object.defineProperty(window, 'matchMedia', {
-            configurable: true,
-            writable: true,
-            value: vi.fn().mockReturnValue({
-                matches: true,
-                media: '(pointer: coarse)',
-                onchange: null,
-                addListener: vi.fn(),
-                removeListener: vi.fn(),
-                addEventListener: vi.fn(),
-                removeEventListener: vi.fn(),
-                dispatchEvent: vi.fn(),
-            }),
-        })
 
         render(
             <PdfPreviewClient
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
+                assistViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=assist"
                 htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
                 backFallbackPath="/dashboard"
+                serverPreferredPrintView="html"
             />
         )
 
@@ -191,6 +219,75 @@ describe('PDFプレビューの戻る動作', () => {
             'href',
             '/dashboard/print?subjectId=subject-1&sets=1&view=html',
         )
+        expect(screen.queryByTitle('印刷プレビュー')).not.toBeInTheDocument()
+    })
+
+    it('iPhone/iPad では印刷アシスト画面への導線を表示する', async () => {
+        vi.useRealTimers()
+
+        render(
+            <PdfPreviewClient
+                pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
+                assistViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=assist"
+                htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
+                backFallbackPath="/dashboard"
+                serverPreferredPrintView="assist"
+            />
+        )
+
+        expect(await screen.findByRole('link', { name: '印刷アシストを開く' })).toHaveAttribute(
+            'href',
+            '/dashboard/print?subjectId=subject-1&sets=1&view=assist',
+        )
+        expect(screen.getByRole('link', { name: 'PDFを開く' })).toHaveAttribute(
+            'href',
+            '/api/print/pdf?subjectId=subject-1&sets=1',
+        )
+        expect(screen.queryByTitle('印刷プレビュー')).not.toBeInTheDocument()
+    })
+
+    it('サーバー初期値が pdf でもクライアント判定で assist に切り替える', async () => {
+        vi.useRealTimers()
+        getPreferredPrintViewMock.mockReturnValue('assist')
+        const requestAnimationFrameMock = vi.fn((callback: FrameRequestCallback) => {
+            callback(0)
+            return 1
+        })
+        Object.defineProperty(window, 'requestAnimationFrame', {
+            configurable: true,
+            writable: true,
+            value: requestAnimationFrameMock,
+        })
+
+        render(
+            <PdfPreviewClient
+                pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
+                assistViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=assist"
+                htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
+                backFallbackPath="/dashboard"
+                serverPreferredPrintView="auto"
+            />
+        )
+
+        expect(await screen.findByRole('link', { name: '印刷アシストを開く' })).toHaveAttribute(
+            'href',
+            '/dashboard/print?subjectId=subject-1&sets=1&view=assist',
+        )
+        expect(screen.queryByTitle('印刷プレビュー')).not.toBeInTheDocument()
+    })
+
+    it('サーバー判定が未確定の間は PDF iframe を出さずにローディングを表示する', () => {
+        render(
+            <PdfPreviewClient
+                pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
+                assistViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=assist"
+                htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
+                backFallbackPath="/dashboard"
+                serverPreferredPrintView="auto"
+            />
+        )
+
+        expect(screen.getByText('印刷方法を判定中です...')).toBeInTheDocument()
         expect(screen.queryByTitle('印刷プレビュー')).not.toBeInTheDocument()
     })
 

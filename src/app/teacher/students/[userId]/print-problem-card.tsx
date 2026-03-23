@@ -58,18 +58,18 @@ export function PrintProblemCard({ userId, subjects }: PrintProblemCardProps) {
     const handlePrint = () => {
         if (!selectedSubjectId) return;
         setLoading(true);
-        const query = new URLSearchParams({
+        const pageQuery = new URLSearchParams({
             subjectId: selectedSubjectId,
             sets: String(sets),
             view: getPreferredPrintView(),
         });
         if (selectedCoreProblemId && selectedCoreProblemId !== 'all') {
-            query.set('coreProblemId', selectedCoreProblemId);
+            pageQuery.set('coreProblemId', selectedCoreProblemId);
         }
-        const url = appendCacheBust(`/teacher/students/${userId}/print?${query.toString()}`);
-        const opened = window.open(url, '_blank', 'noopener,noreferrer');
+        const pageUrl = appendCacheBust(`/teacher/students/${userId}/print?${pageQuery.toString()}`);
+        const opened = window.open(pageUrl, '_blank', 'noopener,noreferrer');
         if (!opened) {
-            router.push(url);
+            router.push(pageUrl);
         }
         setLoading(false);
     };

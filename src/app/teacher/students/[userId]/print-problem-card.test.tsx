@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useRouter } from 'next/navigation';
 
 import { PrintProblemCard } from './print-problem-card';
+import { getPreferredPrintView } from '@/lib/print-view';
 
 const { getCoreProblemsForSubjectMock } = vi.hoisted(() => ({
     getCoreProblemsForSubjectMock: vi.fn(),
@@ -15,6 +16,10 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/app/admin/curriculum/actions', () => ({
     getCoreProblemsForSubject: getCoreProblemsForSubjectMock,
+}));
+
+vi.mock('@/lib/print-view', () => ({
+    getPreferredPrintView: vi.fn(() => 'pdf'),
 }));
 
 vi.mock('@/components/ui/select', async () => {
@@ -94,6 +99,7 @@ describe('講師用問題印刷カード', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         vi.mocked(useRouter).mockReturnValue(mockRouter);
+        vi.mocked(getPreferredPrintView).mockReturnValue('pdf');
         vi.stubGlobal('open', mockOpen);
         getCoreProblemsForSubjectMock.mockResolvedValue({
             success: true,
@@ -122,6 +128,31 @@ describe('講師用問題印刷カード', () => {
             expect(parsed.pathname).toBe('/teacher/students/student-1/print');
             expect(parsed.searchParams.get('subjectId')).toBe('subject-1');
             expect(parsed.searchParams.get('view')).toBe('pdf');
+        });
+    });
+
+    it('iPhone/iPad では印刷アシスト画面を開く', async () => {
+        mockOpen.mockReturnValue({ closed: false });
+        vi.mocked(getPreferredPrintView).mockReturnValue('assist');
+
+        render(
+            <PrintProblemCard
+                userId="student-1"
+                subjects={[{ id: 'subject-1', name: '英語' }]}
+            />
+        );
+
+        fireEvent.click(screen.getAllByRole('combobox')[0]);
+        fireEvent.click(await screen.findByRole('option', { name: '英語' }));
+        fireEvent.click(screen.getByRole('button', { name: 'プレビュー作成' }));
+
+        await waitFor(() => {
+            expect(mockOpen).toHaveBeenCalledTimes(1);
+            const [url] = mockOpen.mock.calls[0];
+            const parsed = new URL(url, 'http://localhost');
+            expect(parsed.pathname).toBe('/teacher/students/student-1/print');
+            expect(parsed.searchParams.get('subjectId')).toBe('subject-1');
+            expect(parsed.searchParams.get('view')).toBe('assist');
         });
     });
 });
