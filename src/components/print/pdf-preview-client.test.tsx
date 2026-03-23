@@ -211,7 +211,7 @@ describe('PDFプレビューの戻る動作', () => {
                 assistViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=assist"
                 htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
                 backFallbackPath="/dashboard"
-                preferredPrintView="html"
+                serverPreferredPrintView="html"
             />
         )
 
@@ -231,7 +231,7 @@ describe('PDFプレビューの戻る動作', () => {
                 assistViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=assist"
                 htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
                 backFallbackPath="/dashboard"
-                preferredPrintView="assist"
+                serverPreferredPrintView="assist"
             />
         )
 
@@ -265,7 +265,7 @@ describe('PDFプレビューの戻る動作', () => {
                 assistViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=assist"
                 htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
                 backFallbackPath="/dashboard"
-                preferredPrintView="pdf"
+                serverPreferredPrintView="pdf"
             />
         )
 

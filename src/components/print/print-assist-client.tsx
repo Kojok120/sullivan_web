@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ExternalLink, Loader2, Printer } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -24,6 +24,7 @@ export function PrintAssistClient({ backFallbackPath, htmlViewUrl, pdfUrl }: Pri
     const { handleBack } = usePrintNavigation(backFallbackPath);
     const [preparedFile, setPreparedFile] = useState<PreparedPdfFile | null>(null);
     const [isPreparing, setIsPreparing] = useState(true);
+    const lastPrepareControllerRef = useRef<AbortController | null>(null);
 
     const preparePdf = useCallback(async (signal?: AbortSignal) => {
         setIsPreparing(true);
@@ -71,22 +72,35 @@ export function PrintAssistClient({ backFallbackPath, htmlViewUrl, pdfUrl }: Pri
         }
     }, [pdfUrl]);
 
-    useEffect(() => {
+    const runPreparePdf = useCallback(async () => {
+        lastPrepareControllerRef.current?.abort();
         const controller = new AbortController();
+        lastPrepareControllerRef.current = controller;
 
-        void preparePdf(controller.signal);
+        try {
+            return await preparePdf(controller.signal);
+        } finally {
+            if (lastPrepareControllerRef.current === controller) {
+                lastPrepareControllerRef.current = null;
+            }
+        }
+    }, [preparePdf]);
+
+    useEffect(() => {
+        void runPreparePdf();
 
         return () => {
-            controller.abort();
+            lastPrepareControllerRef.current?.abort();
+            lastPrepareControllerRef.current = null;
         };
-    }, [preparePdf]);
+    }, [runPreparePdf]);
 
     const handleShare = useCallback(async () => {
         if (isPreparing) return;
 
         const file = preparedFile?.sourceUrl === pdfUrl
             ? preparedFile.file
-            : await preparePdf();
+            : await runPreparePdf();
         if (!file) {
             toast.error('PDFの準備に失敗しました。');
             return;
@@ -121,7 +135,7 @@ export function PrintAssistClient({ backFallbackPath, htmlViewUrl, pdfUrl }: Pri
 
             toast.error('共有メニューを開けませんでした。');
         }
-    }, [isPreparing, pdfUrl, preparePdf, preparedFile]);
+    }, [isPreparing, pdfUrl, preparedFile, runPreparePdf]);
 
     return (
         <div className="min-h-screen bg-gray-100 px-4 py-4 md:px-6 md:py-6">

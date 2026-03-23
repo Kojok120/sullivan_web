@@ -13,7 +13,7 @@ type PdfPreviewClientProps = {
     assistViewUrl?: string;
     htmlViewUrl?: string;
     backFallbackPath: string;
-    preferredPrintView?: PrintView;
+    serverPreferredPrintView?: PrintView;
 };
 
 const RESTORE_RELOAD_THROTTLE_MS = 250;
@@ -23,7 +23,7 @@ export function PdfPreviewClient({
     assistViewUrl,
     htmlViewUrl,
     backFallbackPath,
-    preferredPrintView,
+    serverPreferredPrintView,
 }: PdfPreviewClientProps) {
     return (
         <PdfPreviewClientInner
@@ -32,7 +32,7 @@ export function PdfPreviewClient({
             assistViewUrl={assistViewUrl}
             htmlViewUrl={htmlViewUrl}
             backFallbackPath={backFallbackPath}
-            preferredPrintView={preferredPrintView}
+            serverPreferredPrintView={serverPreferredPrintView}
         />
     );
 }
@@ -42,7 +42,7 @@ function PdfPreviewClientInner({
     assistViewUrl,
     htmlViewUrl,
     backFallbackPath,
-    preferredPrintView = 'pdf',
+    serverPreferredPrintView = 'pdf',
 }: PdfPreviewClientProps) {
     const iframeRef = useRef<HTMLIFrameElement | null>(null);
     const hasLoadedFrameRef = useRef(false);
@@ -50,9 +50,9 @@ function PdfPreviewClientInner({
     const [frameUrl, setFrameUrl] = useState(pdfUrl);
     const [isFrameLoaded, setIsFrameLoaded] = useState(false);
     const [clientPreferredPrintView, setClientPreferredPrintView] = useState<PrintView | null>(null);
-    const resolvedPreferredPrintView = preferredPrintView === 'pdf'
-        ? clientPreferredPrintView ?? preferredPrintView
-        : preferredPrintView;
+    const resolvedPreferredPrintView = serverPreferredPrintView === 'pdf'
+        ? clientPreferredPrintView ?? serverPreferredPrintView
+        : serverPreferredPrintView;
     const prefersAssistView = resolvedPreferredPrintView === 'assist' && Boolean(assistViewUrl);
     const prefersHtmlPrintView = resolvedPreferredPrintView === 'html' && Boolean(htmlViewUrl);
     const { handleBack } = usePrintNavigation(backFallbackPath);
@@ -90,7 +90,7 @@ function PdfPreviewClientInner({
     }, [pdfUrl]);
 
     useEffect(() => {
-        if (preferredPrintView !== 'pdf' || typeof window.requestAnimationFrame !== 'function') {
+        if (serverPreferredPrintView !== 'pdf' || typeof window.requestAnimationFrame !== 'function') {
             return;
         }
 
@@ -101,7 +101,7 @@ function PdfPreviewClientInner({
         return () => {
             window.cancelAnimationFrame(animationFrameId);
         };
-    }, [preferredPrintView]);
+    }, [serverPreferredPrintView]);
 
     useEffect(() => {
         const handlePageShow = (event: PageTransitionEvent) => {

@@ -135,7 +135,7 @@ export async function SharedStudentPrintPage({
     }
 
     const requestHeaders = await headers();
-    const preferredPrintView = detectPreferredPrintViewFromEnvironment({
+    const serverPreferredPrintView = detectPreferredPrintViewFromEnvironment({
         userAgent: requestHeaders.get('user-agent') ?? undefined,
     });
 
@@ -145,7 +145,7 @@ export async function SharedStudentPrintPage({
             assistViewUrl={assistViewUrl}
             htmlViewUrl={htmlViewUrl}
             backFallbackPath={redirectPathIfMissing}
-            preferredPrintView={preferredPrintView}
+            serverPreferredPrintView={serverPreferredPrintView}
         />
     );
 }

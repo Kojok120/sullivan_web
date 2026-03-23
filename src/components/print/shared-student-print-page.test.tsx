@@ -32,14 +32,14 @@ const {
         pdfUrl: string;
         assistViewUrl?: string;
         htmlViewUrl?: string;
-        preferredPrintView?: string;
+        serverPreferredPrintView?: string;
     }) => (
         <div
             data-testid="pdf-preview-client"
             data-pdf-url={props.pdfUrl}
             data-assist-url={props.assistViewUrl}
             data-html-url={props.htmlViewUrl}
-            data-preferred-view={props.preferredPrintView}
+            data-preferred-view={props.serverPreferredPrintView}
         />
     )),
     getPrintDataMock: vi.fn(),
