@@ -1,46 +1,36 @@
 'use client';
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 type Props = {
     data: { date: string; count: number }[];
+    days?: number;
 };
 
-export function Heatmap({ data }: Props) {
-    // Generate last 365 days
-    const days = 365;
+type HeatmapCell = {
+    date: string;
+    count: number;
+} | null;
+
+export function Heatmap({ data, days = 365 }: Props) {
+    const totalDays = Math.max(1, Math.floor(days));
     const today = new Date();
     const startDate = new Date(today);
-    startDate.setDate(today.getDate() - days);
+    startDate.setDate(today.getDate() - (totalDays - 1));
 
-    // Map data for quick lookup
     const dataMap = new Map<string, number>();
     data.forEach(d => dataMap.set(d.date, d.count));
 
     const currentResponseDate = new Date(startDate);
+    const startDay = startDate.getDay();
+    const weeks: HeatmapCell[][] = [];
+    let currentWeek: HeatmapCell[] = [];
 
-    // Adjust start date to align with Sunday (optional, for GitHub style layout)
-    // For simplicity, just horizontal flex or grid wrapped.
-    // GitHub uses a vertical column for each week.
-
-    // Simple implementation: Grid with 7 rows (days of week) and 52 columns?
-    // Or just a flex wrap of squares.
-    // Let's try to mimic GitHub: Columns are weeks, Rows are days (Sun-Sat).
-
-    // 1. Calculate offset to start on correct day of week
-    const startDay = startDate.getDay(); // 0 = Sun, 1 = Mon...
-
-    // We want 53 columns (weeks) x 7 rows.
-    const weeks = [];
-    let currentWeek = [];
-
-    // Fill initial empty days
     for (let i = 0; i < startDay; i++) {
         currentWeek.push(null);
     }
 
-    for (let i = 0; i <= days; i++) {
+    for (let i = 0; i < totalDays; i++) {
         const dateStr = currentResponseDate.toISOString().split('T')[0];
         const count = dataMap.get(dateStr) || 0;
 
@@ -54,7 +44,7 @@ export function Heatmap({ data }: Props) {
         currentResponseDate.setDate(currentResponseDate.getDate() + 1);
     }
     if (currentWeek.length > 0) {
-        // Fill remaining days
+        // 残りの日を埋める
         while (currentWeek.length < 7) {
             currentWeek.push(null);
         }
@@ -70,25 +60,20 @@ export function Heatmap({ data }: Props) {
     };
 
     return (
-        <Card className="w-full overflow-hidden">
-            <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">学習ヒートマップ (過去1年)</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <div className="flex gap-1 overflow-x-auto pb-2">
-                    {weeks.map((week, wIndex) => (
-                        <div key={wIndex} className="flex flex-col gap-1">
-                            {week.map((day, dIndex) => (
-                                <div
-                                    key={dIndex}
-                                    title={day ? `${day.date}: ${day.count}問` : ''}
-                                    className={`w-3 h-3 rounded-sm ${day ? getColor(day.count) : 'bg-transparent'}`}
-                                />
-                            ))}
-                        </div>
-                    ))}
-                </div>
-            </CardContent>
-        </Card>
+        <div className="overflow-x-auto pb-2">
+            <div className="flex w-max gap-0.5 sm:gap-1">
+                {weeks.map((week, wIndex) => (
+                    <div key={wIndex} className="flex flex-col gap-0.5 sm:gap-1">
+                        {week.map((day, dIndex) => (
+                            <div
+                                key={dIndex}
+                                title={day ? `${day.date}: ${day.count}問` : ''}
+                                className={`h-2.5 w-2.5 rounded-[2px] sm:h-3 sm:w-3 sm:rounded-sm ${day ? getColor(day.count) : 'bg-transparent'}`}
+                            />
+                        ))}
+                    </div>
+                ))}
+            </div>
+        </div>
     );
 }

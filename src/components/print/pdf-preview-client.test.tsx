@@ -164,32 +164,44 @@ describe('PDFプレビューの戻る動作', () => {
 
     it('タッチ端末では HTML 印刷ページへの導線を表示する', async () => {
         vi.useRealTimers()
-        Object.defineProperty(window, 'matchMedia', {
-            configurable: true,
-            writable: true,
-            value: vi.fn().mockReturnValue({
-                matches: true,
-                media: '(pointer: coarse)',
-                onchange: null,
-                addListener: vi.fn(),
-                removeListener: vi.fn(),
-                addEventListener: vi.fn(),
-                removeEventListener: vi.fn(),
-                dispatchEvent: vi.fn(),
-            }),
-        })
 
         render(
             <PdfPreviewClient
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
+                assistViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=assist"
                 htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
                 backFallbackPath="/dashboard"
+                preferredPrintView="html"
             />
         )
 
         expect(await screen.findByRole('link', { name: '印刷ページで開く' })).toHaveAttribute(
             'href',
             '/dashboard/print?subjectId=subject-1&sets=1&view=html',
+        )
+        expect(screen.queryByTitle('印刷プレビュー')).not.toBeInTheDocument()
+    })
+
+    it('iPhone/iPad では印刷アシスト画面への導線を表示する', async () => {
+        vi.useRealTimers()
+
+        render(
+            <PdfPreviewClient
+                pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
+                assistViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=assist"
+                htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
+                backFallbackPath="/dashboard"
+                preferredPrintView="assist"
+            />
+        )
+
+        expect(await screen.findByRole('link', { name: '印刷アシストを開く' })).toHaveAttribute(
+            'href',
+            '/dashboard/print?subjectId=subject-1&sets=1&view=assist',
+        )
+        expect(screen.getByRole('link', { name: 'PDFを開く' })).toHaveAttribute(
+            'href',
+            '/api/print/pdf?subjectId=subject-1&sets=1',
         )
         expect(screen.queryByTitle('印刷プレビュー')).not.toBeInTheDocument()
     })

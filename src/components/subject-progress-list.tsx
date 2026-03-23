@@ -14,7 +14,7 @@ type SubjectProgressListProps = {
 
 export function SubjectProgressList({
     items,
-    wrapperClassName = 'space-y-6',
+    wrapperClassName = 'space-y-4 sm:space-y-6',
     emptyMessage = 'まだ学習データがありません',
 }: SubjectProgressListProps) {
     if (items.length === 0) {
@@ -28,12 +28,12 @@ export function SubjectProgressList({
     return (
         <div className={wrapperClassName}>
             {items.map((subject) => (
-                <div key={subject.subjectId} className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                        <div className="font-medium">{subject.subjectName}</div>
-                        <div className="text-muted-foreground">{subject.progressPercentage}%</div>
+                <div key={subject.subjectId} className="space-y-1.5 sm:space-y-2">
+                    <div className="flex items-center justify-between gap-3 text-sm">
+                        <div className="min-w-0 truncate font-medium">{subject.subjectName}</div>
+                        <div className="shrink-0 text-muted-foreground">{subject.progressPercentage}%</div>
                     </div>
-                    <Progress value={subject.progressPercentage} />
+                    <Progress value={subject.progressPercentage} className="w-full" />
                 </div>
             ))}
         </div>

@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useRouter } from 'next/navigation';
 
 import { PrintSelector } from './print-selector';
+import { getPreferredPrintView } from '@/lib/print-view';
 
 const { markLectureAsWatchedMock } = vi.hoisted(() => ({
     markLectureAsWatchedMock: vi.fn(),
@@ -18,6 +19,10 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/lib/api/lecture-watched-client', () => ({
     markLectureAsWatched: markLectureAsWatchedMock,
+}));
+
+vi.mock('@/lib/print-view', () => ({
+    getPreferredPrintView: vi.fn(() => 'pdf'),
 }));
 
 vi.mock('@/components/full-screen-video-player', () => ({
@@ -81,6 +86,7 @@ describe('印刷セレクター', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         vi.mocked(useRouter).mockReturnValue(mockRouter);
+        vi.mocked(getPreferredPrintView).mockReturnValue('pdf');
         vi.stubGlobal('fetch', mockFetch);
         vi.stubGlobal('open', vi.fn(() => mockPopup));
         mockPopup.location.href = '';
@@ -120,6 +126,35 @@ describe('印刷セレクター', () => {
             expect(printUrl.searchParams.get('sets')).toBe('1');
             expect(printUrl.searchParams.get('gateChecked')).toBe('1');
             expect(printUrl.searchParams.get('view')).toBe('pdf');
+            expect(printUrl.searchParams.get('cb')).toBeTruthy();
+        });
+    });
+
+    it('iPhone/iPad では印刷アシスト画面へ遷移する', async () => {
+        vi.mocked(getPreferredPrintView).mockReturnValue('assist');
+        mockFetch.mockResolvedValue({
+            ok: true,
+            json: async () => ({ blocked: false }),
+        });
+
+        render(
+            <PrintSelector
+                subjects={[{ subjectId: 'subject-1', subjectName: '英語' }]}
+            />
+        );
+
+        fireEvent.click(screen.getByText('English'));
+        fireEvent.click(screen.getByRole('button', { name: '印刷する' }));
+
+        await waitFor(() => {
+            expect(window.open).toHaveBeenCalledWith('', '_blank');
+
+            const printUrl = new URL(mockPopup.location.href, 'http://localhost');
+            expect(printUrl.pathname).toBe('/dashboard/print');
+            expect(printUrl.searchParams.get('subjectId')).toBe('subject-1');
+            expect(printUrl.searchParams.get('sets')).toBe('1');
+            expect(printUrl.searchParams.get('gateChecked')).toBe('1');
+            expect(printUrl.searchParams.get('view')).toBe('assist');
             expect(printUrl.searchParams.get('cb')).toBeTruthy();
         });
     });
@@ -294,22 +329,12 @@ describe('印刷セレクター', () => {
         });
     });
 
-    it('タッチ端末では HTML 印刷ページへ遷移する', async () => {
+    it('Android 系タッチ端末では HTML 印刷ページへ遷移する', async () => {
+        vi.mocked(getPreferredPrintView).mockReturnValue('html');
         mockFetch.mockResolvedValue({
             ok: true,
             json: async () => ({ blocked: false }),
         });
-
-        window.matchMedia = vi.fn().mockReturnValue({
-            matches: true,
-            media: '(pointer: coarse)',
-            onchange: null,
-            addListener: vi.fn(),
-            removeListener: vi.fn(),
-            addEventListener: vi.fn(),
-            removeEventListener: vi.fn(),
-            dispatchEvent: vi.fn(),
-        }) as unknown as typeof window.matchMedia;
 
         render(
             <PrintSelector
