@@ -162,4 +162,28 @@ describe('SharedStudentPrintPage', () => {
         expect(pdfClient.getAttribute('data-preferred-view')).toBe('html');
         expect(getPrintData).not.toHaveBeenCalled();
     });
+
+    it('iPhone UA では assist を優先して PDF プレビューへ渡す', async () => {
+        headersMock.mockResolvedValueOnce(new Headers({
+            'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+        }));
+
+        render(await SharedStudentPrintPage({
+            searchParams: {
+                subjectId: 'subject-1',
+                sets: '2',
+                view: 'pdf',
+            },
+            redirectPathIfMissing: '/dashboard',
+            printPagePath: '/dashboard/print',
+            targetUserId: 'student-1',
+        }));
+
+        const pdfClient = screen.getByTestId('pdf-preview-client');
+        expect(pdfClient.getAttribute('data-pdf-url')).toContain('/api/print/pdf?subjectId=subject-1&sets=2');
+        expect(pdfClient.getAttribute('data-assist-url')).toContain('/dashboard/print?subjectId=subject-1&sets=2&view=assist');
+        expect(pdfClient.getAttribute('data-html-url')).toContain('/dashboard/print?subjectId=subject-1&sets=2&view=html');
+        expect(pdfClient.getAttribute('data-preferred-view')).toBe('assist');
+        expect(getPrintData).not.toHaveBeenCalled();
+    });
 });
