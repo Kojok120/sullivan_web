@@ -184,6 +184,77 @@ describe('印刷アシストクライアント', () => {
         });
     });
 
+    it('pdfUrl 切り替え直後は新しい PDF だけを共有する', async () => {
+        const fetchMock = vi.fn()
+            .mockResolvedValueOnce(buildPdfResponse('inline; filename="sheet-1.pdf"'))
+            .mockRejectedValueOnce(new DOMException('aborted', 'AbortError'))
+            .mockResolvedValueOnce(buildPdfResponse('inline; filename="sheet-2.pdf"'));
+        vi.stubGlobal('fetch', fetchMock);
+
+        const shareMock = vi.fn().mockResolvedValue(undefined);
+        const canShareMock = vi.fn().mockReturnValue(true);
+        Object.defineProperty(navigator, 'share', {
+            configurable: true,
+            writable: true,
+            value: shareMock,
+        });
+        Object.defineProperty(navigator, 'canShare', {
+            configurable: true,
+            writable: true,
+            value: canShareMock,
+        });
+
+        const { rerender } = render(
+            <PrintAssistClient
+                backFallbackPath="/dashboard"
+                htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
+                pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
+            />
+        );
+
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: '印刷メニューを開く' })).toBeEnabled();
+        });
+
+        rerender(
+            <PrintAssistClient
+                backFallbackPath="/dashboard"
+                htmlViewUrl="/dashboard/print?subjectId=subject-2&sets=1&view=html"
+                pdfUrl="/api/print/pdf?subjectId=subject-2&sets=1"
+            />
+        );
+
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: '印刷メニューを開く' })).toBeEnabled();
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: '印刷メニューを開く' }));
+
+        await waitFor(() => {
+            expect(fetchMock).toHaveBeenCalledTimes(3);
+            expect(shareMock).toHaveBeenCalledTimes(1);
+        });
+
+        expect(fetchMock.mock.calls[2]?.[0]).toBe('/api/print/pdf?subjectId=subject-2&sets=1');
+        expect(canShareMock).toHaveBeenCalledWith({
+            files: [
+                expect.objectContaining({
+                    name: 'sheet-2.pdf',
+                    type: 'application/pdf',
+                }),
+            ],
+        });
+        expect(shareMock).toHaveBeenCalledWith({
+            files: [
+                expect.objectContaining({
+                    name: 'sheet-2.pdf',
+                    type: 'application/pdf',
+                }),
+            ],
+            title: 'sheet-2.pdf',
+        });
+    });
+
     it('filename* を優先してファイル名を取り出す', async () => {
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
             buildPdfResponse("inline; filename*=UTF-8''lesson%20sheet.pdf"),

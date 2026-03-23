@@ -13,15 +13,21 @@ type PrintAssistClientProps = {
     pdfUrl: string;
 };
 
+type PreparedPdfFile = {
+    file: File;
+    sourceUrl: string;
+};
+
 const DEFAULT_PDF_FILENAME = 'sullivan-print.pdf';
 
 export function PrintAssistClient({ backFallbackPath, htmlViewUrl, pdfUrl }: PrintAssistClientProps) {
     const { handleBack } = usePrintNavigation(backFallbackPath);
-    const [preparedFile, setPreparedFile] = useState<File | null>(null);
+    const [preparedFile, setPreparedFile] = useState<PreparedPdfFile | null>(null);
     const [isPreparing, setIsPreparing] = useState(true);
 
     const preparePdf = useCallback(async (signal?: AbortSignal) => {
         setIsPreparing(true);
+        setPreparedFile(null);
 
         try {
             const response = await fetch(pdfUrl, {
@@ -41,7 +47,10 @@ export function PrintAssistClient({ backFallbackPath, htmlViewUrl, pdfUrl }: Pri
             });
 
             if (!signal?.aborted) {
-                setPreparedFile(file);
+                setPreparedFile({
+                    file,
+                    sourceUrl: pdfUrl,
+                });
             }
 
             return file;
@@ -75,7 +84,9 @@ export function PrintAssistClient({ backFallbackPath, htmlViewUrl, pdfUrl }: Pri
     const handleShare = useCallback(async () => {
         if (isPreparing) return;
 
-        const file = preparedFile ?? await preparePdf();
+        const file = preparedFile?.sourceUrl === pdfUrl
+            ? preparedFile.file
+            : await preparePdf();
         if (!file) {
             toast.error('PDFの準備に失敗しました。');
             return;
@@ -110,7 +121,7 @@ export function PrintAssistClient({ backFallbackPath, htmlViewUrl, pdfUrl }: Pri
 
             toast.error('共有メニューを開けませんでした。');
         }
-    }, [isPreparing, preparePdf, preparedFile]);
+    }, [isPreparing, pdfUrl, preparePdf, preparedFile]);
 
     return (
         <div className="min-h-screen bg-gray-100 px-4 py-4 md:px-6 md:py-6">
