@@ -135,9 +135,12 @@ export async function SharedStudentPrintPage({
     }
 
     const requestHeaders = await headers();
-    const serverPreferredPrintView = detectPreferredPrintViewFromEnvironment({
+    const detectedPreferredPrintView = detectPreferredPrintViewFromEnvironment({
         userAgent: requestHeaders.get('user-agent') ?? undefined,
     });
+    const serverPreferredPrintView = detectedPreferredPrintView === 'pdf'
+        ? 'auto'
+        : detectedPreferredPrintView;
 
     return (
         <PdfPreviewClient

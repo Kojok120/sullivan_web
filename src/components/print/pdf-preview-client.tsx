@@ -13,7 +13,7 @@ type PdfPreviewClientProps = {
     assistViewUrl?: string;
     htmlViewUrl?: string;
     backFallbackPath: string;
-    serverPreferredPrintView?: PrintView;
+    serverPreferredPrintView?: PrintView | 'auto';
 };
 
 const RESTORE_RELOAD_THROTTLE_MS = 250;
@@ -50,9 +50,10 @@ function PdfPreviewClientInner({
     const [frameUrl, setFrameUrl] = useState(pdfUrl);
     const [isFrameLoaded, setIsFrameLoaded] = useState(false);
     const [clientPreferredPrintView, setClientPreferredPrintView] = useState<PrintView | null>(null);
-    const resolvedPreferredPrintView = serverPreferredPrintView === 'pdf'
-        ? clientPreferredPrintView ?? serverPreferredPrintView
-        : serverPreferredPrintView;
+    const isResolvingPreferredPrintView =
+        serverPreferredPrintView === 'auto' && clientPreferredPrintView === null;
+    const resolvedPreferredPrintView =
+        serverPreferredPrintView === 'auto' ? clientPreferredPrintView : serverPreferredPrintView;
     const prefersAssistView = resolvedPreferredPrintView === 'assist' && Boolean(assistViewUrl);
     const prefersHtmlPrintView = resolvedPreferredPrintView === 'html' && Boolean(htmlViewUrl);
     const { handleBack } = usePrintNavigation(backFallbackPath);
@@ -90,7 +91,7 @@ function PdfPreviewClientInner({
     }, [pdfUrl]);
 
     useEffect(() => {
-        if (serverPreferredPrintView !== 'pdf' || typeof window.requestAnimationFrame !== 'function') {
+        if (serverPreferredPrintView !== 'auto' || typeof window.requestAnimationFrame !== 'function') {
             return;
         }
 
@@ -132,6 +133,21 @@ function PdfPreviewClientInner({
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, [reloadFrame]);
+
+    if (isResolvingPreferredPrintView) {
+        return (
+            <div className="min-h-screen bg-gray-100 px-4 py-4 md:px-6 md:py-6">
+                <div className="mx-auto flex w-full max-w-[720px] flex-col gap-4">
+                    <div className="rounded-md bg-white p-5 shadow-sm">
+                        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            印刷方法を判定中です...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     if (prefersAssistView && assistViewUrl) {
         return (

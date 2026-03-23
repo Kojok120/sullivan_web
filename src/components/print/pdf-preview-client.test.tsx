@@ -265,7 +265,7 @@ describe('PDFプレビューの戻る動作', () => {
                 assistViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=assist"
                 htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
                 backFallbackPath="/dashboard"
-                serverPreferredPrintView="pdf"
+                serverPreferredPrintView="auto"
             />
         )
 
@@ -273,6 +273,21 @@ describe('PDFプレビューの戻る動作', () => {
             'href',
             '/dashboard/print?subjectId=subject-1&sets=1&view=assist',
         )
+        expect(screen.queryByTitle('印刷プレビュー')).not.toBeInTheDocument()
+    })
+
+    it('サーバー判定が未確定の間は PDF iframe を出さずにローディングを表示する', () => {
+        render(
+            <PdfPreviewClient
+                pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
+                assistViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=assist"
+                htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
+                backFallbackPath="/dashboard"
+                serverPreferredPrintView="auto"
+            />
+        )
+
+        expect(screen.getByText('印刷方法を判定中です...')).toBeInTheDocument()
         expect(screen.queryByTitle('印刷プレビュー')).not.toBeInTheDocument()
     })
 
