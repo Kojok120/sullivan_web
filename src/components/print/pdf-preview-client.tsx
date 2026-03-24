@@ -11,7 +11,6 @@ import { getPreferredPrintView, type PrintView } from '@/lib/print-view';
 type PdfPreviewClientProps = {
     pdfUrl: string;
     assistViewUrl?: string;
-    htmlViewUrl?: string;
     backFallbackPath: string;
     serverPreferredPrintView?: PrintView | 'auto';
 };
@@ -21,7 +20,6 @@ const RESTORE_RELOAD_THROTTLE_MS = 250;
 export function PdfPreviewClient({
     pdfUrl,
     assistViewUrl,
-    htmlViewUrl,
     backFallbackPath,
     serverPreferredPrintView,
 }: PdfPreviewClientProps) {
@@ -30,7 +28,6 @@ export function PdfPreviewClient({
             key={pdfUrl}
             pdfUrl={pdfUrl}
             assistViewUrl={assistViewUrl}
-            htmlViewUrl={htmlViewUrl}
             backFallbackPath={backFallbackPath}
             serverPreferredPrintView={serverPreferredPrintView}
         />
@@ -40,7 +37,6 @@ export function PdfPreviewClient({
 function PdfPreviewClientInner({
     pdfUrl,
     assistViewUrl,
-    htmlViewUrl,
     backFallbackPath,
     serverPreferredPrintView = 'pdf',
 }: PdfPreviewClientProps) {
@@ -55,7 +51,6 @@ function PdfPreviewClientInner({
     const resolvedPreferredPrintView =
         serverPreferredPrintView === 'auto' ? clientPreferredPrintView : serverPreferredPrintView;
     const prefersAssistView = resolvedPreferredPrintView === 'assist' && Boolean(assistViewUrl);
-    const prefersHtmlPrintView = resolvedPreferredPrintView === 'html' && Boolean(htmlViewUrl);
     const { handleBack } = usePrintNavigation(backFallbackPath);
 
     const triggerPrint = useCallback(() => {
@@ -180,47 +175,6 @@ function PdfPreviewClientInner({
                                     <a href={frameUrl}>
                                         <ExternalLink className="mr-2 h-4 w-4" />
                                         PDFを開く
-                                    </a>
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    if (prefersHtmlPrintView && htmlViewUrl) {
-        return (
-            <div className="min-h-screen bg-gray-100 px-4 py-4 md:px-6 md:py-6">
-                <div className="mx-auto flex w-full max-w-[720px] flex-col gap-4">
-                    <div className="rounded-md bg-white p-5 shadow-sm">
-                        <div className="flex flex-col gap-4">
-                            <div className="flex items-center gap-2">
-                                <Button variant="outline" onClick={handleBack}>
-                                    <ArrowLeft className="mr-2 h-4 w-4" />
-                                    戻る
-                                </Button>
-                            </div>
-
-                            <div className="space-y-2">
-                                <h1 className="text-lg font-semibold">スマホでは専用の印刷画面を開いてください</h1>
-                                <p className="text-sm text-muted-foreground">
-                                    PDF 埋め込みプレビューはスマホ・タブレットで正しく印刷できない場合があります。
-                                </p>
-                            </div>
-
-                            <div className="flex flex-col gap-2 sm:flex-row">
-                                <Button asChild>
-                                    <a href={htmlViewUrl}>
-                                        <Printer className="mr-2 h-4 w-4" />
-                                        印刷ページで開く
-                                    </a>
-                                </Button>
-                                <Button variant="ghost" asChild>
-                                    <a href={frameUrl} target="_blank" rel="noopener noreferrer">
-                                        PDFを別タブで開く
-                                        <ExternalLink className="ml-2 h-4 w-4" />
                                     </a>
                                 </Button>
                             </div>

@@ -9,7 +9,6 @@ import { usePrintNavigation } from '@/hooks/use-print-navigation';
 
 type PrintAssistClientProps = {
     backFallbackPath: string;
-    htmlViewUrl: string;
     pdfUrl: string;
 };
 
@@ -20,7 +19,7 @@ type PreparedPdfFile = {
 
 const DEFAULT_PDF_FILENAME = 'sullivan-print.pdf';
 
-export function PrintAssistClient({ backFallbackPath, htmlViewUrl, pdfUrl }: PrintAssistClientProps) {
+export function PrintAssistClient({ backFallbackPath, pdfUrl }: PrintAssistClientProps) {
     const { handleBack } = usePrintNavigation(backFallbackPath);
     const [preparedFile, setPreparedFile] = useState<PreparedPdfFile | null>(null);
     const [isPreparing, setIsPreparing] = useState(true);
@@ -107,7 +106,7 @@ export function PrintAssistClient({ backFallbackPath, htmlViewUrl, pdfUrl }: Pri
         }
 
         if (typeof navigator.share !== 'function' || typeof navigator.canShare !== 'function') {
-            toast.error('この端末では共有メニューを開けません。HTML印刷をお試しください。');
+            toast.error('この端末では共有メニューを開けません。PDFを開いて印刷してください。');
             return;
         }
 
@@ -119,7 +118,7 @@ export function PrintAssistClient({ backFallbackPath, htmlViewUrl, pdfUrl }: Pri
         }
 
         if (!canShareFiles) {
-            toast.error('この端末では共有メニューを開けません。HTML印刷をお試しください。');
+            toast.error('この端末では共有メニューを開けません。PDFを開いて印刷してください。');
             return;
         }
 
@@ -155,7 +154,7 @@ export function PrintAssistClient({ backFallbackPath, htmlViewUrl, pdfUrl }: Pri
                                 ボタンを押すと共有メニューが開きます。「プリント」を選んでください。
                             </p>
                             <p className="text-sm text-muted-foreground">
-                                共有メニューが使えない場合は、下の「HTML印刷を開く」をお試しください。
+                                共有メニューが使えない場合は、下の「PDFを開く」から印刷してください。
                             </p>
                         </div>
 
@@ -185,13 +184,6 @@ export function PrintAssistClient({ backFallbackPath, htmlViewUrl, pdfUrl }: Pri
                                 <a href={pdfUrl}>
                                     <ExternalLink className="mr-2 h-4 w-4" />
                                     PDFを開く
-                                </a>
-                            </Button>
-
-                            <Button variant="outline" asChild className="sm:flex-1">
-                                <a href={htmlViewUrl}>
-                                    <ExternalLink className="mr-2 h-4 w-4" />
-                                    HTML印刷を開く
                                 </a>
                             </Button>
                         </div>
