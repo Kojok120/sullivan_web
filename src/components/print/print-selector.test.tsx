@@ -329,8 +329,8 @@ describe('印刷セレクター', () => {
         });
     });
 
-    it('Android 系タッチ端末では HTML 印刷ページへ遷移する', async () => {
-        vi.mocked(getPreferredPrintView).mockReturnValue('html');
+    it('Android 系タッチ端末では印刷アシスト画面へ遷移する', async () => {
+        vi.mocked(getPreferredPrintView).mockReturnValue('assist');
         mockFetch.mockResolvedValue({
             ok: true,
             json: async () => ({ blocked: false }),
@@ -347,7 +347,7 @@ describe('印刷セレクター', () => {
 
         await waitFor(() => {
             const printUrl = new URL(mockPopup.location.href, 'http://localhost');
-            expect(printUrl.searchParams.get('view')).toBe('html');
+            expect(printUrl.searchParams.get('view')).toBe('assist');
         });
     });
 
