@@ -202,34 +202,13 @@ describe('PDFプレビューの戻る動作', () => {
         expect(screen.getByText('PDFを読み込み中です...')).toBeTruthy()
     })
 
-    it('タッチ端末では HTML 印刷ページへの導線を表示する', async () => {
+    it('印刷アシスト優先時は専用導線を表示する', async () => {
         vi.useRealTimers()
 
         render(
             <PdfPreviewClient
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
                 assistViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=assist"
-                htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
-                backFallbackPath="/dashboard"
-                serverPreferredPrintView="html"
-            />
-        )
-
-        expect(await screen.findByRole('link', { name: '印刷ページで開く' })).toHaveAttribute(
-            'href',
-            '/dashboard/print?subjectId=subject-1&sets=1&view=html',
-        )
-        expect(screen.queryByTitle('印刷プレビュー')).not.toBeInTheDocument()
-    })
-
-    it('iPhone/iPad では印刷アシスト画面への導線を表示する', async () => {
-        vi.useRealTimers()
-
-        render(
-            <PdfPreviewClient
-                pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
-                assistViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=assist"
-                htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
                 backFallbackPath="/dashboard"
                 serverPreferredPrintView="assist"
             />
@@ -238,10 +217,6 @@ describe('PDFプレビューの戻る動作', () => {
         expect(await screen.findByRole('link', { name: '印刷アシストを開く' })).toHaveAttribute(
             'href',
             '/dashboard/print?subjectId=subject-1&sets=1&view=assist',
-        )
-        expect(screen.getByRole('link', { name: 'PDFを開く' })).toHaveAttribute(
-            'href',
-            '/api/print/pdf?subjectId=subject-1&sets=1',
         )
         expect(screen.queryByTitle('印刷プレビュー')).not.toBeInTheDocument()
     })
@@ -263,7 +238,6 @@ describe('PDFプレビューの戻る動作', () => {
             <PdfPreviewClient
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
                 assistViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=assist"
-                htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
                 backFallbackPath="/dashboard"
                 serverPreferredPrintView="auto"
             />
@@ -281,7 +255,6 @@ describe('PDFプレビューの戻る動作', () => {
             <PdfPreviewClient
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
                 assistViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=assist"
-                htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
                 backFallbackPath="/dashboard"
                 serverPreferredPrintView="auto"
             />

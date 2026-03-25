@@ -24,13 +24,13 @@ describe('print-view', () => {
         })).toBe('assist');
     });
 
-    it('Android Chrome は HTML 印刷を優先する', () => {
+    it('Android Chrome は印刷アシストを優先する', () => {
         expect(detectPreferredPrintViewFromEnvironment({
             userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0 Mobile Safari/537.36',
             platform: 'Linux armv8l',
             maxTouchPoints: 5,
             coarsePointer: true,
-        })).toBe('html');
+        })).toBe('assist');
     });
 
     it('タッチ対応 iPad は印刷アシストを優先する', () => {
@@ -51,9 +51,9 @@ describe('print-view', () => {
         })).toBe('pdf');
     });
 
-    it('view パラメータは assist と html を残し、それ以外を pdf に正規化する', () => {
+    it('view パラメータは assist を残し、それ以外を pdf に正規化する', () => {
         expect(sanitizePrintView('assist')).toBe('assist');
-        expect(sanitizePrintView('html')).toBe('html');
+        expect(sanitizePrintView('html')).toBe('pdf');
         expect(sanitizePrintView('pdf')).toBe('pdf');
         expect(sanitizePrintView('unexpected')).toBe('pdf');
         expect(sanitizePrintView(undefined)).toBe('pdf');

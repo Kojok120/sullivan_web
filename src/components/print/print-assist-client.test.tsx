@@ -118,7 +118,6 @@ describe('印刷アシストクライアント', () => {
         render(
             <PrintAssistClient
                 backFallbackPath="/dashboard"
-                htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
             />
         );
@@ -149,7 +148,6 @@ describe('印刷アシストクライアント', () => {
         render(
             <PrintAssistClient
                 backFallbackPath="/dashboard"
-                htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
             />
         );
@@ -207,7 +205,6 @@ describe('印刷アシストクライアント', () => {
         const { rerender } = render(
             <PrintAssistClient
                 backFallbackPath="/dashboard"
-                htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
             />
         );
@@ -219,7 +216,6 @@ describe('印刷アシストクライアント', () => {
         rerender(
             <PrintAssistClient
                 backFallbackPath="/dashboard"
-                htmlViewUrl="/dashboard/print?subjectId=subject-2&sets=1&view=html"
                 pdfUrl="/api/print/pdf?subjectId=subject-2&sets=1"
             />
         );
@@ -269,7 +265,6 @@ describe('印刷アシストクライアント', () => {
         render(
             <PrintAssistClient
                 backFallbackPath="/dashboard"
-                htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
             />
         );
@@ -305,7 +300,6 @@ describe('印刷アシストクライアント', () => {
         render(
             <PrintAssistClient
                 backFallbackPath="/dashboard"
-                htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
             />
         );
@@ -323,7 +317,7 @@ describe('印刷アシストクライアント', () => {
         expect(toastErrorMock).not.toHaveBeenCalled();
     });
 
-    it('共有失敗時は toast を表示し、PDF と HTML の退避リンクは常に残す', async () => {
+    it('共有失敗時は toast を表示し、PDF の退避リンクは常に残す', async () => {
         const shareMock = vi.fn().mockRejectedValue(new Error('boom'));
         Object.defineProperty(navigator, 'share', {
             configurable: true,
@@ -334,7 +328,6 @@ describe('印刷アシストクライアント', () => {
         render(
             <PrintAssistClient
                 backFallbackPath="/dashboard"
-                htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
             />
         );
@@ -352,13 +345,10 @@ describe('印刷アシストクライアント', () => {
             'href',
             '/api/print/pdf?subjectId=subject-1&sets=1',
         );
-        expect(screen.getByRole('link', { name: 'HTML印刷を開く' })).toHaveAttribute(
-            'href',
-            '/dashboard/print?subjectId=subject-1&sets=1&view=html',
-        );
+        expect(screen.queryByRole('link', { name: 'HTML印刷を開く' })).not.toBeInTheDocument();
     });
 
-    it('ファイル共有非対応時は toast を表示し、HTML 印刷へ退避できる', async () => {
+    it('ファイル共有非対応時は toast を表示し、PDF へ退避できる', async () => {
         const canShareMock = vi.fn().mockReturnValue(false);
         Object.defineProperty(navigator, 'canShare', {
             configurable: true,
@@ -369,7 +359,6 @@ describe('印刷アシストクライアント', () => {
         render(
             <PrintAssistClient
                 backFallbackPath="/dashboard"
-                htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
             />
         );
@@ -380,10 +369,10 @@ describe('印刷アシストクライアント', () => {
 
         fireEvent.click(screen.getByRole('button', { name: '印刷メニューを開く' }));
 
-        expect(toastErrorMock).toHaveBeenCalledWith('この端末では共有メニューを開けません。HTML印刷をお試しください。');
-        expect(screen.getByRole('link', { name: 'HTML印刷を開く' })).toHaveAttribute(
+        expect(toastErrorMock).toHaveBeenCalledWith('この端末では共有メニューを開けません。PDFを開いて印刷してください。');
+        expect(screen.getByRole('link', { name: 'PDFを開く' })).toHaveAttribute(
             'href',
-            '/dashboard/print?subjectId=subject-1&sets=1&view=html',
+            '/api/print/pdf?subjectId=subject-1&sets=1',
         );
     });
 
@@ -400,7 +389,6 @@ describe('印刷アシストクライアント', () => {
         render(
             <PrintAssistClient
                 backFallbackPath="/dashboard"
-                htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
             />
         );
@@ -420,7 +408,6 @@ describe('印刷アシストクライアント', () => {
         render(
             <PrintAssistClient
                 backFallbackPath="/dashboard"
-                htmlViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=html"
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
             />
         );
