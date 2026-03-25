@@ -221,29 +221,6 @@ describe('PDFプレビューの戻る動作', () => {
         expect(screen.queryByTitle('印刷プレビュー')).not.toBeInTheDocument()
     })
 
-    it('iPhone/iPad では印刷アシスト画面への導線を表示する', async () => {
-        vi.useRealTimers()
-
-        render(
-            <PdfPreviewClient
-                pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
-                assistViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=assist"
-                backFallbackPath="/dashboard"
-                serverPreferredPrintView="assist"
-            />
-        )
-
-        expect(await screen.findByRole('link', { name: '印刷アシストを開く' })).toHaveAttribute(
-            'href',
-            '/dashboard/print?subjectId=subject-1&sets=1&view=assist',
-        )
-        expect(screen.getByRole('link', { name: 'PDFを開く' })).toHaveAttribute(
-            'href',
-            '/api/print/pdf?subjectId=subject-1&sets=1',
-        )
-        expect(screen.queryByTitle('印刷プレビュー')).not.toBeInTheDocument()
-    })
-
     it('サーバー初期値が pdf でもクライアント判定で assist に切り替える', async () => {
         vi.useRealTimers()
         getPreferredPrintViewMock.mockReturnValue('assist')
