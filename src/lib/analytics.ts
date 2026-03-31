@@ -228,7 +228,7 @@ export async function getSubjectProgress(userId: string): Promise<SubjectProgres
     // We use UserCoreProblemState.isUnlocked? 
     // Or we calculate "cleared" based on proficiency?
     // Let's use UserCoreProblemState.isUnlocked if available, or assume if next one is unlocked, this one is cleared?
-    // Actually, let's use the same logic as print-algo: AnswerRate >= 50% & CorrectRate >= 60%.
+    // Actually, let's use the same logic as print-algo: AnswerRate >= 40% & CorrectRate >= 50%.
     // But for analytics, we might want to just check if they have "passed" it.
     // Let's rely on UserCoreProblemState.isUnlocked for now, assuming we update it somewhere.
     // Wait, I haven't implemented the logic to UPDATE UserCoreProblemState yet.

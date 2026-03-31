@@ -1,8 +1,8 @@
 import { prisma } from '@/lib/prisma';
 
 // 進行判定（アンロック）しきい値
-export const UNLOCK_ANSWER_RATE = 0.5; // 50%
-export const UNLOCK_CORRECT_RATE = 0.6; // 60%
+export const UNLOCK_ANSWER_RATE = 0.4; // 40%
+export const UNLOCK_CORRECT_RATE = 0.5; // 50%
 
 // CoreProblem 単位の進行状態
 export type CoreProblemStatus = {
