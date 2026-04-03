@@ -16,7 +16,8 @@ export async function getPrintData(
     userId: string,
     subjectId: string,
     coreProblemId?: string,
-    sets: number = 1
+    sets: number = 1,
+    shuffleSeed?: string
 ): Promise<PrintData | null> {
     const PROBLEMS_PER_SET = 10;
     const totalCount = sets * PROBLEMS_PER_SET;
@@ -29,7 +30,7 @@ export async function getPrintData(
         where: { id: subjectId },
         select: { name: true }
     });
-    const problemsPromise = selectProblemsForPrint(userId, subjectId, coreProblemId, totalCount);
+    const problemsPromise = selectProblemsForPrint(userId, subjectId, coreProblemId, totalCount, shuffleSeed);
     const coreProblemPromise = coreProblemId
         ? prisma.coreProblem.findUnique({
             where: { id: coreProblemId },

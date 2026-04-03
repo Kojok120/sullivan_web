@@ -149,7 +149,7 @@ export function PrintProblemCard({ userId, subjects }: PrintProblemCardProps) {
                     </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                    選択した科目の弱点・復習問題を自動生成します
+                    選択した科目の復習問題を自動生成します
                 </p>
             </CardContent>
         </Card>

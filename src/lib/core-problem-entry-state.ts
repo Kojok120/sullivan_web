@@ -65,7 +65,6 @@ export async function ensureInitialCoreProblemStates(
             // 初回単元は無条件アンロックだが、印刷前に講義視聴を要求するため未視聴で開始する
             isLectureWatched: false,
             lectureWatchedAt: null,
-            priority: 0,
         })),
         skipDuplicates: true,
     });

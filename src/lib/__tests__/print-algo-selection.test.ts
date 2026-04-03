@@ -48,6 +48,11 @@ describe('selectProblemsForPrint', () => {
                 customId: true,
                 question: true,
                 order: true,
+                userStates: {
+                    where: { userId: 'user-1' },
+                    select: { lastAnsweredAt: true },
+                    take: 1,
+                },
             },
         });
         expect(query.include).toBeUndefined();
@@ -72,34 +77,112 @@ describe('selectProblemsForPrint', () => {
         });
     });
 
-    it('既存のスコア順序を維持して返却する', async () => {
+    it('同じ seed なら同点グループの順序を再現する', async () => {
         getReadyCoreProblemIdsMock.mockResolvedValue(new Set(['cp-1']));
 
         const now = Date.now();
         findManyMock.mockResolvedValue([
             {
-                id: 'p-old',
+                id: 'p-a',
                 customId: 'E-1',
-                question: 'old',
+                question: 'A',
                 order: 1,
-                coreProblems: [{ userStates: [{ priority: 0 }] }],
-                userStates: [{ lastAnsweredAt: new Date(now - 20 * 24 * 60 * 60 * 1000) }],
+                userStates: [{ lastAnsweredAt: new Date(now - 5 * 24 * 60 * 60 * 1000) }],
             },
             {
-                id: 'p-new',
+                id: 'p-b',
                 customId: 'E-2',
-                question: 'new',
+                question: 'B',
                 order: 2,
-                coreProblems: [{ userStates: [{ priority: 0 }] }],
-                userStates: [],
+                userStates: [{ lastAnsweredAt: new Date(now - 5 * 24 * 60 * 60 * 1000) }],
+            },
+            {
+                id: 'p-c',
+                customId: 'E-3',
+                question: 'C',
+                order: 3,
+                userStates: [{ lastAnsweredAt: new Date(now - 5 * 24 * 60 * 60 * 1000) }],
             },
         ]);
 
-        const result = await selectProblemsForPrint('user-1', 'subject-1', undefined, 2);
+        const first = await selectProblemsForPrint('user-1', 'subject-1', undefined, 3, 'seed-a');
+        const second = await selectProblemsForPrint('user-1', 'subject-1', undefined, 3, 'seed-a');
 
-        expect(result).toEqual([
-            { id: 'p-old', customId: 'E-1', question: 'old', order: 1 },
-            { id: 'p-new', customId: 'E-2', question: 'new', order: 2 },
+        expect(second).toEqual(first);
+    });
+
+    it('明示 seed がなくても count の違いで先頭順位は変わらない', async () => {
+        getReadyCoreProblemIdsMock.mockResolvedValue(new Set(['cp-1']));
+
+        const now = Date.now();
+        findManyMock.mockResolvedValue([
+            {
+                id: 'p-a',
+                customId: 'E-1',
+                question: 'A',
+                order: 1,
+                userStates: [{ lastAnsweredAt: new Date(now - 5 * 24 * 60 * 60 * 1000) }],
+            },
+            {
+                id: 'p-b',
+                customId: 'E-2',
+                question: 'B',
+                order: 2,
+                userStates: [{ lastAnsweredAt: new Date(now - 5 * 24 * 60 * 60 * 1000) }],
+            },
+            {
+                id: 'p-c',
+                customId: 'E-3',
+                question: 'C',
+                order: 3,
+                userStates: [{ lastAnsweredAt: new Date(now - 5 * 24 * 60 * 60 * 1000) }],
+            },
+            {
+                id: 'p-d',
+                customId: 'E-4',
+                question: 'D',
+                order: 4,
+                userStates: [{ lastAnsweredAt: new Date(now - 5 * 24 * 60 * 60 * 1000) }],
+            },
         ]);
+
+        const full = await selectProblemsForPrint('user-1', 'subject-1', undefined, 4);
+        const partial = await selectProblemsForPrint('user-1', 'subject-1', undefined, 2);
+
+        expect(partial).toEqual(full.slice(0, 2));
+    });
+
+    it('count 境界に同点がかかってもシャッフル後に切り出す', async () => {
+        getReadyCoreProblemIdsMock.mockResolvedValue(new Set(['cp-1']));
+
+        const now = Date.now();
+        findManyMock.mockResolvedValue([
+            {
+                id: 'p-a',
+                customId: 'E-1',
+                question: 'A',
+                order: 1,
+                userStates: [{ lastAnsweredAt: new Date(now - 5 * 24 * 60 * 60 * 1000) }],
+            },
+            {
+                id: 'p-b',
+                customId: 'E-2',
+                question: 'B',
+                order: 2,
+                userStates: [{ lastAnsweredAt: new Date(now - 5 * 24 * 60 * 60 * 1000) }],
+            },
+            {
+                id: 'p-c',
+                customId: 'E-3',
+                question: 'C',
+                order: 3,
+                userStates: [{ lastAnsweredAt: new Date(now - 5 * 24 * 60 * 60 * 1000) }],
+            },
+        ]);
+
+        const full = await selectProblemsForPrint('user-1', 'subject-1', undefined, 3, 'seed-boundary');
+        const partial = await selectProblemsForPrint('user-1', 'subject-1', undefined, 2, 'seed-boundary');
+
+        expect(partial).toEqual(full.slice(0, 2));
     });
 });

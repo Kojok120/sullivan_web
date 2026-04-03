@@ -37,19 +37,19 @@
 ### 3.3 スコアリング
 スコアは以下の合計で算出され、降順でソートされる。
 
-- **CoreProblem優先度**: `UserCoreProblemState.priority` の合計
-  - `priorityScore = sum(priority) * WEIGHT_CORE_PRIORITY`
 - **未回答ボーナス**: `UserProblemState` が存在しない場合
   - `score += 100 * WEIGHT_UNANSWERED`
   - `score -= problem.order * 0.1`（順序をわずかに優先）
 - **忘却度（経過日数）**: `lastAnsweredAt` からの経過日数
   - `score += diffDays * FORGETTING_RATE * WEIGHT_TIME`
+- **同点時の扱い**: 同一点の問題群のみ seed 固定のシャッフルを行う
+  - 1回のプレビュー生成中は順序固定
+  - プレビューを新しく作り直した場合のみ再抽選
 
 設定値（`PRINT_CONFIG`）:
 - `WEIGHT_TIME = 2.0`
 - `WEIGHT_WEAKNESS = 1.0`（※現状の実装では未使用）
 - `WEIGHT_UNANSWERED = 1.5`
-- `WEIGHT_CORE_PRIORITY = 1.0`
 - `FORGETTING_RATE = 5.0`
 
 ### 3.4 選抜
@@ -124,7 +124,7 @@
 - `LearningHistory` を `createMany` で保存し、`groupId` を生成。
 - `UserProblemState` を upsert して `priority` と `lastAnsweredAt` を更新。
   - 優先度調整: A:-10 / B:-5 / C:+5 / D:+10
-- `UserCoreProblemState` を upsert（正解: 関連CPに-5 / 不正解: 推定CPに+5、`isUnlocked=true`）。
+- `UserCoreProblemState` は解放・講義視聴状態のみを更新し、出題スコア用のポイント更新は行わない。
 - `checkProgressAndUnlock` で解放判定（解答率>=50% かつ 正答率>=60%）を満たすと次のCoreProblemを解放。
 - 採点完了は `realtime_events` へ `grading_completed` をINSERTし通知。
 - ゲーミフィケーション更新がある場合は `gamification_update` をINSERTして通知。

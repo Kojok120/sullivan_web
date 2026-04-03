@@ -1,7 +1,7 @@
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 
-import { appendCacheBust } from '@/components/print/cache-bust';
+import { appendCacheBust, createCacheBustToken } from '@/components/print/cache-bust';
 import { PrintAssistClient } from '@/components/print/print-assist-client';
 import { PdfPreviewClient } from '@/components/print/pdf-preview-client';
 import {
@@ -15,6 +15,7 @@ type PrintSearchParams = {
     sets?: string;
     gateChecked?: string;
     view?: string;
+    cb?: string;
 };
 
 interface StudentPrintPageProps {
@@ -38,6 +39,7 @@ export async function SharedStudentPrintPage({
 
     const safeSets = sanitizeSets(searchParams.sets);
     const pageView = sanitizePrintView(searchParams.view);
+    const generationToken = searchParams.cb || createCacheBustToken();
     const pageQuery = new URLSearchParams({
         subjectId: searchParams.subjectId,
         sets: String(safeSets),
@@ -45,6 +47,7 @@ export async function SharedStudentPrintPage({
     const apiQuery = new URLSearchParams({
         subjectId: searchParams.subjectId,
         sets: String(safeSets),
+        seed: generationToken,
     });
 
     if (searchParams.coreProblemId) {
@@ -56,14 +59,17 @@ export async function SharedStudentPrintPage({
         pageQuery.set('gateChecked', searchParams.gateChecked);
     }
 
+    pageQuery.set('cb', generationToken);
+
     if (includeTargetUserIdInApiQuery) {
         apiQuery.set('targetUserId', targetUserId);
     }
 
-    const pdfUrl = appendCacheBust(`/api/print/pdf?${apiQuery.toString()}`);
+    const pdfUrl = appendCacheBust(`/api/print/pdf?${apiQuery.toString()}`, generationToken);
     const assistViewUrl = buildAssistViewUrl({
         printPagePath,
         query: pageQuery,
+        cacheBustToken: generationToken,
     });
 
     if (pageView === 'assist') {
@@ -103,8 +109,9 @@ function sanitizeSets(raw?: string): number {
 function buildAssistViewUrl(input: {
     printPagePath: string;
     query: URLSearchParams;
+    cacheBustToken: string;
 }) {
     const query = new URLSearchParams(input.query);
     query.set('view', 'assist');
-    return appendCacheBust(`${input.printPagePath}?${query.toString()}`);
+    return appendCacheBust(`${input.printPagePath}?${query.toString()}`, input.cacheBustToken);
 }
