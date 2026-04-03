@@ -54,7 +54,6 @@ export async function GET(request: NextRequest) {
             ?? toOptionalString(request.nextUrl.searchParams.get('cb'));
         // クライアントの挙動用フラグ。API側では入力互換のため受け付けるだけにする。
         void request.nextUrl.searchParams.get('autoprint');
-        void request.nextUrl.searchParams.get('cb');
 
         const targetResolveStartedAt = Date.now();
         const targetUserId = await resolveTargetUserId({
