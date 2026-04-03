@@ -49,6 +49,9 @@ export async function GET(request: NextRequest) {
         const sets = sanitizeSets(request.nextUrl.searchParams.get('sets'));
         const coreProblemId = toOptionalString(request.nextUrl.searchParams.get('coreProblemId'));
         const targetUserIdParam = toOptionalString(request.nextUrl.searchParams.get('targetUserId'));
+        const shuffleSeed =
+            toOptionalString(request.nextUrl.searchParams.get('seed'))
+            ?? toOptionalString(request.nextUrl.searchParams.get('cb'));
         // クライアントの挙動用フラグ。API側では入力互換のため受け付けるだけにする。
         void request.nextUrl.searchParams.get('autoprint');
         void request.nextUrl.searchParams.get('cb');
@@ -84,7 +87,7 @@ export async function GET(request: NextRequest) {
 
         const dataStartedAt = Date.now();
         const data = await withDeadline(
-            getPrintData(targetUserId.userId, subjectId, coreProblemId, sets),
+            getPrintData(targetUserId.userId, subjectId, coreProblemId, sets, shuffleSeed ?? undefined),
             deadlineAt,
             'print data load timeout',
         );

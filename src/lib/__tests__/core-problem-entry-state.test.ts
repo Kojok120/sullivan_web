@@ -77,7 +77,6 @@ describe('初回CoreProblem状態の初期化', () => {
                 expect(row.userId).toBe('user-1')
                 expect(row.isUnlocked).toBe(true)
                 expect(row.isLectureWatched).toBe(false)
-                expect(row.priority).toBe(0)
                 expect(row.lectureWatchedAt).toBeNull()
             }
         })

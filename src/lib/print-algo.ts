@@ -8,7 +8,6 @@ export const PRINT_CONFIG = {
     WEIGHT_TIME: 2.0,       // Priority for forgetting (time elapsed)
     WEIGHT_WEAKNESS: 1.0,   // Priority for weakness (low accuracy/evaluation)
     WEIGHT_UNANSWERED: 1.5, // Priority for new/unanswered problems
-    WEIGHT_CORE_PRIORITY: 1.0, // Priority from CoreProblem points
 
     // Forgetting curve settings
     FORGETTING_RATE: 5.0,   // Points per day elapsed
@@ -24,7 +23,8 @@ export async function selectProblemsForPrint(
     userId: string,
     subjectId: string,
     coreProblemId?: string,
-    count: number = 30
+    count: number = 30,
+    shuffleSeed?: string
 ): Promise<PrintableProblem[]> {
 
     // 2. Fetch Candidate Problems with Integrated Filtering & User State
@@ -66,15 +66,6 @@ export async function selectProblemsForPrint(
             customId: true,
             question: true,
             order: true,
-            coreProblems: {
-                select: {
-                    userStates: {
-                        where: { userId },
-                        select: { priority: true },
-                        take: 1,
-                    },
-                },
-            },
             // UserProblemStateを一緒に取得 (1:N relation name is 'userStates')
             userStates: {
                 where: { userId },
@@ -96,17 +87,6 @@ export async function selectProblemsForPrint(
         // Integrated userState
         const state = problem.userStates[0];
         let score = 0;
-
-        // Base Score: CoreProblem Priorities
-        let cpPrioritySum = 0;
-        for (const cp of problem.coreProblems) {
-            const cpState = cp.userStates[0];
-            const priority = cpState ? cpState.priority : 0;
-            cpPrioritySum += priority;
-        }
-
-        const priorityScore = cpPrioritySum * PRINT_CONFIG.WEIGHT_CORE_PRIORITY;
-        score += priorityScore;
 
         if (!state) {
             // Unanswered
@@ -133,9 +113,66 @@ export async function selectProblemsForPrint(
         };
     });
 
-    // 5. Sort by score descending
-    scoredProblems.sort((a, b) => b.score - a.score);
+    // 5. Sort by score descending and shuffle ties deterministically per seed
+    const random = createSeededRandom(
+        shuffleSeed ?? `${userId}:${subjectId}:${coreProblemId ?? 'all'}:${count}`
+    );
+    const rankedProblems = shuffleTiedScores(scoredProblems, random);
 
     // 6. Select top 'count'
-    return scoredProblems.slice(0, count).map(sp => sp.problem);
+    return rankedProblems.slice(0, count).map(sp => sp.problem);
+}
+
+function shuffleTiedScores(items: ScoredProblem[], random: () => number): ScoredProblem[] {
+    const sorted = [...items].sort((a, b) => b.score - a.score);
+    const ranked: ScoredProblem[] = [];
+
+    for (let index = 0; index < sorted.length;) {
+        const score = sorted[index]?.score;
+        const group: ScoredProblem[] = [];
+
+        while (index < sorted.length && sorted[index]?.score === score) {
+            const item = sorted[index];
+            if (item) {
+                group.push(item);
+            }
+            index += 1;
+        }
+
+        shuffleInPlace(group, random);
+        ranked.push(...group);
+    }
+
+    return ranked;
+}
+
+function shuffleInPlace<T>(items: T[], random: () => number) {
+    for (let index = items.length - 1; index > 0; index -= 1) {
+        const swapIndex = Math.floor(random() * (index + 1));
+        [items[index], items[swapIndex]] = [items[swapIndex], items[index]];
+    }
+}
+
+function createSeededRandom(seed: string): () => number {
+    return mulberry32(hashSeed(seed));
+}
+
+function hashSeed(seed: string): number {
+    let hash = 2166136261;
+
+    for (let index = 0; index < seed.length; index += 1) {
+        hash ^= seed.charCodeAt(index);
+        hash = Math.imul(hash, 16777619);
+    }
+
+    return hash >>> 0;
+}
+
+function mulberry32(seed: number): () => number {
+    return () => {
+        let next = (seed += 0x6D2B79F5);
+        next = Math.imul(next ^ (next >>> 15), next | 1);
+        next ^= next + Math.imul(next ^ (next >>> 7), next | 61);
+        return ((next ^ (next >>> 14)) >>> 0) / 4294967296;
+    };
 }

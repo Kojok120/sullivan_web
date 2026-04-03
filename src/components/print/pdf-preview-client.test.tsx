@@ -99,7 +99,7 @@ describe('PDFプレビューの戻る動作', () => {
     it('読み込み完了後も自動印刷を試みない', () => {
         render(
             <PdfPreviewClient
-                pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1&cb=initial"
+                pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1&seed=seed-1&cb=initial"
                 backFallbackPath="/dashboard"
             />
         )
@@ -125,7 +125,7 @@ describe('PDFプレビューの戻る動作', () => {
     it('pageshow persisted=true のとき iframe を再読み込みする', () => {
         render(
             <PdfPreviewClient
-                pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1&cb=initial"
+                pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1&seed=seed-1&cb=initial"
                 backFallbackPath="/dashboard"
             />
         )
@@ -149,12 +149,14 @@ describe('PDFプレビューの戻る動作', () => {
         expect(nextSrc).toContain('/api/print/pdf?')
         expect(nextSrc).toContain('subjectId=subject-1')
         expect(nextSrc).toContain('sets=1')
+        expect(nextSrc).toContain('seed=seed-1')
+        expect(nextSrc).not.toContain('cb=initial')
     })
 
     it('visible に戻ったとき iframe を再読み込みする', () => {
         render(
             <PdfPreviewClient
-                pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1&cb=initial"
+                pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1&seed=seed-1&cb=initial"
                 backFallbackPath="/dashboard"
             />
         )
@@ -177,12 +179,14 @@ describe('PDFプレビューの戻る動作', () => {
         expect(nextSrc).toContain('/api/print/pdf?')
         expect(nextSrc).toContain('subjectId=subject-1')
         expect(nextSrc).toContain('sets=1')
+        expect(nextSrc).toContain('seed=seed-1')
+        expect(nextSrc).not.toContain('cb=initial')
     })
 
     it('pdfUrl が変わると iframe を新しい URL で再初期化する', () => {
         const { rerender } = render(
             <PdfPreviewClient
-                pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1&cb=initial"
+                pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1&seed=seed-1&cb=initial"
                 backFallbackPath="/dashboard"
             />
         )
@@ -191,7 +195,7 @@ describe('PDFプレビューの戻る動作', () => {
 
         rerender(
             <PdfPreviewClient
-                pdfUrl="/api/print/pdf?subjectId=subject-2&sets=2&cb=next"
+                pdfUrl="/api/print/pdf?subjectId=subject-2&sets=2&seed=seed-2&cb=next"
                 backFallbackPath="/dashboard"
             />
         )
@@ -199,6 +203,7 @@ describe('PDFプレビューの戻る動作', () => {
         const iframe = screen.getByTitle('印刷プレビュー')
         expect(iframe.getAttribute('src')).toContain('subjectId=subject-2')
         expect(iframe.getAttribute('src')).toContain('sets=2')
+        expect(iframe.getAttribute('src')).toContain('seed=seed-2')
         expect(screen.getByText('PDFを読み込み中です...')).toBeTruthy()
     })
 

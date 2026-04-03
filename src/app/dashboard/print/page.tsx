@@ -6,7 +6,7 @@ import { getPrintGate } from '@/lib/print-gate-service';
 export default async function StudentPrintPage({
     searchParams,
 }: {
-    searchParams: Promise<{ subjectId?: string; coreProblemId?: string; sets?: string; autoprint?: string; gateChecked?: string; view?: string }>;
+    searchParams: Promise<{ subjectId?: string; coreProblemId?: string; sets?: string; autoprint?: string; gateChecked?: string; view?: string; cb?: string }>;
 }) {
     const session = await getSession();
     if (!session) redirect('/login');
