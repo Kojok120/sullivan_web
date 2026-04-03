@@ -113,13 +113,13 @@ export async function selectProblemsForPrint(
         };
     });
 
-    // 5. Sort by score descending and shuffle ties deterministically per seed
+    // 5. スコアで降順ソートし、同点はシードに基づいて決定論的にシャッフルする
     const random = createSeededRandom(
-        shuffleSeed ?? `${userId}:${subjectId}:${coreProblemId ?? 'all'}:${count}`
+        shuffleSeed ?? `${userId}:${subjectId}:${coreProblemId ?? 'all'}`
     );
     const rankedProblems = shuffleTiedScores(scoredProblems, random);
 
-    // 6. Select top 'count'
+    // 6. 上位 `count` 件を返す
     return rankedProblems.slice(0, count).map(sp => sp.problem);
 }
 

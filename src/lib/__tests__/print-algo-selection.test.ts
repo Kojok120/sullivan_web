@@ -111,7 +111,7 @@ describe('selectProblemsForPrint', () => {
         expect(second).toEqual(first);
     });
 
-    it('seed が変わると同点グループの順序が変わりうる', async () => {
+    it('明示 seed がなくても count の違いで先頭順位は変わらない', async () => {
         getReadyCoreProblemIdsMock.mockResolvedValue(new Set(['cp-1']));
 
         const now = Date.now();
@@ -146,10 +146,10 @@ describe('selectProblemsForPrint', () => {
             },
         ]);
 
-        const first = await selectProblemsForPrint('user-1', 'subject-1', undefined, 4, 'seed-a');
-        const second = await selectProblemsForPrint('user-1', 'subject-1', undefined, 4, 'seed-b');
+        const full = await selectProblemsForPrint('user-1', 'subject-1', undefined, 4);
+        const partial = await selectProblemsForPrint('user-1', 'subject-1', undefined, 2);
 
-        expect(second).not.toEqual(first);
+        expect(partial).toEqual(full.slice(0, 2));
     });
 
     it('count 境界に同点がかかってもシャッフル後に切り出す', async () => {

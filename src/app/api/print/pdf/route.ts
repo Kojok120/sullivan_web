@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
 
         const dataStartedAt = Date.now();
         const data = await withDeadline(
-            getPrintData(targetUserId.userId, subjectId, coreProblemId, sets, shuffleSeed ?? undefined),
+            getPrintData(targetUserId.userId, subjectId, coreProblemId, sets, shuffleSeed),
             deadlineAt,
             'print data load timeout',
         );
