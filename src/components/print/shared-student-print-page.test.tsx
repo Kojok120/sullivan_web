@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SharedStudentPrintPage } from './shared-student-print-page';
+import { createCacheBustToken } from '@/components/print/cache-bust';
 
 const {
     redirectMock,
@@ -51,6 +52,15 @@ vi.mock('@/components/print/pdf-preview-client', () => ({
     PdfPreviewClient: pdfPreviewClientMock,
 }));
 
+vi.mock('@/components/print/cache-bust', async () => {
+    const actual = await vi.importActual<typeof import('@/components/print/cache-bust')>('@/components/print/cache-bust');
+
+    return {
+        ...actual,
+        createCacheBustToken: vi.fn(() => 'generated-seed'),
+    };
+});
+
 describe('SharedStudentPrintPage', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -62,6 +72,7 @@ describe('SharedStudentPrintPage', () => {
                 subjectId: 'subject-1',
                 sets: '2',
                 view: 'assist',
+                cb: 'seed-123',
             },
             redirectPathIfMissing: '/dashboard',
             printPagePath: '/dashboard/print',
@@ -70,6 +81,8 @@ describe('SharedStudentPrintPage', () => {
 
         const assistClient = screen.getByTestId('print-assist-client');
         expect(assistClient.getAttribute('data-pdf-url')).toContain('/api/print/pdf?subjectId=subject-1&sets=2');
+        expect(assistClient.getAttribute('data-pdf-url')).toContain('seed=seed-123');
+        expect(assistClient.getAttribute('data-pdf-url')).toContain('cb=seed-123');
         expect(screen.queryByTestId('pdf-preview-client')).not.toBeInTheDocument();
     });
 
@@ -93,6 +106,7 @@ describe('SharedStudentPrintPage', () => {
                 subjectId: 'subject-1',
                 sets: '2',
                 view: 'html',
+                cb: 'seed-123',
             },
             redirectPathIfMissing: '/dashboard',
             printPagePath: '/dashboard/print',
@@ -101,7 +115,9 @@ describe('SharedStudentPrintPage', () => {
 
         const pdfClient = screen.getByTestId('pdf-preview-client');
         expect(pdfClient.getAttribute('data-pdf-url')).toContain('/api/print/pdf?subjectId=subject-1&sets=2');
-        expect(pdfClient.getAttribute('data-assist-url')).toContain('/dashboard/print?subjectId=subject-1&sets=2&view=assist');
+        expect(pdfClient.getAttribute('data-pdf-url')).toContain('seed=seed-123');
+        expect(pdfClient.getAttribute('data-pdf-url')).toContain('cb=seed-123');
+        expect(pdfClient.getAttribute('data-assist-url')).toContain('/dashboard/print?subjectId=subject-1&sets=2&cb=seed-123&view=assist');
         expect(pdfClient.getAttribute('data-preferred-view')).toBe('assist');
     });
 
@@ -115,6 +131,7 @@ describe('SharedStudentPrintPage', () => {
                 subjectId: 'subject-1',
                 sets: '2',
                 view: 'pdf',
+                cb: 'seed-123',
             },
             redirectPathIfMissing: '/dashboard',
             printPagePath: '/dashboard/print',
@@ -123,5 +140,23 @@ describe('SharedStudentPrintPage', () => {
 
         const pdfClient = screen.getByTestId('pdf-preview-client');
         expect(pdfClient.getAttribute('data-preferred-view')).toBe('auto');
+    });
+
+    it('cb が無い場合は生成したトークンを seed に使う', async () => {
+        render(await SharedStudentPrintPage({
+            searchParams: {
+                subjectId: 'subject-1',
+                sets: '2',
+                view: 'pdf',
+            },
+            redirectPathIfMissing: '/dashboard',
+            printPagePath: '/dashboard/print',
+            targetUserId: 'student-1',
+        }));
+
+        expect(createCacheBustToken).toHaveBeenCalledTimes(1);
+        const pdfClient = screen.getByTestId('pdf-preview-client');
+        expect(pdfClient.getAttribute('data-pdf-url')).toContain('seed=generated-seed');
+        expect(pdfClient.getAttribute('data-pdf-url')).toContain('cb=generated-seed');
     });
 });

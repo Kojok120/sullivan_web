@@ -89,7 +89,7 @@ describe('print pdf route', () => {
     });
 
     it('200 応答でも no-store ヘッダーを返し、If-None-Match を無視する', async () => {
-        const response = await GET(createRequest('subjectId=subject-1&sets=1&cb=initial', {
+        const response = await GET(createRequest('subjectId=subject-1&sets=1&seed=seed-123&cb=initial', {
             'If-None-Match': '"etag"',
         }));
 
@@ -98,6 +98,7 @@ describe('print pdf route', () => {
         expect(response.headers.get('ETag')).toBeNull();
         expect(response.headers.get('Content-Type')).toBe('application/pdf');
         expect(getOrCreatePrintPdfMock).toHaveBeenCalledTimes(1);
+        expect(getPrintDataMock).toHaveBeenCalledWith('student-1', 'subject-1', undefined, 1, 'seed-123');
     });
 
     it('401 応答でも no-store ヘッダーを返す', async () => {

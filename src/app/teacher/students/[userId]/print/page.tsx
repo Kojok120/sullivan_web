@@ -8,7 +8,7 @@ export default async function PrintPage({
     searchParams,
 }: {
     params: Promise<{ userId: string }>;
-    searchParams: Promise<{ subjectId?: string; coreProblemId?: string; sets?: string; autoprint?: string; gateChecked?: string; view?: string }>;
+    searchParams: Promise<{ subjectId?: string; coreProblemId?: string; sets?: string; autoprint?: string; gateChecked?: string; view?: string; cb?: string }>;
 }) {
     const session = await getSession();
     if (!isTeacherOrAdmin(session)) {

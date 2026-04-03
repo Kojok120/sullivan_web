@@ -6,7 +6,6 @@ describe('PRINT_CONFIG', () => {
         expect(PRINT_CONFIG.WEIGHT_TIME).toBe(2.0)
         expect(PRINT_CONFIG.WEIGHT_WEAKNESS).toBe(1.0)
         expect(PRINT_CONFIG.WEIGHT_UNANSWERED).toBe(1.5)
-        expect(PRINT_CONFIG.WEIGHT_CORE_PRIORITY).toBe(1.0)
         expect(PRINT_CONFIG.FORGETTING_RATE).toBe(5.0)
     })
 

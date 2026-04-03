@@ -1229,8 +1229,7 @@ async function recordGradingResults(results: GradingResult[], qrData: QRData): P
             await Promise.all(updatePromises);
         }
 
-        // 4. Update UserCoreProblemState (Batch / Aggregated)
-        const cpDeltas = new Map<string, number>();
+        // 4. Collect involved UserCoreProblemState IDs for unlock checks
         const involvedCpIdsInTransaction = new Set<string>();
 
         for (const result of results) {
@@ -1240,16 +1239,13 @@ async function recordGradingResults(results: GradingResult[], qrData: QRData): P
             const targetCoreProblems = filterCoreProblemsByScope(problem.coreProblems, progressionScope);
 
             if (result.isCorrect) {
-                // 正解時: 対象CoreProblemの優先度を下げる
                 for (const coreProblem of targetCoreProblems) {
-                    const current = cpDeltas.get(coreProblem.id) || 0;
-                    cpDeltas.set(coreProblem.id, current - 5);
                     involvedCpIdsInTransaction.add(coreProblem.id);
                 }
                 continue;
             }
 
-            // 不正解時: badCoreProblemIds が指定されている場合のみ対象を上げる
+            // 不正解時: badCoreProblemIds が指定されている場合のみ対象を unlock 判定候補に含める
             if (!result.badCoreProblemIds || result.badCoreProblemIds.length === 0) {
                 continue;
             }
@@ -1258,28 +1254,9 @@ async function recordGradingResults(results: GradingResult[], qrData: QRData): P
             const scopedBadCoreProblemIds = filterCoreProblemIdsByScope(result.badCoreProblemIds, progressionScope);
             for (const coreProblemId of scopedBadCoreProblemIds) {
                 if (!coreProblemIdsOnProblem.has(coreProblemId)) continue;
-                const current = cpDeltas.get(coreProblemId) || 0;
-                cpDeltas.set(coreProblemId, current + 5);
                 involvedCpIdsInTransaction.add(coreProblemId);
             }
         }
-
-        await Promise.all(
-            Array.from(cpDeltas.entries()).map(([coreProblemId, delta]) =>
-                tx.userCoreProblemState.upsert({
-                    where: { userId_coreProblemId: { userId, coreProblemId } },
-                    create: {
-                        userId,
-                        coreProblemId,
-                        priority: delta,
-                        isUnlocked: false,
-                        isLectureWatched: false,
-                        lectureWatchedAt: null,
-                    },
-                    update: { priority: { increment: delta } }
-                })
-            )
-        );
 
         return {
             involvedCpIds: Array.from(involvedCpIdsInTransaction),
@@ -1464,7 +1441,6 @@ async function checkProgressAndUnlock(userId: string, cpIdsToCheck: string[]) {
                             userId,
                             coreProblemId: nextCp.id,
                             isUnlocked: true,
-                            priority: 0,
                             // 講義動画がない場合はtrue（視聴不要）、ある場合はfalse（視聴必須）
                             isLectureWatched: !hasLectureVideos
                         },
