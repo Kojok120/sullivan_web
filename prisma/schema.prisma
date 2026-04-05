@@ -169,17 +169,31 @@ enum GuidanceType {
   OTHER // その他
 }
 
+enum GuidanceRecordStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
 model GuidanceRecord {
-  id        String       @id @default(cuid())
-  studentId String
-  student   User         @relation("StudentGuidance", fields: [studentId], references: [id])
-  teacherId String
-  teacher   User         @relation("TeacherGuidance", fields: [teacherId], references: [id])
-  date      DateTime     @default(now())
-  content   String
-  type      GuidanceType @default(GUIDANCE)
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  id                  String               @id @default(cuid())
+  studentId           String
+  student             User                 @relation("StudentGuidance", fields: [studentId], references: [id])
+  teacherId           String
+  teacher             User                 @relation("TeacherGuidance", fields: [teacherId], references: [id])
+  date                DateTime             @default(now())
+  content             String
+  type                GuidanceType         @default(GUIDANCE)
+  status              GuidanceRecordStatus @default(COMPLETED)
+  summaryErrorCode    String?
+  summaryErrorMessage String?
+  summaryJobAttempts  Int                  @default(0)
+  geminiFileName      String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([status, updatedAt])
 }
 
 model LearningHistory {

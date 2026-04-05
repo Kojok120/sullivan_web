@@ -3,7 +3,7 @@
 import { prisma } from '@/lib/prisma';
 import { getSession, isTeacherOrAdmin } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
-import { GuidanceType } from '@prisma/client';
+import { GuidanceRecordStatus, GuidanceType } from '@prisma/client';
 import { normalizeOptionalSelection } from '@/lib/form-selection';
 import { z } from 'zod';
 import { addDaysToDateKey, getTodayDateKey, isValidDateKey, listDateKeysBetween, normalizeTimeZone } from '@/lib/date-key';
@@ -334,6 +334,7 @@ export async function addGuidanceRecord(userId: string, formData: FormData) {
                 content,
                 type,
                 date: new Date(dateStr),
+                status: GuidanceRecordStatus.COMPLETED,
             },
         });
 
@@ -375,6 +376,7 @@ export async function saveGeneratedGuidanceRecord(params: {
                 content: params.content,
                 type: params.type ?? GuidanceType.INTERVIEW,
                 date: params.date,
+                status: GuidanceRecordStatus.COMPLETED,
             },
         });
 
