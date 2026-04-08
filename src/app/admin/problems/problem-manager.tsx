@@ -3,14 +3,29 @@
 import { useState, useTransition } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { Plus } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus } from 'lucide-react';
 import { ProblemList } from './components/problem-list';
-import { ProblemDialog } from './components/problem-dialog';
 import { BulkImportDialog } from './components/problem-bulk-import';
 import type { ProblemWithRelations } from './types';
+import {
+    CONTENT_FORMAT_OPTIONS,
+    PROBLEM_STATUS_OPTIONS,
+    PROBLEM_TYPE_OPTIONS,
+    type ProblemEditorViewMode,
+} from '@/lib/problem-ui';
+
+type ProblemManagerSubject = {
+    id: string;
+    name: string;
+    coreProblems: {
+        id: string;
+        name: string;
+    }[];
+};
 
 interface ProblemManagerProps {
     initialProblems: ProblemWithRelations[];
@@ -19,7 +34,11 @@ interface ProblemManagerProps {
     initialQuery: string;
     sortBy: string;
     sortOrder: 'asc' | 'desc';
-    subjects: { id: string; name: string }[];
+    subjects: ProblemManagerSubject[];
+    currentSubject: ProblemManagerSubject;
+    structuredProblemsEnabled: boolean;
+    routeBase?: string;
+    viewMode?: ProblemEditorViewMode;
 }
 
 export function ProblemManager({
@@ -29,15 +48,18 @@ export function ProblemManager({
     initialQuery,
     sortBy,
     sortOrder,
-    subjects
+    subjects,
+    currentSubject,
+    structuredProblemsEnabled,
+    routeBase = '/admin/problems',
+    viewMode = 'admin',
 }: ProblemManagerProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const [isPending, startTransition] = useTransition();
     const [query, setQuery] = useState(initialQuery);
-    const [selectedProblem, setSelectedProblem] = useState<ProblemWithRelations | null>(null);
-    const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isBulkDialogOpen, setIsBulkDialogOpen] = useState(false);
+    const isAuthorView = viewMode === 'author';
 
     const buildParams = (updates: Record<string, string | undefined>) => {
         const params = new URLSearchParams(searchParams.toString());
@@ -55,16 +77,24 @@ export function ProblemManager({
 
     const updateParams = (updates: Record<string, string | undefined>) => {
         const params = buildParams(updates);
-        router.push(`/admin/problems?${params.toString()}`);
+        router.push(`${routeBase}?${params.toString()}`);
     };
 
     const buildHref = (updates: Record<string, string | undefined>) => {
         const params = buildParams(updates);
-        return `/admin/problems?${params.toString()}`;
+        return `${routeBase}?${params.toString()}`;
     };
 
-    const selectedSubjectId = searchParams.get('subjectId') || 'ALL';
+    const rawSelectedCoreProblemId = searchParams.get('coreProblemId');
     const selectedVideoFilter = searchParams.get('video') || 'ALL';
+    const selectedProblemType = searchParams.get('problemType') || 'ALL';
+    const selectedContentFormat = searchParams.get('contentFormat') || 'ALL';
+    const selectedStatus = searchParams.get('status') || 'ALL';
+    const availableCoreProblems = currentSubject.coreProblems;
+    const selectedCoreProblemId = rawSelectedCoreProblemId
+        && availableCoreProblems.some((coreProblem) => coreProblem.id === rawSelectedCoreProblemId)
+        ? rawSelectedCoreProblemId
+        : 'ALL';
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
@@ -73,19 +103,8 @@ export function ProblemManager({
         });
     };
 
-    const handleCreate = () => {
-        setSelectedProblem(null);
-        setIsDialogOpen(true);
-    };
-
     const handleEdit = (problem: ProblemWithRelations) => {
-        setSelectedProblem(problem);
-        setIsDialogOpen(true);
-    };
-
-    const handleSuccess = () => {
-        setIsDialogOpen(false);
-        router.refresh();
+        router.push(`${routeBase}/${problem.id}`);
     };
 
     const handleSort = (column: string) => {
@@ -95,11 +114,11 @@ export function ProblemManager({
         });
     };
 
-    const handleSubjectFilter = (subjectId: string) => {
+    const handleCoreProblemFilter = (coreProblemId: string) => {
         startTransition(() => {
             updateParams({
-                subjectId: subjectId === 'ALL' ? undefined : subjectId,
-                page: '1'
+                coreProblemId: coreProblemId === 'ALL' ? undefined : coreProblemId,
+                page: '1',
             });
         });
     };
@@ -108,7 +127,34 @@ export function ProblemManager({
         startTransition(() => {
             updateParams({
                 video: value === 'ALL' ? undefined : value,
-                page: '1'
+                page: '1',
+            });
+        });
+    };
+
+    const handleProblemTypeFilter = (value: string) => {
+        startTransition(() => {
+            updateParams({
+                problemType: value === 'ALL' ? undefined : value,
+                page: '1',
+            });
+        });
+    };
+
+    const handleContentFormatFilter = (value: string) => {
+        startTransition(() => {
+            updateParams({
+                contentFormat: value === 'ALL' ? undefined : value,
+                page: '1',
+            });
+        });
+    };
+
+    const handleStatusFilter = (value: string) => {
+        startTransition(() => {
+            updateParams({
+                status: value === 'ALL' ? undefined : value,
+                page: '1',
             });
         });
     };
@@ -116,10 +162,10 @@ export function ProblemManager({
     return (
         <div className="space-y-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-col gap-2 sm:flex-1 sm:flex-row sm:items-center">
+                <div className="flex flex-col gap-2 sm:flex-1">
                     <form onSubmit={handleSearch} className="flex w-full gap-2 sm:max-w-sm">
                         <Input
-                            placeholder="問題文、解答、ID、マスタNo、単元名で検索..."
+                            placeholder={isAuthorView ? '問題名、問題文、ID、単元名で検索...' : '問題文、解答、ID、マスタNo、単元名で検索...'}
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
                         />
@@ -127,39 +173,87 @@ export function ProblemManager({
                             検索
                         </Button>
                     </form>
-                    <Select value={selectedSubjectId} onValueChange={handleSubjectFilter}>
-                        <SelectTrigger className="w-full sm:w-[200px]">
-                            <SelectValue placeholder="科目" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="ALL">全科目</SelectItem>
-                            {subjects.map(subject => (
-                                <SelectItem key={subject.id} value={subject.id}>
-                                    {subject.name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <Select value={selectedVideoFilter} onValueChange={handleVideoFilter}>
-                        <SelectTrigger className="w-full sm:w-[150px]">
-                            <SelectValue placeholder="動画" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="ALL">動画：全件</SelectItem>
-                            <SelectItem value="exists">動画あり</SelectItem>
-                            <SelectItem value="none">動画なし</SelectItem>
-                        </SelectContent>
-                    </Select>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                        <Select value={selectedCoreProblemId} onValueChange={handleCoreProblemFilter}>
+                            <SelectTrigger className="w-full sm:w-[180px]">
+                                <SelectValue placeholder="単元" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="ALL">全単元</SelectItem>
+                                {availableCoreProblems.map((coreProblem) => (
+                                    <SelectItem key={coreProblem.id} value={coreProblem.id}>
+                                        {coreProblem.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <Select value={selectedVideoFilter} onValueChange={handleVideoFilter}>
+                            <SelectTrigger className="w-full sm:w-[150px]">
+                                <SelectValue placeholder="動画" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="ALL">動画：全件</SelectItem>
+                                <SelectItem value="exists">動画あり</SelectItem>
+                                <SelectItem value="none">動画なし</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Select value={selectedProblemType} onValueChange={handleProblemTypeFilter}>
+                            <SelectTrigger className="w-full sm:w-[180px]">
+                                <SelectValue placeholder="問題形式" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="ALL">形式：全件</SelectItem>
+                                {PROBLEM_TYPE_OPTIONS.map((option) => (
+                                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        {!isAuthorView && (
+                            <Select value={selectedContentFormat} onValueChange={handleContentFormatFilter}>
+                                <SelectTrigger className="w-full sm:w-[180px]">
+                                    <SelectValue placeholder="本文形式" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="ALL">本文：全件</SelectItem>
+                                    {CONTENT_FORMAT_OPTIONS.map((option) => (
+                                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
+                        <Select value={selectedStatus} onValueChange={handleStatusFilter}>
+                            <SelectTrigger className="w-full sm:w-[160px]">
+                                <SelectValue placeholder="公開状況" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="ALL">公開状況：全件</SelectItem>
+                                {PROBLEM_STATUS_OPTIONS.map((option) => (
+                                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
 
                 <div className="flex gap-2">
-                    <Button onClick={() => setIsBulkDialogOpen(true)} variant="outline" className="min-h-11 flex-1 sm:min-h-10 sm:flex-none">
-                        一括登録
-                    </Button>
-                    <Button onClick={handleCreate} className="min-h-11 flex-1 sm:min-h-10 sm:flex-none">
-                        <Plus className="w-4 h-4 mr-2" />
-                        新規作成
-                    </Button>
+                    {!isAuthorView && (
+                        <Button onClick={() => setIsBulkDialogOpen(true)} variant="outline" className="min-h-11 flex-1 sm:min-h-10 sm:flex-none">
+                            一括登録
+                        </Button>
+                    )}
+                    {structuredProblemsEnabled ? (
+                        <Button asChild className="min-h-11 flex-1 sm:min-h-10 sm:flex-none">
+                            <Link href={`${routeBase}/new?subjectId=${currentSubject.id}`}>
+                                <Plus className="mr-2 h-4 w-4" />
+                                {isAuthorView ? '新しい問題を作成' : '問題を作成'}
+                            </Link>
+                        </Button>
+                    ) : (
+                        <Button disabled className="min-h-11 flex-1 sm:min-h-10 sm:flex-none">
+                            <Plus className="mr-2 h-4 w-4" />
+                            {isAuthorView ? '新しい問題を作成' : '問題を作成'}
+                        </Button>
+                    )}
                 </div>
             </div>
 
@@ -169,16 +263,15 @@ export function ProblemManager({
                 sortBy={sortBy}
                 sortOrder={sortOrder}
                 onSort={handleSort}
+                viewMode={viewMode}
             />
 
-            <div className="flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col items-start justify-between gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center">
                 <div>全 {totalCount} 件</div>
-                <div className="flex gap-2 items-center">
+                <div className="flex items-center gap-2">
                     {currentPage > 1 ? (
                         <Button variant="outline" size="sm" asChild>
-                            <Link href={buildHref({ page: String(currentPage - 1) })}>
-                                前へ
-                            </Link>
+                            <Link href={buildHref({ page: String(currentPage - 1) })}>前へ</Link>
                         </Button>
                     ) : (
                         <Button variant="outline" size="sm" disabled>
@@ -190,9 +283,7 @@ export function ProblemManager({
                     </span>
                     {currentPage * 20 < totalCount ? (
                         <Button variant="outline" size="sm" asChild>
-                            <Link href={buildHref({ page: String(currentPage + 1) })}>
-                                次へ
-                            </Link>
+                            <Link href={buildHref({ page: String(currentPage + 1) })}>次へ</Link>
                         </Button>
                     ) : (
                         <Button variant="outline" size="sm" disabled>
@@ -202,22 +293,14 @@ export function ProblemManager({
                 </div>
             </div>
 
-            <ProblemDialog
-                open={isDialogOpen}
-                onOpenChange={setIsDialogOpen}
-                problem={selectedProblem}
-                onSuccess={handleSuccess}
-            />
-
-            <BulkImportDialog
-                open={isBulkDialogOpen}
-                onOpenChange={setIsBulkDialogOpen}
-                subjects={subjects}
-                onSuccess={() => {
-                    setIsBulkDialogOpen(false);
-                    router.refresh();
-                }}
-            />
+            {!isAuthorView && (
+                <BulkImportDialog
+                    open={isBulkDialogOpen}
+                    onOpenChange={setIsBulkDialogOpen}
+                    subjects={subjects}
+                    onSuccess={() => router.refresh()}
+                />
+            )}
         </div>
     );
 }

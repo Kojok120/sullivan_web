@@ -1,6 +1,34 @@
+import type {
+    AnswerSpec,
+    GradingConfig,
+    PrintConfig,
+    StructuredProblemDocument,
+} from '@/lib/structured-problem';
+
+export type PrintableProblemAsset = {
+    id: string;
+    kind: string;
+    fileName: string;
+    mimeType: string;
+    storageKey?: string | null;
+    inlineContent?: string | null;
+    width?: number | null;
+    height?: number | null;
+    signedUrl?: string | null;
+};
+
 export type PrintableProblem = {
     id: string;
     customId: string | null;
     question: string;
     order: number;
+    problemType?: string;
+    contentFormat?: string;
+    status?: string;
+    publishedRevisionId?: string | null;
+    structuredContent?: StructuredProblemDocument | null;
+    answerSpec?: AnswerSpec | null;
+    printConfig?: PrintConfig | null;
+    gradingConfig?: GradingConfig | null;
+    assets?: PrintableProblemAsset[];
 };

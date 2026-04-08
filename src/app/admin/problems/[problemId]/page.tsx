@@ -1,0 +1,35 @@
+import { notFound } from 'next/navigation';
+
+import { isStructuredProblemsEnabled } from '@/lib/feature-flags';
+import { getProblemEditorContext } from '../actions';
+import { ProblemEditorClient } from '../problem-editor-client';
+
+export const dynamic = 'force-dynamic';
+
+export default async function ProblemDetailPage({
+    params,
+}: {
+    params: Promise<{ problemId: string }>;
+}) {
+    if (!isStructuredProblemsEnabled()) {
+        notFound();
+    }
+
+    const { problemId } = await params;
+    const context = await getProblemEditorContext(problemId);
+
+    if (!context.problem) {
+        notFound();
+    }
+
+    return (
+        <div className="container mx-auto px-4 py-6 sm:py-8">
+            <ProblemEditorClient
+                problem={context.problem}
+                audits={context.audits}
+                subjects={context.subjects}
+                coreProblems={context.coreProblems}
+            />
+        </div>
+    );
+}

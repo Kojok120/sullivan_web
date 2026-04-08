@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import 'katex/dist/katex.min.css';
 import { Toaster } from "@/components/ui/sonner";
 import { MainNav } from "@/components/main-nav";
 import { GradingNotifier } from "@/components/grading-notifier";

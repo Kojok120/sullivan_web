@@ -63,4 +63,185 @@ describe('print-document', () => {
         consoleSpy.mockRestore();
         qrSpy.mockRestore();
     });
+
+    it('structured problem でも別紙の解答用紙を出し、旧解答欄は本文に描画しない', async () => {
+        const { markup } = await buildPrintDocumentMarkup({
+            studentName: '生徒D',
+            studentLoginId: 'student-d',
+            subjectName: '理科',
+            problemSets: [[{
+                id: 'structured-1',
+                customId: 'S-101',
+                question: '回路図の読み取り',
+                order: 1,
+                contentFormat: 'STRUCTURED_V1',
+                publishedRevisionId: 'rev-1',
+                structuredContent: {
+                    version: 1,
+                    title: '回路図の読み取り',
+                    summary: '図を見て答える',
+                    blocks: [
+                        { id: 'b1', type: 'paragraph', text: '図の回路は直列か並列か。' },
+                        { id: 'b2', type: 'answerLines', lines: 2 },
+                    ],
+                },
+                printConfig: {
+                    template: 'WORKSPACE',
+                    estimatedHeight: 'MEDIUM',
+                    answerMode: 'INLINE',
+                    answerLines: 3,
+                    showQrOnFirstPage: true,
+                },
+                assets: [],
+            }]],
+        });
+
+        expect(markup).toContain('problem-card');
+        expect(markup).toContain('回路図の読み取り');
+        expect(markup).toContain('answer-sheet');
+        expect(markup).not.toContain('workspace-line');
+    });
+
+    it('graphAsset は inline SVG asset を描画し、assetId 不整合時もフォールバックする', async () => {
+        const { markup } = await buildPrintDocumentMarkup({
+            studentName: '生徒E',
+            studentLoginId: 'student-e',
+            subjectName: '数学',
+            problemSets: [[{
+                id: 'structured-graph-1',
+                customId: 'M-102',
+                question: '二次関数のグラフ',
+                order: 1,
+                contentFormat: 'STRUCTURED_V1',
+                publishedRevisionId: 'rev-graph-1',
+                structuredContent: {
+                    version: 1,
+                    title: '二次関数のグラフ',
+                    blocks: [
+                        { id: 'b1', type: 'paragraph', text: 'グラフを見て答えなさい。' },
+                        { id: 'b2', type: 'graphAsset', assetId: 'mismatched-asset-id', caption: '図2' },
+                    ],
+                },
+                assets: [{
+                    id: 'actual-svg-asset',
+                    kind: 'SVG',
+                    fileName: 'graph.svg',
+                    mimeType: 'image/svg+xml',
+                    inlineContent: '<svg width="484" height="0"><path d="M0 0 L10 10" /></svg>',
+                }],
+            }]],
+        });
+
+        expect(markup).toContain('class="problem-figure-frame"');
+        expect(markup).toContain('style="width:50%;aspect-ratio:1.3333;"');
+        expect(markup).toContain('図2');
+    });
+
+    it('図版 block の display を印刷HTMLへ反映する', async () => {
+        const { markup } = await buildPrintDocumentMarkup({
+            studentName: '生徒G',
+            studentLoginId: 'student-g',
+            subjectName: '数学',
+            problemSets: [[{
+                id: 'structured-display-1',
+                customId: 'M-202',
+                question: '図版調整',
+                order: 1,
+                contentFormat: 'STRUCTURED_V1',
+                publishedRevisionId: 'rev-display-1',
+                structuredContent: {
+                    version: 1,
+                    blocks: [
+                        {
+                            id: 'img-1',
+                            type: 'image',
+                            assetId: 'asset-image',
+                            caption: '画像',
+                            display: { zoom: 1.5, panX: 0.25, panY: -0.5 },
+                        },
+                        {
+                            id: 'svg-1',
+                            type: 'svg',
+                            svg: '<svg width="320" height="240"><rect width="320" height="240" /></svg>',
+                            caption: 'SVG',
+                            display: { zoom: 1.8, panX: -0.5, panY: 0.2 },
+                        },
+                        {
+                            id: 'graph-1',
+                            type: 'graphAsset',
+                            assetId: 'asset-graph',
+                            caption: 'グラフ',
+                            display: { zoom: 2, panX: -0.5, panY: 0.2 },
+                        },
+                        {
+                            id: 'geom-1',
+                            type: 'geometryAsset',
+                            assetId: 'asset-geom',
+                            caption: '図形',
+                            display: { zoom: 2.2, panX: 0.1, panY: -0.25 },
+                        },
+                    ],
+                },
+                assets: [
+                    {
+                        id: 'asset-image',
+                        kind: 'IMAGE',
+                        fileName: 'image.png',
+                        mimeType: 'image/png',
+                        signedUrl: 'https://example.com/image.png',
+                        width: 600,
+                        height: 400,
+                    },
+                    {
+                        id: 'asset-graph',
+                        kind: 'SVG',
+                        fileName: 'graph.svg',
+                        mimeType: 'image/svg+xml',
+                        inlineContent: '<svg width="400" height="300"><circle cx="10" cy="10" r="4" /></svg>',
+                    },
+                    {
+                        id: 'asset-geom',
+                        kind: 'SVG',
+                        fileName: 'geometry.svg',
+                        mimeType: 'image/svg+xml',
+                        inlineContent: '<svg width="500" height="500"><circle cx="10" cy="10" r="4" /></svg>',
+                    },
+                ],
+            }]],
+        });
+
+        expect(markup).toContain('transform:translate(6.25%, -12.5%);');
+        expect(markup).toContain('transform:translate(-20%, 8%);');
+        expect(markup).toContain('transform:translate(-25%, 10%);');
+        expect(markup).toContain('transform:translate(6%, -15%);');
+        expect(markup).toContain('style="width:50%;aspect-ratio:1.3333;"');
+        expect(markup).toContain('style="width:100%;aspect-ratio:1;"');
+    });
+
+    it('structured problem の本文で $...$ と $$...$$ を KaTeX 描画する', async () => {
+        const { markup } = await buildPrintDocumentMarkup({
+            studentName: '生徒F',
+            studentLoginId: 'student-f',
+            subjectName: '数学',
+            problemSets: [[{
+                id: 'structured-math-1',
+                customId: 'M-201',
+                question: '数式表示',
+                order: 1,
+                contentFormat: 'STRUCTURED_V1',
+                publishedRevisionId: 'rev-math-1',
+                structuredContent: {
+                    version: 1,
+                    blocks: [
+                        { id: 'b1', type: 'paragraph', text: '解きなさい。$x^2+1$ と $$y=x+1$$ を確認する。' },
+                    ],
+                },
+                assets: [],
+            }]],
+        });
+
+        expect(markup).toContain('class="katex"');
+        expect(markup).toContain('class="katex-display"');
+        expect(markup).not.toContain('$x^2+1$');
+    });
 });

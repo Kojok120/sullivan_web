@@ -18,6 +18,7 @@ import { claimGradingJob, markGradingJobCompleted, markGradingJobFailed, publish
 import { loadInstructionPrompt as loadPrompt } from '@/lib/instruction-prompt';
 import { getGeminiMediaResolutionForMimeType } from '@/lib/gemini-media-resolution';
 import { buildGradingTempFileContext } from '@/lib/grading-temp-path';
+import { gradeStructuredAnswer } from '@/lib/problem-grading';
 
 // Priority adjustment logic (inlined from removed priority-algo.ts)
 type Evaluation = "A" | "B" | "C" | "D";
@@ -55,7 +56,7 @@ function getGenAI() {
 }
 
 import type { QRData } from '@/lib/qr-utils';
-import { decodeUnitToken, expandProblemIds } from '@/lib/qr-utils';
+import { decodeUnitToken, expandProblemIds, expandRevisionIds } from '@/lib/qr-utils';
 import {
     buildProgressionUpdateScope,
     filterCoreProblemIdsByScope,
@@ -532,11 +533,21 @@ async function ensureFolder(name: string, parentId: string): Promise<string> {
 type GradingResult = {
     studentId: string;
     problemId: string;
+    problemRevisionId?: string | null;
     isCorrect: boolean; // Based on evaluation
     evaluation: 'A' | 'B' | 'C' | 'D';
     feedback: string;
     badCoreProblemIds: string[];
     userAnswer: string;
+    gradingMode?: string | null;
+    score?: number;
+    maxScore?: number;
+    confidence?: number | null;
+    reason?: string;
+    graderType?: 'DETERMINISTIC' | 'AI' | 'AI_VISION';
+    modelVersion?: string;
+    promptVersion?: string;
+    rawResponseDigest?: string;
 };
 
 // Validation types for grading response
@@ -553,6 +564,12 @@ type ProblemForGrading = {
     question: string;
     answer: string | null;
     acceptedAnswers: string[];
+    contentFormat: string;
+    problemType: string;
+    publishedRevisionId: string | null;
+    structuredContent: Prisma.JsonValue | null;
+    answerSpec: Prisma.JsonValue | null;
+    gradingConfig: Prisma.JsonValue | null;
     coreProblems: { id: string; name: string }[];
 };
 
@@ -639,6 +656,75 @@ function validateGradingResponse(
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null;
+}
+
+async function applyStructuredGradingIfNeeded(input: {
+    result: GradingResult;
+    problem: ProblemForGrading;
+}): Promise<GradingResult> {
+    if (
+        input.problem.contentFormat !== 'STRUCTURED_V1'
+        || !input.problem.answerSpec
+        || !input.problem.gradingConfig
+    ) {
+        return input.result;
+    }
+
+    try {
+        const gradeResult = await gradeStructuredAnswer({
+            studentAnswer: input.result.userAnswer,
+            answerSpec: parseAnswerSpecJson(input.problem.answerSpec),
+            gradingConfig: parseGradingConfigJson(input.problem.gradingConfig),
+            problemSummary: input.problem.question,
+        });
+
+        return {
+            ...input.result,
+            problemRevisionId: input.problem.publishedRevisionId,
+            gradingMode: readStringField(input.problem.gradingConfig, 'mode'),
+            score: gradeResult.score,
+            maxScore: gradeResult.maxScore,
+            confidence: gradeResult.confidence,
+            reason: gradeResult.reason,
+            graderType: gradeResult.graderType,
+            modelVersion: gradeResult.modelVersion,
+            promptVersion: gradeResult.promptVersion,
+            rawResponseDigest: gradeResult.rawResponseDigest,
+            evaluation: gradeResult.evaluation,
+            isCorrect: gradeResult.isCorrect,
+            feedback: gradeResult.feedback,
+        };
+    } catch (error) {
+        console.warn('[grading-service] structured grading fallback failed', {
+            problemId: input.problem.id,
+            error,
+        });
+        return {
+            ...input.result,
+            problemRevisionId: input.problem.publishedRevisionId,
+            gradingMode: readStringField(input.problem.gradingConfig, 'mode'),
+        };
+    }
+}
+
+function parseAnswerSpecJson(value: Prisma.JsonValue) {
+    if (!value || typeof value !== 'object') {
+        throw new Error('answerSpec is invalid');
+    }
+    return value as never;
+}
+
+function parseGradingConfigJson(value: Prisma.JsonValue) {
+    if (!value || typeof value !== 'object') {
+        throw new Error('gradingConfig is invalid');
+    }
+    return value as never;
+}
+
+function readStringField(value: Prisma.JsonValue | null, key: string) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const field = (value as Record<string, unknown>)[key];
+    return typeof field === 'string' ? field : null;
 }
 
 // Local QR Reader using Python OpenCV via child_process
@@ -793,6 +879,7 @@ async function gradeWithGemini(
     // 1. Fetch Full Problem Context from DB
     const extractedPids = expandProblemIds(qrData);
     const uniquePids = Array.from(new Set(extractedPids));
+    const printedRevisionIds = expandRevisionIds(qrData);
 
     console.log(`Fetching problems from DB for IDs: ${uniquePids.join(', ')}`);
     const problems = await prisma.problem.findMany({
@@ -802,7 +889,26 @@ async function gradeWithGemini(
                 { customId: { in: uniquePids as string[] } }
             ]
         },
-        include: { coreProblems: true }
+        include: {
+            coreProblems: true,
+            publishedRevision: {
+                select: {
+                    id: true,
+                    structuredContent: true,
+                    answerSpec: true,
+                    gradingConfig: true,
+                },
+            },
+            revisions: printedRevisionIds.length > 0 ? {
+                where: { id: { in: printedRevisionIds } },
+                select: {
+                    id: true,
+                    structuredContent: true,
+                    answerSpec: true,
+                    gradingConfig: true,
+                },
+            } : undefined,
+        }
     });
 
     // 単元指定印刷の短縮トークン(u)を検証してログに残す。
@@ -857,14 +963,28 @@ async function gradeWithGemini(
     }
 
     // Convert to ProblemForGrading type
-    const problemsForGrading: ProblemForGrading[] = problems.map(p => ({
-        id: p.id,
-        customId: p.customId,
-        question: p.question,
-        answer: p.answer,
-        acceptedAnswers: p.acceptedAnswers,
-        coreProblems: p.coreProblems.map(cp => ({ id: cp.id, name: cp.name }))
-    }));
+    const problemsForGrading: ProblemForGrading[] = problems.map((p) => {
+        const qrIndex = idToIndexMap.get(p.id) ?? idToIndexMap.get(p.customId || '') ?? -1;
+        const revisionFromQrIndex = qrIndex >= 0 ? printedRevisionIds[qrIndex] : undefined;
+        const matchedRevision = revisionFromQrIndex
+            ? p.revisions.find((revision) => revision.id === revisionFromQrIndex) ?? p.publishedRevision
+            : p.publishedRevision;
+
+        return {
+            id: p.id,
+            customId: p.customId,
+            question: p.question,
+            answer: p.answer,
+            acceptedAnswers: p.acceptedAnswers,
+            contentFormat: p.contentFormat,
+            problemType: p.problemType,
+            publishedRevisionId: matchedRevision?.id ?? p.publishedRevisionId,
+            structuredContent: matchedRevision?.structuredContent ?? null,
+            answerSpec: matchedRevision?.answerSpec ?? null,
+            gradingConfig: matchedRevision?.gradingConfig ?? null,
+            coreProblems: p.coreProblems.map((cp) => ({ id: cp.id, name: cp.name })),
+        };
+    });
 
     // 2. Build problem contexts with INDEX instead of ID
     const problemContexts = problemsForGrading.map((p, index) => ({
@@ -873,7 +993,12 @@ async function gradeWithGemini(
         question: p.question,
         correctAnswer: p.answer,
         acceptedAnswers: p.acceptedAnswers,
+        problemType: p.problemType,
+        contentFormat: p.contentFormat,
+        gradingMode: isRecord(p.gradingConfig) && typeof p.gradingConfig.mode === 'string' ? p.gradingConfig.mode : null,
+        answerSpec: p.answerSpec,
     }));
+    const hasStructuredProblems = problemsForGrading.some((problem) => problem.contentFormat === 'STRUCTURED_V1');
 
     // 3. Define responseSchema for structured output
     const gradingResponseSchema = {
@@ -906,7 +1031,7 @@ async function gradeWithGemini(
 
     // 5. Build enhanced prompt
     // 5. Build enhanced prompt
-    const gradingPrompt = loadPrompt('grading-prompt.md', {
+    const gradingPrompt = loadPrompt(hasStructuredProblems ? 'grading-prompt-structured.md' : 'grading-prompt.md', {
         problemCount: problemContexts.length,
         problemContexts: JSON.stringify(problemContexts, null, 2),
         maxIndex: problemContexts.length - 1
@@ -953,7 +1078,19 @@ async function gradeWithGemini(
 
             if (validation.isValid) {
                 console.log(`Grading validated successfully on attempt ${attempt}`);
-                return validation.validatedResults;
+                const enrichedResults = await Promise.all(
+                    validation.validatedResults.map(async (validatedResult) => {
+                        const problem = problemsForGrading.find((candidate) => candidate.id === validatedResult.problemId);
+                        if (!problem) return validatedResult;
+
+                        return applyStructuredGradingIfNeeded({
+                            result: validatedResult,
+                            problem,
+                        });
+                    }),
+                );
+
+                return enrichedResults;
             }
 
             // Validation failed
@@ -1092,20 +1229,42 @@ async function recordGradingResults(results: GradingResult[], qrData: QRData): P
     // WRAP EVERYTHING IN A SINGLE TRANSACTION
     const { involvedCpIds, isUnitMode } = await prisma.$transaction(async (tx) => {
         // 1. Record History (Batch)
-        // Note: createMany is not supported in interactive transactions for SQLite/some adapters if using executeRaw,
-        // but typically supported in modern Prisma client (tx.learningHistory.createMany).
-        await tx.learningHistory.createMany({
-            data: results.map(r => ({
+        const createdHistories = await Promise.all(results.map((r) => tx.learningHistory.create({
+            data: {
                 userId,
                 problemId: r.problemId,
+                problemRevisionId: r.problemRevisionId ?? undefined,
                 evaluation: r.evaluation,
                 userAnswer: r.userAnswer || '',
                 feedback: r.feedback || '',
                 answeredAt: new Date(),
                 groupId,
-                isVideoWatched: false
-            }))
-        });
+                isVideoWatched: false,
+            },
+        })));
+
+        await Promise.all(results.map((r, index) => tx.problemGradingAudit.create({
+            data: {
+                problemId: r.problemId,
+                problemRevisionId: r.problemRevisionId ?? undefined,
+                learningHistoryId: createdHistories[index]?.id,
+                gradingMode: (r.gradingMode ?? 'AI_RUBRIC') as never,
+                graderType: (r.graderType ?? 'AI') as never,
+                source: 'scan',
+                score: r.score ?? (r.isCorrect ? 100 : 0),
+                maxScore: r.maxScore ?? 100,
+                confidence: r.confidence ?? null,
+                reason: r.reason ?? null,
+                modelVersion: r.modelVersion ?? null,
+                promptVersion: r.promptVersion ?? null,
+                rawResponseDigest: r.rawResponseDigest ?? null,
+                payload: {
+                    evaluation: r.evaluation,
+                    feedback: r.feedback,
+                    userAnswer: r.userAnswer,
+                } as Prisma.InputJsonValue,
+            },
+        })));
 
         // 2. 問題と紐づく CoreProblem を取得して、単元集中モードを判定
         const problems = await tx.problem.findMany({

@@ -10,7 +10,15 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { logoutAction } from '@/app/actions';
 
-export function AdminShell({ children }: { children: React.ReactNode }) {
+type AdminShellProps = {
+    children: React.ReactNode;
+    problemSubjects: {
+        id: string;
+        name: string;
+    }[];
+};
+
+export function AdminShell({ children, problemSubjects }: AdminShellProps) {
     const [isCollapsed, setIsCollapsed] = useState(() => {
         if (typeof window === 'undefined') return false;
         return localStorage.getItem('admin-sidebar-collapsed') === 'true';
@@ -26,7 +34,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         <div className="min-h-dvh bg-gray-50">
             <div className="sticky top-0 z-40 border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/75 md:hidden">
                 <div className="flex h-14 items-center justify-between px-3">
-                    <AdminMobileNav />
+                    <AdminMobileNav problemSubjects={problemSubjects} />
                     <Link href="/admin" className="flex items-center">
                         <div className="relative h-8 w-28">
                             <Image
@@ -65,7 +73,11 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                             isCollapsed ? 'w-16' : 'w-64'
                         )}
                     >
-                        <AdminNav isCollapsed={isCollapsed} onToggle={toggleSidebar} />
+                        <AdminNav
+                            isCollapsed={isCollapsed}
+                            onToggle={toggleSidebar}
+                            problemSubjects={problemSubjects}
+                        />
                     </div>
                 </aside>
                 <main className="min-w-0 flex-1 bg-gray-50 transition-all duration-300">

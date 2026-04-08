@@ -7,6 +7,7 @@ import { ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 import type { ClassroomWithGroups, GroupOption } from '@/lib/types/classroom';
 import { DEFAULT_INITIAL_PASSWORD } from '@/lib/auth-constants';
+import { ROLE_OPTIONS } from '@/lib/role-display';
 
 interface RegisterFormProps {
     classrooms: ClassroomWithGroups[];
@@ -50,7 +51,7 @@ export function RegisterForm({ classrooms, allGroups }: RegisterFormProps) {
                         新規ユーザー登録
                     </h2>
                     <p className="mt-2 text-center text-sm text-gray-600">
-                        生徒、講師、校舎長、管理者アカウントを作成します
+                        Sullivan で利用する各種アカウントを作成します
                     </p>
                 </div>
 
@@ -104,11 +105,9 @@ export function RegisterForm({ classrooms, allGroups }: RegisterFormProps) {
                                     onChange={(e) => setSelectedRole(e.target.value)}
                                     className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
                                 >
-                                    <option value="STUDENT">生徒</option>
-                                    <option value="TEACHER">講師</option>
-                                    <option value="HEAD_TEACHER">校舎長</option>
-                                    <option value="PARENT">保護者</option>
-                                    <option value="ADMIN">管理者</option>
+                                    {ROLE_OPTIONS.map((option) => (
+                                        <option key={option.value} value={option.value}>{option.label}</option>
+                                    ))}
                                 </select>
                             </div>
 

@@ -35,25 +35,156 @@ model CoreProblem {
 }
 
 model Problem {
-  id              String             @id @default(cuid())
-  question        String
-  answer          String?
-  customId        String? // Custom ID (e.g., E-1, S-10)
-  acceptedAnswers String[]           @default([]) // 許容解答（複数）
-  grade           String? // 学年 (e.g., "中1", "高2")
-  masterNumber    Int? // マスタ内問題番号
-  subjectId       String
-  subject         Subject            @relation(fields: [subjectId], references: [id])
-  coreProblems    CoreProblem[]
-  order           Int // Chain order
-  videoUrl        String? // For C/D feedback
-  histories       LearningHistory[]
-  userStates      UserProblemState[]
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
+  id                   String                @id @default(cuid())
+  question             String
+  answer               String?
+  customId             String? // Custom ID (e.g., E-1, S-10)
+  acceptedAnswers      String[]              @default([]) // 許容解答（複数）
+  grade                String? // 学年 (e.g., "中1", "高2")
+  masterNumber         Int? // マスタ内問題番号
+  problemType          ProblemType           @default(SHORT_TEXT)
+  contentFormat        ProblemContentFormat  @default(PLAIN_TEXT)
+  status               ProblemStatus         @default(PUBLISHED)
+  hasStructuredContent Boolean               @default(false)
+  publishedRevisionId  String?               @unique
+  subjectId            String
+  subject              Subject               @relation(fields: [subjectId], references: [id])
+  coreProblems         CoreProblem[]
+  publishedRevision    ProblemRevision?      @relation("PublishedProblemRevision", fields: [publishedRevisionId], references: [id], onDelete: SetNull)
+  revisions            ProblemRevision[]     @relation("ProblemRevisions")
+  gradingAudits        ProblemGradingAudit[]
+  order                Int // Chain order
+  videoUrl             String? // For C/D feedback
+  histories            LearningHistory[]
+  userStates           UserProblemState[]
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
 
   @@unique([subjectId, customId])
   @@unique([subjectId, masterNumber])
+}
+
+enum ProblemType {
+  SHORT_TEXT
+  NUMERIC
+  MULTIPLE_CHOICE
+  MULTI_BLANK
+  FORMULA_FINAL
+  TABLE_FILL
+  GRAPH_READ
+  GRAPH_DRAW
+  GEOMETRY
+  DIAGRAM_LABEL
+  SHORT_EXPLANATION
+  SCIENCE_EXPERIMENT
+}
+
+enum ProblemContentFormat {
+  PLAIN_TEXT
+  STRUCTURED_V1
+}
+
+enum ProblemStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ProblemRevisionStatus {
+  DRAFT
+  PUBLISHED
+  SUPERSEDED
+  ARCHIVED
+}
+
+enum ProblemAuthoringTool {
+  MANUAL
+  DESMOS
+  GEOGEBRA
+  SVG
+  UPLOAD
+}
+
+enum PrintTemplate {
+  COMPACT
+  STANDARD
+  WORKSPACE
+  GRAPH
+  TABLE
+  EXPLANATION
+}
+
+enum GradingMode {
+  EXACT
+  NUMERIC_TOLERANCE
+  CHOICE
+  MULTI_BLANK
+  FORMULA
+  AI_RUBRIC
+  AI_VISION_RUBRIC
+}
+
+enum ProblemAssetKind {
+  IMAGE
+  SVG
+  PDF
+  DESMOS_STATE
+  GEOGEBRA_STATE
+  JSON
+  THUMBNAIL
+}
+
+enum ProblemGraderType {
+  DETERMINISTIC
+  AI
+  AI_VISION
+  MANUAL_OVERRIDE
+}
+
+model ProblemRevision {
+  id                  String                @id @default(cuid())
+  problemId           String
+  revisionNumber      Int
+  status              ProblemRevisionStatus @default(DRAFT)
+  structuredContent   Json?
+  answerSpec          Json?
+  printConfig         Json?
+  gradingConfig       Json?
+  generationContext   Json?
+  authoringTool       ProblemAuthoringTool  @default(MANUAL)
+  authoringState      Json?
+  createdByUserId     String?
+  publishedAt         DateTime?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  problem             Problem               @relation("ProblemRevisions", fields: [problemId], references: [id], onDelete: Cascade)
+  publishedForProblem Problem?              @relation("PublishedProblemRevision")
+  assets              ProblemAsset[]
+  histories           LearningHistory[]
+  gradingAudits       ProblemGradingAudit[]
+
+  @@unique([problemId, revisionNumber])
+  @@index([problemId, status, revisionNumber])
+}
+
+model ProblemAsset {
+  id                String               @id @default(cuid())
+  problemRevisionId String
+  kind              ProblemAssetKind
+  fileName          String
+  storageKey        String?
+  mimeType          String
+  width             Int?
+  height            Int?
+  checksum          String?
+  sourceTool        ProblemAuthoringTool @default(UPLOAD)
+  metadata          Json?
+  inlineContent     String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  problemRevision   ProblemRevision      @relation(fields: [problemRevisionId], references: [id], onDelete: Cascade)
+
+  @@index([problemRevisionId, kind])
 }
 
 enum Role {
@@ -62,6 +193,7 @@ enum Role {
   HEAD_TEACHER
   PARENT
   ADMIN
+  MATERIAL_AUTHOR
 }
 
 enum ClassroomPlan {
@@ -102,19 +234,19 @@ model User {
   surveyResponses SurveyResponse[]
 
   // Teacher specific fields
-  bio             String? // 生徒プロフィール（部活、志望校など）
-  notes           String? // 講師用メモ（性格、特記事項など）
-  birthday        DateTime? // 生年月日
-  classroomId     String?
-  classroom       Classroom?       @relation(fields: [classroomId], references: [id])
-  school          String? // 学校
-  phoneNumber     String? // 電話番号
-  email           String? // メールアドレス
-  guidanceRecords GuidanceRecord[] @relation("StudentGuidance")
-  createdGuidance GuidanceRecord[] @relation("TeacherGuidance")
-  studentGoals    StudentGoal[]    @relation("StudentGoals")
-  createdGoals    StudentGoal[]    @relation("CreatedStudentGoals")
-  updatedGoals    StudentGoal[]    @relation("UpdatedStudentGoals")
+  bio                  String? // 生徒プロフィール（部活、志望校など）
+  notes                String? // 講師用メモ（性格、特記事項など）
+  birthday             DateTime? // 生年月日
+  classroomId          String?
+  classroom            Classroom?            @relation(fields: [classroomId], references: [id])
+  school               String? // 学校
+  phoneNumber          String? // 電話番号
+  email                String? // メールアドレス
+  guidanceRecords      GuidanceRecord[]      @relation("StudentGuidance")
+  createdGuidance      GuidanceRecord[]      @relation("TeacherGuidance")
+  studentGoals         StudentGoal[]         @relation("StudentGoals")
+  createdGoals         StudentGoal[]         @relation("CreatedStudentGoals")
+  updatedGoals         StudentGoal[]         @relation("UpdatedStudentGoals")
   vocabularyGameScores VocabularyGameScore[]
 }
 
@@ -141,13 +273,13 @@ model StudentGoal {
 
 model StudentGoalMilestone {
   id          String      @id @default(cuid())
-  goalId       String
-  goal         StudentGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
-  dateKey      String // YYYY-MM-DD
-  targetCount  Int?
-  targetText   String?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  goalId      String
+  goal        StudentGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  dateKey     String // YYYY-MM-DD
+  targetCount Int?
+  targetText  String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 
   @@unique([goalId, dateKey])
   @@index([goalId, dateKey])
@@ -197,15 +329,17 @@ model GuidanceRecord {
 }
 
 model LearningHistory {
-  id         String   @id @default(cuid())
-  userId     String
-  user       User     @relation(fields: [userId], references: [id])
-  problemId  String
-  problem    Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
-  evaluation String // A, B, C, D
-  userAnswer String? // User's text answer
-  feedback   String? // AI feedback
-  answeredAt DateTime @default(now())
+  id                String           @id @default(cuid())
+  userId            String
+  user              User             @relation(fields: [userId], references: [id])
+  problemId         String
+  problem           Problem          @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  problemRevisionId String?
+  problemRevision   ProblemRevision? @relation(fields: [problemRevisionId], references: [id], onDelete: SetNull)
+  evaluation        String // A, B, C, D
+  userAnswer        String? // User's text answer
+  feedback          String? // AI feedback
+  answeredAt        DateTime         @default(now())
 
   // Grouping & Video Logic
   groupId           String? // UUID for batch grouping
@@ -216,6 +350,35 @@ model LearningHistory {
   @@index([groupId, userId, id])
   @@index([userId, groupId, isStudentReviewed])
   @@index([userId, groupId, answeredAt(sort: Desc)])
+}
+
+model ProblemGradingAudit {
+  id                String            @id @default(cuid())
+  problemId         String
+  problemRevisionId String?
+  learningHistoryId String?
+  gradingMode       GradingMode
+  graderType        ProblemGraderType
+  source            String
+  score             Float
+  maxScore          Float             @default(100)
+  confidence        Float?
+  reason            String?
+  modelVersion      String?
+  promptVersion     String?
+  rawResponseDigest String?
+  payload           Json?
+  overrideScore     Float?
+  overrideReason    String?
+  overrideByUserId  String?
+  overriddenAt      DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  problem           Problem           @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  problemRevision   ProblemRevision?  @relation(fields: [problemRevisionId], references: [id], onDelete: SetNull)
+
+  @@index([problemId, createdAt(sort: Desc)])
+  @@index([learningHistoryId])
 }
 
 model VocabularyGameScore {
@@ -238,14 +401,14 @@ model VocabularyGameScore {
 }
 
 model UserProblemState {
-  id             String    @id @default(cuid())
-  userId         String
-  user           User      @relation(fields: [userId], references: [id])
-  problemId      String
-  problem        Problem   @relation(fields: [problemId], references: [id], onDelete: Cascade)
-  priority       Int       @default(0)
-  lastAnsweredAt DateTime?
-  isCleared      Boolean   @default(false)
+  id                   String    @id @default(cuid())
+  userId               String
+  user                 User      @relation(fields: [userId], references: [id])
+  problemId            String
+  problem              Problem   @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  priority             Int       @default(0)
+  lastAnsweredAt       DateTime?
+  isCleared            Boolean   @default(false)
   unlockLastAnsweredAt DateTime?
   unlockIsCleared      Boolean   @default(false)
 
