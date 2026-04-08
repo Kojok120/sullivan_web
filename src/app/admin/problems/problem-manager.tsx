@@ -17,6 +17,7 @@ import {
     PROBLEM_TYPE_OPTIONS,
     type ProblemEditorViewMode,
 } from '@/lib/problem-ui';
+import type { BulkImportVariant } from './problem-list-policy';
 
 type ProblemManagerSubject = {
     id: string;
@@ -39,6 +40,14 @@ interface ProblemManagerProps {
     structuredProblemsEnabled: boolean;
     routeBase?: string;
     viewMode?: ProblemEditorViewMode;
+    showMasterNumber?: boolean;
+    showBulkImport?: boolean;
+    bulkImportLabel?: string;
+    bulkImportConfig?: {
+        defaultSubjectId?: string;
+        lockSubjectSelection?: boolean;
+        variant?: BulkImportVariant;
+    };
 }
 
 export function ProblemManager({
@@ -53,6 +62,10 @@ export function ProblemManager({
     structuredProblemsEnabled,
     routeBase = '/admin/problems',
     viewMode = 'admin',
+    showMasterNumber = true,
+    showBulkImport,
+    bulkImportLabel = '一括登録',
+    bulkImportConfig,
 }: ProblemManagerProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -60,6 +73,8 @@ export function ProblemManager({
     const [query, setQuery] = useState(initialQuery);
     const [isBulkDialogOpen, setIsBulkDialogOpen] = useState(false);
     const isAuthorView = viewMode === 'author';
+    const resolvedShowBulkImport = showBulkImport ?? !isAuthorView;
+    const resolvedBulkImportConfig = bulkImportConfig ?? { variant: 'default' as const };
 
     const buildParams = (updates: Record<string, string | undefined>) => {
         const params = new URLSearchParams(searchParams.toString());
@@ -71,6 +86,11 @@ export function ProblemManager({
                 params.set(key, value);
             }
         });
+
+        if (!showMasterNumber && params.get('sortBy') === 'masterNumber') {
+            params.delete('sortBy');
+            params.delete('sortOrder');
+        }
 
         return params;
     };
@@ -165,7 +185,13 @@ export function ProblemManager({
                 <div className="flex flex-col gap-2 sm:flex-1">
                     <form onSubmit={handleSearch} className="flex w-full gap-2 sm:max-w-sm">
                         <Input
-                            placeholder={isAuthorView ? '問題名、問題文、ID、単元名で検索...' : '問題文、解答、ID、マスタNo、単元名で検索...'}
+                            placeholder={
+                                isAuthorView
+                                    ? '問題名、問題文、ID、単元名で検索...'
+                                    : showMasterNumber
+                                        ? '問題文、解答、ID、マスタNo、単元名で検索...'
+                                        : '問題文、解答、ID、単元名で検索...'
+                            }
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
                         />
@@ -236,9 +262,9 @@ export function ProblemManager({
                 </div>
 
                 <div className="flex gap-2">
-                    {!isAuthorView && (
+                    {resolvedShowBulkImport && (
                         <Button onClick={() => setIsBulkDialogOpen(true)} variant="outline" className="min-h-11 flex-1 sm:min-h-10 sm:flex-none">
-                            一括登録
+                            {bulkImportLabel}
                         </Button>
                     )}
                     {structuredProblemsEnabled ? (
@@ -264,6 +290,7 @@ export function ProblemManager({
                 sortOrder={sortOrder}
                 onSort={handleSort}
                 viewMode={viewMode}
+                showMasterNumber={showMasterNumber}
             />
 
             <div className="flex flex-col items-start justify-between gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center">
@@ -293,12 +320,15 @@ export function ProblemManager({
                 </div>
             </div>
 
-            {!isAuthorView && (
+            {resolvedShowBulkImport && (
                 <BulkImportDialog
                     open={isBulkDialogOpen}
                     onOpenChange={setIsBulkDialogOpen}
                     subjects={subjects}
                     onSuccess={() => router.refresh()}
+                    defaultSubjectId={resolvedBulkImportConfig.defaultSubjectId}
+                    lockSubjectSelection={resolvedBulkImportConfig.lockSubjectSelection}
+                    variant={resolvedBulkImportConfig.variant}
                 />
             )}
         </div>

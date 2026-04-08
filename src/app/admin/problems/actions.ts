@@ -147,6 +147,23 @@ function buildProblemWhere(filters: ProblemFilters, search?: string): Prisma.Pro
     return conditionsToPrismaWhere(conditions);
 }
 
+async function getSubjectNameById(subjectId: string) {
+    const subject = await prisma.subject.findUnique({
+        where: { id: subjectId },
+        select: { name: true },
+    });
+
+    if (!subject) {
+        throw new Error('教科が見つかりません');
+    }
+
+    return subject.name;
+}
+
+function shouldPreserveProblemMasterNumber(subjectName: string) {
+    return subjectName === '英語';
+}
+
 async function resolveSubjectIdFromCoreProblemIds(coreProblemIds: string[]) {
     if (coreProblemIds.length === 0) {
         throw new Error('CoreProblemは最低1件必要です');
@@ -498,7 +515,6 @@ export async function createStandaloneProblem(data: {
     answer?: string;
     acceptedAnswers?: string[];
     grade?: string;
-    masterNumber?: number;
     videoUrl?: string;
     coreProblemIds: string[];
 }) {
@@ -509,7 +525,6 @@ export async function createStandaloneProblem(data: {
             answer: data.answer,
             acceptedAnswers: data.acceptedAnswers,
             grade: data.grade,
-            masterNumber: data.masterNumber,
             videoUrl: data.videoUrl,
             coreProblemIds: data.coreProblemIds,
             order: 0,
@@ -528,7 +543,6 @@ export async function updateStandaloneProblem(id: string, data: {
     answer?: string;
     acceptedAnswers?: string[];
     grade?: string;
-    masterNumber?: number;
     videoUrl?: string;
     coreProblemIds?: string[];
 }) {
@@ -539,18 +553,21 @@ export async function updateStandaloneProblem(id: string, data: {
             answer: data.answer,
             acceptedAnswers: data.acceptedAnswers,
             grade: data.grade,
-            masterNumber: data.masterNumber,
             videoUrl: data.videoUrl,
         };
 
         if (data.coreProblemIds) {
             const subjectId = await resolveSubjectIdFromCoreProblemIds(data.coreProblemIds);
+            const subjectName = await getSubjectNameById(subjectId);
             updateData.coreProblems = {
                 set: data.coreProblemIds.map((cid) => ({ id: cid })),
             };
             updateData.subject = {
                 connect: { id: subjectId },
             };
+            if (!shouldPreserveProblemMasterNumber(subjectName)) {
+                updateData.masterNumber = null;
+            }
         }
 
         const problem = await prisma.problem.update({
@@ -571,7 +588,6 @@ export async function createProblemDraft(data: {
     problemId?: string;
     problemType: string;
     grade?: string;
-    masterNumber?: number;
     videoUrl?: string;
     coreProblemIds: string[];
     authoringTool?: ProblemAuthoringTool;
@@ -587,6 +603,7 @@ export async function createProblemDraft(data: {
     try {
         const normalized = normalizeStructuredDraftInput(data);
         const subjectId = await resolveSubjectIdFromCoreProblemIds(data.coreProblemIds);
+        const subjectName = await getSubjectNameById(subjectId);
         const contentFormat = 'STRUCTURED_V1';
         const legacyQuestion = normalized.legacy.question.trim() || '構造化問題';
         const legacyAnswer = normalized.legacy.answer.trim() || null;
@@ -604,7 +621,6 @@ export async function createProblemDraft(data: {
                         answer: legacyAnswer,
                         acceptedAnswers: normalized.legacy.acceptedAnswers,
                         grade: data.grade,
-                        masterNumber: data.masterNumber,
                         videoUrl: data.videoUrl,
                         customId,
                         subjectId,
@@ -620,24 +636,31 @@ export async function createProblemDraft(data: {
                 });
                 problemId = createdProblem.id;
             } else {
+                const problemUpdateData: Prisma.ProblemUpdateInput = {
+                    question: legacyQuestion,
+                    answer: legacyAnswer,
+                    acceptedAnswers: normalized.legacy.acceptedAnswers,
+                    grade: data.grade,
+                    videoUrl: data.videoUrl,
+                    subject: {
+                        connect: { id: subjectId },
+                    },
+                    problemType: data.problemType as never,
+                    contentFormat: contentFormat as never,
+                    status: 'DRAFT',
+                    hasStructuredContent: true,
+                    coreProblems: {
+                        set: data.coreProblemIds.map((id) => ({ id })),
+                    },
+                };
+
+                if (!shouldPreserveProblemMasterNumber(subjectName)) {
+                    problemUpdateData.masterNumber = null;
+                }
+
                 await tx.problem.update({
                     where: { id: problemId },
-                    data: {
-                        question: legacyQuestion,
-                        answer: legacyAnswer,
-                        acceptedAnswers: normalized.legacy.acceptedAnswers,
-                        grade: data.grade,
-                        masterNumber: data.masterNumber,
-                        videoUrl: data.videoUrl,
-                        subjectId,
-                        problemType: data.problemType as never,
-                        contentFormat: contentFormat as never,
-                        status: 'DRAFT',
-                        hasStructuredContent: true,
-                        coreProblems: {
-                            set: data.coreProblemIds.map((id) => ({ id })),
-                        },
-                    },
+                    data: problemUpdateData,
                 });
             }
 
@@ -1154,7 +1177,7 @@ export async function bulkDeleteProblems(ids: string[]) {
 }
 
 export async function bulkSearchCoreProblems(names: string[]) {
-    await requireAdmin();
+    await requireProblemAuthor();
     try {
         const uniqueNames = [...new Set(names.map((name) => name.trim()))].filter(Boolean);
         if (uniqueNames.length === 0) {
@@ -1233,14 +1256,14 @@ export async function bulkUpsertStandaloneProblems(problems: {
     videoUrl?: string;
     coreProblemIds: string[];
 }[], options?: { subjectId?: string }) {
-    await requireAdmin();
+    await requireProblemAuthor();
     try {
         const { createdCount, updatedCount, warnings } = await bulkUpsertProblemsCore(
             problems,
             { batchSize: 50, assignOrder: false, subjectId: options?.subjectId },
         );
 
-        revalidatePath('/admin/problems');
+        revalidateProblemPaths();
         return { success: true, createdCount, updatedCount, warnings };
     } catch (error) {
         console.error('Failed to bulk upsert problems:', error);
@@ -1249,7 +1272,7 @@ export async function bulkUpsertStandaloneProblems(problems: {
 }
 
 export async function searchProblemsByMasterNumbers(targets: { masterNumber: number; subjectId: string }[]) {
-    await requireAdmin();
+    await requireProblemAuthor();
     try {
         if (targets.length === 0) return { success: true, problems: [] };
 

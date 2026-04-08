@@ -86,7 +86,6 @@ type EditorState = {
     subjectId: string | null;
     problemType: string;
     grade: string;
-    masterNumber: string;
     videoUrl: string;
     coreProblems: SelectedCoreProblem[];
     authoringTool: string;
@@ -141,7 +140,6 @@ function buildInitialState(problem: RenderableProblemWithRelations | null, initi
         subjectId: problem?.subjectId ?? problem?.coreProblems[0]?.subjectId ?? initialSubjectId ?? null,
         problemType: initialProblemType,
         grade: problem?.grade ?? '',
-        masterNumber: problem?.masterNumber?.toString() ?? '',
         videoUrl: problem?.videoUrl ?? '',
         coreProblems: (problem?.coreProblems ?? []) as SelectedCoreProblem[],
         authoringTool: normalizedAuthoringTool,
@@ -327,7 +325,6 @@ export function ProblemAuthorEditorClient({
                 problemId: state.problemId || undefined,
                 problemType: effectiveProblemType,
                 grade: state.grade || undefined,
-                masterNumber: state.masterNumber ? Number.parseInt(state.masterNumber, 10) : undefined,
                 videoUrl: state.videoUrl || undefined,
                 coreProblemIds: state.coreProblems.map((coreProblem) => coreProblem.id),
                 authoringTool: effectiveAuthoringTool as never,
@@ -378,7 +375,6 @@ export function ProblemAuthorEditorClient({
                             problemId,
                             problemType: effectiveProblemType,
                             grade: state.grade || undefined,
-                            masterNumber: state.masterNumber ? Number.parseInt(state.masterNumber, 10) : undefined,
                             videoUrl: state.videoUrl || undefined,
                             coreProblemIds: state.coreProblems.map((coreProblem) => coreProblem.id),
                             authoringTool: effectiveAuthoringTool as never,
@@ -578,7 +574,6 @@ export function ProblemAuthorEditorClient({
                     problemId: result.problemId,
                     problemType: deriveProblemTypeFromDocument(nextDocument, state.gradingConfig.mode),
                     grade: state.grade || undefined,
-                    masterNumber: state.masterNumber ? Number.parseInt(state.masterNumber, 10) : undefined,
                     videoUrl: state.videoUrl || undefined,
                     coreProblemIds: state.coreProblems.map((coreProblem) => coreProblem.id),
                     authoringTool: result.targetTool === 'SVG' ? 'SVG' as never : result.targetTool as never,
@@ -676,7 +671,7 @@ export function ProblemAuthorEditorClient({
                             <CardDescription>科目、学年、動画、単元を設定します。</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="grid gap-4 md:grid-cols-4">
+                            <div className="grid gap-4 md:grid-cols-3">
                                 <div className="space-y-2">
                                     <Label>科目</Label>
                                     <Select
@@ -698,10 +693,6 @@ export function ProblemAuthorEditorClient({
                                 <div className="space-y-2">
                                     <Label>学年</Label>
                                     <Input value={state.grade} onChange={(event) => setState((current) => ({ ...current, grade: event.target.value }))} placeholder="中2" />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>マスタNo</Label>
-                                    <Input value={state.masterNumber} onChange={(event) => setState((current) => ({ ...current, masterNumber: event.target.value }))} placeholder="101" />
                                 </div>
                             </div>
                             <div className="space-y-2">

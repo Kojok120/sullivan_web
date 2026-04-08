@@ -2,6 +2,7 @@ import { isStructuredProblemsEnabled } from '@/lib/feature-flags';
 import { notFound, redirect } from 'next/navigation';
 import { getProblemSubjects, getProblems } from '@/app/admin/problems/actions';
 import { ProblemManager } from '@/app/admin/problems/problem-manager';
+import { buildProblemListUiPolicy, normalizeProblemSortBy } from '@/app/admin/problems/problem-list-policy';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,8 +49,8 @@ export default async function MaterialsProblemsPage({
 
         if (params.q) nextParams.set('q', params.q);
         if (params.grade) nextParams.set('grade', params.grade);
-        if (params.sortBy) nextParams.set('sortBy', params.sortBy);
-        if (params.sortOrder) nextParams.set('sortOrder', params.sortOrder);
+        if (params.sortBy && params.sortBy !== 'masterNumber') nextParams.set('sortBy', params.sortBy);
+        if (params.sortBy && params.sortBy !== 'masterNumber' && params.sortOrder) nextParams.set('sortOrder', params.sortOrder);
         if (params.video) nextParams.set('video', params.video);
         if (params.problemType) nextParams.set('problemType', params.problemType);
         if (params.contentFormat) nextParams.set('contentFormat', params.contentFormat);
@@ -71,7 +72,7 @@ export default async function MaterialsProblemsPage({
             contentFormat: params.contentFormat,
             status: params.status,
         },
-        sortBy,
+        normalizeProblemSortBy(sortBy, currentSubject.name),
         sortOrder,
     );
 
@@ -92,13 +93,17 @@ export default async function MaterialsProblemsPage({
                 totalCount={result.total || 0}
                 currentPage={page}
                 initialQuery={query}
-                sortBy={sortBy}
+                sortBy={normalizeProblemSortBy(sortBy, currentSubject.name)}
                 sortOrder={sortOrder}
                 subjects={subjects}
                 currentSubject={currentSubject}
                 structuredProblemsEnabled={isStructuredProblemsEnabled()}
                 routeBase="/materials/problems"
                 viewMode="author"
+                showMasterNumber={buildProblemListUiPolicy(currentSubject, 'author').showMasterNumber}
+                showBulkImport={buildProblemListUiPolicy(currentSubject, 'author').showBulkImport}
+                bulkImportLabel={buildProblemListUiPolicy(currentSubject, 'author').bulkImportLabel}
+                bulkImportConfig={buildProblemListUiPolicy(currentSubject, 'author').bulkImportConfig}
             />
         </div>
     );

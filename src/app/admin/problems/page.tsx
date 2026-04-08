@@ -1,5 +1,6 @@
 import { getProblems, getProblemSubjects } from './actions';
 import { ProblemManager } from './problem-manager';
+import { buildProblemListUiPolicy, normalizeProblemSortBy } from './problem-list-policy';
 import { ProblemSubjectRequiredState } from './problem-subject-required-state';
 import { isStructuredProblemsEnabled } from '@/lib/feature-flags';
 
@@ -41,6 +42,9 @@ export default async function ProblemsPage({
         );
     }
 
+    const normalizedSortBy = normalizeProblemSortBy(sortBy, currentSubject.name);
+    const policy = buildProblemListUiPolicy(currentSubject, 'admin');
+
     const result = await getProblems(
         page,
         20,
@@ -54,7 +58,7 @@ export default async function ProblemsPage({
             contentFormat: params.contentFormat,
             status: params.status,
         },
-        sortBy,
+        normalizedSortBy,
         sortOrder
     );
 
@@ -70,11 +74,15 @@ export default async function ProblemsPage({
                 totalCount={result.total || 0}
                 currentPage={page}
                 initialQuery={query}
-                sortBy={sortBy}
+                sortBy={normalizedSortBy}
                 sortOrder={sortOrder}
                 subjects={subjects}
                 currentSubject={currentSubject}
                 structuredProblemsEnabled={isStructuredProblemsEnabled()}
+                showMasterNumber={policy.showMasterNumber}
+                showBulkImport={policy.showBulkImport}
+                bulkImportLabel={policy.bulkImportLabel}
+                bulkImportConfig={policy.bulkImportConfig}
             />
         </div>
     );

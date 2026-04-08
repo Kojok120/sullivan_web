@@ -214,4 +214,87 @@ describe('ProblemManager', () => {
 
         expect(pushMock).toHaveBeenCalledWith('/materials/problems?subjectId=subject-math&video=exists&page=1');
     });
+
+    it('英語の管理画面では英語シート一括登録ボタンを表示する', () => {
+        render(
+            <ProblemManager
+                initialProblems={[]}
+                totalCount={0}
+                currentPage={1}
+                initialQuery=""
+                sortBy="updatedAt"
+                sortOrder="desc"
+                subjects={subjects}
+                currentSubject={subjects[1]}
+                structuredProblemsEnabled
+                showBulkImport
+                bulkImportLabel="英語シート一括登録"
+            />,
+        );
+
+        expect(screen.getByRole('button', { name: '英語シート一括登録' })).toBeInTheDocument();
+    });
+
+    it('英語の作成者画面でも英語シート一括登録ボタンを表示する', () => {
+        render(
+            <ProblemManager
+                initialProblems={[]}
+                totalCount={0}
+                currentPage={1}
+                initialQuery=""
+                sortBy="updatedAt"
+                sortOrder="desc"
+                subjects={subjects}
+                currentSubject={subjects[1]}
+                structuredProblemsEnabled
+                routeBase="/materials/problems"
+                viewMode="author"
+                showBulkImport
+                bulkImportLabel="英語シート一括登録"
+            />,
+        );
+
+        expect(screen.getByRole('button', { name: '英語シート一括登録' })).toBeInTheDocument();
+    });
+
+    it('英語以外の作成者画面では一括登録ボタンを表示しない', () => {
+        render(
+            <ProblemManager
+                initialProblems={[]}
+                totalCount={0}
+                currentPage={1}
+                initialQuery=""
+                sortBy="updatedAt"
+                sortOrder="desc"
+                subjects={subjects}
+                currentSubject={currentSubject}
+                structuredProblemsEnabled
+                routeBase="/materials/problems"
+                viewMode="author"
+                showBulkImport={false}
+            />,
+        );
+
+        expect(screen.queryByRole('button', { name: '一括登録' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: '英語シート一括登録' })).not.toBeInTheDocument();
+    });
+
+    it('マスタNo非表示時は検索プレースホルダからマスタNoを除外する', () => {
+        render(
+            <ProblemManager
+                initialProblems={[]}
+                totalCount={0}
+                currentPage={1}
+                initialQuery=""
+                sortBy="updatedAt"
+                sortOrder="desc"
+                subjects={subjects}
+                currentSubject={currentSubject}
+                structuredProblemsEnabled
+                showMasterNumber={false}
+            />,
+        );
+
+        expect(screen.getByPlaceholderText('問題文、解答、ID、単元名で検索...')).toBeInTheDocument();
+    });
 });

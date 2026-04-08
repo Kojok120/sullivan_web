@@ -36,6 +36,7 @@ interface ProblemListProps {
     sortOrder: 'asc' | 'desc';
     onSort: (column: string) => void;
     viewMode?: ProblemEditorViewMode;
+    showMasterNumber?: boolean;
 }
 
 export function ProblemList({
@@ -45,6 +46,7 @@ export function ProblemList({
     sortOrder,
     onSort,
     viewMode = 'admin',
+    showMasterNumber = true,
 }: ProblemListProps) {
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
@@ -52,6 +54,7 @@ export function ProblemList({
     const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
     const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
     const isAuthorView = viewMode === 'author';
+    const emptyTableColSpan = (isAuthorView ? 8 : 10) + (showMasterNumber ? 1 : 0);
 
     const handleDeleteConfirm = () => {
         if (!deleteTarget) return;
@@ -155,7 +158,9 @@ export function ProblemList({
                                         />
                                     )}
                                     <div>
-                                        <p className="font-mono text-sm font-bold">No.{problem.masterNumber || '-'}</p>
+                                        {showMasterNumber && (
+                                            <p className="font-mono text-sm font-bold">No.{problem.masterNumber || '-'}</p>
+                                        )}
                                         <p className="font-mono text-xs text-muted-foreground">{problem.customId || '-'}</p>
                                     </div>
                                 </div>
@@ -231,12 +236,14 @@ export function ProblemList({
                     <TableHeader>
                         <TableRow>
                             {!isAuthorView && <TableHead className="w-[50px]" />}
-                            <TableHead className="w-[100px] cursor-pointer hover:bg-muted/50" onClick={() => onSort('masterNumber')}>
-                                <div className="flex items-center">
-                                    マスタNo
-                                    <SortIcon active={sortBy === 'masterNumber'} sortOrder={sortOrder} />
-                                </div>
-                            </TableHead>
+                            {showMasterNumber && (
+                                <TableHead className="w-[100px] cursor-pointer hover:bg-muted/50" onClick={() => onSort('masterNumber')}>
+                                    <div className="flex items-center">
+                                        マスタNo
+                                        <SortIcon active={sortBy === 'masterNumber'} sortOrder={sortOrder} />
+                                    </div>
+                                </TableHead>
+                            )}
                             <TableHead className="w-[120px] cursor-pointer hover:bg-muted/50" onClick={() => onSort('customId')}>
                                 <div className="flex items-center">
                                     ID
@@ -256,7 +263,7 @@ export function ProblemList({
                     <TableBody>
                         {problems.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={isAuthorView ? 9 : 11} className="py-8 text-center text-muted-foreground">
+                                <TableCell colSpan={emptyTableColSpan} className="py-8 text-center text-muted-foreground">
                                     問題が見つかりませんでした
                                 </TableCell>
                             </TableRow>
@@ -271,7 +278,9 @@ export function ProblemList({
                                             />
                                         </TableCell>
                                     )}
-                                    <TableCell className="font-mono text-sm font-bold">{problem.masterNumber || '-'}</TableCell>
+                                    {showMasterNumber && (
+                                        <TableCell className="font-mono text-sm font-bold">{problem.masterNumber || '-'}</TableCell>
+                                    )}
                                     <TableCell className="font-mono text-xs text-muted-foreground">{problem.customId || '-'}</TableCell>
                                     <TableCell className="min-w-[200px] whitespace-pre-wrap" title={problem.question}>
                                         {problem.question}
