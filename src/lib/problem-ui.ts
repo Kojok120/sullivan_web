@@ -52,7 +52,6 @@ export const BLOCK_TYPE_OPTIONS = [
     { value: 'blankGroup', label: '空欄' },
     { value: 'graphAsset', label: 'グラフ図版' },
     { value: 'geometryAsset', label: '図形図版' },
-    { value: 'caption', label: 'キャプション' },
 ] as const satisfies ReadonlyArray<Option<string>>;
 
 export const ANSWER_KIND_OPTIONS = [

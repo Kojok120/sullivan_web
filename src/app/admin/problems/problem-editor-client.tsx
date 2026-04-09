@@ -25,9 +25,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { TeXHelpLink } from '@/components/problem-authoring/tex-help-link';
-import { DEFAULT_PROBLEM_FIGURE_DISPLAY } from '@/lib/problem-figure-display';
 import {
     buildDefaultStructuredDraft,
+    parseStructuredDocument,
     type AnswerSpec,
     type GradingConfig,
     type PrintConfig,
@@ -40,7 +40,7 @@ import {
     renderSvgSceneSpec,
     type ProblemFigureSceneSpec,
 } from '@/lib/problem-figure-scene';
-import type { ProblemGradingAuditWithProblem, RenderableProblemWithRelations } from './types';
+import type { ProblemGradingAuditWithProblem, RenderableProblemAsset, RenderableProblemWithRelations } from './types';
 import {
     createProblemDraft,
     deleteProblemAsset,
@@ -58,10 +58,8 @@ import {
     type ProblemEditorSubjectOption,
     type SelectedCoreProblem,
 } from './components/core-problem-selector';
-import { ProblemAssetPreview, type ProblemAssetPreviewItem } from './components/problem-asset-preview';
 import { ProblemTextPreview } from './components/problem-text-preview';
 import { ProblemAuthoringEmbed, type VendorSceneApplyPayload, type VendorSyncPayload } from './problem-authoring-embed';
-import { useLiveProblemAssetPreview } from '@/hooks/use-live-problem-asset-preview';
 import {
     appendProblemBodyCard,
     deleteProblemBodySegment,
@@ -135,7 +133,9 @@ function getCardUploadAssetSpec(file: File): { assetKind: 'IMAGE' | 'SVG'; attac
 function buildInitialState(problem: RenderableProblemWithRelations | null, initialSubjectId?: string | null): EditorState {
     const base = buildDefaultStructuredDraft(problem?.problemType ?? 'SHORT_TEXT');
     const draftRevision = problem?.revisions.find((revision) => revision.status === 'DRAFT') ?? problem?.publishedRevision ?? null;
-    const structuredContent = (draftRevision?.structuredContent as StructuredProblemDocument | null) ?? base.document;
+    const structuredContent = draftRevision?.structuredContent
+        ? parseStructuredDocument(draftRevision.structuredContent)
+        : base.document;
     const answerSpec = (draftRevision?.answerSpec as AnswerSpec | null) ?? base.answerSpec;
     const printConfig = (draftRevision?.printConfig as PrintConfig | null) ?? base.printConfig;
     const gradingConfig = (draftRevision?.gradingConfig as GradingConfig | null) ?? base.gradingConfig;
@@ -236,12 +236,6 @@ export function ProblemEditorClient({
     const activeVisualAuthoringTool = getProblemBodyCardAuthoringTool(activeVisualCard, state.authoringTool);
     const effectiveAuthoringTool = activeVisualAuthoringTool ?? state.authoringTool;
     const supportsAiFigureGeneration = isAiFigureGenerationSupported(effectiveProblemType);
-    const liveVisualPreview = useLiveProblemAssetPreview({
-        authoringStateText: state.authoringStateText,
-        cardId: activeVisualAuthoringTool === 'GEOGEBRA' ? activeVisualCard?.id ?? null : null,
-        enabled: Boolean(isVendorToolReady),
-        syncHandlerRef: vendorSyncHandlerRef,
-    });
 
     useEffect(() => {
         if (!activeVisualAuthoringTool) {
@@ -288,7 +282,6 @@ export function ProblemEditorClient({
                     attachmentKind: 'upload',
                     attachmentBlockType: uploadSpec.attachmentBlockType,
                     assetId: result.asset?.id ?? '',
-                    display: DEFAULT_PROBLEM_FIGURE_DISPLAY,
                 })),
             }));
             toast.success('図版をアップロードしました');
@@ -852,7 +845,6 @@ export function ProblemEditorClient({
                                                 <ProblemBodyCardEditor
                                                     card={segment.card}
                                                     isActiveVisualCard={segment.card.id === resolvedActiveVisualCardId}
-                                                    assets={assetOptions as ProblemAssetPreviewItem[]}
                                                     problemId={state.problemId}
                                                     revisionId={state.revisionId}
                                                     isUploadingAsset={uploadingCardId === segment.card.id}
@@ -879,7 +871,6 @@ export function ProblemEditorClient({
                                                     sceneApplyHandlerRef={vendorSceneApplyHandlerRef}
                                                     onAuthoringToolReadyChange={setIsVendorToolReady}
                                                     effectiveProblemType={effectiveProblemType}
-                                                    livePreviewAsset={segment.card.id === liveVisualPreview?.cardId ? liveVisualPreview.asset : null}
                                                     preferredAuthoringTool={state.authoringTool}
                                                 />
                                             ) : (
@@ -1143,7 +1134,6 @@ function AttachmentKindSelect({
 function ProblemBodyCardEditor({
     card,
     isActiveVisualCard,
-    assets,
     problemId,
     revisionId,
     isUploadingAsset,
@@ -1164,12 +1154,10 @@ function ProblemBodyCardEditor({
     sceneApplyHandlerRef,
     onAuthoringToolReadyChange,
     effectiveProblemType,
-    livePreviewAsset,
     preferredAuthoringTool,
 }: {
     card: ProblemBodyCard;
     isActiveVisualCard: boolean;
-    assets: ProblemAssetPreviewItem[];
     problemId: string;
     revisionId: string;
     isUploadingAsset: boolean;
@@ -1190,15 +1178,12 @@ function ProblemBodyCardEditor({
     sceneApplyHandlerRef: MutableRefObject<((payload: VendorSceneApplyPayload) => Promise<void>) | null>;
     onAuthoringToolReadyChange: (ready: boolean) => void;
     effectiveProblemType: string;
-    livePreviewAsset: ProblemAssetPreviewItem | null;
     preferredAuthoringTool: string;
 }) {
     const isVisualCard = isVisualAttachmentKind(card.attachmentKind);
     const isUploadCard = card.attachmentKind === 'upload';
     const authoringTool = getProblemBodyCardAuthoringTool(card, preferredAuthoringTool);
     const canUploadAsset = Boolean(problemId && revisionId);
-    const visualPreviewAssetId = livePreviewAsset?.id ?? card.assetId ?? undefined;
-    const visualPreviewAssets = livePreviewAsset ? [livePreviewAsset, ...assets] : assets;
 
     return (
         <div className="space-y-4">
@@ -1238,8 +1223,6 @@ function ProblemBodyCardEditor({
                                 attachmentKind: nextKind,
                                 attachmentBlockType: nextAttachmentBlockType,
                                 assetId: '',
-                                caption: current.caption,
-                                display: DEFAULT_PROBLEM_FIGURE_DISPLAY,
                             };
                         })}
                     />
@@ -1254,8 +1237,6 @@ function ProblemBodyCardEditor({
                                 attachmentKind: 'none',
                                 attachmentBlockType: null,
                                 assetId: '',
-                                caption: '',
-                                display: DEFAULT_PROBLEM_FIGURE_DISPLAY,
                             }))}
                         >
                             添付を外す
@@ -1286,27 +1267,6 @@ function ProblemBodyCardEditor({
                             <p className="text-xs text-muted-foreground">先に下書き保存するとアップロードできます。</p>
                         )}
                     </div>
-                    <div className="space-y-2">
-                        <Label>図版表示確認</Label>
-                        <ProblemAssetPreview
-                            assetId={card.assetId || undefined}
-                            assets={assets}
-                            caption={card.caption || undefined}
-                            emptyMessage="アップロードした図版がここに表示されます。"
-                            displayScale={1}
-                            display={card.display}
-                            editable
-                            onDisplayChange={(nextDisplay) => onCardChange((current) => ({ ...current, display: nextDisplay }))}
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <Label>補足説明</Label>
-                        <Input
-                            value={card.caption}
-                            onChange={(event) => onCardChange((current) => ({ ...current, caption: event.target.value }))}
-                            placeholder="必要なら図の補足を入力"
-                        />
-                    </div>
                 </>
             )}
 
@@ -1317,27 +1277,6 @@ function ProblemBodyCardEditor({
                         <p className="text-sm text-muted-foreground">
                             このカードに紐づく図版を作成・生成します。
                         </p>
-                    </div>
-                    <div className="space-y-2">
-                        <Label>図版表示確認</Label>
-                        <ProblemAssetPreview
-                            assetId={visualPreviewAssetId}
-                            assets={visualPreviewAssets}
-                            caption={card.caption || undefined}
-                            emptyMessage="生成または作成した図版がここに表示されます。"
-                            displayScale={card.attachmentKind === 'graph' ? 0.5 : 1}
-                            display={card.display}
-                            editable
-                            onDisplayChange={(nextDisplay) => onCardChange((current) => ({ ...current, display: nextDisplay }))}
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <Label>補足説明</Label>
-                        <Input
-                            value={card.caption}
-                            onChange={(event) => onCardChange((current) => ({ ...current, caption: event.target.value }))}
-                            placeholder="必要なら図の補足を入力"
-                        />
                     </div>
 
                     {!isActiveVisualCard && (
@@ -1428,18 +1367,18 @@ function BlockEditor({
     onChange,
 }: {
     block: ProblemBlock;
-    assetOptions: ProblemAssetPreviewItem[];
+    assetOptions: RenderableProblemAsset[];
     onChange: (block: ProblemBlock) => void;
 }) {
     const type = block.type;
     const update = (patch: Partial<ProblemBlock>) => onChange({ ...block, ...patch } as ProblemBlock);
 
-    if (type === 'paragraph' || type === 'caption') {
+    if (type === 'paragraph') {
         return (
             <Textarea
                 value={String(block.text ?? '')}
                 onChange={(event) => update({ text: event.target.value })}
-                rows={type === 'paragraph' ? 4 : 2}
+                rows={4}
             />
         );
     }
@@ -1448,9 +1387,6 @@ function BlockEditor({
         return (
             <div className="space-y-2">
                 <Textarea value={String(block.latex ?? '')} onChange={(event) => update({ latex: event.target.value })} rows={3} />
-                {type === 'katexDisplay' && (
-                    <Input value={String(block.caption ?? '')} onChange={(event) => update({ caption: event.target.value })} placeholder="caption" />
-                )}
             </div>
         );
     }
@@ -1464,7 +1400,6 @@ function BlockEditor({
                         value={String(block.assetId ?? '') || '__NONE__'}
                         onValueChange={(value) => update({
                             assetId: value === '__NONE__' ? '' : value,
-                            display: DEFAULT_PROBLEM_FIGURE_DISPLAY,
                         })}
                     >
                         <SelectTrigger><SelectValue placeholder="asset を選択" /></SelectTrigger>
@@ -1482,20 +1417,6 @@ function BlockEditor({
                 {type === 'svg' && (
                     <Textarea value={String(block.svg ?? '')} onChange={(event) => update({ svg: event.target.value })} rows={5} placeholder="<svg>...</svg>" />
                 )}
-                <Input value={String(block.caption ?? '')} onChange={(event) => update({ caption: event.target.value })} placeholder="caption" />
-                <div className="space-y-2">
-                    <Label>表示プレビュー</Label>
-                    <ProblemAssetPreview
-                        assetId={String(block.assetId ?? '') || undefined}
-                        assets={assetOptions}
-                        caption={String(block.caption ?? '') || undefined}
-                        emptyMessage="asset を選択すると、ここに問題文での見え方を表示します。"
-                        displayScale={type === 'graphAsset' ? 0.5 : 1}
-                        display={block.display}
-                        editable
-                        onDisplayChange={(nextDisplay) => update({ display: nextDisplay })}
-                    />
-                </div>
             </div>
         );
     }
@@ -1515,7 +1436,6 @@ function BlockEditor({
                     rows={6}
                     placeholder='[["1", "2"]]'
                 />
-                <Input value={String(block.caption ?? '')} onChange={(event) => update({ caption: event.target.value })} placeholder="caption" />
             </div>
         );
     }

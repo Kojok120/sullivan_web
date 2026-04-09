@@ -58,6 +58,14 @@ function replaceSvgAttribute(markup: string, name: string, value: string) {
     });
 }
 
+function formatSvgNumber(value: number) {
+    if (!Number.isFinite(value)) {
+        return '0';
+    }
+
+    return Number.isInteger(value) ? String(value) : value.toString();
+}
+
 export function normalizeSvgExport(raw: string) {
     const trimmed = raw.trim();
     if (!trimmed) return '';
@@ -85,10 +93,14 @@ export function ensureRenderableSvgMarkup(
 
     const width = parseSvgDimension(parseSvgAttribute(normalized, 'width'));
     const height = parseSvgDimension(parseSvgAttribute(normalized, 'height'));
-    const resolvedWidth = width && width > 0 ? width : fallbackDimensions.width;
+    const viewBox = parseSvgViewBox(normalized);
+    const resolvedWidth = width && width > 0
+        ? width
+        : viewBox?.width ?? fallbackDimensions.width;
     const resolvedHeight = height && height > 0
         ? height
-        : Math.max(1, Math.round(resolvedWidth * (fallbackDimensions.height / fallbackDimensions.width)));
+        : viewBox?.height
+            ?? Math.max(1, Math.round(resolvedWidth * (fallbackDimensions.height / fallbackDimensions.width)));
 
     let nextMarkup = normalized;
     if (!width || width <= 0) {
@@ -96,6 +108,13 @@ export function ensureRenderableSvgMarkup(
     }
     if (!height || height <= 0) {
         nextMarkup = replaceSvgAttribute(nextMarkup, 'height', String(Math.round(resolvedHeight)));
+    }
+    if (!viewBox) {
+        nextMarkup = replaceSvgAttribute(
+            nextMarkup,
+            'viewBox',
+            `0 0 ${formatSvgNumber(resolvedWidth)} ${formatSvgNumber(resolvedHeight)}`,
+        );
     }
 
     return nextMarkup;

@@ -19,7 +19,7 @@ describe('problem-figure-scene', () => {
             instructions: '頂点を答えなさい。',
             blocks: [
                 { id: 'b1', type: 'paragraph', text: 'y = x^2 - 4x + 3 のグラフを考える。' },
-                { id: 'b2', type: 'katexDisplay', latex: 'y=x^2-4x+3', caption: '式' },
+                { id: 'b2', type: 'katexDisplay', latex: 'y=x^2-4x+3' },
             ],
         });
 
@@ -59,9 +59,119 @@ describe('problem-figure-scene', () => {
         expect(compiled.commands).toContain('sAB=Segment(A, B)');
         expect(compiled.commands).toContain('M=Midpoint(A, B)');
         expect(compiled.viewport.ymin).toBeLessThan(0);
+        expect(compiled.viewport.ymax).toBeGreaterThan(scene.viewport.ymax);
         expect(compiled.labelOperations).toEqual([
             { target: 'A', text: 'A', visible: true, style: 3 },
         ]);
+    });
+
+    it('GeoGebra の polygon が point より先に来ても依存順へ並べ替える', () => {
+        const scene = parseSceneSpecForTarget('GEOGEBRA', {
+            kind: 'geogebra',
+            viewport: { xmin: -1, xmax: 6, ymin: -1, ymax: 5 },
+            objects: [
+                { type: 'polygon', name: 'poly1', points: ['P1', 'P2', 'P3'] },
+                { type: 'point', name: 'P1', x: 0, y: 0 },
+                { type: 'point', name: 'P2', x: 4, y: 0 },
+                { type: 'point', name: 'P3', x: 2, y: 3 },
+            ],
+            constraints: [],
+            labels: [],
+            style: { showGrid: true, showAxes: true },
+        }) as GeoGebraSceneSpec;
+
+        const compiled = compileGeoGebraSceneSpec(scene);
+
+        expect(compiled.commands).toEqual([
+            'P1=(0, 0)',
+            'P2=(4, 0)',
+            'P3=(2, 3)',
+            'poly1=Polygon(P1, P2, P3)',
+        ]);
+    });
+
+    it('GeoGebra scene spec の未定義参照は object 名つきで検出する', () => {
+        const scene = parseSceneSpecForTarget('GEOGEBRA', {
+            kind: 'geogebra',
+            viewport: { xmin: -1, xmax: 6, ymin: -1, ymax: 5 },
+            objects: [
+                { type: 'polygon', name: 'poly1', points: ['P1', 'P2', 'P3'] },
+                { type: 'point', name: 'P1', x: 0, y: 0 },
+                { type: 'point', name: 'P2', x: 4, y: 0 },
+            ],
+            constraints: [],
+            labels: [],
+            style: { showGrid: true, showAxes: true },
+        }) as GeoGebraSceneSpec;
+
+        expect(() => compileGeoGebraSceneSpec(scene)).toThrowError(
+            'GeoGebra scene spec に未定義の参照があります: poly1 -> P3',
+        );
+    });
+
+    it('GeoGebra の circle は through と radius のどちらか一方だけ必須とする', () => {
+        expect(() => parseSceneSpecForTarget('GEOGEBRA', {
+            kind: 'geogebra',
+            viewport: { xmin: -1, xmax: 6, ymin: -1, ymax: 5 },
+            objects: [
+                { type: 'point', name: 'A', x: 0, y: 0 },
+                { type: 'circle', name: 'c1', center: 'A' },
+            ],
+            constraints: [],
+            labels: [],
+            style: { showGrid: true, showAxes: true },
+        })).toThrowError('circle は through または radius のいずれか一方だけを指定してください。');
+
+        expect(() => parseSceneSpecForTarget('GEOGEBRA', {
+            kind: 'geogebra',
+            viewport: { xmin: -1, xmax: 6, ymin: -1, ymax: 5 },
+            objects: [
+                { type: 'point', name: 'A', x: 0, y: 0 },
+                { type: 'point', name: 'B', x: 4, y: 0 },
+                { type: 'circle', name: 'c1', center: 'A', through: 'B', radius: 3 },
+            ],
+            constraints: [],
+            labels: [],
+            style: { showGrid: true, showAxes: true },
+        })).toThrowError('circle は through または radius のいずれか一方だけを指定してください。');
+    });
+
+    it('GeoGebra scene spec の重複 name は検出する', () => {
+        const scene = parseSceneSpecForTarget('GEOGEBRA', {
+            kind: 'geogebra',
+            viewport: { xmin: -1, xmax: 6, ymin: -1, ymax: 5 },
+            objects: [
+                { type: 'point', name: 'A', x: 0, y: 0 },
+                { type: 'point', name: 'A', x: 4, y: 0 },
+            ],
+            constraints: [],
+            labels: [],
+            style: { showGrid: true, showAxes: true },
+        }) as GeoGebraSceneSpec;
+
+        expect(() => compileGeoGebraSceneSpec(scene)).toThrowError(
+            'GeoGebra scene spec に重複した name があります: A',
+        );
+    });
+
+    it('AI の viewport が頂点を外していても二次関数の重要点を含むように補正する', () => {
+        const scene = parseSceneSpecForTarget('GEOGEBRA', {
+            kind: 'geogebra',
+            viewport: { xmin: -1, xmax: 0.5, ymin: 0, ymax: 6 },
+            objects: [
+                { type: 'function', name: 'f', expression: 'y=x^2-4x+3' },
+            ],
+            constraints: [],
+            labels: [],
+            style: { showGrid: true, showAxes: true },
+        }) as GeoGebraSceneSpec;
+
+        const compiled = compileGeoGebraSceneSpec(scene);
+
+        expect(compiled.commands).toContain('f(x)=x^2-4x+3');
+        expect(compiled.viewport.xmax).toBeGreaterThan(2);
+        expect(compiled.viewport.ymin).toBeLessThan(-0.9);
+        expect(compiled.viewport.xmax).toBeGreaterThan(3);
     });
 
     it('GeoGebra label の空文字は undefined として扱い、生成エラーにしない', () => {

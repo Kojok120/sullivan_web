@@ -12,12 +12,6 @@ const blockBaseSchema = z.object({
     id: z.string().min(1),
 });
 
-export const problemFigureDisplaySchema = z.object({
-    zoom: z.number().min(0.25).max(3),
-    panX: z.number().min(-1).max(1),
-    panY: z.number().min(-1).max(1),
-});
-
 const paragraphBlockSchema = blockBaseSchema.extend({
     type: z.literal('paragraph'),
     text: z.string().min(1),
@@ -31,7 +25,6 @@ const katexInlineBlockSchema = blockBaseSchema.extend({
 const katexDisplayBlockSchema = blockBaseSchema.extend({
     type: z.literal('katexDisplay'),
     latex: z.string().min(1),
-    caption: z.string().optional(),
 });
 
 const imageBlockSchema = blockBaseSchema.extend({
@@ -39,25 +32,20 @@ const imageBlockSchema = blockBaseSchema.extend({
     assetId: z.string().optional(),
     src: z.string().optional(),
     alt: z.string().optional(),
-    caption: z.string().optional(),
     width: z.number().int().positive().optional(),
     height: z.number().int().positive().optional(),
-    display: problemFigureDisplaySchema.optional(),
 });
 
 const svgBlockSchema = blockBaseSchema.extend({
     type: z.literal('svg'),
     assetId: z.string().optional(),
     svg: z.string().optional(),
-    caption: z.string().optional(),
-    display: problemFigureDisplaySchema.optional(),
 });
 
 const tableBlockSchema = blockBaseSchema.extend({
     type: z.literal('table'),
     headers: z.array(z.string()).default([]),
     rows: z.array(z.array(z.string())).default([]),
-    caption: z.string().optional(),
 });
 
 const choicesBlockSchema = blockBaseSchema.extend({
@@ -80,25 +68,16 @@ const blankGroupBlockSchema = blockBaseSchema.extend({
 const graphAssetBlockSchema = blockBaseSchema.extend({
     type: z.literal('graphAsset'),
     assetId: z.string().optional(),
-    caption: z.string().optional(),
-    display: problemFigureDisplaySchema.optional(),
 });
 
 const geometryAssetBlockSchema = blockBaseSchema.extend({
     type: z.literal('geometryAsset'),
     assetId: z.string().optional(),
-    caption: z.string().optional(),
-    display: problemFigureDisplaySchema.optional(),
 });
 
 const answerLinesBlockSchema = blockBaseSchema.extend({
     type: z.literal('answerLines'),
     lines: z.number().int().min(1).max(20).default(3),
-});
-
-const captionBlockSchema = blockBaseSchema.extend({
-    type: z.literal('caption'),
-    text: z.string().min(1),
 });
 
 export const problemBlockSchema = z.discriminatedUnion('type', [
@@ -113,7 +92,6 @@ export const problemBlockSchema = z.discriminatedUnion('type', [
     graphAssetBlockSchema,
     geometryAssetBlockSchema,
     answerLinesBlockSchema,
-    captionBlockSchema,
 ]);
 
 export const structuredProblemDocumentSchema = z.object({
@@ -206,14 +184,42 @@ export const gradingConfigSchema = z.object({
 });
 
 export type ProblemBlock = z.infer<typeof problemBlockSchema>;
-export type ProblemFigureDisplay = z.infer<typeof problemFigureDisplaySchema>;
 export type StructuredProblemDocument = z.infer<typeof structuredProblemDocumentSchema>;
 export type AnswerSpec = z.infer<typeof answerSpecSchema>;
 export type PrintConfig = z.infer<typeof printConfigSchema>;
 export type GradingConfig = z.infer<typeof gradingConfigSchema>;
 
+function normalizeLegacyStructuredDocumentRaw(raw: unknown) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+        return raw;
+    }
+
+    const document = { ...(raw as Record<string, unknown>) };
+    if (!Array.isArray(document.blocks)) {
+        return document;
+    }
+
+    document.blocks = document.blocks.flatMap((candidate) => {
+        if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+            return [];
+        }
+
+        const block = { ...(candidate as Record<string, unknown>) };
+        if (block.type === 'caption') {
+            return [];
+        }
+
+        delete block.caption;
+        delete block.display;
+
+        return [block];
+    });
+
+    return document;
+}
+
 export function parseStructuredDocument(raw: unknown): StructuredProblemDocument {
-    return structuredProblemDocumentSchema.parse(raw);
+    return structuredProblemDocumentSchema.parse(normalizeLegacyStructuredDocumentRaw(raw));
 }
 
 export function parseAnswerSpec(raw: unknown): AnswerSpec {
@@ -241,8 +247,8 @@ export function deriveLegacyFieldsFromStructuredData(input: {
         document.title,
         document.summary,
         ...document.blocks
-            .filter((block) => block.type === 'paragraph' || block.type === 'caption')
-            .map((block) => block.type === 'paragraph' ? block.text : block.text),
+            .filter((block) => block.type === 'paragraph')
+            .map((block) => block.text),
     ]
         .filter(Boolean)
         .join('\n')

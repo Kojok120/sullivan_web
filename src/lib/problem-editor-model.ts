@@ -1,13 +1,7 @@
-import {
-    DEFAULT_PROBLEM_FIGURE_DISPLAY,
-    normalizeProblemFigureDisplay,
-    shouldPersistProblemFigureDisplay,
-} from '@/lib/problem-figure-display';
 import type {
     AnswerSpec,
     GradingConfig,
     ProblemBlock,
-    ProblemFigureDisplay,
     StructuredProblemDocument,
 } from '@/lib/structured-problem';
 
@@ -20,8 +14,6 @@ export type ProblemBodyCard = {
     attachmentKind: ProblemBodyAttachmentKind;
     attachmentBlockType: ProblemBodyAttachmentBlockType;
     assetId: string;
-    caption: string;
-    display: ProblemFigureDisplay;
 };
 
 export type ProblemBodySegment =
@@ -96,40 +88,32 @@ function buildCardBlocks(card: ProblemBodyCard): ProblemBlock[] {
     if (card.attachmentKind !== 'none') {
         const figureId = `${card.id}-asset`;
         const attachmentBlockType = getAttachmentBlockType(card.attachmentKind, card.attachmentBlockType);
-        const figureBlock =
+        const figureBlock: ProblemBlock =
             attachmentBlockType === 'image'
                 ? {
                     id: figureId,
-                    type: 'image' as const,
+                    type: 'image',
                     assetId: card.assetId,
                     src: '',
                     alt: '',
-                    caption: card.caption,
-                    display: shouldPersistProblemFigureDisplay(card.display) ? card.display : undefined,
                 }
                 : attachmentBlockType === 'svg'
                     ? {
                         id: figureId,
-                        type: 'svg' as const,
+                        type: 'svg',
                         assetId: card.assetId,
                         svg: '',
-                        caption: card.caption,
-                        display: shouldPersistProblemFigureDisplay(card.display) ? card.display : undefined,
                     }
                     : attachmentBlockType === 'graphAsset'
                         ? {
                             id: figureId,
-                            type: 'graphAsset' as const,
+                            type: 'graphAsset',
                             assetId: card.assetId,
-                            caption: card.caption,
-                            display: shouldPersistProblemFigureDisplay(card.display) ? card.display : undefined,
                         }
                         : {
                             id: figureId,
-                            type: 'geometryAsset' as const,
+                            type: 'geometryAsset',
                             assetId: card.assetId,
-                            caption: card.caption,
-                            display: shouldPersistProblemFigureDisplay(card.display) ? card.display : undefined,
                         };
 
         blocks.push(figureBlock);
@@ -153,8 +137,6 @@ export function createEmptyProblemBodyCard(): ProblemBodyCard {
         attachmentKind: 'none',
         attachmentBlockType: null,
         assetId: '',
-        caption: '',
-        display: DEFAULT_PROBLEM_FIGURE_DISPLAY,
     };
 }
 
@@ -167,7 +149,6 @@ export function parseProblemBodySegments(blocks: ProblemBlock[]): ProblemBodySeg
         if (block.type === 'paragraph') {
             const nextBlock = blocks[index + 1];
             if (isCardAttachmentBlock(nextBlock)) {
-                const captionBlock = blocks[index + 2];
                 segments.push({
                     kind: 'card',
                     card: {
@@ -176,15 +157,9 @@ export function parseProblemBodySegments(blocks: ProblemBlock[]): ProblemBodySeg
                         attachmentKind: getAttachmentKind(nextBlock),
                         attachmentBlockType: nextBlock.type,
                         assetId: nextBlock.assetId ?? '',
-                        caption: captionBlock?.type === 'caption'
-                            ? captionBlock.text
-                            : 'caption' in nextBlock
-                                ? nextBlock.caption ?? ''
-                                : '',
-                        display: normalizeProblemFigureDisplay('display' in nextBlock ? nextBlock.display : undefined),
                     },
                 });
-                index += captionBlock?.type === 'caption' ? 2 : 1;
+                index += 1;
                 continue;
             }
 
@@ -196,15 +171,12 @@ export function parseProblemBodySegments(blocks: ProblemBlock[]): ProblemBodySeg
                     attachmentKind: 'none',
                     attachmentBlockType: null,
                     assetId: '',
-                    caption: '',
-                    display: DEFAULT_PROBLEM_FIGURE_DISPLAY,
                 },
             });
             continue;
         }
 
         if (isCardAttachmentBlock(block)) {
-            const captionBlock = blocks[index + 1];
             segments.push({
                 kind: 'card',
                 card: {
@@ -213,17 +185,8 @@ export function parseProblemBodySegments(blocks: ProblemBlock[]): ProblemBodySeg
                     attachmentKind: getAttachmentKind(block),
                     attachmentBlockType: block.type,
                     assetId: block.assetId ?? '',
-                    caption: captionBlock?.type === 'caption'
-                        ? captionBlock.text
-                        : 'caption' in block
-                            ? block.caption ?? ''
-                            : '',
-                    display: normalizeProblemFigureDisplay('display' in block ? block.display : undefined),
                 },
             });
-            if (captionBlock?.type === 'caption') {
-                index += 1;
-            }
             continue;
         }
 

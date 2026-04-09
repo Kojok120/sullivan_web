@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { parseStructuredDocument } from './structured-problem';
 
 describe('structured-problem', () => {
-    it('図版 block の display を構造化ドキュメントとして受け入れる', () => {
+    it('legacy caption / display / caption block を読み込み時に捨てる', () => {
         const document = parseStructuredDocument({
             version: 1,
             blocks: [
@@ -11,34 +11,36 @@ describe('structured-problem', () => {
                     id: 'image-1',
                     type: 'image',
                     assetId: 'asset-image',
+                    caption: '図1',
                     display: { zoom: 0.6, panX: 0.1, panY: -0.2 },
                 },
                 {
-                    id: 'svg-1',
-                    type: 'svg',
-                    svg: '<svg width="10" height="10"></svg>',
-                    display: { zoom: 1.5, panX: -0.3, panY: 0.4 },
+                    id: 'table-1',
+                    type: 'table',
+                    headers: ['x'],
+                    rows: [['1']],
+                    caption: '表1',
                 },
                 {
-                    id: 'graph-1',
-                    type: 'graphAsset',
-                    assetId: 'asset-graph',
-                    display: { zoom: 2, panX: 0.5, panY: -0.6 },
-                },
-                {
-                    id: 'geometry-1',
-                    type: 'geometryAsset',
-                    assetId: 'asset-geometry',
-                    display: { zoom: 2.5, panX: -0.7, panY: 0.8 },
+                    id: 'caption-1',
+                    type: 'caption',
+                    text: '旧キャプション',
                 },
             ],
         });
 
-        expect(document.blocks).toMatchObject([
-            { id: 'image-1', display: { zoom: 0.6, panX: 0.1, panY: -0.2 } },
-            { id: 'svg-1', display: { zoom: 1.5, panX: -0.3, panY: 0.4 } },
-            { id: 'graph-1', display: { zoom: 2, panX: 0.5, panY: -0.6 } },
-            { id: 'geometry-1', display: { zoom: 2.5, panX: -0.7, panY: 0.8 } },
+        expect(document.blocks).toEqual([
+            {
+                id: 'image-1',
+                type: 'image',
+                assetId: 'asset-image',
+            },
+            {
+                id: 'table-1',
+                type: 'table',
+                headers: ['x'],
+                rows: [['1']],
+            },
         ]);
     });
 });

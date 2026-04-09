@@ -1,16 +1,11 @@
 import katex from 'katex';
 import QRCode from 'qrcode';
 
-import {
-    getProblemFigureShiftPercent,
-    normalizeProblemFigureDisplay,
-    resolveProblemFigureAspectRatio,
-} from '@/lib/problem-figure-display';
 import { compressProblemIds } from '@/lib/qr-utils';
 import { renderProblemTextHtml } from '@/lib/problem-text';
-import { ensureRenderableSvgMarkup, normalizeSvgExport } from '@/lib/problem-svg';
+import { ensureRenderableSvgMarkup, getRenderableSvgDimensions, normalizeSvgExport } from '@/lib/problem-svg';
+import { parseStructuredDocument } from '@/lib/structured-problem';
 import type { PrintableProblem, PrintableProblemAsset } from '@/lib/print-types';
-import type { ProblemFigureDisplay } from '@/lib/structured-problem';
 
 export type PrintDocumentInput = {
     studentName: string;
@@ -157,7 +152,6 @@ export const PRINT_DOCUMENT_CSS = `
 }
 
 .${PRINT_DOCUMENT_ROOT_CLASS} .problem-card-summary,
-.${PRINT_DOCUMENT_ROOT_CLASS} .problem-caption,
 .${PRINT_DOCUMENT_ROOT_CLASS} .problem-paragraph {
     white-space: pre-wrap;
 }
@@ -201,18 +195,12 @@ export const PRINT_DOCUMENT_CSS = `
     max-height: 120mm;
 }
 
-.${PRINT_DOCUMENT_ROOT_CLASS} .problem-figure-pan {
-    position: absolute;
-    inset: 0;
+.${PRINT_DOCUMENT_ROOT_CLASS} .problem-figure-content {
+    width: 100%;
+    height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
-}
-
-.${PRINT_DOCUMENT_ROOT_CLASS} .problem-figure-zoom {
-    width: 100%;
-    height: 100%;
-    transform-origin: center;
 }
 
 .${PRINT_DOCUMENT_ROOT_CLASS} .problem-figure-image,
@@ -519,7 +507,7 @@ function renderSheetHeader(input: {
 
 function renderStructuredProblem(problem: PrintableProblem): string {
     const displayId = getProblemDisplayId(problem);
-    const document = problem.structuredContent;
+    const document = parseStructuredDocumentSafely(problem);
     const title = document?.title?.trim() || problem.question || displayId;
     const summary = document?.summary?.trim();
 
@@ -543,12 +531,10 @@ function renderStructuredBlock(problem: PrintableProblem, block: NonNullable<Pri
     switch (block.type) {
         case 'paragraph':
             return `<div class="problem-paragraph">${renderProblemTextHtml(block.text)}</div>`;
-        case 'caption':
-            return `<div class="problem-caption">${renderProblemTextHtml(block.text)}</div>`;
         case 'katexInline':
             return `<div>${renderKatex(block.latex, false)}</div>`;
         case 'katexDisplay':
-            return `<div class="katex-display">${renderKatex(block.latex, true)}${block.caption ? `<div class="problem-caption">${escapeHtml(block.caption)}</div>` : ''}</div>`;
+            return `<div class="katex-display">${renderKatex(block.latex, true)}</div>`;
         case 'choices':
             return `<ol class="problem-choices">${block.options.map((option) => `<li>${escapeHtml(option.label)}</li>`).join('')}</ol>`;
         case 'table':
@@ -560,7 +546,6 @@ function renderStructuredBlock(problem: PrintableProblem, block: NonNullable<Pri
                             ${block.rows.map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`).join('')}
                         </tbody>
                     </table>
-                    ${block.caption ? `<div class="problem-caption">${escapeHtml(block.caption)}</div>` : ''}
                 </div>
             `;
         case 'blankGroup':
@@ -575,13 +560,13 @@ function renderStructuredBlock(problem: PrintableProblem, block: NonNullable<Pri
                 </div>
             `;
         case 'image':
-            return renderAssetFigure(problem, block.assetId, block.src, block.alt, block.caption, 1, block.display);
+            return renderAssetFigure(problem, block.assetId, block.src, block.alt, 1);
         case 'svg':
-            return renderSvgFigure(problem, block.assetId, block.svg, block.caption, 1, block.display);
+            return renderSvgFigure(problem, block.assetId, block.svg, 1);
         case 'graphAsset':
-            return renderFigureAsset(problem, block.assetId, block.caption, 0.5, block.display);
+            return renderFigureAsset(problem, block.assetId, 0.5);
         case 'geometryAsset':
-            return renderFigureAsset(problem, block.assetId, block.caption, 1, block.display);
+            return renderFigureAsset(problem, block.assetId, 1);
         case 'answerLines':
             return '';
         default:
@@ -606,20 +591,16 @@ function renderAssetFigure(
     assetId?: string,
     src?: string,
     alt?: string,
-    caption?: string,
     displayScale = 1,
-    display?: ProblemFigureDisplay,
 ): string {
     const asset = assetId ? findProblemAsset(problem.assets, assetId) : undefined;
     const resolvedSrc = src || asset?.signedUrl;
     if (!resolvedSrc) return '';
 
     return renderFigureViewport(
-        `<img class="problem-figure-image" src="${escapeHtml(resolvedSrc)}" alt="${escapeHtml(alt || caption || '図版')}" />`,
+        `<img class="problem-figure-image" src="${escapeHtml(resolvedSrc)}" alt="${escapeHtml(alt || '図版')}" />`,
         {
             aspectRatio: resolveProblemFigureAspectRatio(asset),
-            caption,
-            display,
             displayScale,
         },
     );
@@ -628,27 +609,23 @@ function renderAssetFigure(
 function renderFigureAsset(
     problem: PrintableProblem,
     assetId?: string,
-    caption?: string,
     displayScale = 1,
-    display?: ProblemFigureDisplay,
 ): string {
     const asset = findFigureAsset(problem.assets, assetId);
     if (!asset) return '';
 
     if (isSvgAsset(asset)) {
-        return renderSvgFigure(problem, asset.id, asset.inlineContent ?? undefined, caption, displayScale, display);
+        return renderSvgFigure(problem, asset.id, asset.inlineContent ?? undefined, displayScale);
     }
 
-    return renderAssetFigure(problem, asset.id, asset.signedUrl ?? undefined, '図版', caption, displayScale, display);
+    return renderAssetFigure(problem, asset.id, asset.signedUrl ?? undefined, '図版', displayScale);
 }
 
 function renderSvgFigure(
     problem: PrintableProblem,
     assetId?: string,
     inlineSvg?: string,
-    caption?: string,
     displayScale = 1,
-    display?: ProblemFigureDisplay,
 ): string {
     const asset = assetId ? findFigureAsset(problem.assets, assetId) : undefined;
     const svg = ensureRenderableSvgMarkup(inlineSvg || asset?.inlineContent || '');
@@ -664,15 +641,13 @@ function renderSvgFigure(
                     width: asset?.width,
                     height: asset?.height,
                 }),
-                caption,
-                display,
                 displayScale,
             },
         );
     }
 
     if (asset?.signedUrl) {
-        return renderAssetFigure(problem, assetId, asset.signedUrl, '図版', caption, displayScale, display);
+        return renderAssetFigure(problem, assetId, asset.signedUrl, '図版', displayScale);
     }
 
     return '';
@@ -682,13 +657,9 @@ function renderFigureViewport(
     contentHtml: string,
     input: {
         aspectRatio: number;
-        caption?: string;
-        display?: ProblemFigureDisplay;
         displayScale: number;
     },
 ) {
-    const normalizedDisplay = normalizeProblemFigureDisplay(input.display);
-    const shiftPercent = getProblemFigureShiftPercent(normalizedDisplay);
     const formatStyleNumber = (value: number) => Number(value.toFixed(4)).toString();
 
     return `
@@ -697,15 +668,58 @@ function renderFigureViewport(
                 class="problem-figure-frame"
                 style="width:${formatStyleNumber(input.displayScale * 100)}%;aspect-ratio:${formatStyleNumber(input.aspectRatio)};"
             >
-                <div class="problem-figure-pan" style="transform:translate(${formatStyleNumber(shiftPercent.x)}%, ${formatStyleNumber(shiftPercent.y)}%);">
-                    <div class="problem-figure-zoom" style="transform:scale(${formatStyleNumber(normalizedDisplay.zoom)});">
-                        ${contentHtml}
-                    </div>
+                <div class="problem-figure-content">
+                    ${contentHtml}
                 </div>
             </div>
         </figure>
-        ${input.caption ? `<div class="problem-caption">${escapeHtml(input.caption)}</div>` : ''}
     `;
+}
+
+function parseStructuredDocumentSafely(problem: PrintableProblem) {
+    if (!problem.structuredContent) {
+        return null;
+    }
+
+    try {
+        return parseStructuredDocument(problem.structuredContent);
+    } catch (error) {
+        console.error('[print-document] structuredContent の解析に失敗しました', {
+            problemId: problem.id,
+            error,
+        });
+        return null;
+    }
+}
+
+function resolveProblemFigureAspectRatio(
+    asset?: {
+        kind?: string | null;
+        mimeType?: string | null;
+        inlineContent?: string | null;
+        width?: number | null;
+        height?: number | null;
+    } | null,
+    fallbackAspectRatio = 4 / 3,
+) {
+    if (asset?.width && asset.width > 0 && asset.height && asset.height > 0) {
+        return asset.width / asset.height;
+    }
+
+    const inlineContent = asset?.inlineContent?.trim();
+    const normalizedSvg = normalizeSvgExport(inlineContent ?? '');
+    const isSvg = asset?.kind === 'SVG'
+        || asset?.mimeType === 'image/svg+xml'
+        || normalizedSvg.startsWith('<svg');
+
+    if (isSvg && inlineContent) {
+        const dimensions = getRenderableSvgDimensions(inlineContent);
+        if (dimensions) {
+            return dimensions.width / dimensions.height;
+        }
+    }
+
+    return fallbackAspectRatio;
 }
 
 function findProblemAsset(assets: PrintableProblemAsset[] | undefined, assetId: string) {

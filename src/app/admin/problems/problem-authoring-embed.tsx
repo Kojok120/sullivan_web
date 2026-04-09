@@ -3,9 +3,6 @@
 import Script from 'next/script';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MutableRefObject } from 'react';
-import { toast } from 'sonner';
-
-import { Button } from '@/components/ui/button';
 import {
     compileDesmosSceneSpec,
     compileGeoGebraSceneSpec,
@@ -38,9 +35,11 @@ type GeoGebraApi = {
     setBase64: (base64: string, callback?: () => void) => void;
     exportSVG: (callback: (svg: string) => void) => void;
     evalCommand?: (command: string) => boolean | void;
+    getViewProperties?: (viewId: number) => string | Record<string, unknown>;
     getAllObjectNames?: () => string[] | string;
     deleteObject?: (name: string) => void;
     setCoordSystem?: (xmin: number, xmax: number, ymin: number, ymax: number) => void;
+    showAllObjects?: () => void;
     setGridVisible?: (visible: boolean) => void;
     setAxesVisible?: (xVisible: boolean, yVisible: boolean) => void;
     setCaption?: (name: string, caption: string) => void;
@@ -88,6 +87,13 @@ type ProblemAuthoringEmbedProps = {
     onReadyStateChange?: (ready: boolean) => void;
 };
 
+type GeoGebraViewport = {
+    xmin: number;
+    xmax: number;
+    ymin: number;
+    ymax: number;
+};
+
 function safeParseJson(value: string) {
     try {
         return JSON.parse(value) as Record<string, unknown>;
@@ -106,6 +112,74 @@ function normalizeGeoGebraObjectNames(raw: string[] | string | undefined) {
     return [];
 }
 
+function toFiniteNumber(value: unknown) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+    }
+
+    if (typeof value === 'string' && value.trim()) {
+        const parsed = Number.parseFloat(value);
+        if (Number.isFinite(parsed)) {
+            return parsed;
+        }
+    }
+
+    return null;
+}
+
+function normalizeGeoGebraViewport(raw: unknown): GeoGebraViewport | null {
+    if (!raw || typeof raw !== 'object') {
+        return null;
+    }
+
+    const candidate = raw as Record<string, unknown>;
+    const xMin = toFiniteNumber(candidate.xMin);
+    const yMin = toFiniteNumber(candidate.yMin);
+    const width = toFiniteNumber(candidate.width);
+    const height = toFiniteNumber(candidate.height);
+    const invXscale = toFiniteNumber(candidate.invXscale);
+    const invYscale = toFiniteNumber(candidate.invYscale);
+
+    if (
+        xMin === null
+        || yMin === null
+        || width === null
+        || height === null
+        || invXscale === null
+        || invYscale === null
+        || width <= 0
+        || height <= 0
+        || invXscale <= 0
+        || invYscale <= 0
+    ) {
+        return null;
+    }
+
+    return {
+        xmin: xMin,
+        xmax: xMin + width * invXscale,
+        ymin: yMin,
+        ymax: yMin + height * invYscale,
+    };
+}
+
+function readGeoGebraViewport(api: GeoGebraApi, viewId = 1) {
+    const raw = api.getViewProperties?.(viewId);
+    if (!raw) {
+        return null;
+    }
+
+    if (typeof raw === 'string') {
+        try {
+            return normalizeGeoGebraViewport(JSON.parse(raw));
+        } catch {
+            return null;
+        }
+    }
+
+    return normalizeGeoGebraViewport(raw);
+}
+
 export function ProblemAuthoringEmbed({
     problemType,
     tool,
@@ -121,15 +195,15 @@ export function ProblemAuthoringEmbed({
     const geoGebraRef = useRef<GeoGebraApi | null>(null);
     const geoGebraAppletRef = useRef<GGBAppletInstance | null>(null);
     const geoGebraListenerRef = useRef<((event: unknown) => void) | null>(null);
+    const geoGebraViewportRef = useRef<GeoGebraViewport | null>(null);
     const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const appliedStateRef = useRef('');
     const authoringStateTextRef = useRef(authoringStateText);
     const queueStateSyncRef = useRef<(producer: () => unknown | Promise<unknown>) => Promise<void>>(async () => {});
     const desmosApiKey = (process.env.NEXT_PUBLIC_DESMOS_API_KEY || '').trim();
-    const [desmosScriptReady, setDesmosScriptReady] = useState(false);
-    const [geoGebraScriptReady, setGeoGebraScriptReady] = useState(false);
-    const [statusText, setStatusText] = useState('読み込み待ち');
-    const [isSyncing, setIsSyncing] = useState(false);
+    const [desmosScriptReady, setDesmosScriptReady] = useState(() => typeof window !== 'undefined' && Boolean(window.Desmos));
+    const [geoGebraScriptReady, setGeoGebraScriptReady] = useState(() => typeof window !== 'undefined' && Boolean(window.GGBApplet));
+    const setStatusText: (nextStatusText: string) => void = () => {};
     const [isReady, setIsReady] = useState(false);
 
     const geoGebraAppName = problemType === 'GRAPH_DRAW' ? 'graphing' : 'geometry';
@@ -142,7 +216,44 @@ export function ProblemAuthoringEmbed({
         return serialized;
     }, [onAuthoringStateTextChange]);
 
-    const queueStateSync = async (producer: () => unknown | Promise<unknown>) => {
+    const refitGeoGebraViewport = useCallback(async ({
+        fallbackViewport,
+        statusText: nextStatusText,
+    }: {
+        fallbackViewport?: GeoGebraViewport | null;
+        statusText?: string;
+    } = {}) => {
+        const api = geoGebraRef.current;
+        if (!api) {
+            throw new Error('GeoGebra エディタがまだ準備できていません');
+        }
+
+        const viewport = fallbackViewport ?? geoGebraViewportRef.current;
+
+        if (api.showAllObjects) {
+            api.showAllObjects();
+            if (nextStatusText) {
+                setStatusText(nextStatusText);
+            }
+            await new Promise((resolve) => setTimeout(resolve, 150));
+            geoGebraViewportRef.current = readGeoGebraViewport(api) ?? fallbackViewport ?? geoGebraViewportRef.current;
+            return true;
+        }
+
+        if (viewport) {
+            api.setCoordSystem?.(viewport.xmin, viewport.xmax, viewport.ymin, viewport.ymax);
+            if (nextStatusText) {
+                setStatusText(nextStatusText);
+            }
+            await new Promise((resolve) => setTimeout(resolve, 150));
+            geoGebraViewportRef.current = readGeoGebraViewport(api) ?? viewport;
+            return true;
+        }
+
+        return false;
+    }, []);
+
+    const queueStateSync = useCallback(async (producer: () => unknown | Promise<unknown>) => {
         if (syncTimeoutRef.current) {
             clearTimeout(syncTimeoutRef.current);
         }
@@ -156,10 +267,15 @@ export function ProblemAuthoringEmbed({
                 setStatusText('state 同期に失敗しました');
             }
         }, 300);
-    };
+    }, [pushStateText]);
 
-    authoringStateTextRef.current = authoringStateText;
-    queueStateSyncRef.current = queueStateSync;
+    useEffect(() => {
+        authoringStateTextRef.current = authoringStateText;
+    }, [authoringStateText]);
+
+    useEffect(() => {
+        queueStateSyncRef.current = queueStateSync;
+    }, [queueStateSync]);
 
     const captureDesmosPayload = useCallback(async (): Promise<VendorSyncPayload> => {
         if (!desmosApiKey) {
@@ -201,6 +317,19 @@ export function ProblemAuthoringEmbed({
         const api = geoGebraRef.current;
         if (!api) {
             throw new Error('GeoGebra エディタがまだ準備できていません');
+        }
+
+        const currentViewport = readGeoGebraViewport(api) ?? geoGebraViewportRef.current;
+        if (currentViewport) {
+            geoGebraViewportRef.current = currentViewport;
+            api.evalCommand?.('SetActiveView(1)');
+            api.setCoordSystem?.(
+                currentViewport.xmin,
+                currentViewport.xmax,
+                currentViewport.ymin,
+                currentViewport.ymax,
+            );
+            await new Promise((resolve) => setTimeout(resolve, 150));
         }
 
         const base64 = await new Promise<string>((resolve, reject) => {
@@ -256,6 +385,7 @@ export function ProblemAuthoringEmbed({
         }
 
         const compiled = compileGeoGebraSceneSpec(sceneSpec);
+        geoGebraViewportRef.current = compiled.viewport;
         const existingObjectNames = normalizeGeoGebraObjectNames(api.getAllObjectNames?.());
         for (const name of existingObjectNames.reverse()) {
             api.deleteObject?.(name);
@@ -294,9 +424,11 @@ export function ProblemAuthoringEmbed({
         );
         api.setGridVisible?.(compiled.style.showGrid);
         api.setAxesVisible?.(compiled.style.showAxes, compiled.style.showAxes);
-        setStatusText('AI生成結果を GeoGebra に反映しました');
-        await new Promise((resolve) => setTimeout(resolve, 200));
-    }, []);
+        await refitGeoGebraViewport({
+            fallbackViewport: compiled.viewport,
+            statusText: 'AI生成結果を GeoGebra に反映しました',
+        });
+    }, [refitGeoGebraViewport]);
 
     useEffect(() => {
         onReadyStateChange?.(isReady);
@@ -342,22 +474,8 @@ export function ProblemAuthoringEmbed({
     ]);
 
     useEffect(() => {
-        setIsReady(false);
+        geoGebraViewportRef.current = null;
     }, [tool]);
-
-    useEffect(() => {
-        if (typeof window === 'undefined') {
-            return;
-        }
-
-        if (window.Desmos && !desmosScriptReady) {
-            setDesmosScriptReady(true);
-        }
-
-        if (window.GGBApplet && !geoGebraScriptReady) {
-            setGeoGebraScriptReady(true);
-        }
-    }, [desmosScriptReady, geoGebraScriptReady, tool]);
 
     useEffect(() => {
         if (tool !== 'DESMOS') return;
@@ -382,7 +500,9 @@ export function ProblemAuthoringEmbed({
             keypad: true,
         });
         desmosRef.current = calculator;
-        setIsReady(true);
+        queueMicrotask(() => {
+            setIsReady(true);
+        });
         setStatusText('Desmos エディタを初期化しました');
 
         const initialState = safeParseJson(authoringStateTextRef.current);
@@ -457,13 +577,17 @@ export function ProblemAuthoringEmbed({
                     try {
                         api.setBase64(base64, () => {
                             appliedStateRef.current = authoringStateTextRef.current;
+                            geoGebraViewportRef.current = readGeoGebraViewport(api) ?? geoGebraViewportRef.current;
                         });
                     } catch (error) {
                         console.error('[problem-authoring-embed] GeoGebra state 復元に失敗しました', error);
                     }
+                } else {
+                    geoGebraViewportRef.current = readGeoGebraViewport(api) ?? geoGebraViewportRef.current;
                 }
 
                 const listener = () => {
+                    geoGebraViewportRef.current = readGeoGebraViewport(api) ?? geoGebraViewportRef.current;
                     void queueStateSyncRef.current(async () => {
                         const currentBase64 = await new Promise<string>((resolve, reject) => {
                             try {
@@ -497,6 +621,7 @@ export function ProblemAuthoringEmbed({
             geoGebraRef.current = null;
             geoGebraAppletRef.current = null;
             geoGebraListenerRef.current = null;
+            geoGebraViewportRef.current = null;
             setIsReady(false);
             container.innerHTML = '';
         };
@@ -529,39 +654,6 @@ export function ProblemAuthoringEmbed({
         };
     }, []);
 
-    const handleManualStateSync = async () => {
-        setIsSyncing(true);
-        try {
-            if (tool === 'DESMOS') {
-                await captureDesmosPayload();
-            } else {
-                await captureGeoGebraPayload();
-            }
-            toast.success('作問 state を同期しました');
-        } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'state 同期に失敗しました');
-        } finally {
-            setIsSyncing(false);
-        }
-    };
-
-    const handleSvgExportTest = async () => {
-        setIsSyncing(true);
-        try {
-            const payload = tool === 'DESMOS'
-                ? await captureDesmosPayload()
-                : await captureGeoGebraPayload();
-            if (!payload.svgContent?.trim()) {
-                throw new Error('SVG 書き出し結果が空です');
-            }
-            toast.success(`SVG を生成しました (${payload.svgContent.length.toLocaleString()} chars)`);
-        } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'SVG 書き出しに失敗しました');
-        } finally {
-            setIsSyncing(false);
-        }
-    };
-
     return (
         <div className="space-y-3">
             {tool === 'DESMOS' && desmosApiKey && (
@@ -579,26 +671,11 @@ export function ProblemAuthoringEmbed({
                 />
             )}
 
-            <div className="flex flex-wrap items-center gap-2">
-                <Button type="button" variant="outline" onClick={handleManualStateSync} disabled={disabled || isSyncing}>
-                    state を再同期
-                </Button>
-                <Button type="button" variant="outline" onClick={handleSvgExportTest} disabled={disabled || isSyncing}>
-                    SVG 書き出しテスト
-                </Button>
-                <div className="text-xs text-muted-foreground">
-                    {statusText}
-                </div>
-            </div>
-
             <div
                 ref={containerRef}
+                aria-disabled={disabled}
                 className="h-[520px] w-full overflow-hidden rounded-lg border bg-white"
             />
-
-            <p className="text-xs text-muted-foreground">
-                保存時に {tool} の native state と SVG export を自動で回収し、Sullivan 側へ保存します。
-            </p>
             {tool === 'DESMOS' && !desmosApiKey && (
                 <p className="text-xs text-amber-700">
                     Desmos を有効にするには `.env.local` または `.env.DEV` に `NEXT_PUBLIC_DESMOS_API_KEY` を設定してください。

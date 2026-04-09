@@ -416,16 +416,30 @@ export const geoGebraSceneSpecJsonSchema: JsonSchema = {
                         additionalProperties: false,
                     },
                     {
-                        type: 'object',
-                        properties: {
-                            type: { type: 'string', enum: ['circle'] },
-                            name: { type: 'string' },
-                            center: { type: 'string' },
-                            through: { type: 'string' },
-                            radius: { type: 'number' },
-                        },
-                        required: ['type', 'name', 'center'],
-                        additionalProperties: false,
+                        oneOf: [
+                            {
+                                type: 'object',
+                                properties: {
+                                    type: { type: 'string', enum: ['circle'] },
+                                    name: { type: 'string' },
+                                    center: { type: 'string' },
+                                    through: { type: 'string' },
+                                },
+                                required: ['type', 'name', 'center', 'through'],
+                                additionalProperties: false,
+                            },
+                            {
+                                type: 'object',
+                                properties: {
+                                    type: { type: 'string', enum: ['circle'] },
+                                    name: { type: 'string' },
+                                    center: { type: 'string' },
+                                    radius: { type: 'number' },
+                                },
+                                required: ['type', 'name', 'center', 'radius'],
+                                additionalProperties: false,
+                            },
+                        ],
                     },
                     {
                         type: 'object',
@@ -691,10 +705,26 @@ export function getSceneSpecJsonSchema(targetTool: FigureGenerationTarget): Json
     }
 }
 
+function validateGeoGebraSceneShape(scene: GeoGebraSceneSpec) {
+    scene.objects.forEach((object) => {
+        if (object.type !== 'circle') {
+            return;
+        }
+
+        const hasThrough = object.through !== undefined;
+        const hasRadius = object.radius !== undefined;
+        if (hasThrough === hasRadius) {
+            throw new Error('circle は through または radius のいずれか一方だけを指定してください。');
+        }
+    });
+
+    return scene;
+}
+
 export function parseSceneSpecForTarget(targetTool: FigureGenerationTarget, raw: unknown) {
     switch (targetTool) {
         case 'GEOGEBRA':
-            return geoGebraSceneSpecSchema.parse(raw);
+            return validateGeoGebraSceneShape(geoGebraSceneSpecSchema.parse(raw));
         case 'SVG':
             return svgSceneSpecSchema.parse(raw);
     }
@@ -728,7 +758,7 @@ export function buildFigureGenerationSourceText(document: {
         document.instructions?.trim(),
         ...document.blocks.flatMap((block) => {
             const type = String(block.type ?? '');
-            if (type === 'paragraph' || type === 'caption') {
+            if (type === 'paragraph') {
                 return [String(block.text ?? '').trim()];
             }
             if (type === 'katexInline' || type === 'katexDisplay') {
@@ -742,7 +772,6 @@ export function buildFigureGenerationSourceText(document: {
                 return [
                     headers.join(' | '),
                     ...rows.map((row) => row.join(' | ')),
-                    String(block.caption ?? '').trim(),
                 ];
             }
             if (type === 'choices') {
@@ -781,9 +810,10 @@ export function buildFigureGenerationPrompt(params: {
         const graphingGuidance = params.problemType === 'GRAPH_DRAW'
             ? [
             '関数グラフ問題なので、必要なら objects に type:"function" を使ってください。',
-            'function.expression には GeoGebra で扱える関数式を入れてください。例: x^2-4x+3。',
-            '頂点、切片、交点など読み取らせたい点は point で別に定義してください。',
-            'viewport は、グラフの重要点が端で切れないように上下左右へ十分な余白を入れてください。特に頂点や交点が見切れないようにしてください。',
+            'function.expression には GeoGebra で扱える関数式の右辺だけを入れてください。y= や f(x)= は含めません。例: x^2-4x+3。',
+            '頂点、x切片、y切片、交点など読み取らせたい点は point で別に定義してください。',
+            'viewport は、グラフの重要点が端で切れないように上下左右へ十分な余白を入れてください。特に頂点・切片・交点が見切れないようにしてください。',
+            '二次関数では頂点と切片が viewport 内に必ず入るようにしてください。',
         ]
             : [];
 
@@ -792,9 +822,11 @@ export function buildFigureGenerationPrompt(params: {
             'targetTool: GEOGEBRA',
             'kind は "geogebra" に固定してください。',
             'objects は依存順に並べ、先に点、その後に線分・直線・円・多角形などを定義してください。',
+            'name / target には空白を含めない簡潔な識別子を使ってください。例: A, B, P1, segAB, f, c1。',
             'point / segment / line / function / circle / polygon / angle / text のみを使ってください。',
+            'circle では through か radius のどちらか一方だけを指定してください。',
             'constraints には perpendicular / parallel / midpoint のみを使ってください。',
-            '必要なラベルは labels に入れ、target には既存 object 名を指定してください。',
+            '必要なラベルは labels に入れ、target には既存 object / constraint 名を指定してください。',
             ...graphingGuidance,
         ].join('\n\n');
     }
@@ -864,8 +896,134 @@ function escapeGeoString(value: string) {
     return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 }
 
+function normalizeGeoFunctionExpression(expression: string) {
+    return expression
+        .trim()
+        .replace(/[−–—]/g, '-')
+        .replace(/^[A-Za-z_][A-Za-z0-9_]*\s*\(\s*x\s*\)\s*=\s*/i, '')
+        .replace(/^y\s*=\s*/i, '');
+}
+
+type GeoGebraObject = GeoGebraSceneSpec['objects'][number];
+type GeoGebraConstraint = GeoGebraSceneSpec['constraints'][number];
+
+function getGeoGebraObjectDependencies(object: GeoGebraObject): string[] {
+    switch (object.type) {
+        case 'point':
+        case 'function':
+        case 'text':
+            return [];
+        case 'segment':
+            return [object.from, object.to];
+        case 'line':
+            return [...object.through];
+        case 'circle':
+            return object.through ? [object.center, object.through] : [object.center];
+        case 'polygon':
+            return [...object.points];
+        case 'angle':
+            return [...object.points];
+    }
+}
+
+function getGeoGebraConstraintDependencies(constraint: GeoGebraConstraint): string[] {
+    switch (constraint.type) {
+        case 'perpendicular':
+        case 'parallel':
+            return [constraint.through, ...constraint.baseLine];
+        case 'midpoint':
+            return [...constraint.of];
+    }
+}
+
+function formatMissingGeoGebraReferences(targetName: string, references: string[]) {
+    return `${targetName} -> ${references.join(', ')}`;
+}
+
+function sortGeoGebraObjects(objects: GeoGebraObject[]) {
+    const definedObjectNames = new Set(objects.map((object) => object.name));
+    const pending = objects.map((object, index) => ({
+        object,
+        index,
+        dependencies: getGeoGebraObjectDependencies(object),
+    }));
+
+    const missingReferences = pending
+        .map(({ object, dependencies }) => {
+            const missing = dependencies.filter((dependency) => !definedObjectNames.has(dependency));
+            return missing.length > 0 ? formatMissingGeoGebraReferences(object.name, missing) : null;
+        })
+        .filter((value): value is string => Boolean(value));
+
+    if (missingReferences.length > 0) {
+        throw new Error(`GeoGebra scene spec に未定義の参照があります: ${missingReferences.join(' / ')}`);
+    }
+
+    const remaining = [...pending];
+    const resolvedNames = new Set<string>();
+    const orderedObjects: GeoGebraObject[] = [];
+
+    while (remaining.length > 0) {
+        const ready = remaining.filter(({ dependencies }) => dependencies.every((dependency) => resolvedNames.has(dependency)));
+        if (ready.length === 0) {
+            throw new Error(`GeoGebra scene spec の objects 依存順を解決できませんでした: ${remaining.map(({ object }) => object.name).join(', ')}`);
+        }
+
+        for (const candidate of ready) {
+            orderedObjects.push(candidate.object);
+            resolvedNames.add(candidate.object.name);
+        }
+
+        const readyIndexes = new Set(ready.map(({ index }) => index));
+        for (let index = remaining.length - 1; index >= 0; index -= 1) {
+            if (readyIndexes.has(remaining[index].index)) {
+                remaining.splice(index, 1);
+            }
+        }
+    }
+
+    return orderedObjects;
+}
+
+function validateGeoGebraReferences(scene: GeoGebraSceneSpec) {
+    const allNames = [
+        ...scene.objects.map((object) => object.name),
+        ...scene.constraints.map((constraint) => constraint.name),
+    ];
+    const duplicateNames = [...new Set(allNames.filter((name, index) => allNames.indexOf(name) !== index))];
+    if (duplicateNames.length > 0) {
+        throw new Error(`GeoGebra scene spec に重複した name があります: ${duplicateNames.join(', ')}`);
+    }
+
+    const objectNames = new Set(scene.objects.map((object) => object.name));
+    const availableLabelTargets = new Set([
+        ...scene.objects.map((object) => object.name),
+        ...scene.constraints.map((constraint) => constraint.name),
+    ]);
+
+    const missingConstraintReferences = scene.constraints
+        .map((constraint) => {
+            const missing = getGeoGebraConstraintDependencies(constraint)
+                .filter((dependency) => !objectNames.has(dependency));
+            return missing.length > 0 ? formatMissingGeoGebraReferences(constraint.name, missing) : null;
+        })
+        .filter((value): value is string => Boolean(value));
+
+    if (missingConstraintReferences.length > 0) {
+        throw new Error(`GeoGebra scene spec の constraint 参照が未定義です: ${missingConstraintReferences.join(' / ')}`);
+    }
+
+    const missingLabelTargets = scene.labels
+        .filter((label) => !availableLabelTargets.has(label.target))
+        .map((label) => label.target);
+
+    if (missingLabelTargets.length > 0) {
+        throw new Error(`GeoGebra scene spec の label target が未定義です: ${missingLabelTargets.join(', ')}`);
+    }
+}
+
 function compileFunctionEvaluator(expression: string) {
-    const sanitized = expression
+    const sanitized = normalizeGeoFunctionExpression(expression)
         .replace(/\s+/g, '')
         .replace(/π/g, 'pi')
         .replace(/\bpi\b/gi, 'Math.PI')
@@ -890,6 +1048,201 @@ function compileFunctionEvaluator(expression: string) {
         };
     } catch {
         return null;
+    }
+}
+
+type FunctionSamplePoint = {
+    x: number;
+    y: number;
+};
+
+function parseQuadraticCoefficient(raw: string) {
+    const normalized = raw.replace(/\*/g, '');
+    if (normalized === '' || normalized === '+') return 1;
+    if (normalized === '-') return -1;
+    if (!/^[+\-]?(?:\d+(?:\.\d+)?|\.\d+)$/.test(normalized)) {
+        return null;
+    }
+
+    const parsed = Number.parseFloat(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parseQuadraticCoefficients(expression: string) {
+    const normalized = normalizeGeoFunctionExpression(expression)
+        .replace(/\s+/g, '')
+        .replace(/\*/g, '');
+
+    if (!/^[+\-0-9.x^]+$/i.test(normalized)) {
+        return null;
+    }
+
+    const terms = normalized
+        .replace(/-/g, '+-')
+        .split('+')
+        .filter(Boolean);
+
+    let a = 0;
+    let b = 0;
+    let c = 0;
+
+    for (const term of terms) {
+        if (/x\^2$/i.test(term)) {
+            const coefficient = parseQuadraticCoefficient(term.replace(/x\^2$/i, ''));
+            if (coefficient === null) return null;
+            a += coefficient;
+            continue;
+        }
+
+        if (/x$/i.test(term)) {
+            const coefficient = parseQuadraticCoefficient(term.replace(/x$/i, ''));
+            if (coefficient === null) return null;
+            b += coefficient;
+            continue;
+        }
+
+        if (!/^[+\-]?(?:\d+(?:\.\d+)?|\.\d+)$/.test(term)) {
+            return null;
+        }
+
+        const constant = Number.parseFloat(term);
+        if (!Number.isFinite(constant)) {
+            return null;
+        }
+        c += constant;
+    }
+
+    if (Math.abs(a) < 1e-9) {
+        return null;
+    }
+
+    return { a, b, c };
+}
+
+function collectFunctionSamples(
+    evaluate: (x: number) => number | null,
+    minX: number,
+    maxX: number,
+    sampleCount: number,
+) {
+    const safeSampleCount = Math.max(sampleCount, 1);
+    const step = (maxX - minX) / safeSampleCount;
+    const samples: Array<FunctionSamplePoint | null> = [];
+
+    for (let index = 0; index <= safeSampleCount; index += 1) {
+        const x = minX + (step * index);
+        const y = evaluate(x);
+        samples.push(y === null ? null : { x, y });
+    }
+
+    return samples;
+}
+
+function findRootBetween(
+    evaluate: (x: number) => number | null,
+    left: FunctionSamplePoint,
+    right: FunctionSamplePoint,
+) {
+    if (Math.abs(left.y) <= 1e-9) return left.x;
+    if (Math.abs(right.y) <= 1e-9) return right.x;
+    if (Math.sign(left.y) === Math.sign(right.y)) {
+        return null;
+    }
+
+    let low = left.x;
+    let high = right.x;
+    let lowY = left.y;
+
+    for (let index = 0; index < 24; index += 1) {
+        const mid = (low + high) / 2;
+        const midY = evaluate(mid);
+        if (midY === null) {
+            return mid;
+        }
+        if (Math.abs(midY) <= 1e-9) {
+            return mid;
+        }
+
+        if (Math.sign(lowY) === Math.sign(midY)) {
+            low = mid;
+            lowY = midY;
+        } else {
+            high = mid;
+        }
+    }
+
+    return (low + high) / 2;
+}
+
+function addFunctionKeyPoints(
+    scene: GeoGebraSceneSpec,
+    expression: string,
+    addPoint: (x: number, y: number) => void,
+) {
+    const evaluate = compileFunctionEvaluator(expression);
+    if (!evaluate) {
+        return;
+    }
+
+    const pushCandidate = (x: number, y: number | null) => {
+        if (y !== null && Number.isFinite(x) && Number.isFinite(y)) {
+            addPoint(x, y);
+        }
+    };
+
+    pushCandidate(0, evaluate(0));
+
+    const quadratic = parseQuadraticCoefficients(expression);
+    if (quadratic) {
+        const vertexX = -quadratic.b / (2 * quadratic.a);
+        pushCandidate(vertexX, evaluate(vertexX));
+
+        const discriminant = (quadratic.b ** 2) - (4 * quadratic.a * quadratic.c);
+        if (discriminant >= 0) {
+            const rootOffset = Math.sqrt(discriminant);
+            pushCandidate((-quadratic.b - rootOffset) / (2 * quadratic.a), 0);
+            pushCandidate((-quadratic.b + rootOffset) / (2 * quadratic.a), 0);
+        }
+    }
+
+    const viewportWidth = Math.max(scene.viewport.xmax - scene.viewport.xmin, 4);
+    const searchMinX = scene.viewport.xmin - (viewportWidth * 2);
+    const searchMaxX = scene.viewport.xmax + (viewportWidth * 2);
+    const samples = collectFunctionSamples(evaluate, searchMinX, searchMaxX, 192);
+
+    for (let index = 1; index < samples.length - 1; index += 1) {
+        const previous = samples[index - 1];
+        const current = samples[index];
+        const next = samples[index + 1];
+        if (!previous || !current || !next) {
+            continue;
+        }
+
+        const isLocalMinimum = current.y <= previous.y && current.y <= next.y
+            && (current.y < previous.y || current.y < next.y);
+        const isLocalMaximum = current.y >= previous.y && current.y >= next.y
+            && (current.y > previous.y || current.y > next.y);
+
+        if (isLocalMinimum || isLocalMaximum) {
+            pushCandidate(current.x, current.y);
+        }
+    }
+
+    for (let index = 1; index < samples.length; index += 1) {
+        const previous = samples[index - 1];
+        const current = samples[index];
+        if (!previous || !current) {
+            continue;
+        }
+
+        if (Math.abs(previous.y) <= 1e-9) {
+            pushCandidate(previous.x, 0);
+        }
+
+        const rootX = findRootBetween(evaluate, previous, current);
+        if (rootX !== null) {
+            pushCandidate(rootX, evaluate(rootX));
+        }
     }
 }
 
@@ -976,6 +1329,7 @@ function expandViewportForScene(scene: GeoGebraSceneSpec) {
                         addPoint(x, y);
                     }
                 }
+                addFunctionKeyPoints(scene, object.expression, addPoint);
                 break;
             }
         }
@@ -998,6 +1352,8 @@ function expandViewportForScene(scene: GeoGebraSceneSpec) {
 
 export function compileGeoGebraSceneSpec(scene: GeoGebraSceneSpec) {
     const normalizedViewport = expandViewportForScene(scene);
+    const orderedObjects = sortGeoGebraObjects(scene.objects);
+    validateGeoGebraReferences(scene);
     const commands: string[] = [];
     const labelOperations = scene.labels.map((label) => ({
         target: label.target,
@@ -1006,7 +1362,7 @@ export function compileGeoGebraSceneSpec(scene: GeoGebraSceneSpec) {
         style: label.text?.trim() ? 3 : 0,
     }));
 
-    for (const object of scene.objects) {
+    for (const object of orderedObjects) {
         switch (object.type) {
             case 'point':
                 commands.push(`${object.name}=(${object.x}, ${object.y})`);
@@ -1018,7 +1374,7 @@ export function compileGeoGebraSceneSpec(scene: GeoGebraSceneSpec) {
                 commands.push(`${object.name}=Line(${object.through[0]}, ${object.through[1]})`);
                 break;
             case 'function':
-                commands.push(`${object.name}(x)=${object.expression}`);
+                commands.push(`${object.name}(x)=${normalizeGeoFunctionExpression(object.expression)}`);
                 break;
             case 'circle':
                 if (object.radius !== undefined) {

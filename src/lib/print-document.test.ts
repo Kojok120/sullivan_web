@@ -119,7 +119,7 @@ describe('print-document', () => {
                     title: '二次関数のグラフ',
                     blocks: [
                         { id: 'b1', type: 'paragraph', text: 'グラフを見て答えなさい。' },
-                        { id: 'b2', type: 'graphAsset', assetId: 'mismatched-asset-id', caption: '図2' },
+                        { id: 'b2', type: 'graphAsset', assetId: 'mismatched-asset-id' },
                     ],
                 },
                 assets: [{
@@ -134,10 +134,9 @@ describe('print-document', () => {
 
         expect(markup).toContain('class="problem-figure-frame"');
         expect(markup).toContain('style="width:50%;aspect-ratio:1.3333;"');
-        expect(markup).toContain('図2');
     });
 
-    it('図版 block の display を印刷HTMLへ反映する', async () => {
+    it('legacy caption / display が残っていても印刷では標準表示だけを使う', async () => {
         const { markup } = await buildPrintDocumentMarkup({
             studentName: '生徒G',
             studentLoginId: 'student-g',
@@ -158,6 +157,11 @@ describe('print-document', () => {
                             assetId: 'asset-image',
                             caption: '画像',
                             display: { zoom: 1.5, panX: 0.25, panY: -0.5 },
+                        },
+                        {
+                            id: 'legacy-caption',
+                            type: 'caption',
+                            text: '旧キャプション',
                         },
                         {
                             id: 'svg-1',
@@ -181,7 +185,7 @@ describe('print-document', () => {
                             display: { zoom: 2.2, panX: 0.1, panY: -0.25 },
                         },
                     ],
-                },
+                } as never,
                 assets: [
                     {
                         id: 'asset-image',
@@ -210,10 +214,10 @@ describe('print-document', () => {
             }]],
         });
 
-        expect(markup).toContain('transform:translate(6.25%, -12.5%);');
-        expect(markup).toContain('transform:translate(-20%, 8%);');
-        expect(markup).toContain('transform:translate(-25%, 10%);');
-        expect(markup).toContain('transform:translate(6%, -15%);');
+        expect(markup).not.toContain('problem-caption');
+        expect(markup).not.toContain('problem-figure-pan');
+        expect(markup).not.toContain('problem-figure-zoom');
+        expect(markup).toContain('class="problem-figure-content"');
         expect(markup).toContain('style="width:50%;aspect-ratio:1.3333;"');
         expect(markup).toContain('style="width:100%;aspect-ratio:1;"');
     });
