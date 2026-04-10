@@ -45,15 +45,16 @@ describe('MaterialsShell', () => {
         useSearchParamsMock.mockReturnValue(new URLSearchParams('subjectId=subject-1'));
     });
 
-    it('問題作成者向け画面でログアウト導線を常に表示する', () => {
+    it('管理画面と同じ構成でログアウト導線を表示する', () => {
         render(
             <MaterialsShell problemSubjects={[{ id: 'subject-1', name: '数学' }]}>
                 <div>content</div>
             </MaterialsShell>,
         );
 
+        expect(screen.getByTestId('materials-mobile-nav-trigger')).toBeInTheDocument();
         expect(screen.getByTestId('materials-mobile-top-logout-button')).toBeInTheDocument();
-        expect(screen.getByTestId('materials-sidebar-logout-button')).toBeInTheDocument();
+        expect(screen.getByTestId('materials-logout-button')).toBeInTheDocument();
         expect(screen.getByRole('link', { name: '問題一覧 - 数学' })).toHaveAttribute(
             'href',
             '/materials/problems?subjectId=subject-1',

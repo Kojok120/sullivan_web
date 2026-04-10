@@ -913,7 +913,6 @@ export function ProblemEditorClient({
                         <CardContent className="space-y-4">
                             <AnswerSpecEditor
                                 value={syncedAnswerSpec}
-                                gradingMode={state.gradingConfig.mode}
                                 choiceOptions={currentChoiceOptions}
                                 onChange={(next) => setState((current) => ({ ...current, answerSpec: next }))}
                             />
@@ -1475,12 +1474,10 @@ function BlockEditor({
 
 function AnswerSpecEditor({
     value,
-    gradingMode,
     choiceOptions,
     onChange,
 }: {
     value: AnswerSpec;
-    gradingMode: GradingConfig['mode'];
     choiceOptions: Array<{ id: string; label: string }>;
     onChange: (next: AnswerSpec) => void;
 }) {
@@ -1489,10 +1486,6 @@ function AnswerSpecEditor({
 
     return (
         <div className="space-y-4">
-            <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-                採点方式 `{gradingMode}` に合わせて解答欄を自動表示しています。
-            </div>
-
             {(kind === 'exact' || kind === 'numeric' || kind === 'formula') && (
                 <div className="space-y-3">
                     <div className="space-y-2">

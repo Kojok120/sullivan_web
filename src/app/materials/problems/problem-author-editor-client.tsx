@@ -825,7 +825,6 @@ export function ProblemAuthorEditorClient({
                         <CardContent>
                             <AuthorAnswerSpecEditor
                                 value={syncedAnswerSpec}
-                                gradingMode={state.gradingConfig.mode}
                                 choiceOptions={currentChoiceOptions}
                                 onChange={(next) => setState((current) => ({ ...current, answerSpec: next }))}
                             />
@@ -1419,12 +1418,10 @@ function BlankGroupEditor({
 
 function AuthorAnswerSpecEditor({
     value,
-    gradingMode,
     choiceOptions,
     onChange,
 }: {
     value: AnswerSpec;
-    gradingMode: GradingConfig['mode'];
     choiceOptions: Array<{ id: string; label: string }>;
     onChange: (next: AnswerSpec) => void;
 }) {
@@ -1432,10 +1429,6 @@ function AuthorAnswerSpecEditor({
 
     return (
         <div className="space-y-4">
-            <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-                採点方式 `{gradingMode}` に合わせて必要な解答欄だけを表示しています。
-            </div>
-
             {(kind === 'exact' || kind === 'numeric' || kind === 'formula') && (
                 <div className="space-y-4">
                     <div className="space-y-2">
