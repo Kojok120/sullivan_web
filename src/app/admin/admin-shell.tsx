@@ -31,7 +31,7 @@ export function AdminShell({ children, problemSubjects }: AdminShellProps) {
     };
 
     return (
-        <div className="min-h-dvh bg-gray-50">
+        <div className="min-h-dvh bg-background">
             <div className="sticky top-0 z-40 border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/75 md:hidden">
                 <div className="flex h-14 items-center justify-between px-3">
                     <AdminMobileNav problemSubjects={problemSubjects} />
@@ -80,7 +80,7 @@ export function AdminShell({ children, problemSubjects }: AdminShellProps) {
                         />
                     </div>
                 </aside>
-                <main className="min-w-0 flex-1 bg-gray-50 transition-all duration-300">
+                <main className="min-w-0 flex-1 bg-background transition-all duration-300">
                     {children}
                 </main>
             </div>

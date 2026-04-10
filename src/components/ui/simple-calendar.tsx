@@ -49,7 +49,7 @@ export function SimpleCalendar({ value, onChange, minDateKey, className }: Simpl
     const currentMonth = visibleMonth.getUTCMonth();
 
     return (
-        <div className={cn('rounded-md border bg-background p-3 shadow-sm', className)}>
+        <div className={cn('rounded-md border bg-background p-3', className)}>
             <div className="mb-3 flex items-center justify-between">
                 <button
                     type="button"

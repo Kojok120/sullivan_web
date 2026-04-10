@@ -11,7 +11,7 @@ export default function SettingsPage() {
 
     return (
         <div className="container mx-auto py-10 px-4">
-            <h1 className="text-3xl font-bold mb-8 text-gray-800">アカウント設定</h1>
+            <h1 className="text-3xl font-bold mb-8 text-foreground">アカウント設定</h1>
 
             <Card className="max-w-md mx-auto">
                 <CardHeader>
@@ -36,7 +36,7 @@ export default function SettingsPage() {
                             </div>
                         )}
 
-                        <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={pending}>
+                        <Button type="submit" className="w-full" disabled={pending}>
                             {pending ? '変更中...' : 'パスワードを変更する'}
                         </Button>
                     </form>

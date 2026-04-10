@@ -117,7 +117,7 @@ export function CurriculumManager({ initialSubjects }: CurriculumManagerProps) {
                         </div>
                     </div>
                 ) : (
-                    <div className="h-full overflow-hidden rounded-lg border bg-card shadow-sm">
+                    <div className="h-full overflow-hidden rounded-lg border bg-card">
                         {selectedCoreProblemId ? (
                             <ProblemEditor coreProblemId={selectedCoreProblemId} />
                         ) : (
@@ -159,7 +159,7 @@ export function CurriculumManager({ initialSubjects }: CurriculumManagerProps) {
                 </div>
 
                 {/* Right Pane: Problems */}
-                <div className="col-span-9 border rounded-lg bg-card flex flex-col overflow-hidden shadow-sm">
+                <div className="col-span-9 border rounded-lg bg-card flex flex-col overflow-hidden">
                     {selectedCoreProblemId ? (
                         <ProblemEditor coreProblemId={selectedCoreProblemId} />
                     ) : (

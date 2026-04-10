@@ -71,7 +71,7 @@ export function AdminNav({ isCollapsed = false, onToggle, problemSubjects }: Adm
 
     return (
         <div className={cn(
-            "flex h-screen flex-col border-r bg-gray-100/40 transition-all duration-300",
+            "flex h-screen flex-col border-r bg-muted/40 transition-all duration-300",
             isCollapsed ? "w-16" : "w-64"
         )}>
             <div className={cn("flex items-center p-4", isCollapsed ? "justify-center" : "justify-between")}>
@@ -102,7 +102,7 @@ export function AdminNav({ isCollapsed = false, onToggle, problemSubjects }: Adm
                         className={cn(
                             "w-full min-h-11",
                             isCollapsed ? "justify-center px-2" : "justify-start",
-                            pathname === item.href && "bg-gray-200"
+                            pathname === item.href && "bg-accent"
                         )}
                         asChild
                         title={isCollapsed ? item.title : undefined}
@@ -129,7 +129,7 @@ export function AdminNav({ isCollapsed = false, onToggle, problemSubjects }: Adm
                             className={cn(
                                 "w-full min-h-11",
                                 isCollapsed ? "justify-center px-2" : "justify-start",
-                                isActive && "bg-gray-200"
+                                isActive && "bg-accent"
                             )}
                             asChild
                             title={isCollapsed ? `問題一覧 - ${subject.name}` : undefined}
@@ -217,7 +217,7 @@ export function AdminMobileNav({
                             <Button
                                 key={item.href}
                                 variant={isActive ? "secondary" : "ghost"}
-                                className={cn("w-full min-h-11 justify-start", isActive && "bg-gray-200")}
+                                className={cn("w-full min-h-11 justify-start", isActive && "bg-accent")}
                                 asChild
                                 onClick={() => setOpen(false)}
                             >
@@ -241,7 +241,7 @@ export function AdminMobileNav({
                             <Button
                                 key={href}
                                 variant={isActive ? "secondary" : "ghost"}
-                                className={cn("w-full min-h-11 justify-start", isActive && "bg-gray-200")}
+                                className={cn("w-full min-h-11 justify-start", isActive && "bg-accent")}
                                 asChild
                                 onClick={() => setOpen(false)}
                             >
