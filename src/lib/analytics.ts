@@ -637,22 +637,37 @@ export async function getSessionDetails(groupId: string, userId?: string) {
     });
 }
 
+export async function getStudentOverviewData(userId: string) {
+    const [stats, subjectProgress, weaknesses] = await Promise.all([
+        getStudentStats(userId),
+        getSubjectProgress(userId),
+        getStudentWeaknesses(userId),
+    ]);
+
+    const subjects = subjectProgress.map((subjectProgressItem) => ({
+        id: subjectProgressItem.subjectId,
+        name: subjectProgressItem.subjectName,
+    }));
+
+    return {
+        stats,
+        subjectProgress,
+        weaknesses,
+        subjects,
+    };
+}
+
 // Consolidated Dashboard Data Fetcher
 export async function getStudentDashboardData(userId: string) {
     // 1. Fetch all necessary data in parallel
-    // Note: subjectProgress already contains subject info, so we don't need a separate subjects query
     const [
-        stats,
+        overview,
         dailyActivity,
-        subjectProgress,
-        weaknesses,
         recentHistory,
-        student
+        student,
     ] = await Promise.all([
-        getStudentStats(userId),
+        getStudentOverviewData(userId),
         getDailyActivity(userId),
-        getSubjectProgress(userId),
-        getStudentWeaknesses(userId),
         prisma.learningHistory.findMany({
             where: { userId },
             select: {
@@ -697,21 +712,14 @@ export async function getStudentDashboardData(userId: string) {
 
     if (!student) return null;
 
-    // Derive subjects from subjectProgress to avoid duplicate query
-    // Note: Only id and name are needed by PrintProblemCard component
-    const subjects = subjectProgress.map(sp => ({
-        id: sp.subjectId,
-        name: sp.subjectName,
-    }));
-
     return {
         student,
-        stats,
+        stats: overview.stats,
         dailyActivity,
-        subjectProgress,
-        weaknesses,
+        subjectProgress: overview.subjectProgress,
+        weaknesses: overview.weaknesses,
         recentHistory,
-        subjects
+        subjects: overview.subjects,
     };
 }
 

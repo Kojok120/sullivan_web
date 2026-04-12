@@ -13,11 +13,19 @@ type ExtendedUserAchievement = UserAchievement & {
     achievement: Achievement;
 };
 
-export function AchievementOverlay() {
-    const [queue, setQueue] = useState<ExtendedUserAchievement[]>([]);
+type AchievementOverlayProps = {
+    initialQueue?: ExtendedUserAchievement[];
+};
+
+export function AchievementOverlay({ initialQueue }: AchievementOverlayProps) {
+    const [queue, setQueue] = useState<ExtendedUserAchievement[]>(() => initialQueue ?? []);
     const current = queue[0] || null;
 
     useEffect(() => {
+        if (initialQueue !== undefined) {
+            return;
+        }
+
         const checkAchievements = async () => {
             try {
                 const unseen = await getUnseenAchievements();
@@ -30,7 +38,7 @@ export function AchievementOverlay() {
         };
 
         checkAchievements();
-    }, []);
+    }, [initialQueue]);
 
     const handleClose = async () => {
         if (!current) return;
