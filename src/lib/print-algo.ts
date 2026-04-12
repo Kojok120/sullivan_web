@@ -75,7 +75,6 @@ export async function selectProblemsForPrint(
                     structuredContent: true,
                     answerSpec: true,
                     printConfig: true,
-                    gradingConfig: true,
                     assets: {
                         select: {
                             id: true,
@@ -139,7 +138,6 @@ export async function selectProblemsForPrint(
                 structuredContent: problem.publishedRevision?.structuredContent as never,
                 answerSpec: problem.publishedRevision?.answerSpec as never,
                 printConfig: problem.publishedRevision?.printConfig as never,
-                gradingConfig: problem.publishedRevision?.gradingConfig as never,
                 assets: problem.publishedRevision?.assets.map((asset) => ({
                     id: asset.id,
                     kind: asset.kind,

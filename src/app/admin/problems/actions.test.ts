@@ -16,7 +16,7 @@ const {
     parseStructuredDocumentMock,
     parseAnswerSpecMock,
     parsePrintConfigMock,
-    parseGradingConfigMock,
+    normalizeAnswerSpecForAuthoringMock,
     deriveLegacyFieldsFromStructuredDataMock,
     txProblemCreateMock,
     txProblemUpdateMock,
@@ -39,7 +39,7 @@ const {
     parseStructuredDocumentMock: vi.fn(),
     parseAnswerSpecMock: vi.fn(),
     parsePrintConfigMock: vi.fn(),
-    parseGradingConfigMock: vi.fn(),
+    normalizeAnswerSpecForAuthoringMock: vi.fn(),
     deriveLegacyFieldsFromStructuredDataMock: vi.fn(),
     txProblemCreateMock: vi.fn(),
     txProblemUpdateMock: vi.fn(),
@@ -101,8 +101,8 @@ vi.mock('@/lib/feature-flags', () => ({
 vi.mock('@/lib/structured-problem', () => ({
     buildDefaultStructuredDraft: vi.fn(),
     deriveLegacyFieldsFromStructuredData: deriveLegacyFieldsFromStructuredDataMock,
+    normalizeAnswerSpecForAuthoring: normalizeAnswerSpecForAuthoringMock,
     parseAnswerSpec: parseAnswerSpecMock,
-    parseGradingConfig: parseGradingConfigMock,
     parsePrintConfig: parsePrintConfigMock,
     parseStructuredDocument: parseStructuredDocumentMock,
 }));
@@ -111,10 +111,6 @@ vi.mock('@/lib/problem-assets', () => ({
     createProblemAssetSignedUrl: vi.fn(),
     removeProblemAssetFromStorage: vi.fn(),
     uploadProblemAssetToStorage: vi.fn(),
-}));
-
-vi.mock('@/lib/problem-grading', () => ({
-    gradeStructuredAnswer: vi.fn(),
 }));
 
 vi.mock('@/lib/problem-svg', () => ({
@@ -144,7 +140,7 @@ describe('problem actions permissions', () => {
         parseStructuredDocumentMock.mockImplementation((value) => value);
         parseAnswerSpecMock.mockImplementation((value) => value);
         parsePrintConfigMock.mockImplementation((value) => value);
-        parseGradingConfigMock.mockImplementation((value) => value);
+        normalizeAnswerSpecForAuthoringMock.mockImplementation((value) => value);
         deriveLegacyFieldsFromStructuredDataMock.mockReturnValue({
             question: '構造化問題',
             answer: '答え',
@@ -288,7 +284,6 @@ describe('problem actions permissions', () => {
             document: { blocks: [] },
             answerSpec: { kind: 'exact' },
             printConfig: {},
-            gradingConfig: { mode: 'EXACT', maxScore: 100 },
         });
 
         expect(txProblemCreateMock).toHaveBeenCalledOnce();
@@ -313,7 +308,6 @@ describe('problem actions permissions', () => {
             document: { blocks: [] },
             answerSpec: { kind: 'exact' },
             printConfig: {},
-            gradingConfig: { mode: 'EXACT', maxScore: 100 },
         });
 
         expect(txProblemUpdateMock).toHaveBeenCalledOnce();
@@ -338,7 +332,6 @@ describe('problem actions permissions', () => {
             document: { blocks: [] },
             answerSpec: { kind: 'exact' },
             printConfig: {},
-            gradingConfig: { mode: 'EXACT', maxScore: 100 },
         });
 
         expect(txProblemUpdateMock).toHaveBeenCalledOnce();

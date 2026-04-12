@@ -22,22 +22,8 @@ export const problemAdminInclude = {
     },
 } satisfies Prisma.ProblemInclude;
 
-export const problemAuditInclude = {
-    problem: {
-        select: {
-            id: true,
-            customId: true,
-            question: true,
-        },
-    },
-} satisfies Prisma.ProblemGradingAuditInclude;
-
 export type ProblemWithRelations = Prisma.ProblemGetPayload<{
     include: typeof problemAdminInclude;
-}>;
-
-export type ProblemGradingAuditWithProblem = Prisma.ProblemGradingAuditGetPayload<{
-    include: typeof problemAuditInclude;
 }>;
 
 export type RenderableProblemAsset = ProblemAsset & {

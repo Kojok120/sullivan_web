@@ -1,9 +1,4 @@
-import type {
-    AnswerSpec,
-    GradingConfig,
-    ProblemBlock,
-    StructuredProblemDocument,
-} from '@/lib/structured-problem';
+import type { ProblemBlock, StructuredProblemDocument } from '@/lib/structured-problem';
 
 export type ProblemBodyAttachmentKind = 'none' | 'upload' | 'graph' | 'geometry';
 export type ProblemBodyAttachmentBlockType = Extract<ProblemBlock['type'], 'image' | 'svg' | 'graphAsset' | 'geometryAsset'> | null;
@@ -264,7 +259,7 @@ export function deleteProblemBodySegment(
 
 export function deriveProblemTypeFromDocument(
     document: StructuredProblemDocument,
-    gradingMode: GradingConfig['mode'],
+    fallbackProblemType: string,
 ): string {
     if (document.blocks.some((block) => block.type === 'graphAsset')) {
         return 'GRAPH_DRAW';
@@ -274,102 +269,15 @@ export function deriveProblemTypeFromDocument(
         return 'GEOMETRY';
     }
 
-    switch (gradingMode) {
-        case 'CHOICE':
-            return 'MULTIPLE_CHOICE';
-        case 'MULTI_BLANK':
-            return 'MULTI_BLANK';
-        case 'FORMULA':
-            return 'FORMULA_FINAL';
-        case 'NUMERIC_TOLERANCE':
-            return 'NUMERIC';
-        case 'AI_RUBRIC':
-        case 'AI_VISION_RUBRIC':
-            return 'SHORT_EXPLANATION';
-        default:
-            return 'SHORT_TEXT';
-    }
-}
-
-export function getAnswerKindForGradingMode(mode: GradingConfig['mode']): AnswerSpec['kind'] {
-    switch (mode) {
-        case 'NUMERIC_TOLERANCE':
-            return 'numeric';
-        case 'CHOICE':
-            return 'choice';
-        case 'MULTI_BLANK':
-            return 'multiBlank';
-        case 'FORMULA':
-            return 'formula';
-        case 'AI_RUBRIC':
-            return 'rubric';
-        case 'AI_VISION_RUBRIC':
-            return 'visionRubric';
-        default:
-            return 'exact';
-    }
-}
-
-export function syncAnswerSpecWithGradingMode(
-    answerSpec: AnswerSpec,
-    gradingMode: GradingConfig['mode'],
-): AnswerSpec {
-    const targetKind = getAnswerKindForGradingMode(gradingMode);
-
-    if (answerSpec.kind === targetKind) {
-        return answerSpec;
+    if (document.blocks.some((block) => block.type === 'choices')) {
+        return 'MULTIPLE_CHOICE';
     }
 
-    switch (targetKind) {
-        case 'numeric':
-            return {
-                kind: 'numeric',
-                correctAnswer: 'correctAnswer' in answerSpec ? answerSpec.correctAnswer : '',
-                acceptedAnswers: 'acceptedAnswers' in answerSpec ? answerSpec.acceptedAnswers : [],
-                tolerance: answerSpec.kind === 'numeric' ? answerSpec.tolerance : 0,
-                unit: answerSpec.kind === 'numeric' ? answerSpec.unit ?? '' : '',
-            };
-        case 'choice':
-            return {
-                kind: 'choice',
-                correctChoiceId: answerSpec.kind === 'choice' ? answerSpec.correctChoiceId : 'A',
-            };
-        case 'multiBlank':
-            return {
-                kind: 'multiBlank',
-                blanks: answerSpec.kind === 'multiBlank'
-                    ? answerSpec.blanks
-                    : [{ id: 'blank-1', correctAnswer: '', acceptedAnswers: [] }],
-            };
-        case 'formula':
-            return {
-                kind: 'formula',
-                correctAnswer: 'correctAnswer' in answerSpec ? answerSpec.correctAnswer : '',
-                acceptedAnswers: 'acceptedAnswers' in answerSpec ? answerSpec.acceptedAnswers : [],
-            };
-        case 'rubric':
-            return {
-                kind: 'rubric',
-                modelAnswer: 'modelAnswer' in answerSpec ? answerSpec.modelAnswer ?? '' : '',
-                rubric: 'rubric' in answerSpec ? answerSpec.rubric : '',
-                criteria: 'criteria' in answerSpec ? answerSpec.criteria : [],
-            };
-        case 'visionRubric':
-            return {
-                kind: 'visionRubric',
-                modelAnswer: 'modelAnswer' in answerSpec ? answerSpec.modelAnswer ?? '' : '',
-                rubric: 'rubric' in answerSpec ? answerSpec.rubric : '',
-                criteria: 'criteria' in answerSpec ? answerSpec.criteria : [],
-                expectedElements: answerSpec.kind === 'visionRubric' ? answerSpec.expectedElements : [],
-            };
-        case 'exact':
-        default:
-            return {
-                kind: 'exact',
-                correctAnswer: 'correctAnswer' in answerSpec ? answerSpec.correctAnswer : '',
-                acceptedAnswers: 'acceptedAnswers' in answerSpec ? answerSpec.acceptedAnswers : [],
-            };
+    if (document.blocks.some((block) => block.type === 'blankGroup')) {
+        return 'MULTI_BLANK';
     }
+
+    return fallbackProblemType || 'SHORT_TEXT';
 }
 
 export function isVisualAttachmentKind(kind: ProblemBodyAttachmentKind) {

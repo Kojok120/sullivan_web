@@ -64,16 +64,6 @@ export const ANSWER_KIND_OPTIONS = [
     { value: 'visionRubric', label: '図や記述の評価' },
 ] as const satisfies ReadonlyArray<Option<string>>;
 
-export const GRADING_MODE_OPTIONS = [
-    { value: 'EXACT', label: '完全一致で採点' },
-    { value: 'NUMERIC_TOLERANCE', label: '数値の誤差を許容' },
-    { value: 'CHOICE', label: '選択肢で採点' },
-    { value: 'MULTI_BLANK', label: '空欄ごとに採点' },
-    { value: 'FORMULA', label: '式として採点' },
-    { value: 'AI_RUBRIC', label: 'AIで記述採点' },
-    { value: 'AI_VISION_RUBRIC', label: 'AIで図や記述を採点' },
-] as const satisfies ReadonlyArray<Option<string>>;
-
 export const ASSET_KIND_OPTIONS = [
     { value: 'IMAGE', label: '画像' },
     { value: 'SVG', label: 'SVG図版' },
@@ -117,10 +107,6 @@ export function getBlockTypeLabel(value: string | null | undefined) {
 
 export function getAnswerKindLabel(value: string | null | undefined) {
     return getOptionLabel(ANSWER_KIND_OPTIONS, value);
-}
-
-export function getGradingModeLabel(value: string | null | undefined) {
-    return getOptionLabel(GRADING_MODE_OPTIONS, value);
 }
 
 export function getAssetKindLabel(value: string | null | undefined) {

@@ -6,7 +6,6 @@ import {
     getProblemBodyCardAuthoringTool,
     hasEmptyProblemBodyCard,
     parseProblemBodySegments,
-    syncAnswerSpecWithGradingMode,
     updateProblemBodyCard,
 } from './problem-editor-model';
 
@@ -98,26 +97,31 @@ describe('problem-editor-model', () => {
         ]);
     });
 
-    it('grading mode と答え種類を同期し、graph/geometry を優先して problemType を決める', () => {
-        expect(syncAnswerSpecWithGradingMode(
-            { kind: 'exact', correctAnswer: '3', acceptedAnswers: [] },
-            'NUMERIC_TOLERANCE',
-        )).toMatchObject({
-            kind: 'numeric',
-            correctAnswer: '3',
-            acceptedAnswers: [],
-            tolerance: 0,
-        });
-
+    it('図版や選択肢など明白な構造だけで problemType を補正し、それ以外は既存値を保つ', () => {
         expect(deriveProblemTypeFromDocument({
             version: 1,
             blocks: [{ id: 'g1', type: 'graphAsset', assetId: 'asset-1' }],
-        }, 'EXACT')).toBe('GRAPH_DRAW');
+        }, 'SHORT_TEXT')).toBe('GRAPH_DRAW');
 
         expect(deriveProblemTypeFromDocument({
             version: 1,
             blocks: [{ id: 'geom1', type: 'geometryAsset', assetId: 'asset-2' }],
-        }, 'FORMULA')).toBe('GEOMETRY');
+        }, 'SHORT_TEXT')).toBe('GEOMETRY');
+
+        expect(deriveProblemTypeFromDocument({
+            version: 1,
+            blocks: [{ id: 'choice-1', type: 'choices', options: [{ id: 'A', label: '1' }, { id: 'B', label: '2' }] }],
+        }, 'SHORT_TEXT')).toBe('MULTIPLE_CHOICE');
+
+        expect(deriveProblemTypeFromDocument({
+            version: 1,
+            blocks: [{ id: 'blank-1', type: 'blankGroup', blanks: [{ id: 'b1', label: '空欄1' }] }],
+        }, 'SHORT_TEXT')).toBe('MULTI_BLANK');
+
+        expect(deriveProblemTypeFromDocument({
+            version: 1,
+            blocks: [{ id: 'p1', type: 'paragraph', text: '説明しなさい。' }],
+        }, 'SHORT_EXPLANATION')).toBe('SHORT_EXPLANATION');
     });
 
     it('本文も添付もないカードを検出する', () => {

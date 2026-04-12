@@ -52,7 +52,6 @@ model Problem {
   coreProblems         CoreProblem[]
   publishedRevision    ProblemRevision?      @relation("PublishedProblemRevision", fields: [publishedRevisionId], references: [id], onDelete: SetNull)
   revisions            ProblemRevision[]     @relation("ProblemRevisions")
-  gradingAudits        ProblemGradingAudit[]
   order                Int // Chain order
   videoUrl             String? // For C/D feedback
   histories            LearningHistory[]
@@ -114,16 +113,6 @@ enum PrintTemplate {
   EXPLANATION
 }
 
-enum GradingMode {
-  EXACT
-  NUMERIC_TOLERANCE
-  CHOICE
-  MULTI_BLANK
-  FORMULA
-  AI_RUBRIC
-  AI_VISION_RUBRIC
-}
-
 enum ProblemAssetKind {
   IMAGE
   SVG
@@ -134,13 +123,6 @@ enum ProblemAssetKind {
   THUMBNAIL
 }
 
-enum ProblemGraderType {
-  DETERMINISTIC
-  AI
-  AI_VISION
-  MANUAL_OVERRIDE
-}
-
 model ProblemRevision {
   id                  String                @id @default(cuid())
   problemId           String
@@ -149,7 +131,6 @@ model ProblemRevision {
   structuredContent   Json?
   answerSpec          Json?
   printConfig         Json?
-  gradingConfig       Json?
   generationContext   Json?
   authoringTool       ProblemAuthoringTool  @default(MANUAL)
   authoringState      Json?
@@ -161,7 +142,6 @@ model ProblemRevision {
   publishedForProblem Problem?              @relation("PublishedProblemRevision")
   assets              ProblemAsset[]
   histories           LearningHistory[]
-  gradingAudits       ProblemGradingAudit[]
 
   @@unique([problemId, revisionNumber])
   @@index([problemId, status, revisionNumber])
@@ -350,35 +330,6 @@ model LearningHistory {
   @@index([groupId, userId, id])
   @@index([userId, groupId, isStudentReviewed])
   @@index([userId, groupId, answeredAt(sort: Desc)])
-}
-
-model ProblemGradingAudit {
-  id                String            @id @default(cuid())
-  problemId         String
-  problemRevisionId String?
-  learningHistoryId String?
-  gradingMode       GradingMode
-  graderType        ProblemGraderType
-  source            String
-  score             Float
-  maxScore          Float             @default(100)
-  confidence        Float?
-  reason            String?
-  modelVersion      String?
-  promptVersion     String?
-  rawResponseDigest String?
-  payload           Json?
-  overrideScore     Float?
-  overrideReason    String?
-  overrideByUserId  String?
-  overriddenAt      DateTime?
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  problem           Problem           @relation(fields: [problemId], references: [id], onDelete: Cascade)
-  problemRevision   ProblemRevision?  @relation(fields: [problemRevisionId], references: [id], onDelete: SetNull)
-
-  @@index([problemId, createdAt(sort: Desc)])
-  @@index([learningHistoryId])
 }
 
 model VocabularyGameScore {

@@ -102,26 +102,6 @@ export async function uploadProblemAssetToStorage(input: {
     });
 }
 
-export async function uploadProblemAssetContentToStorage(input: {
-    problemId: string;
-    revisionId: string;
-    fileName: string;
-    contentType: string;
-    content: string | Buffer;
-}) {
-    const buffer = typeof input.content === 'string'
-        ? Buffer.from(input.content, 'utf8')
-        : input.content;
-
-    return uploadProblemAssetBufferToStorage({
-        problemId: input.problemId,
-        revisionId: input.revisionId,
-        fileName: input.fileName,
-        contentType: input.contentType,
-        buffer,
-    });
-}
-
 export async function removeProblemAssetFromStorage(storageKey: string | null | undefined) {
     if (!storageKey) return;
 
@@ -150,4 +130,20 @@ export async function createProblemAssetSignedUrl(storageKey: string, expiresIn 
     }
 
     return data.signedUrl;
+}
+
+export async function downloadProblemAssetFromStorage(storageKey: string): Promise<Buffer | null> {
+    const admin = createAdminClient();
+    const bucket = getProblemAssetBucketName();
+    const { data, error } = await admin.storage.from(bucket).download(storageKey);
+
+    if (error) {
+        console.warn('[problem-assets] Storage ダウンロードに失敗しました', {
+            storageKey,
+            message: error.message,
+        });
+        return null;
+    }
+
+    return Buffer.from(await data.arrayBuffer());
 }

@@ -5,8 +5,7 @@ import "./globals.css";
 import 'katex/dist/katex.min.css';
 import { Toaster } from "@/components/ui/sonner";
 import { MainNav } from "@/components/main-nav";
-import { GradingNotifier } from "@/components/grading-notifier";
-import { LevelUpModal } from "@/components/gamification/level-up-modal";
+import { StudentRealtimeEvents } from "@/components/student-realtime-events";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -43,10 +42,7 @@ export default async function RootLayout({
         <MainNav role={session?.role} />
         {children}
         {session && session.role === 'STUDENT' && (
-          <>
-            <GradingNotifier />
-            <LevelUpModal />
-          </>
+          <StudentRealtimeEvents />
         )}
         <Toaster />
       </body>

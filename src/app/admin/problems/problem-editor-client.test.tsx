@@ -26,10 +26,8 @@ vi.mock('./actions', () => ({
     createProblemDraft: vi.fn(),
     deleteProblemAsset: vi.fn(),
     generateProblemFigureDraft: vi.fn(),
-    overrideProblemGradingAudit: vi.fn(),
     previewProblemPrint: vi.fn(),
     publishProblemRevision: vi.fn(),
-    simulateProblemGrading: vi.fn(),
     syncProblemAuthoringArtifacts: vi.fn(),
     uploadProblemAsset: vi.fn(),
 }));
@@ -75,7 +73,6 @@ const baseProblem = {
         },
         answerSpec: { kind: 'exact', correctAnswer: '', acceptedAnswers: [] },
         printConfig: { template: 'STANDARD', estimatedHeight: 'MEDIUM', answerMode: 'INLINE', answerLines: 3, showQrOnFirstPage: true },
-        gradingConfig: { mode: 'EXACT', maxScore: 100 },
         generationContext: null,
         assets: [],
     }],
@@ -90,7 +87,6 @@ describe('ProblemEditorClient', () => {
         render(
             <ProblemEditorClient
                 problem={null}
-                audits={[]}
                 subjects={[{ id: 'subject-1', name: '英語' }]}
                 coreProblems={[{ id: 'core-1', name: '現在完了', subjectId: 'subject-1', subject: { name: '英語' } }]}
                 initialSubjectId="subject-1"
@@ -105,19 +101,35 @@ describe('ProblemEditorClient', () => {
         render(
             <ProblemEditorClient
                 problem={baseProblem as never}
-                audits={[]}
                 subjects={[{ id: 'subject-1', name: '英語' }]}
                 coreProblems={[{ id: 'core-1', name: '現在完了', subjectId: 'subject-1', subject: { name: '英語' } }]}
                 initialSubjectId="subject-1"
             />,
         );
 
-        fireEvent.click(screen.getByRole('tab', { name: '本文' }));
+        fireEvent.mouseDown(screen.getByRole('tab', { name: '本文' }), { button: 0 });
 
         expect(screen.queryByText('図版表示確認')).not.toBeInTheDocument();
         expect(screen.queryByText('補足説明')).not.toBeInTheDocument();
         expect(screen.queryByText('state を再同期')).not.toBeInTheDocument();
         expect(screen.queryByText('全体表示に合わせる')).not.toBeInTheDocument();
         expect(screen.queryByText('SVG 書き出しテスト')).not.toBeInTheDocument();
+    });
+
+    it('採点タブを表示せず、解答仕様だけを編集できる', () => {
+        render(
+            <ProblemEditorClient
+                problem={baseProblem as never}
+                subjects={[{ id: 'subject-1', name: '英語' }]}
+                coreProblems={[{ id: 'core-1', name: '現在完了', subjectId: 'subject-1', subject: { name: '英語' } }]}
+                initialSubjectId="subject-1"
+            />,
+        );
+
+        fireEvent.mouseDown(screen.getByRole('tab', { name: '解答仕様' }), { button: 0 });
+        expect(screen.getByText('正解')).toBeInTheDocument();
+        expect(screen.getByText('別解(JSON)')).toBeInTheDocument();
+        expect(screen.queryByRole('tab', { name: '採点' })).not.toBeInTheDocument();
+        expect(screen.queryByText('採点監査')).not.toBeInTheDocument();
     });
 });

@@ -27,9 +27,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { TeXHelpLink } from '@/components/problem-authoring/tex-help-link';
 import {
     buildDefaultStructuredDraft,
+    normalizeAnswerSpecForAuthoring,
     parseStructuredDocument,
     type AnswerSpec,
-    type GradingConfig,
     type PrintConfig,
     type ProblemBlock,
     type StructuredProblemDocument,
@@ -40,15 +40,13 @@ import {
     renderSvgSceneSpec,
     type ProblemFigureSceneSpec,
 } from '@/lib/problem-figure-scene';
-import type { ProblemGradingAuditWithProblem, RenderableProblemAsset, RenderableProblemWithRelations } from './types';
+import type { RenderableProblemAsset, RenderableProblemWithRelations } from './types';
 import {
     createProblemDraft,
     deleteProblemAsset,
     generateProblemFigureDraft,
-    overrideProblemGradingAudit,
     previewProblemPrint,
     publishProblemRevision,
-    simulateProblemGrading,
     syncProblemAuthoringArtifacts,
     uploadProblemAsset,
 } from './actions';
@@ -69,7 +67,6 @@ import {
     isVisualAttachmentKind,
     moveProblemBodySegment,
     parseProblemBodySegments,
-    syncAnswerSpecWithGradingMode,
     updateProblemBodyCard,
     type ProblemBodyAttachmentBlockType,
     type ProblemBodyAttachmentKind,
@@ -78,7 +75,6 @@ import {
 
 type EditorProps = {
     problem: RenderableProblemWithRelations | null;
-    audits: ProblemGradingAuditWithProblem[];
     subjects: ProblemEditorSubjectOption[];
     coreProblems: ProblemEditorCoreProblemOption[];
     initialSubjectId?: string | null;
@@ -96,7 +92,6 @@ type EditorState = {
     document: StructuredProblemDocument;
     answerSpec: AnswerSpec;
     printConfig: PrintConfig;
-    gradingConfig: GradingConfig;
     generationExtraPrompt: string;
     authoringStateText: string;
 };
@@ -136,9 +131,8 @@ function buildInitialState(problem: RenderableProblemWithRelations | null, initi
     const structuredContent = draftRevision?.structuredContent
         ? parseStructuredDocument(draftRevision.structuredContent)
         : base.document;
-    const answerSpec = (draftRevision?.answerSpec as AnswerSpec | null) ?? base.answerSpec;
+    const answerSpec = normalizeAnswerSpecForAuthoring((draftRevision?.answerSpec as AnswerSpec | null) ?? base.answerSpec);
     const printConfig = (draftRevision?.printConfig as PrintConfig | null) ?? base.printConfig;
-    const gradingConfig = (draftRevision?.gradingConfig as GradingConfig | null) ?? base.gradingConfig;
     const generationContext = parseProblemFigureGenerationContext(draftRevision?.generationContext);
     const initialProblemType = problem?.problemType ?? 'SHORT_TEXT';
     const normalizedAuthoringTool = normalizeAuthoringTool(draftRevision?.authoringTool);
@@ -155,7 +149,6 @@ function buildInitialState(problem: RenderableProblemWithRelations | null, initi
         document: structuredContent,
         answerSpec,
         printConfig,
-        gradingConfig,
         generationExtraPrompt: generationContext?.extraPrompt ?? '',
         authoringStateText: draftRevision?.authoringState ? JSON.stringify(draftRevision.authoringState, null, 2) : '',
     };
@@ -179,7 +172,6 @@ function validateEditorState(state: Pick<EditorState, 'subjectId' | 'coreProblem
 
 export function ProblemEditorClient({
     problem,
-    audits,
     subjects,
     coreProblems,
     initialSubjectId = null,
@@ -194,8 +186,6 @@ export function ProblemEditorClient({
     const [assetInlineContent, setAssetInlineContent] = useState('');
     const [assetSourceTool, setAssetSourceTool] = useState<(typeof ASSET_SOURCE_TOOLS)[number]>('UPLOAD');
     const [assetFile, setAssetFile] = useState<File | null>(null);
-    const [simulationAnswer, setSimulationAnswer] = useState('');
-    const [simulationResult, setSimulationResult] = useState<Awaited<ReturnType<typeof simulateProblemGrading>> | null>(null);
     const [generationDiagnostic, setGenerationDiagnostic] = useState<string | null>(null);
     const [activeVisualCardId, setActiveVisualCardId] = useState<string | null>(null);
     const [uploadingCardId, setUploadingCardId] = useState<string | null>(null);
@@ -214,17 +204,13 @@ export function ProblemEditorClient({
         [bodySegments],
     );
     const effectiveProblemType = useMemo(
-        () => deriveProblemTypeFromDocument(state.document, state.gradingConfig.mode),
-        [state.document, state.gradingConfig.mode],
+        () => deriveProblemTypeFromDocument(state.document, state.problemType),
+        [state.document, state.problemType],
     );
     const syncedAnswerSpec = useMemo(
-        () => syncAnswerSpecWithGradingMode(state.answerSpec, state.gradingConfig.mode),
-        [state.answerSpec, state.gradingConfig.mode],
+        () => normalizeAnswerSpecForAuthoring(state.answerSpec),
+        [state.answerSpec],
     );
-    const currentChoiceOptions = useMemo(() => {
-        const choiceBlock = state.document.blocks.find((block) => block.type === 'choices');
-        return choiceBlock?.type === 'choices' ? choiceBlock.options : [];
-    }, [state.document.blocks]);
     const visualCards = useMemo(
         () => bodyCards.filter((card) => isVisualAttachmentKind(card.attachmentKind)),
         [bodyCards],
@@ -317,7 +303,7 @@ export function ProblemEditorClient({
                 ? JSON.parse(state.authoringStateText)
                 : undefined;
             let vendorPayload: VendorSyncPayload | null = null;
-            const normalizedAnswerSpec = syncAnswerSpecWithGradingMode(state.answerSpec, state.gradingConfig.mode);
+            const normalizedAnswerSpec = normalizeAnswerSpecForAuthoring(state.answerSpec);
 
             if (activeVisualCard && activeVisualAuthoringTool === 'GEOGEBRA') {
                 if (!vendorSyncHandlerRef.current) {
@@ -341,7 +327,6 @@ export function ProblemEditorClient({
                 document: workingDocument,
                 answerSpec: normalizedAnswerSpec,
                 printConfig: state.printConfig,
-                gradingConfig: state.gradingConfig,
             });
 
             if (!result.success) {
@@ -397,7 +382,6 @@ export function ProblemEditorClient({
                             document: workingDocument,
                             answerSpec: normalizedAnswerSpec,
                             printConfig: state.printConfig,
-                            gradingConfig: state.gradingConfig,
                         });
 
                         if (!result.success) {
@@ -557,7 +541,7 @@ export function ProblemEditorClient({
 
                 const saveResult = await createProblemDraft({
                     problemId: result.problemId,
-                    problemType: deriveProblemTypeFromDocument(nextDocument, state.gradingConfig.mode),
+                    problemType: deriveProblemTypeFromDocument(nextDocument, state.problemType),
                     grade: state.grade || undefined,
                     videoUrl: state.videoUrl || undefined,
                     coreProblemIds: state.coreProblems.map((coreProblem) => coreProblem.id),
@@ -566,9 +550,8 @@ export function ProblemEditorClient({
                         ? undefined
                         : JSON.parse(nextAuthoringStateText),
                     document: nextDocument,
-                    answerSpec: syncAnswerSpecWithGradingMode(state.answerSpec, state.gradingConfig.mode),
+                    answerSpec: normalizeAnswerSpecForAuthoring(state.answerSpec),
                     printConfig: state.printConfig,
-                    gradingConfig: state.gradingConfig,
                 });
 
                 if (!saveResult.success) {
@@ -581,8 +564,8 @@ export function ProblemEditorClient({
                     ...current,
                     problemId: saveResult.problemId || result.problemId,
                     revisionId: saveResult.revisionId || result.revisionId,
-                    problemType: deriveProblemTypeFromDocument(nextDocument, current.gradingConfig.mode),
-                    answerSpec: syncAnswerSpecWithGradingMode(current.answerSpec, current.gradingConfig.mode),
+                    problemType: deriveProblemTypeFromDocument(nextDocument, current.problemType),
+                    answerSpec: normalizeAnswerSpecForAuthoring(current.answerSpec),
                     document: nextDocument,
                     authoringStateText: nextAuthoringStateText,
                     authoringTool: result.targetTool,
@@ -672,50 +655,13 @@ export function ProblemEditorClient({
         });
     };
 
-    const handleSimulate = () => {
-        if (!state.problemId) {
-            toast.error('先に保存してください');
-            return;
-        }
-        startTransition(async () => {
-            const result = await simulateProblemGrading({
-                problemId: state.problemId,
-                revisionId: state.revisionId || undefined,
-                studentAnswer: simulationAnswer,
-            });
-            setSimulationResult(result);
-            if (result.success) {
-                toast.success('採点シミュレーションを実行しました');
-                router.refresh();
-            } else {
-                toast.error(result.error || '採点シミュレーションに失敗しました');
-            }
-        });
-    };
-
-    const handleOverrideAudit = (auditId: string, score: number, reason: string) => {
-        startTransition(async () => {
-            const result = await overrideProblemGradingAudit({
-                auditId,
-                overrideScore: score,
-                overrideReason: reason,
-            });
-            if (result.success) {
-                toast.success('監査を更新しました');
-                router.refresh();
-            } else {
-                toast.error(result.error || '監査更新に失敗しました');
-            }
-        });
-    };
-
     return (
         <div className="space-y-6">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                     <h1 className="text-2xl font-bold">構造化問題エディタ</h1>
                     <p className="text-sm text-muted-foreground">
-                        理科・数学向けの revision / asset / grading 一体型エディタです。
+                        理科・数学向けの revision / asset 一体型エディタです。
                     </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -747,7 +693,6 @@ export function ProblemEditorClient({
                     <TabsTrigger value="basic">基本情報</TabsTrigger>
                     <TabsTrigger value="body">本文</TabsTrigger>
                     <TabsTrigger value="answer">解答仕様</TabsTrigger>
-                    <TabsTrigger value="grading">採点</TabsTrigger>
                     <TabsTrigger value="assets">アセット</TabsTrigger>
                     <TabsTrigger value="history">改訂履歴</TabsTrigger>
                 </TabsList>
@@ -908,80 +853,13 @@ export function ProblemEditorClient({
                     <Card>
                         <CardHeader>
                             <CardTitle>解答仕様</CardTitle>
-                            <CardDescription>採点方式に応じて必要な解答情報だけを設定します。</CardDescription>
+                            <CardDescription>AI採点の基準になる正解と別解を設定します。</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <AnswerSpecEditor
                                 value={syncedAnswerSpec}
-                                choiceOptions={currentChoiceOptions}
                                 onChange={(next) => setState((current) => ({ ...current, answerSpec: next }))}
                             />
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-
-                <TabsContent value="grading">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>採点</CardTitle>
-                            <CardDescription>決定論採点か AI rubric かを設定し、テキスト回答でシミュレーションします。</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="grid gap-4 md:grid-cols-2">
-                                <div className="space-y-2">
-                                    <Label>採点モード</Label>
-                                    <EnumSelect
-                                        value={state.gradingConfig.mode}
-                                        values={['EXACT', 'NUMERIC_TOLERANCE', 'CHOICE', 'MULTI_BLANK', 'FORMULA', 'AI_RUBRIC', 'AI_VISION_RUBRIC']}
-                                        onChange={(value) => setState((current) => ({
-                                            ...current,
-                                            gradingConfig: { ...current.gradingConfig, mode: value as GradingConfig['mode'] },
-                                            answerSpec: syncAnswerSpecWithGradingMode(current.answerSpec, value as GradingConfig['mode']),
-                                        }))}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>満点</Label>
-                                    <Input
-                                        type="number"
-                                        value={state.gradingConfig.maxScore}
-                                        onChange={(event) => setState((current) => ({
-                                            ...current,
-                                            gradingConfig: { ...current.gradingConfig, maxScore: Number.parseInt(event.target.value || '100', 10) || 100 },
-                                        }))}
-                                    />
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <Label>rubricPrompt</Label>
-                                <Textarea
-                                    value={state.gradingConfig.rubricPrompt ?? ''}
-                                    onChange={(event) => setState((current) => ({
-                                        ...current,
-                                        gradingConfig: { ...current.gradingConfig, rubricPrompt: event.target.value },
-                                    }))}
-                                    rows={4}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label>採点シミュレーション用の回答</Label>
-                                <Textarea value={simulationAnswer} onChange={(event) => setSimulationAnswer(event.target.value)} rows={5} />
-                            </div>
-                            <Button variant="outline" onClick={handleSimulate} disabled={isPending || !state.problemId}>
-                                採点シミュレーション
-                            </Button>
-                            {simulationResult?.success && (
-                                <Alert>
-                                    <AlertTitle>採点結果</AlertTitle>
-                                    <AlertDescription className="space-y-1">
-                                        <div>評価: {simulationResult.result.evaluation}</div>
-                                        <div>スコア: {simulationResult.result.score} / {simulationResult.result.maxScore}</div>
-                                        <div>信頼度: {simulationResult.result.confidence}</div>
-                                        <div>理由: {simulationResult.result.reason}</div>
-                                        <div>フィードバック: {simulationResult.result.feedback}</div>
-                                    </AlertDescription>
-                                </Alert>
-                            )}
                         </CardContent>
                     </Card>
                 </TabsContent>
@@ -1046,44 +924,28 @@ export function ProblemEditorClient({
                 </TabsContent>
 
                 <TabsContent value="history">
-                    <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>改訂履歴</CardTitle>
-                                <CardDescription>draft / published / superseded の revision を確認します。</CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-3">
-                                {problem?.revisions.length ? problem.revisions.map((revision) => (
-                                    <div key={revision.id} className="rounded-lg border p-4">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <Badge>{revision.status}</Badge>
-                                            <Badge variant="secondary">rev.{revision.revisionNumber}</Badge>
-                                            {revision.id === state.revisionId && <Badge variant="outline">編集中</Badge>}
-                                        </div>
-                                        <div className="mt-2 text-sm text-muted-foreground">
-                                            {new Date(revision.updatedAt).toLocaleString('ja-JP')}
-                                        </div>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>改訂履歴</CardTitle>
+                            <CardDescription>draft / published / superseded の revision を確認します。</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            {problem?.revisions.length ? problem.revisions.map((revision) => (
+                                <div key={revision.id} className="rounded-lg border p-4">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <Badge>{revision.status}</Badge>
+                                        <Badge variant="secondary">rev.{revision.revisionNumber}</Badge>
+                                        {revision.id === state.revisionId && <Badge variant="outline">編集中</Badge>}
                                     </div>
-                                )) : (
-                                    <div className="text-sm text-muted-foreground">revision はまだありません。</div>
-                                )}
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>採点監査</CardTitle>
-                                <CardDescription>直近の simulation / grading audit を確認し、必要なら上書きします。</CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                {audits.length === 0 ? (
-                                    <div className="text-sm text-muted-foreground">監査履歴はありません。</div>
-                                ) : audits.map((audit) => (
-                                    <AuditCard key={audit.id} audit={audit} onOverride={handleOverrideAudit} />
-                                ))}
-                            </CardContent>
-                        </Card>
-                    </div>
+                                    <div className="mt-2 text-sm text-muted-foreground">
+                                        {new Date(revision.updatedAt).toLocaleString('ja-JP')}
+                                    </div>
+                                </div>
+                            )) : (
+                                <div className="text-sm text-muted-foreground">revision はまだありません。</div>
+                            )}
+                        </CardContent>
+                    </Card>
                 </TabsContent>
             </Tabs>
         </div>
@@ -1474,135 +1336,33 @@ function BlockEditor({
 
 function AnswerSpecEditor({
     value,
-    choiceOptions,
     onChange,
 }: {
     value: AnswerSpec;
-    choiceOptions: Array<{ id: string; label: string }>;
     onChange: (next: AnswerSpec) => void;
 }) {
-    const kind = value.kind;
-    const update = (patch: Partial<AnswerSpec>) => onChange({ ...value, ...patch } as AnswerSpec);
+    const exactValue = normalizeAnswerSpecForAuthoring(value);
+    const update = (patch: Partial<typeof exactValue>) => onChange({ ...exactValue, ...patch });
 
     return (
         <div className="space-y-4">
-            {(kind === 'exact' || kind === 'numeric' || kind === 'formula') && (
-                <div className="space-y-3">
-                    <div className="space-y-2">
-                        <Label>correctAnswer</Label>
-                        <Input value={String(value.correctAnswer ?? '')} onChange={(event) => update({ correctAnswer: event.target.value })} />
-                    </div>
-                    <div className="space-y-2">
-                        <Label>acceptedAnswers(JSON)</Label>
-                        <Textarea
-                            value={JSON.stringify(value.acceptedAnswers ?? [], null, 2)}
-                            onChange={(event) => update({ acceptedAnswers: safeJsonArray(event.target.value) })}
-                            rows={4}
-                        />
-                    </div>
-                    {kind === 'numeric' && (
-                        <div className="grid gap-4 md:grid-cols-2">
-                            <div className="space-y-2">
-                                <Label>tolerance</Label>
-                                <Input type="number" value={Number(value.tolerance ?? 0)} onChange={(event) => update({ tolerance: Number.parseFloat(event.target.value || '0') || 0 })} />
-                            </div>
-                            <div className="space-y-2">
-                                <Label>unit</Label>
-                                <Input value={String(value.unit ?? '')} onChange={(event) => update({ unit: event.target.value })} />
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {kind === 'choice' && (
+            <div className="space-y-3">
                 <div className="space-y-2">
-                    <Label>correctChoiceId</Label>
-                    <Select value={value.correctChoiceId} onValueChange={(correctChoiceId) => onChange({ ...value, correctChoiceId })}>
-                        <SelectTrigger><SelectValue placeholder="選択肢を選ぶ" /></SelectTrigger>
-                        <SelectContent>
-                            {choiceOptions.map((option) => (
-                                <SelectItem key={option.id} value={option.id}>
-                                    {option.id} / {option.label || '未入力'}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-            )}
-
-            {kind === 'multiBlank' && (
-                <div className="space-y-2">
-                    <Label>blanks(JSON)</Label>
+                    <Label>正解</Label>
                     <Textarea
-                        value={JSON.stringify(value.blanks ?? [], null, 2)}
-                        onChange={(event) => update({ blanks: safeJsonArrayOfObjects(event.target.value, [{ id: 'blank-1', correctAnswer: '', acceptedAnswers: [] }]) })}
-                        rows={8}
+                        value={exactValue.correctAnswer}
+                        onChange={(event) => update({ correctAnswer: event.target.value })}
+                        rows={4}
                     />
                 </div>
-            )}
-
-            {(kind === 'rubric' || kind === 'visionRubric') && (
-                <div className="space-y-3">
-                    <div className="space-y-2">
-                        <Label>modelAnswer</Label>
-                        <Textarea value={String(value.modelAnswer ?? '')} onChange={(event) => update({ modelAnswer: event.target.value })} rows={4} />
-                    </div>
-                    <div className="space-y-2">
-                        <Label>rubric</Label>
-                        <Textarea value={String(value.rubric ?? '')} onChange={(event) => update({ rubric: event.target.value })} rows={4} />
-                    </div>
-                    <div className="space-y-2">
-                        <Label>criteria(JSON)</Label>
-                        <Textarea
-                            value={JSON.stringify(value.criteria ?? [], null, 2)}
-                            onChange={(event) => update({ criteria: safeJsonArrayOfObjects(event.target.value, [{ id: 'criterion-1', label: '観点', description: '説明', maxPoints: 50 }]) })}
-                            rows={8}
-                        />
-                    </div>
-                    {kind === 'visionRubric' && (
-                        <div className="space-y-2">
-                            <Label>expectedElements(JSON)</Label>
-                            <Textarea
-                                value={JSON.stringify(value.expectedElements ?? [], null, 2)}
-                                onChange={(event) => update({ expectedElements: safeJsonArray(event.target.value) })}
-                                rows={4}
-                            />
-                        </div>
-                    )}
+                <div className="space-y-2">
+                    <Label>別解(JSON)</Label>
+                    <Textarea
+                        value={JSON.stringify(exactValue.acceptedAnswers ?? [], null, 2)}
+                        onChange={(event) => update({ acceptedAnswers: safeJsonArray(event.target.value) })}
+                        rows={4}
+                    />
                 </div>
-            )}
-        </div>
-    );
-}
-
-function AuditCard({
-    audit,
-    onOverride,
-}: {
-    audit: ProblemGradingAuditWithProblem;
-    onOverride: (auditId: string, score: number, reason: string) => void;
-}) {
-    const [score, setScore] = useState(audit.overrideScore ?? audit.score);
-    const [reason, setReason] = useState(audit.overrideReason ?? '');
-
-    return (
-        <div className="rounded-lg border p-4">
-            <div className="flex flex-wrap items-center gap-2">
-                <Badge>{audit.gradingMode}</Badge>
-                <Badge variant="secondary">{audit.graderType}</Badge>
-                <Badge variant="outline">{audit.source}</Badge>
-            </div>
-            <div className="mt-2 text-sm text-muted-foreground">
-                score: {audit.score} / {audit.maxScore} {audit.confidence !== null ? `(confidence: ${audit.confidence})` : ''}
-            </div>
-            {audit.reason && <div className="mt-2 text-sm">{audit.reason}</div>}
-            <div className="mt-3 space-y-2">
-                <Input type="number" value={score} onChange={(event) => setScore(Number.parseFloat(event.target.value || '0') || 0)} />
-                <Textarea value={reason} onChange={(event) => setReason(event.target.value)} rows={3} placeholder="override reason" />
-                <Button variant="outline" onClick={() => onOverride(audit.id, score, reason)}>
-                    上書き保存
-                </Button>
             </div>
         </div>
     );

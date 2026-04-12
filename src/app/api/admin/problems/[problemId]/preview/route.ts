@@ -66,7 +66,6 @@ export async function GET(
         structuredContent: revision.structuredContent as never,
         answerSpec: revision.answerSpec as never,
         printConfig: revision.printConfig as never,
-        gradingConfig: revision.gradingConfig as never,
         assets: await Promise.all(revision.assets.map(async (asset) => ({
             id: asset.id,
             kind: asset.kind,

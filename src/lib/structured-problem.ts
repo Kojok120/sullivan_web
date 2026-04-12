@@ -176,18 +176,10 @@ export const printConfigSchema = z.object({
     showQrOnFirstPage: z.boolean().default(true),
 });
 
-export const gradingConfigSchema = z.object({
-    mode: z.enum(['EXACT', 'NUMERIC_TOLERANCE', 'CHOICE', 'MULTI_BLANK', 'FORMULA', 'AI_RUBRIC', 'AI_VISION_RUBRIC']).default('EXACT'),
-    maxScore: z.number().positive().default(100),
-    promptFilename: z.string().optional(),
-    rubricPrompt: z.string().optional(),
-});
-
 export type ProblemBlock = z.infer<typeof problemBlockSchema>;
 export type StructuredProblemDocument = z.infer<typeof structuredProblemDocumentSchema>;
 export type AnswerSpec = z.infer<typeof answerSpecSchema>;
 export type PrintConfig = z.infer<typeof printConfigSchema>;
-export type GradingConfig = z.infer<typeof gradingConfigSchema>;
 
 function normalizeLegacyStructuredDocumentRaw(raw: unknown) {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
@@ -230,8 +222,170 @@ export function parsePrintConfig(raw: unknown): PrintConfig {
     return printConfigSchema.parse(raw ?? {});
 }
 
-export function parseGradingConfig(raw: unknown): GradingConfig {
-    return gradingConfigSchema.parse(raw ?? {});
+function uniqueNonEmpty(values: string[]) {
+    return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+}
+
+export function normalizeAnswerSpecForAi(answerSpec: AnswerSpec): {
+    referenceAnswer: string;
+    alternativeAnswers: string[];
+} {
+    switch (answerSpec.kind) {
+        case 'exact':
+        case 'numeric':
+        case 'formula':
+            return {
+                referenceAnswer: answerSpec.correctAnswer.trim(),
+                alternativeAnswers: uniqueNonEmpty(answerSpec.acceptedAnswers),
+            };
+        case 'choice':
+            return {
+                referenceAnswer: answerSpec.correctChoiceId.trim(),
+                alternativeAnswers: [],
+            };
+        case 'multiBlank':
+            return {
+                referenceAnswer: answerSpec.blanks
+                    .map((blank) => `${blank.id}: ${blank.correctAnswer}`.trim())
+                    .filter(Boolean)
+                    .join('\n'),
+                alternativeAnswers: uniqueNonEmpty(
+                    answerSpec.blanks.flatMap((blank) =>
+                        blank.acceptedAnswers.map((candidate) => `${blank.id}: ${candidate}`),
+                    ),
+                ),
+            };
+        case 'rubric': {
+            const referenceSections = [
+                answerSpec.modelAnswer?.trim()
+                    ? `模範解答:\n${answerSpec.modelAnswer.trim()}`
+                    : '',
+                answerSpec.rubric.trim()
+                    ? `採点基準:\n${answerSpec.rubric.trim()}`
+                    : '',
+                answerSpec.criteria.length > 0
+                    ? `観点:\n${answerSpec.criteria
+                        .map((criterion) => `- ${criterion.label} (${criterion.maxPoints}点): ${criterion.description}`)
+                        .join('\n')}`
+                    : '',
+            ].filter(Boolean);
+
+            return {
+                referenceAnswer: referenceSections.join('\n\n').trim(),
+                alternativeAnswers: [],
+            };
+        }
+        case 'visionRubric': {
+            const referenceSections = [
+                answerSpec.modelAnswer?.trim()
+                    ? `模範解答:\n${answerSpec.modelAnswer.trim()}`
+                    : '',
+                answerSpec.rubric.trim()
+                    ? `採点基準:\n${answerSpec.rubric.trim()}`
+                    : '',
+                answerSpec.criteria.length > 0
+                    ? `観点:\n${answerSpec.criteria
+                        .map((criterion) => `- ${criterion.label} (${criterion.maxPoints}点): ${criterion.description}`)
+                        .join('\n')}`
+                    : '',
+                answerSpec.expectedElements.length > 0
+                    ? `図版で確認したい要素:\n${answerSpec.expectedElements.map((element) => `- ${element}`).join('\n')}`
+                    : '',
+            ].filter(Boolean);
+
+            return {
+                referenceAnswer: referenceSections.join('\n\n').trim(),
+                alternativeAnswers: [],
+            };
+        }
+    }
+}
+
+export function normalizeAnswerSpecForAuthoring(answerSpec: AnswerSpec): Extract<AnswerSpec, { kind: 'exact' }> {
+    const normalized = normalizeAnswerSpecForAi(answerSpec);
+
+    return {
+        kind: 'exact',
+        correctAnswer: normalized.referenceAnswer,
+        acceptedAnswers: normalized.alternativeAnswers,
+    };
+}
+
+export function buildAiProblemText(document: StructuredProblemDocument): string {
+    const sections: string[] = [];
+
+    if (document.title?.trim()) {
+        sections.push(`タイトル: ${document.title.trim()}`);
+    }
+
+    if (document.summary?.trim()) {
+        sections.push(`概要: ${document.summary.trim()}`);
+    }
+
+    if (document.instructions?.trim()) {
+        sections.push(`指示: ${document.instructions.trim()}`);
+    }
+
+    for (const block of document.blocks) {
+        switch (block.type) {
+            case 'paragraph':
+                sections.push(block.text.trim());
+                break;
+            case 'katexInline':
+                sections.push(`[数式] ${block.latex}`);
+                break;
+            case 'katexDisplay':
+                sections.push(`[数式ブロック]\n${block.latex}`);
+                break;
+            case 'table': {
+                const rows = [
+                    block.headers.length > 0 ? block.headers.join(' | ') : '',
+                    ...block.rows.map((row) => row.join(' | ')),
+                ].filter(Boolean);
+
+                if (rows.length > 0) {
+                    sections.push(`表:\n${rows.join('\n')}`);
+                }
+                break;
+            }
+            case 'choices':
+                sections.push(`選択肢:\n${block.options.map((option) => `- ${option.id}: ${option.label}`).join('\n')}`);
+                break;
+            case 'blankGroup':
+                sections.push(
+                    `空欄:\n${block.blanks
+                        .map((blank) => `- ${blank.id}: ${blank.label}${blank.placeholder ? ` (${blank.placeholder})` : ''}`)
+                        .join('\n')}`,
+                );
+                break;
+            default:
+                break;
+        }
+    }
+
+    return sections
+        .map((section) => section.trim())
+        .filter(Boolean)
+        .join('\n\n')
+        .slice(0, 8000);
+}
+
+export function collectStructuredDocumentAssetIds(document: StructuredProblemDocument): string[] {
+    return Array.from(new Set(
+        document.blocks.flatMap((block) => {
+            if (
+                (block.type === 'image'
+                    || block.type === 'svg'
+                    || block.type === 'graphAsset'
+                    || block.type === 'geometryAsset')
+                && block.assetId
+            ) {
+                return [block.assetId];
+            }
+
+            return [];
+        }),
+    ));
 }
 
 export function deriveLegacyFieldsFromStructuredData(input: {
@@ -243,6 +397,7 @@ export function deriveLegacyFieldsFromStructuredData(input: {
     acceptedAnswers: string[];
 } {
     const { document, answerSpec } = input;
+    const normalizedAnswer = normalizeAnswerSpecForAi(answerSpec);
     const question = [
         document.title,
         document.summary,
@@ -254,35 +409,11 @@ export function deriveLegacyFieldsFromStructuredData(input: {
         .join('\n')
         .slice(0, 4000);
 
-    switch (answerSpec.kind) {
-        case 'exact':
-        case 'numeric':
-        case 'formula':
-            return {
-                question,
-                answer: answerSpec.correctAnswer,
-                acceptedAnswers: answerSpec.acceptedAnswers,
-            };
-        case 'choice':
-            return {
-                question,
-                answer: answerSpec.correctChoiceId,
-                acceptedAnswers: [],
-            };
-        case 'multiBlank':
-            return {
-                question,
-                answer: answerSpec.blanks.map((blank) => `${blank.id}:${blank.correctAnswer}`).join(', '),
-                acceptedAnswers: answerSpec.blanks.flatMap((blank) => blank.acceptedAnswers),
-            };
-        case 'rubric':
-        case 'visionRubric':
-            return {
-                question,
-                answer: answerSpec.modelAnswer ?? '',
-                acceptedAnswers: [],
-            };
-    }
+    return {
+        question,
+        answer: normalizedAnswer.referenceAnswer,
+        acceptedAnswers: normalizedAnswer.alternativeAnswers,
+    };
 }
 
 export function buildDefaultStructuredDraft(problemType: string) {
@@ -311,32 +442,9 @@ export function buildDefaultStructuredDraft(problemType: string) {
         showQrOnFirstPage: true,
     };
 
-    const gradingConfig: GradingConfig = {
-        mode:
-            safeType === 'NUMERIC' ? 'NUMERIC_TOLERANCE'
-                : safeType === 'MULTIPLE_CHOICE' ? 'CHOICE'
-                    : safeType === 'MULTI_BLANK' ? 'MULTI_BLANK'
-                        : safeType === 'FORMULA_FINAL' ? 'FORMULA'
-                            : safeType === 'SHORT_EXPLANATION' || safeType === 'SCIENCE_EXPERIMENT' || safeType === 'GRAPH_READ' || safeType === 'DIAGRAM_LABEL'
-                                ? 'AI_RUBRIC'
-                                : 'EXACT',
-        maxScore: 100,
-    };
+    const answerSpec: AnswerSpec = { kind: 'exact', correctAnswer: '', acceptedAnswers: [] };
 
-    const answerSpec: AnswerSpec =
-        gradingConfig.mode === 'CHOICE'
-            ? { kind: 'choice', correctChoiceId: 'A' }
-            : gradingConfig.mode === 'MULTI_BLANK'
-                ? { kind: 'multiBlank', blanks: [{ id: 'blank-1', correctAnswer: '', acceptedAnswers: [] }] }
-                : gradingConfig.mode === 'NUMERIC_TOLERANCE'
-                    ? { kind: 'numeric', correctAnswer: '', acceptedAnswers: [], tolerance: 0, unit: '' }
-                    : gradingConfig.mode === 'FORMULA'
-                        ? { kind: 'formula', correctAnswer: '', acceptedAnswers: [] }
-                        : gradingConfig.mode === 'AI_RUBRIC'
-                            ? { kind: 'rubric', modelAnswer: '', rubric: '', criteria: [] }
-                            : { kind: 'exact', correctAnswer: '', acceptedAnswers: [] };
-
-    return { document, answerSpec, printConfig, gradingConfig };
+    return { document, answerSpec, printConfig };
 }
 
 export function stringifyPrettyJson(value: unknown): string {

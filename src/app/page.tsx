@@ -18,7 +18,7 @@ export default async function Home() {
 
     const [subjectProgress, goalData] = await Promise.all([
         getSubjectProgress(session.userId),
-        getGoalDailyViewPayload({ studentId: session.userId }),
+        getGoalDailyViewPayload({ studentId: session.userId, daysBefore: 0, daysAfter: 1 }),
     ]);
 
     return (

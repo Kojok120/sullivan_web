@@ -23,7 +23,6 @@ export default async function NewProblemPage({
         <div className="container mx-auto px-4 py-6 sm:py-8">
             <ProblemEditorClient
                 problem={null}
-                audits={[]}
                 subjects={context.subjects}
                 coreProblems={context.coreProblems}
                 initialSubjectId={initialSubjectId}

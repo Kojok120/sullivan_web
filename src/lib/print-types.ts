@@ -1,6 +1,5 @@
 import type {
     AnswerSpec,
-    GradingConfig,
     PrintConfig,
     StructuredProblemDocument,
 } from '@/lib/structured-problem';
@@ -29,6 +28,5 @@ export type PrintableProblem = {
     structuredContent?: StructuredProblemDocument | null;
     answerSpec?: AnswerSpec | null;
     printConfig?: PrintConfig | null;
-    gradingConfig?: GradingConfig | null;
     assets?: PrintableProblemAsset[];
 };

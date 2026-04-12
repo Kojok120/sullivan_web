@@ -19,6 +19,14 @@ type GoalReadonlyPanelProps = {
     className?: string;
 };
 
+function clampSelectedDateKey(selectedDateKey: string, data: GoalDailyViewPayload) {
+    if (selectedDateKey < data.fromDateKey || selectedDateKey > data.toDateKey) {
+        return data.todayKey;
+    }
+
+    return selectedDateKey;
+}
+
 function formatDateKeyLabel(dateKey: string, timeZone: string) {
     const [year, month, day] = dateKey.split('-').map(Number);
     const date = new Date(Date.UTC(year, month - 1, day));
@@ -140,29 +148,66 @@ export function GoalReadonlyPanel({
     showTimeline = false,
     className,
 }: GoalReadonlyPanelProps) {
-    const [data, setData] = useState<GoalDailyViewPayload>(initialData);
-    const [selectedDateKey, setSelectedDateKey] = useState(initialData.todayKey);
+    const [state, setState] = useState(() => ({
+        data: initialData,
+        initialDataSnapshot: initialData,
+        selectedDateKey: initialData.todayKey,
+    }));
     const [isPending, startTransition] = useTransition();
     const timelineRef = useRef<HTMLDivElement | null>(null);
     const todayRowRef = useRef<HTMLButtonElement | null>(null);
 
+    const resolvedState = state.initialDataSnapshot === initialData
+        ? state
+        : {
+            data: initialData,
+            initialDataSnapshot: initialData,
+            selectedDateKey: clampSelectedDateKey(state.selectedDateKey, initialData),
+        };
+    const data = resolvedState.data;
+    const selectedDateKey = resolvedState.selectedDateKey;
+
     useEffect(() => {
         const browserTimeZone = getBrowserTimeZoneSafe();
+        if (normalizeTimeZone(browserTimeZone) === initialData.timeZone) {
+            return;
+        }
+
+        let cancelled = false;
 
         startTransition(() => {
             void (async () => {
                 const result = await getGoalDailyViewAction({
                     studentId,
                     timeZone: browserTimeZone,
+                    fromDateKey: initialData.fromDateKey,
+                    toDateKey: initialData.toDateKey,
                 });
 
-                if (result.success && result.data) {
-                    setData(result.data);
-                    setSelectedDateKey(result.data.todayKey);
+                if (!cancelled && result.success && result.data) {
+                    setState((current) => {
+                        const nextState = current.initialDataSnapshot === initialData
+                            ? current
+                            : {
+                                data: initialData,
+                                initialDataSnapshot: initialData,
+                                selectedDateKey: clampSelectedDateKey(current.selectedDateKey, initialData),
+                            };
+
+                        return {
+                            data: result.data,
+                            initialDataSnapshot: initialData,
+                            selectedDateKey: clampSelectedDateKey(nextState.selectedDateKey, result.data),
+                        };
+                    });
                 }
             })();
         });
-    }, [studentId]);
+
+        return () => {
+            cancelled = true;
+        };
+    }, [initialData, studentId, startTransition]);
 
     useEffect(() => {
         if (!showTimeline) return;
@@ -178,10 +223,7 @@ export function GoalReadonlyPanel({
         });
     }, [data, showTimeline]);
 
-    const effectiveSelectedDateKey =
-        selectedDateKey < data.fromDateKey || selectedDateKey > data.toDateKey
-            ? data.todayKey
-            : selectedDateKey;
+    const effectiveSelectedDateKey = clampSelectedDateKey(selectedDateKey, data);
 
     const todayEntries = useMemo(
         () => data.rows.find((row) => row.dateKey === data.todayKey)?.entries ?? [],
@@ -320,7 +362,22 @@ export function GoalReadonlyPanel({
                                             <button
                                                 type="button"
                                                 ref={isToday ? todayRowRef : null}
-                                                onClick={() => setSelectedDateKey(row.dateKey)}
+                                                onClick={() => {
+                                                    setState((current) => {
+                                                        const nextState = current.initialDataSnapshot === initialData
+                                                            ? current
+                                                            : {
+                                                                data: initialData,
+                                                                initialDataSnapshot: initialData,
+                                                                selectedDateKey: clampSelectedDateKey(current.selectedDateKey, initialData),
+                                                            };
+
+                                                        return {
+                                                            ...nextState,
+                                                            selectedDateKey: row.dateKey,
+                                                        };
+                                                    });
+                                                }}
                                                 className={cn(
                                                     'w-full border-b px-3 py-2 text-left transition-colors last:border-b-0 hover:bg-muted/50',
                                                     isSelected && 'bg-primary/[0.08] ring-1 ring-primary/30',

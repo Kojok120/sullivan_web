@@ -346,52 +346,6 @@ export async function addGuidanceRecord(userId: string, formData: FormData) {
     }
 }
 
-export async function saveGeneratedGuidanceRecord(params: {
-    studentId: string;
-    date: Date;
-    content: string;
-    type?: GuidanceType;
-}) {
-    const session = await getSession();
-    if (!isTeacherOrAdmin(session)) {
-        return { error: '権限がありません' };
-    }
-
-    if (session.role === 'TEACHER' || session.role === 'HEAD_TEACHER') {
-        const accessError = await ensureTeacherCanAccessStudent(
-            session.userId,
-            params.studentId,
-            '担当教室外の生徒です',
-        );
-        if (accessError) {
-            return { error: accessError };
-        }
-    }
-
-    try {
-        const record = await prisma.guidanceRecord.create({
-            data: {
-                studentId: params.studentId,
-                teacherId: session.userId,
-                content: params.content,
-                type: params.type ?? GuidanceType.INTERVIEW,
-                date: params.date,
-                status: GuidanceRecordStatus.COMPLETED,
-            },
-        });
-
-        revalidatePath(`/teacher/students/${params.studentId}`);
-        return {
-            success: true,
-            recordId: record.id,
-            content: record.content,
-        };
-    } catch (e) {
-        console.error(e);
-        return { error: '記録の作成に失敗しました' };
-    }
-}
-
 export async function deleteGuidanceRecord(recordId: string, studentId: string) {
     const session = await getSession();
     if (!isTeacherOrAdmin(session)) {

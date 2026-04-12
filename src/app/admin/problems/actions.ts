@@ -13,15 +13,14 @@ import { isStructuredProblemsEnabled } from '@/lib/feature-flags';
 import {
     buildDefaultStructuredDraft,
     deriveLegacyFieldsFromStructuredData,
+    normalizeAnswerSpecForAuthoring,
     parseAnswerSpec,
-    parseGradingConfig,
     parsePrintConfig,
     parseStructuredDocument,
 } from '@/lib/structured-problem';
 import { createProblemAssetSignedUrl, removeProblemAssetFromStorage, uploadProblemAssetToStorage } from '@/lib/problem-assets';
-import { gradeStructuredAnswer } from '@/lib/problem-grading';
 import { ensureRenderableSvgMarkup } from '@/lib/problem-svg';
-import { problemAdminInclude, problemAuditInclude } from './types';
+import { problemAdminInclude } from './types';
 
 type ProblemFilters = {
     grade?: string;
@@ -199,19 +198,16 @@ function normalizeStructuredDraftInput(data: {
     document: unknown;
     answerSpec: unknown;
     printConfig?: unknown;
-    gradingConfig?: unknown;
 }) {
     const document = parseStructuredDocument(data.document);
-    const answerSpec = parseAnswerSpec(data.answerSpec);
+    const answerSpec = normalizeAnswerSpecForAuthoring(parseAnswerSpec(data.answerSpec));
     const printConfig = parsePrintConfig(data.printConfig ?? {});
-    const gradingConfig = parseGradingConfig(data.gradingConfig ?? {});
     const legacy = deriveLegacyFieldsFromStructuredData({ document, answerSpec });
 
     return {
         document,
         answerSpec,
         printConfig,
-        gradingConfig,
         legacy,
     };
 }
@@ -259,7 +255,6 @@ async function ensureProblemDraftRevision(params: {
                 structuredContent: (sourceRevision?.structuredContent ?? defaultDraft.document) as Prisma.InputJsonValue,
                 answerSpec: (sourceRevision?.answerSpec ?? defaultDraft.answerSpec) as Prisma.InputJsonValue,
                 printConfig: (sourceRevision?.printConfig ?? defaultDraft.printConfig) as Prisma.InputJsonValue,
-                gradingConfig: (sourceRevision?.gradingConfig ?? defaultDraft.gradingConfig) as Prisma.InputJsonValue,
                 generationContext: (sourceRevision?.generationContext ?? undefined) as Prisma.InputJsonValue | undefined,
                 authoringTool: sourceRevision?.authoringTool ?? 'MANUAL',
                 authoringState: (sourceRevision?.authoringState ?? undefined) as Prisma.InputJsonValue | undefined,
@@ -484,10 +479,9 @@ export async function getProblemNavSubjects() {
 }
 
 export async function getProblemEditorContext(problemId?: string) {
-    const session = await requireProblemAuthor();
-    const canViewAudits = session.role === 'ADMIN';
+    await requireProblemAuthor();
 
-    const [subjects, coreProblems, problem, audits] = await Promise.all([
+    const [subjects, coreProblems, problem] = await Promise.all([
         prisma.subject.findMany({
             orderBy: [{ order: 'asc' }, { name: 'asc' }],
             select: { id: true, name: true },
@@ -497,17 +491,9 @@ export async function getProblemEditorContext(problemId?: string) {
             include: { subject: true },
         }),
         problemId ? mapProblemForEditor(problemId) : Promise.resolve(null),
-        problemId && canViewAudits
-            ? prisma.problemGradingAudit.findMany({
-                where: { problemId },
-                include: problemAuditInclude,
-                orderBy: { createdAt: 'desc' },
-                take: 20,
-            })
-            : Promise.resolve([]),
     ]);
 
-    return { subjects, coreProblems, problem, audits };
+    return { subjects, coreProblems, problem };
 }
 
 export async function createStandaloneProblem(data: {
@@ -595,7 +581,6 @@ export async function createProblemDraft(data: {
     document: unknown;
     answerSpec: unknown;
     printConfig?: unknown;
-    gradingConfig?: unknown;
 }) {
     await requireProblemAuthor();
     ensureStructuredProblems();
@@ -676,7 +661,6 @@ export async function createProblemDraft(data: {
                         structuredContent: normalized.document as Prisma.InputJsonValue,
                         answerSpec: normalized.answerSpec as Prisma.InputJsonValue,
                         printConfig: normalized.printConfig as Prisma.InputJsonValue,
-                        gradingConfig: normalized.gradingConfig as Prisma.InputJsonValue,
                         authoringTool: data.authoringTool ?? 'MANUAL',
                         authoringState: (data.authoringState ?? undefined) as Prisma.InputJsonValue | undefined,
                     },
@@ -699,7 +683,6 @@ export async function createProblemDraft(data: {
                     structuredContent: normalized.document as Prisma.InputJsonValue,
                     answerSpec: normalized.answerSpec as Prisma.InputJsonValue,
                     printConfig: normalized.printConfig as Prisma.InputJsonValue,
-                    gradingConfig: normalized.gradingConfig as Prisma.InputJsonValue,
                     authoringTool: data.authoringTool ?? 'MANUAL',
                     authoringState: (data.authoringState ?? undefined) as Prisma.InputJsonValue | undefined,
                 },
@@ -747,7 +730,6 @@ export async function publishProblemRevision(problemId: string) {
             document: draftRevision.structuredContent,
             answerSpec: draftRevision.answerSpec,
             printConfig: draftRevision.printConfig,
-            gradingConfig: draftRevision.gradingConfig,
         });
 
         await prisma.$transaction(async (tx) => {
@@ -1042,112 +1024,6 @@ export async function deleteProblemAsset(assetId: string) {
     }
 }
 
-export async function simulateProblemGrading(input: {
-    problemId: string;
-    revisionId?: string;
-    studentAnswer: string;
-}) {
-    await requireProblemAuthor();
-    ensureStructuredProblems();
-
-    try {
-        const problem = await prisma.problem.findUnique({
-            where: { id: input.problemId },
-            include: {
-                publishedRevision: true,
-                revisions: {
-                    orderBy: { revisionNumber: 'desc' },
-                },
-            },
-        });
-
-        if (!problem) {
-            return { error: '問題が見つかりません' };
-        }
-
-        const revision =
-            (input.revisionId
-                ? problem.revisions.find((candidate) => candidate.id === input.revisionId)
-                : null)
-            ?? problem.revisions.find((candidate) => candidate.status === 'DRAFT')
-            ?? problem.publishedRevision;
-
-        if (!revision?.structuredContent || !revision.answerSpec) {
-            return { error: '採点可能な revision がありません' };
-        }
-
-        const normalized = normalizeStructuredDraftInput({
-            document: revision.structuredContent,
-            answerSpec: revision.answerSpec,
-            printConfig: revision.printConfig,
-            gradingConfig: revision.gradingConfig,
-        });
-
-        const result = await gradeStructuredAnswer({
-            studentAnswer: input.studentAnswer,
-            answerSpec: normalized.answerSpec,
-            gradingConfig: normalized.gradingConfig,
-            problemSummary: normalized.legacy.question,
-        });
-
-        const audit = await prisma.problemGradingAudit.create({
-            data: {
-                problemId: problem.id,
-                problemRevisionId: revision.id,
-                gradingMode: normalized.gradingConfig.mode as never,
-                graderType: result.graderType,
-                source: 'simulation',
-                score: result.score,
-                maxScore: result.maxScore,
-                confidence: result.confidence,
-                reason: result.reason,
-                modelVersion: result.modelVersion,
-                promptVersion: result.promptVersion,
-                rawResponseDigest: result.rawResponseDigest,
-                payload: {
-                    studentAnswer: input.studentAnswer,
-                    feedback: result.feedback,
-                    evaluation: result.evaluation,
-                } as Prisma.InputJsonValue,
-            },
-        });
-
-        revalidateProblemPaths(problem.id);
-        return { success: true, result, audit };
-    } catch (error) {
-        console.error('Failed to simulate grading:', error);
-        return { error: '採点シミュレーションに失敗しました' };
-    }
-}
-
-export async function overrideProblemGradingAudit(input: {
-    auditId: string;
-    overrideScore: number;
-    overrideReason: string;
-}) {
-    await requireAdmin();
-    ensureStructuredProblems();
-
-    try {
-        const session = await requireAdmin();
-        const audit = await prisma.problemGradingAudit.update({
-            where: { id: input.auditId },
-            data: {
-                overrideScore: input.overrideScore,
-                overrideReason: input.overrideReason,
-                overrideByUserId: session.userId,
-                overriddenAt: new Date(),
-            },
-        });
-
-        revalidateProblemPaths();
-        return { success: true, audit };
-    } catch (error) {
-        console.error('Failed to override grading audit:', error);
-        return { error: '採点監査の更新に失敗しました' };
-    }
-}
-
 export async function deleteStandaloneProblem(id: string) {
     await requireAdmin();
     try {
@@ -1295,19 +1171,4 @@ export async function searchProblemsByMasterNumbers(targets: { masterNumber: num
         console.error('Failed to search problems by master numbers:', error);
         return { error: '既存問題の検索に失敗しました' };
     }
-}
-
-export async function getSignedProblemAssetUrl(assetId: string) {
-    await requireAdmin();
-    const asset = await prisma.problemAsset.findUnique({
-        where: { id: assetId },
-        select: { storageKey: true },
-    });
-
-    if (!asset?.storageKey) return { success: false, url: null };
-
-    return {
-        success: true,
-        url: await createProblemAssetSignedUrl(asset.storageKey),
-    };
 }

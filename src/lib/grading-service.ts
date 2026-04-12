@@ -1,3 +1,5 @@
+import crypto from 'node:crypto';
+
 import { GoogleGenAI } from '@google/genai';
 import { prisma } from '@/lib/prisma';
 import type { Prisma, User } from '@prisma/client';
@@ -18,7 +20,14 @@ import { claimGradingJob, markGradingJobCompleted, markGradingJobFailed, publish
 import { loadInstructionPrompt as loadPrompt } from '@/lib/instruction-prompt';
 import { getGeminiMediaResolutionForMimeType } from '@/lib/gemini-media-resolution';
 import { buildGradingTempFileContext } from '@/lib/grading-temp-path';
-import { gradeStructuredAnswer } from '@/lib/problem-grading';
+import { downloadProblemAssetFromStorage } from '@/lib/problem-assets';
+import {
+    buildAiProblemText,
+    collectStructuredDocumentAssetIds,
+    normalizeAnswerSpecForAi,
+    parseAnswerSpec,
+    parseStructuredDocument,
+} from '@/lib/structured-problem';
 
 // Priority adjustment logic (inlined from removed priority-algo.ts)
 type Evaluation = "A" | "B" | "C" | "D";
@@ -539,28 +548,34 @@ type GradingResult = {
     feedback: string;
     badCoreProblemIds: string[];
     userAnswer: string;
-    gradingMode?: string | null;
-    score?: number;
-    maxScore?: number;
     confidence?: number | null;
     reason?: string;
-    graderType?: 'DETERMINISTIC' | 'AI' | 'AI_VISION';
-    modelVersion?: string;
-    promptVersion?: string;
-    rawResponseDigest?: string;
 };
 
-// Validation types for grading response
 type GradingValidationResult = {
     isValid: boolean;
     errors: string[];
     validatedResults: GradingResult[];
 };
 
-// Problem type for grading context (subset of Prisma Problem)
-type ProblemForGrading = {
+type ProblemRevisionAssetForGrading = {
+    id: string;
+    fileName: string;
+    mimeType: string;
+    storageKey: string | null;
+};
+
+type ProblemRevisionForGrading = {
+    id: string;
+    structuredContent: Prisma.JsonValue | null;
+    answerSpec: Prisma.JsonValue | null;
+    assets: ProblemRevisionAssetForGrading[];
+};
+
+export type ProblemForGrading = {
     id: string;
     customId: string | null;
+    subjectName: string;
     question: string;
     answer: string | null;
     acceptedAnswers: string[];
@@ -569,15 +584,167 @@ type ProblemForGrading = {
     publishedRevisionId: string | null;
     structuredContent: Prisma.JsonValue | null;
     answerSpec: Prisma.JsonValue | null;
-    gradingConfig: Prisma.JsonValue | null;
+    revisionAssets: ProblemRevisionAssetForGrading[];
     coreProblems: { id: string; name: string }[];
 };
 
-/**
- * Validates Gemini's grading response and converts index-based results to problemId-based results.
- * This ensures that the response matches the expected structure and all indices are valid.
- */
-function validateGradingResponse(
+export type GeminiProblemContext = {
+    index: number;
+    displayId: string;
+    subjectName: string;
+    problemType: string;
+    contentFormat: string;
+    problemText: string;
+    referenceAnswer: string;
+    alternativeAnswers: string[];
+    hasReferenceFigures: boolean;
+};
+
+type GeminiReferenceFigure = {
+    problemIndex: number;
+    problemId: string;
+    fileName: string;
+    mimeType: string;
+    base64Data: string;
+};
+
+type GeminiInlinePart = {
+    text?: string;
+    inlineData?: {
+        data: string;
+        mimeType: string;
+    };
+};
+
+function parseAnswerSpecJson(value: Prisma.JsonValue) {
+    return parseAnswerSpec(value as unknown);
+}
+
+function parseStructuredDocumentJson(value: Prisma.JsonValue) {
+    return parseStructuredDocument(value as unknown);
+}
+
+function uniqueNonEmpty(values: string[]) {
+    return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+}
+
+function isSupportedReferenceFigureMimeType(mimeType: string) {
+    const normalized = mimeType.trim().toLowerCase();
+    return normalized === 'application/pdf' || normalized.startsWith('image/');
+}
+
+function getReferencedFigureAssets(problem: ProblemForGrading) {
+    if (problem.contentFormat !== 'STRUCTURED_V1' || !problem.structuredContent) {
+        return [];
+    }
+
+    try {
+        const document = parseStructuredDocumentJson(problem.structuredContent);
+        const assetIds = new Set(collectStructuredDocumentAssetIds(document));
+        return problem.revisionAssets.filter((asset) =>
+            assetIds.has(asset.id)
+            && Boolean(asset.storageKey)
+            && isSupportedReferenceFigureMimeType(asset.mimeType),
+        );
+    } catch (error) {
+        console.warn('[grading-service] failed to collect structured asset ids', {
+            problemId: problem.id,
+            error,
+        });
+        return [];
+    }
+}
+
+export function buildProblemContextForGemini(problem: ProblemForGrading, index: number): GeminiProblemContext {
+    let problemText = problem.question?.trim() || '(問題文なし)';
+    let referenceAnswer = problem.answer?.trim() || '';
+    let alternativeAnswers = uniqueNonEmpty(problem.acceptedAnswers);
+
+    if (problem.contentFormat === 'STRUCTURED_V1' && problem.structuredContent && problem.answerSpec) {
+        try {
+            const document = parseStructuredDocumentJson(problem.structuredContent);
+            const normalizedAnswer = normalizeAnswerSpecForAi(parseAnswerSpecJson(problem.answerSpec));
+            problemText = buildAiProblemText(document).trim() || problemText;
+            referenceAnswer = normalizedAnswer.referenceAnswer.trim() || referenceAnswer;
+            alternativeAnswers = uniqueNonEmpty([
+                ...normalizedAnswer.alternativeAnswers,
+                ...alternativeAnswers,
+            ]);
+        } catch (error) {
+            console.warn('[grading-service] failed to normalize structured problem', {
+                problemId: problem.id,
+                error,
+            });
+        }
+    }
+
+    return {
+        index,
+        displayId: problem.customId || `Q${index + 1}`,
+        subjectName: problem.subjectName,
+        problemType: problem.problemType,
+        contentFormat: problem.contentFormat,
+        problemText,
+        referenceAnswer,
+        alternativeAnswers,
+        hasReferenceFigures: getReferencedFigureAssets(problem).length > 0,
+    };
+}
+
+async function loadReferenceFiguresForGemini(problems: ProblemForGrading[]) {
+    const figures: GeminiReferenceFigure[] = [];
+
+    for (const [problemIndex, problem] of problems.entries()) {
+        const assets = getReferencedFigureAssets(problem);
+        for (const asset of assets) {
+            if (!asset.storageKey) continue;
+            const buffer = await downloadProblemAssetFromStorage(asset.storageKey);
+            if (!buffer) continue;
+
+            figures.push({
+                problemIndex,
+                problemId: problem.id,
+                fileName: asset.fileName,
+                mimeType: asset.mimeType,
+                base64Data: buffer.toString('base64'),
+            });
+        }
+    }
+
+    return figures;
+}
+
+export function buildGeminiGradingContents(input: {
+    gradingPrompt: string;
+    answerSheet: PreparedFile;
+    referenceFigures: GeminiReferenceFigure[];
+}): GeminiInlinePart[] {
+    const contents: GeminiInlinePart[] = [
+        { text: input.gradingPrompt },
+        {
+            inlineData: {
+                data: input.answerSheet.base64Data,
+                mimeType: input.answerSheet.mimeType,
+            },
+        },
+    ];
+
+    for (const figure of input.referenceFigures) {
+        contents.push({
+            text: `参考図版 problemIndex=${figure.problemIndex} problemId=${figure.problemId} fileName=${figure.fileName}`,
+        });
+        contents.push({
+            inlineData: {
+                data: figure.base64Data,
+                mimeType: figure.mimeType,
+            },
+        });
+    }
+
+    return contents;
+}
+
+export function validateGradingResponse(
     resultsJson: unknown,
     problems: ProblemForGrading[],
     userId: string
@@ -619,27 +786,51 @@ function validateGradingResponse(
         }
         seenIndices.add(idx);
 
-        // Evaluation value check
         const evaluation = rawResult.evaluation;
         if (evaluation !== 'A' && evaluation !== 'B' && evaluation !== 'C' && evaluation !== 'D') {
             errors.push(`Invalid evaluation for index ${idx}: ${String(evaluation)}`);
             continue;
         }
 
-        // Convert index to actual problem ID
         const problem = problems[idx];
-        const studentAnswer =
-            typeof rawResult.studentAnswer === 'string' ? rawResult.studentAnswer : "(空欄)";
-        const feedback =
-            typeof rawResult.feedback === 'string' ? rawResult.feedback : "";
+        const studentAnswer = typeof rawResult.studentAnswer === 'string' ? rawResult.studentAnswer : null;
+        const feedback = typeof rawResult.feedback === 'string' ? rawResult.feedback : null;
+        const confidence = typeof rawResult.confidence === 'number' && Number.isFinite(rawResult.confidence)
+            ? Math.max(0, Math.min(1, rawResult.confidence))
+            : null;
+        const reason = typeof rawResult.reason === 'string' ? rawResult.reason : null;
+
+        if (studentAnswer === null) {
+            errors.push(`Invalid studentAnswer for index ${idx}`);
+            continue;
+        }
+
+        if (feedback === null) {
+            errors.push(`Invalid feedback for index ${idx}`);
+            continue;
+        }
+
+        if (confidence === null) {
+            errors.push(`Invalid confidence for index ${idx}`);
+            continue;
+        }
+
+        if (reason === null) {
+            errors.push(`Invalid reason for index ${idx}`);
+            continue;
+        }
+
         validatedResults.push({
             studentId: userId,
-            problemId: problem.id,  // Convert index to actual problemId
+            problemId: problem.id,
+            problemRevisionId: problem.publishedRevisionId,
             userAnswer: studentAnswer,
             evaluation,
             isCorrect: evaluation === 'A' || evaluation === 'B',
             feedback,
-            badCoreProblemIds: []  // Not used in new schema for simplicity
+            badCoreProblemIds: [],
+            confidence,
+            reason,
         });
     }
 
@@ -656,75 +847,6 @@ function validateGradingResponse(
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null;
-}
-
-async function applyStructuredGradingIfNeeded(input: {
-    result: GradingResult;
-    problem: ProblemForGrading;
-}): Promise<GradingResult> {
-    if (
-        input.problem.contentFormat !== 'STRUCTURED_V1'
-        || !input.problem.answerSpec
-        || !input.problem.gradingConfig
-    ) {
-        return input.result;
-    }
-
-    try {
-        const gradeResult = await gradeStructuredAnswer({
-            studentAnswer: input.result.userAnswer,
-            answerSpec: parseAnswerSpecJson(input.problem.answerSpec),
-            gradingConfig: parseGradingConfigJson(input.problem.gradingConfig),
-            problemSummary: input.problem.question,
-        });
-
-        return {
-            ...input.result,
-            problemRevisionId: input.problem.publishedRevisionId,
-            gradingMode: readStringField(input.problem.gradingConfig, 'mode'),
-            score: gradeResult.score,
-            maxScore: gradeResult.maxScore,
-            confidence: gradeResult.confidence,
-            reason: gradeResult.reason,
-            graderType: gradeResult.graderType,
-            modelVersion: gradeResult.modelVersion,
-            promptVersion: gradeResult.promptVersion,
-            rawResponseDigest: gradeResult.rawResponseDigest,
-            evaluation: gradeResult.evaluation,
-            isCorrect: gradeResult.isCorrect,
-            feedback: gradeResult.feedback,
-        };
-    } catch (error) {
-        console.warn('[grading-service] structured grading fallback failed', {
-            problemId: input.problem.id,
-            error,
-        });
-        return {
-            ...input.result,
-            problemRevisionId: input.problem.publishedRevisionId,
-            gradingMode: readStringField(input.problem.gradingConfig, 'mode'),
-        };
-    }
-}
-
-function parseAnswerSpecJson(value: Prisma.JsonValue) {
-    if (!value || typeof value !== 'object') {
-        throw new Error('answerSpec is invalid');
-    }
-    return value as never;
-}
-
-function parseGradingConfigJson(value: Prisma.JsonValue) {
-    if (!value || typeof value !== 'object') {
-        throw new Error('gradingConfig is invalid');
-    }
-    return value as never;
-}
-
-function readStringField(value: Prisma.JsonValue | null, key: string) {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-    const field = (value as Record<string, unknown>)[key];
-    return typeof field === 'string' ? field : null;
 }
 
 // Local QR Reader using Python OpenCV via child_process
@@ -891,12 +1013,22 @@ async function gradeWithGemini(
         },
         include: {
             coreProblems: true,
+            subject: {
+                select: { name: true },
+            },
             publishedRevision: {
                 select: {
                     id: true,
                     structuredContent: true,
                     answerSpec: true,
-                    gradingConfig: true,
+                    assets: {
+                        select: {
+                            id: true,
+                            fileName: true,
+                            mimeType: true,
+                            storageKey: true,
+                        },
+                    },
                 },
             },
             revisions: printedRevisionIds.length > 0 ? {
@@ -905,7 +1037,14 @@ async function gradeWithGemini(
                     id: true,
                     structuredContent: true,
                     answerSpec: true,
-                    gradingConfig: true,
+                    assets: {
+                        select: {
+                            id: true,
+                            fileName: true,
+                            mimeType: true,
+                            storageKey: true,
+                        },
+                    },
                 },
             } : undefined,
         }
@@ -966,13 +1105,14 @@ async function gradeWithGemini(
     const problemsForGrading: ProblemForGrading[] = problems.map((p) => {
         const qrIndex = idToIndexMap.get(p.id) ?? idToIndexMap.get(p.customId || '') ?? -1;
         const revisionFromQrIndex = qrIndex >= 0 ? printedRevisionIds[qrIndex] : undefined;
-        const matchedRevision = revisionFromQrIndex
+        const matchedRevision = (revisionFromQrIndex
             ? p.revisions.find((revision) => revision.id === revisionFromQrIndex) ?? p.publishedRevision
-            : p.publishedRevision;
+            : p.publishedRevision) as ProblemRevisionForGrading | null;
 
         return {
             id: p.id,
             customId: p.customId,
+            subjectName: p.subject.name,
             question: p.question,
             answer: p.answer,
             acceptedAnswers: p.acceptedAnswers,
@@ -981,26 +1121,19 @@ async function gradeWithGemini(
             publishedRevisionId: matchedRevision?.id ?? p.publishedRevisionId,
             structuredContent: matchedRevision?.structuredContent ?? null,
             answerSpec: matchedRevision?.answerSpec ?? null,
-            gradingConfig: matchedRevision?.gradingConfig ?? null,
+            revisionAssets: matchedRevision?.assets.map((asset) => ({
+                id: asset.id,
+                fileName: asset.fileName,
+                mimeType: asset.mimeType,
+                storageKey: asset.storageKey,
+            })) ?? [],
             coreProblems: p.coreProblems.map((cp) => ({ id: cp.id, name: cp.name })),
         };
     });
 
-    // 2. Build problem contexts with INDEX instead of ID
-    const problemContexts = problemsForGrading.map((p, index) => ({
-        index: index,
-        displayId: p.customId || `Q${index + 1}`,
-        question: p.question,
-        correctAnswer: p.answer,
-        acceptedAnswers: p.acceptedAnswers,
-        problemType: p.problemType,
-        contentFormat: p.contentFormat,
-        gradingMode: isRecord(p.gradingConfig) && typeof p.gradingConfig.mode === 'string' ? p.gradingConfig.mode : null,
-        answerSpec: p.answerSpec,
-    }));
-    const hasStructuredProblems = problemsForGrading.some((problem) => problem.contentFormat === 'STRUCTURED_V1');
+    const problemContexts = problemsForGrading.map((problem, index) => buildProblemContextForGemini(problem, index));
+    const referenceFigures = await loadReferenceFiguresForGemini(problemsForGrading);
 
-    // 3. Define responseSchema for structured output
     const gradingResponseSchema = {
         type: 'array',
         items: {
@@ -1019,25 +1152,30 @@ async function gradeWithGemini(
                     enum: ["A", "B", "C", "D"],
                     description: "A=完璧, B=ほぼ正解, C=部分的に正解, D=不正解"
                 },
+                confidence: {
+                    type: 'number',
+                    description: '0 から 1 の信頼度'
+                },
+                reason: {
+                    type: 'string',
+                    description: '採点理由の要約'
+                },
                 feedback: {
                     type: 'string',
                     description: "日本語でのフィードバック"
                 }
             },
-            required: ["problemIndex", "studentAnswer", "evaluation", "feedback"],
+            required: ["problemIndex", "studentAnswer", "evaluation", "confidence", "reason", "feedback"],
             additionalProperties: false,
         }
     };
 
-    // 5. Build enhanced prompt
-    // 5. Build enhanced prompt
-    const gradingPrompt = loadPrompt(hasStructuredProblems ? 'grading-prompt-structured.md' : 'grading-prompt.md', {
+    const gradingPrompt = loadPrompt('grading-prompt.md', {
         problemCount: problemContexts.length,
         problemContexts: JSON.stringify(problemContexts, null, 2),
         maxIndex: problemContexts.length - 1
     });
 
-    // 6. Retry loop
     let lastErrors: string[] = [];
     const mediaResolution = getGeminiMediaResolutionForMimeType(prepared.mimeType);
 
@@ -1052,15 +1190,11 @@ async function gradeWithGemini(
             console.log(`Calling Gemini generateContent for grading (attempt ${attempt})...`);
             const result = await getGenAI().models.generateContent({
                 model: modelName,
-                contents: [
-                    { text: gradingPrompt },
-                    {
-                        inlineData: {
-                            data: prepared.base64Data,
-                            mimeType: prepared.mimeType
-                        }
-                    }
-                ],
+                contents: buildGeminiGradingContents({
+                    gradingPrompt,
+                    answerSheet: prepared,
+                    referenceFigures,
+                }),
                 config: {
                     responseMimeType: "application/json",
                     responseJsonSchema: gradingResponseSchema,
@@ -1073,24 +1207,11 @@ async function gradeWithGemini(
 
             const resultsJson = parseJSON(text);
 
-            // Validate response using the new validation function
             const validation = validateGradingResponse(resultsJson, problemsForGrading, userId);
 
             if (validation.isValid) {
                 console.log(`Grading validated successfully on attempt ${attempt}`);
-                const enrichedResults = await Promise.all(
-                    validation.validatedResults.map(async (validatedResult) => {
-                        const problem = problemsForGrading.find((candidate) => candidate.id === validatedResult.problemId);
-                        if (!problem) return validatedResult;
-
-                        return applyStructuredGradingIfNeeded({
-                            result: validatedResult,
-                            problem,
-                        });
-                    }),
-                );
-
-                return enrichedResults;
+                return validation.validatedResults;
             }
 
             // Validation failed
@@ -1229,7 +1350,7 @@ async function recordGradingResults(results: GradingResult[], qrData: QRData): P
     // WRAP EVERYTHING IN A SINGLE TRANSACTION
     const { involvedCpIds, isUnitMode } = await prisma.$transaction(async (tx) => {
         // 1. Record History (Batch)
-        const createdHistories = await Promise.all(results.map((r) => tx.learningHistory.create({
+        await Promise.all(results.map((r) => tx.learningHistory.create({
             data: {
                 userId,
                 problemId: r.problemId,
@@ -1240,29 +1361,6 @@ async function recordGradingResults(results: GradingResult[], qrData: QRData): P
                 answeredAt: new Date(),
                 groupId,
                 isVideoWatched: false,
-            },
-        })));
-
-        await Promise.all(results.map((r, index) => tx.problemGradingAudit.create({
-            data: {
-                problemId: r.problemId,
-                problemRevisionId: r.problemRevisionId ?? undefined,
-                learningHistoryId: createdHistories[index]?.id,
-                gradingMode: (r.gradingMode ?? 'AI_RUBRIC') as never,
-                graderType: (r.graderType ?? 'AI') as never,
-                source: 'scan',
-                score: r.score ?? (r.isCorrect ? 100 : 0),
-                maxScore: r.maxScore ?? 100,
-                confidence: r.confidence ?? null,
-                reason: r.reason ?? null,
-                modelVersion: r.modelVersion ?? null,
-                promptVersion: r.promptVersion ?? null,
-                rawResponseDigest: r.rawResponseDigest ?? null,
-                payload: {
-                    evaluation: r.evaluation,
-                    feedback: r.feedback,
-                    userAnswer: r.userAnswer,
-                } as Prisma.InputJsonValue,
             },
         })));
 

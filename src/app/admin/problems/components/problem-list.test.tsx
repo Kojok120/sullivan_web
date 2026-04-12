@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ProblemList } from './problem-list';
+import type { ProblemWithRelations } from '../types';
 
 const { refreshMock, bulkDeleteProblemsMock, deleteStandaloneProblemMock } = vi.hoisted(() => ({
     refreshMock: vi.fn(),
@@ -45,7 +46,7 @@ describe('ProblemList', () => {
                 },
             ],
         },
-    ] as any;
+    ] as unknown as ProblemWithRelations[];
 
     beforeEach(() => {
         vi.clearAllMocks();

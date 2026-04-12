@@ -398,10 +398,6 @@ async function seedStructuredProblemSamples() {
           answerLines: 3,
           showQrOnFirstPage: true,
         },
-        gradingConfig: {
-          mode: 'EXACT',
-          maxScore: 100,
-        },
         assets: [
           {
             kind: 'SVG',
@@ -444,10 +440,6 @@ async function seedStructuredProblemSamples() {
           answerLines: 2,
           showQrOnFirstPage: true,
         },
-        gradingConfig: {
-          mode: 'EXACT',
-          maxScore: 100,
-        },
         assets: [
           {
             kind: 'SVG',
@@ -488,10 +480,6 @@ async function seedStructuredProblemSamples() {
           answerMode: 'INLINE',
           answerLines: 2,
           showQrOnFirstPage: true,
-        },
-        gradingConfig: {
-          mode: 'EXACT',
-          maxScore: 100,
         },
         assets: [
           {
@@ -535,10 +523,6 @@ async function seedStructuredProblemSamples() {
           answerMode: 'INLINE',
           answerLines: 2,
           showQrOnFirstPage: true,
-        },
-        gradingConfig: {
-          mode: 'NUMERIC_TOLERANCE',
-          maxScore: 100,
         },
         assets: [
           {
@@ -584,11 +568,6 @@ async function seedStructuredProblemSamples() {
           answerMode: 'INLINE',
           answerLines: 6,
           showQrOnFirstPage: true,
-        },
-        gradingConfig: {
-          mode: 'AI_RUBRIC',
-          maxScore: 100,
-          rubricPrompt: '蒸散の役割を中学生向けに採点する',
         },
         assets: [],
       },
@@ -661,7 +640,6 @@ async function seedStructuredProblemSamples() {
         structuredContent: sample.problem.document as never,
         answerSpec: sample.problem.answerSpec as never,
         printConfig: sample.problem.printConfig as never,
-        gradingConfig: sample.problem.gradingConfig as never,
         authoringTool: sample.problem.authoringTool as never,
         publishedAt,
         assets: {
@@ -682,7 +660,6 @@ async function seedStructuredProblemSamples() {
         structuredContent: sample.problem.document as never,
         answerSpec: sample.problem.answerSpec as never,
         printConfig: sample.problem.printConfig as never,
-        gradingConfig: sample.problem.gradingConfig as never,
         authoringTool: sample.problem.authoringTool as never,
         publishedAt,
         assets: {

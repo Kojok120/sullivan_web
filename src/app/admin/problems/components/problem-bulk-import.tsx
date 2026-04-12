@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, useTransition } from 'react';
+import { useMemo, useState, useTransition } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -78,6 +78,10 @@ type RowDiffResult = {
 };
 
 const AUTO_SUBJECT_VALUE = '__AUTO_SUBJECT__';
+
+function getInitialSelectedSubjectId(defaultSubjectId?: string) {
+    return defaultSubjectId ?? AUTO_SUBJECT_VALUE;
+}
 
 function makeSubjectMasterKey(subjectId: string, masterNumber: number): string {
     return `${subjectId}:${masterNumber}`;
@@ -208,7 +212,7 @@ export function BulkImportDialog({
 
     // Shared CoreProblem selection
     const [coreProblems, setCoreProblems] = useState<SelectedCoreProblem[]>([]);
-    const [selectedSubjectId, setSelectedSubjectId] = useState(defaultSubjectId ?? AUTO_SUBJECT_VALUE);
+    const [selectedSubjectId, setSelectedSubjectId] = useState(() => getInitialSelectedSubjectId(defaultSubjectId));
 
     // Map of CoreProblem name -> CoreProblem data (auto-resolved)
     const [resolvedCoreProblems, setResolvedCoreProblems] = useState<Map<string, ResolvedCoreProblem>>(new Map());
@@ -262,10 +266,6 @@ export function BulkImportDialog({
     const textareaPlaceholder = isEnglishSheetVariant
         ? '例:\n1001\t中1\tbe動詞の文_肯定文\t私は新入生です I (A) a new student.\tA: am\t\thttps://youtube.com/...'
         : '例:\n1001\t中1\tbe動詞の文_肯定文\t私は新入生です I (A) a new student.\tA: am\t\thttps://youtube.com/...';
-
-    useEffect(() => {
-        setSelectedSubjectId(defaultSubjectId ?? AUTO_SUBJECT_VALUE);
-    }, [defaultSubjectId]);
 
     // parseTSV is now imported from @/lib/tsv-parser
 
@@ -420,7 +420,7 @@ export function BulkImportDialog({
                 setParsedData([]);
                 setCoreProblems([]);
                 setResolvedCoreProblems(new Map());
-                setSelectedSubjectId(defaultSubjectId ?? AUTO_SUBJECT_VALUE);
+                setSelectedSubjectId(getInitialSelectedSubjectId(defaultSubjectId));
                 setShowAllResolvedCoreProblems(false);
             } else {
                 toast.error(result.error || '登録に失敗しました', {

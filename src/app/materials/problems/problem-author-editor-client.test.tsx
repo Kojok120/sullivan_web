@@ -27,7 +27,6 @@ vi.mock('@/app/admin/problems/actions', () => ({
     generateProblemFigureDraft: vi.fn(),
     previewProblemPrint: vi.fn(),
     publishProblemRevision: vi.fn(),
-    simulateProblemGrading: vi.fn(),
     syncProblemAuthoringArtifacts: vi.fn(),
     uploadProblemAsset: vi.fn(),
 }));
@@ -73,7 +72,6 @@ const baseProblem = {
         },
         answerSpec: { kind: 'exact', correctAnswer: '', acceptedAnswers: [] },
         printConfig: { template: 'STANDARD', estimatedHeight: 'MEDIUM', answerMode: 'INLINE', answerLines: 3, showQrOnFirstPage: true },
-        gradingConfig: { mode: 'EXACT', maxScore: 100 },
         generationContext: null,
         assets: [],
     }],
@@ -108,12 +106,29 @@ describe('ProblemAuthorEditorClient', () => {
             />,
         );
 
-        fireEvent.click(screen.getByRole('tab', { name: '問題文' }));
+        fireEvent.mouseDown(screen.getByRole('tab', { name: '問題文' }), { button: 0 });
 
         expect(screen.queryByText('図版表示確認')).not.toBeInTheDocument();
         expect(screen.queryByText('補足説明')).not.toBeInTheDocument();
         expect(screen.queryByText('state を再同期')).not.toBeInTheDocument();
         expect(screen.queryByText('全体表示に合わせる')).not.toBeInTheDocument();
         expect(screen.queryByText('SVG 書き出しテスト')).not.toBeInTheDocument();
+    });
+
+    it('採点タブを表示せず、正解と別解だけを扱う', () => {
+        render(
+            <ProblemAuthorEditorClient
+                problem={baseProblem as never}
+                subjects={[{ id: 'subject-1', name: '英語' }]}
+                coreProblems={[{ id: 'core-1', name: '現在完了', subjectId: 'subject-1', subject: { name: '英語' } }]}
+                initialSubjectId="subject-1"
+            />,
+        );
+
+        fireEvent.mouseDown(screen.getByRole('tab', { name: '答え' }), { button: 0 });
+        expect(screen.getByText('答えと正解判定')).toBeInTheDocument();
+        expect(screen.getByText('正解')).toBeInTheDocument();
+        expect(screen.getByText('別解')).toBeInTheDocument();
+        expect(screen.queryByRole('tab', { name: '採点' })).not.toBeInTheDocument();
     });
 });

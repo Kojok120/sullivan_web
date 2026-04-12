@@ -322,6 +322,11 @@ export function ProblemManager({
 
             {resolvedShowBulkImport && (
                 <BulkImportDialog
+                    key={[
+                        resolvedBulkImportConfig.defaultSubjectId ?? 'default',
+                        resolvedBulkImportConfig.lockSubjectSelection ? 'locked' : 'unlocked',
+                        resolvedBulkImportConfig.variant,
+                    ].join(':')}
                     open={isBulkDialogOpen}
                     onOpenChange={setIsBulkDialogOpen}
                     subjects={subjects}

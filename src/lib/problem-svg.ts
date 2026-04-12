@@ -160,15 +160,3 @@ export function getRenderableSvgDimensions(
 
     return { width, height };
 }
-
-export function isRenderableSvgMarkup(raw: string) {
-    const normalized = normalizeSvgExport(raw);
-    if (!normalized.startsWith('<svg')) {
-        return false;
-    }
-
-    const width = parseSvgDimension(parseSvgAttribute(normalized, 'width'));
-    const height = parseSvgDimension(parseSvgAttribute(normalized, 'height'));
-
-    return Boolean(width && width > 0 && height && height > 0);
-}

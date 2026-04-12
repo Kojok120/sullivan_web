@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Subject, CoreProblem } from '@prisma/client';
 import { CoreProblemList } from './components/core-problem-list';
 import { CoreProblemBulkImport } from './components/core-problem-bulk-import';
@@ -18,32 +18,24 @@ interface CurriculumManagerProps {
 }
 
 export function CurriculumManager({ initialSubjects }: CurriculumManagerProps) {
-    const [subjects, setSubjects] = useState(initialSubjects);
-    const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(subjects[0]?.id || null);
-    const [selectedCoreProblemId, setSelectedCoreProblemId] = useState<string | null>(null);
-    const [mobilePane, setMobilePane] = useState<'core' | 'problems'>('core');
+    const [rawSelectedSubjectId, setRawSelectedSubjectId] = useState<string | null>(() => initialSubjects[0]?.id || null);
+    const [rawSelectedCoreProblemId, setRawSelectedCoreProblemId] = useState<string | null>(null);
+    const [rawMobilePane, setRawMobilePane] = useState<'core' | 'problems'>('core');
 
-    // Sync state with props when server action updates data
-    useEffect(() => {
-        setSubjects(initialSubjects);
-    }, [initialSubjects]);
+    const selectedSubjectId = rawSelectedSubjectId && initialSubjects.some((subject) => subject.id === rawSelectedSubjectId)
+        ? rawSelectedSubjectId
+        : initialSubjects[0]?.id || null;
+    const selectedSubject = initialSubjects.find((subject) => subject.id === selectedSubjectId) || null;
+    const selectedCoreProblemId = selectedSubject?.coreProblems.some((coreProblem) => coreProblem.id === rawSelectedCoreProblemId)
+        ? rawSelectedCoreProblemId
+        : null;
+    const mobilePane = selectedCoreProblemId ? rawMobilePane : 'core';
 
-    const selectedSubject = subjects.find(s => s.id === selectedSubjectId) || null;
-
-    // When subject changes, reset core problem selection or select the first one?
-    // Let's select null for now to be safe, or maybe the first one for convenience.
-    useEffect(() => {
-        const activeSubject = subjects.find((s) => s.id === selectedSubjectId) || null;
-        if (activeSubject && activeSubject.coreProblems.length > 0) {
-            // Optional: Auto-select first core problem?
-            // setSelectedCoreProblemId(selectedSubject.coreProblems[0].id);
-            setSelectedCoreProblemId(null);
-            setMobilePane('core');
-        } else {
-            setSelectedCoreProblemId(null);
-            setMobilePane('core');
-        }
-    }, [selectedSubjectId, subjects]);
+    const handleSubjectChange = (subjectId: string) => {
+        setRawSelectedSubjectId(subjectId);
+        setRawSelectedCoreProblemId(null);
+        setRawMobilePane('core');
+    };
 
     return (
         <div className="flex min-h-[calc(100dvh-8rem)] flex-col gap-4 md:h-[calc(100vh-10rem)]">
@@ -52,12 +44,12 @@ export function CurriculumManager({ initialSubjects }: CurriculumManagerProps) {
                 <h2 className="whitespace-nowrap font-semibold">科目選択:</h2>
                 <Tabs
                     value={selectedSubjectId || ''}
-                    onValueChange={(val) => setSelectedSubjectId(val)}
+                    onValueChange={handleSubjectChange}
                     className="w-full"
                 >
                     <div className="overflow-x-auto pb-1">
                         <TabsList className="w-max min-w-full md:min-w-0">
-                        {subjects.map(subject => (
+                        {initialSubjects.map(subject => (
                             <TabsTrigger key={subject.id} value={subject.id} className="px-4">
                                 {subject.name}
                             </TabsTrigger>
@@ -71,14 +63,14 @@ export function CurriculumManager({ initialSubjects }: CurriculumManagerProps) {
                 <Button
                     variant={mobilePane === 'core' ? 'default' : 'outline'}
                     className="min-h-11 flex-1"
-                    onClick={() => setMobilePane('core')}
+                    onClick={() => setRawMobilePane('core')}
                 >
                     CoreProblem一覧
                 </Button>
                 <Button
                     variant={mobilePane === 'problems' ? 'default' : 'outline'}
                     className="min-h-11 flex-1"
-                    onClick={() => setMobilePane('problems')}
+                    onClick={() => setRawMobilePane('problems')}
                     disabled={!selectedCoreProblemId}
                 >
                     問題一覧
@@ -105,8 +97,8 @@ export function CurriculumManager({ initialSubjects }: CurriculumManagerProps) {
                                     coreProblems={selectedSubject.coreProblems}
                                     selectedId={selectedCoreProblemId}
                                     onSelect={(id) => {
-                                        setSelectedCoreProblemId(id);
-                                        if (id) setMobilePane('problems');
+                                        setRawSelectedCoreProblemId(id);
+                                        if (id) setRawMobilePane('problems');
                                     }}
                                 />
                             ) : (
@@ -148,7 +140,7 @@ export function CurriculumManager({ initialSubjects }: CurriculumManagerProps) {
                                 subjectId={selectedSubject.id}
                                 coreProblems={selectedSubject.coreProblems}
                                 selectedId={selectedCoreProblemId}
-                                onSelect={(id) => setSelectedCoreProblemId(id)}
+                                onSelect={(id) => setRawSelectedCoreProblemId(id)}
                             />
                         ) : (
                             <div className="p-4 text-center text-muted-foreground text-sm">
