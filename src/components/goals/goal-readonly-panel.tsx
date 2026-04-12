@@ -15,7 +15,7 @@ import {
     resolveGoalTargetForDate,
 } from '@/lib/student-goal-ui';
 import { cn } from '@/lib/utils';
-import type { DailyGoalEntry, GoalDailyViewPayload, StudentGoalView } from '@/lib/types/student-goal';
+import type { DailyGoalEntry, GoalDailyViewPayload } from '@/lib/types/student-goal';
 
 type GoalReadonlyPanelProps = {
     studentId: string;

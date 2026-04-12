@@ -28,9 +28,9 @@ describe('proxy', () => {
 
         const result = await proxy(request);
 
-        expect(result).toBe(supabaseResponse);
         expect(result.status).toBe(200);
         expect(result.headers.get('location')).toBeNull();
+        expect(result.headers.get('x-middleware-request-x-pathname')).toBe('/login');
     });
 
     it('未ログインの保護ページは /login に redirect する', async () => {
@@ -143,9 +143,9 @@ describe('proxy', () => {
 
         const result = await proxy(request);
 
-        expect(result).toBe(supabaseResponse);
         expect(result.status).toBe(200);
         expect(result.headers.get('location')).toBeNull();
+        expect(result.headers.get('x-middleware-request-x-pathname')).toBe('/problem-authoring/tex-help');
     });
 
     it('学生向け印刷ページには no-store ヘッダーを付与する', async () => {
@@ -162,11 +162,11 @@ describe('proxy', () => {
 
         const result = await proxy(request);
 
-        expect(result).toBe(supabaseResponse);
         expect(result.status).toBe(200);
         expect(result.headers.get('Cache-Control')).toBe('private, no-store, no-cache, max-age=0, must-revalidate');
         expect(result.headers.get('Pragma')).toBe('no-cache');
         expect(result.headers.get('Expires')).toBe('0');
+        expect(result.headers.get('x-middleware-request-x-pathname')).toBe('/dashboard/print');
     });
 
     it('学生向け印刷ページの末尾スラッシュ付き URL にも no-store ヘッダーを付与する', async () => {
@@ -183,11 +183,11 @@ describe('proxy', () => {
 
         const result = await proxy(request);
 
-        expect(result).toBe(supabaseResponse);
         expect(result.status).toBe(200);
         expect(result.headers.get('Cache-Control')).toBe('private, no-store, no-cache, max-age=0, must-revalidate');
         expect(result.headers.get('Pragma')).toBe('no-cache');
         expect(result.headers.get('Expires')).toBe('0');
+        expect(result.headers.get('x-middleware-request-x-pathname')).toBe('/dashboard/print/');
     });
 
     it('講師向け印刷ページへの redirect にも no-store ヘッダーを付与する', async () => {
@@ -222,10 +222,10 @@ describe('proxy', () => {
 
         const result = await proxy(request);
 
-        expect(result).toBe(supabaseResponse);
         expect(result.status).toBe(200);
         expect(result.headers.get('Cache-Control')).toBe('private, no-store, no-cache, max-age=0, must-revalidate');
         expect(result.headers.get('Pragma')).toBe('no-cache');
         expect(result.headers.get('Expires')).toBe('0');
+        expect(result.headers.get('x-middleware-request-x-pathname')).toBe('/teacher/students/student-1/print');
     });
 });
