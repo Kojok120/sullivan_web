@@ -1,9 +1,25 @@
 import type { Metadata } from "next";
+import { Inter, Noto_Sans_JP } from "next/font/google";
+import { GeistMono } from "geist/font/mono";
 import "./globals.css";
+import 'katex/dist/katex.min.css';
 import { Toaster } from "@/components/ui/sonner";
 import { MainNav } from "@/components/main-nav";
-import { GradingNotifier } from "@/components/grading-notifier";
-import { LevelUpModal } from "@/components/gamification/level-up-modal";
+import { StudentRealtimeEvents } from "@/components/student-realtime-events";
+
+export const dynamic = 'force-dynamic';
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
+const notoSansJP = Noto_Sans_JP({
+  subsets: ["latin"],
+  variable: "--font-noto-sans-jp",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Sullivan",
@@ -11,8 +27,6 @@ export const metadata: Metadata = {
 };
 
 import { getSession } from "@/lib/auth";
-
-// ... imports
 
 export default async function RootLayout({
   children,
@@ -22,7 +36,7 @@ export default async function RootLayout({
   const session = await getSession();
 
   return (
-    <html lang="en">
+    <html lang="ja" className={`${inter.variable} ${notoSansJP.variable} ${GeistMono.variable}`}>
       <body
         className="antialiased"
         suppressHydrationWarning
@@ -30,10 +44,7 @@ export default async function RootLayout({
         <MainNav role={session?.role} />
         {children}
         {session && session.role === 'STUDENT' && (
-          <>
-            <GradingNotifier />
-            <LevelUpModal />
-          </>
+          <StudentRealtimeEvents />
         )}
         <Toaster />
       </body>

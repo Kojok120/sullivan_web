@@ -12,10 +12,13 @@ import { GoalReadonlyPanel } from '@/components/goals/goal-readonly-panel';
 export default async function Home() {
     const session = await getSession();
     if (!session) redirect("/login");
+    if (session.role === 'ADMIN') redirect('/admin');
+    if (session.role === 'MATERIAL_AUTHOR') redirect('/materials/problems');
+    if (session.role === 'TEACHER' || session.role === 'HEAD_TEACHER') redirect('/teacher');
 
     const [subjectProgress, goalData] = await Promise.all([
         getSubjectProgress(session.userId),
-        getGoalDailyViewPayload({ studentId: session.userId }),
+        getGoalDailyViewPayload({ studentId: session.userId, daysBefore: 0, daysAfter: 1 }),
     ]);
 
     return (

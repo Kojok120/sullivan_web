@@ -5,9 +5,14 @@ import { updateSession } from '@/lib/supabase/middleware';
 
 const PRINT_PAGE_PATTERN = /^\/teacher\/students\/[^/]+\/print(?:\/)?$/;
 const DASHBOARD_PRINT_PAGE_PATTERN = /^\/dashboard\/print(?:\/)?$/;
+const MATERIAL_AUTHOR_ALLOWED_PATH_PREFIXES = ['/materials', '/problem-authoring'] as const;
 
 function isPrintPagePath(pathname: string) {
     return DASHBOARD_PRINT_PAGE_PATTERN.test(pathname) || PRINT_PAGE_PATTERN.test(pathname);
+}
+
+function isAllowedMaterialAuthorPath(pathname: string) {
+    return MATERIAL_AUTHOR_ALLOWED_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
 export async function proxy(request: NextRequest) {
@@ -42,7 +47,20 @@ export async function proxy(request: NextRequest) {
         if (!user) {
             return maybeApplyNoStoreHeaders(NextResponse.redirect(new URL('/login', request.url)));
         }
+        if (userRole === 'MATERIAL_AUTHOR') {
+            return maybeApplyNoStoreHeaders(NextResponse.redirect(new URL('/materials/problems', request.url)));
+        }
         if (userRole !== 'ADMIN') {
+            return maybeApplyNoStoreHeaders(NextResponse.redirect(new URL('/', request.url)));
+        }
+        return maybeApplyNoStoreHeaders(supabaseResponse);
+    }
+
+    if (request.nextUrl.pathname.startsWith('/materials')) {
+        if (!user) {
+            return maybeApplyNoStoreHeaders(NextResponse.redirect(new URL('/login', request.url)));
+        }
+        if (userRole !== 'MATERIAL_AUTHOR' && userRole !== 'ADMIN') {
             return maybeApplyNoStoreHeaders(NextResponse.redirect(new URL('/', request.url)));
         }
         return maybeApplyNoStoreHeaders(supabaseResponse);
@@ -72,9 +90,23 @@ export async function proxy(request: NextRequest) {
         return maybeApplyNoStoreHeaders(NextResponse.redirect(new URL('/admin', request.url)));
     }
 
+    if (user && userRole === 'MATERIAL_AUTHOR' && request.nextUrl.pathname === '/') {
+        return maybeApplyNoStoreHeaders(NextResponse.redirect(new URL('/materials/problems', request.url)));
+    }
+
     // Redirect TEACHER/HEAD_TEACHER users from root to /teacher
     if (user && (userRole === 'TEACHER' || userRole === 'HEAD_TEACHER') && request.nextUrl.pathname === '/') {
         return maybeApplyNoStoreHeaders(NextResponse.redirect(new URL('/teacher', request.url)));
+    }
+
+    if (
+        user
+        && userRole === 'MATERIAL_AUTHOR'
+        && !isAllowedMaterialAuthorPath(request.nextUrl.pathname)
+        && !request.nextUrl.pathname.startsWith('/force-password-change')
+        && !isPublicPath
+    ) {
+        return maybeApplyNoStoreHeaders(NextResponse.redirect(new URL('/materials/problems', request.url)));
     }
 
     return maybeApplyNoStoreHeaders(supabaseResponse);

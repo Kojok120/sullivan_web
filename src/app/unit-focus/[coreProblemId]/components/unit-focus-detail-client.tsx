@@ -144,10 +144,10 @@ export function UnitFocusDetailClient({
             <div className="grid gap-8">
                 {/* 1. 講義動画セクション */}
                 <section>
-                    <Card className={`overflow-hidden shadow-lg ${needsWatching ? 'border-2 border-amber-400' : 'border-2 border-primary/10'}`}>
+                    <Card className={`overflow-hidden ${needsWatching ? 'border-2 border-amber-400' : 'border-2 border-primary/10'}`}>
                         <CardHeader className="bg-muted/30 pb-4">
                             <CardTitle className="flex items-center gap-2">
-                                <PlayCircle className={`w-5 h-5 ${needsWatching ? 'text-amber-600' : 'text-blue-600'}`} />
+                                <PlayCircle className={`w-5 h-5 ${needsWatching ? 'text-amber-600' : 'text-primary'}`} />
                                 講義動画を視聴
                                 {needsWatching && isUnlocked && (
                                     <span className="text-xs bg-amber-500 text-white px-2 py-0.5 rounded-full ml-2">通常演習に必要</span>
@@ -167,15 +167,15 @@ export function UnitFocusDetailClient({
                                     {/* メイン再生ボタン（先頭から再生） */}
                                     <div className={`aspect-video w-full flex flex-col items-center justify-center rounded-lg border-2 border-dashed mb-4 group cursor-pointer transition-colors ${needsWatching
                                         ? 'bg-amber-50 border-amber-300 hover:bg-amber-100'
-                                        : 'bg-black/5 border-gray-200 hover:bg-black/10'
+                                        : 'bg-black/5 border hover:bg-black/10'
                                         }`}
                                         onClick={() => {
                                             setStartIndex(0);
                                             setIsVideoOpen(true);
                                         }}>
-                                        <PlayCircle className={`w-16 h-16 mb-2 group-hover:scale-110 transition-transform ${needsWatching ? 'text-amber-500' : 'text-blue-500'
+                                        <PlayCircle className={`w-16 h-16 mb-2 group-hover:scale-110 transition-transform ${needsWatching ? 'text-amber-500' : 'text-primary'
                                             }`} />
-                                        <p className={`font-semibold text-lg ${needsWatching ? 'text-amber-700' : 'text-blue-700'}`}>
+                                        <p className={`font-semibold text-lg ${needsWatching ? 'text-amber-700' : 'text-primary'}`}>
                                             {needsWatching ? '今すぐ視聴する' : '再生する'}
                                         </p>
                                         <p className="text-sm text-muted-foreground">{lectureVideos[0].title}</p>
@@ -247,7 +247,7 @@ export function UnitFocusDetailClient({
 
                 {/* 2. 印刷セクション */}
                 <section>
-                    <Card className="border-2 shadow-md border-primary/20 bg-primary/5">
+                    <Card className="border-2 border-primary/20 bg-primary/5">
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
                                 <Printer className="w-6 h-6 text-primary" />
@@ -260,7 +260,7 @@ export function UnitFocusDetailClient({
                         <CardContent>
                             <Button
                                 size="lg"
-                                className="w-full sm:w-auto text-lg py-6 gap-3 shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5"
+                                className="w-full sm:w-auto text-lg py-6 gap-3 transition-all hover:-translate-y-0.5"
                                 asChild
                             >
                                 <Link

@@ -15,7 +15,7 @@ export default function LoginPage() {
                     <h1 className="text-3xl font-bold tracking-tight text-foreground">Sullivan</h1>
                     <p className="mt-2 text-sm text-muted-foreground">アカウントにログインしてください</p>
                 </div>
-                <div className="rounded-xl bg-card p-8 shadow-lg border border-border">
+                <div className="rounded-lg bg-card p-8 border border-border">
                     <form action={action} className="space-y-6" autoComplete="off">
                         <div className="space-y-2">
                             <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">ログインID</label>
@@ -55,7 +55,7 @@ export default function LoginPage() {
                         <button
                             type="submit"
                             disabled={pending}
-                            className="inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-11 px-8 w-full shadow-sm"
+                            className="inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-11 px-8 w-full"
                         >
                             {pending ? 'ログイン中...' : 'ログイン'}
                         </button>

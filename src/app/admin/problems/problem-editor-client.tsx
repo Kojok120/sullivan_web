@@ -1,0 +1,1160 @@
+'use client';
+
+import Link from 'next/link';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
+import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
+import {
+    Check,
+    ChevronDown,
+    ChevronUp,
+    FileUp,
+    Plus,
+    Trash2,
+} from 'lucide-react';
+
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import {
+    buildDefaultStructuredDraft,
+    normalizeAnswerSpecForAuthoring,
+    parseStructuredDocument,
+    type AnswerSpec,
+    type PrintConfig,
+    type ProblemBlock,
+    type StructuredProblemDocument,
+} from '@/lib/structured-problem';
+import {
+    isAiFigureGenerationSupported,
+    parseProblemFigureGenerationContext,
+    renderSvgSceneSpec,
+    type ProblemFigureSceneSpec,
+} from '@/lib/problem-figure-scene';
+import type { RenderableProblemAsset, RenderableProblemWithRelations } from './types';
+import {
+    createProblemDraft,
+    deleteProblemAsset,
+    generateProblemFigureDraft,
+    previewProblemPrint,
+    publishProblemRevision,
+    syncProblemAuthoringArtifacts,
+    uploadProblemAsset,
+} from './actions';
+import {
+    CoreProblemSelector,
+    type ProblemEditorCoreProblemOption,
+    type ProblemEditorSubjectOption,
+    type SelectedCoreProblem,
+} from './components/core-problem-selector';
+import { ProblemBodyCardEditorShared } from './components/problem-body-card-editor-shared';
+import { type VendorSceneApplyPayload, type VendorSyncPayload } from './problem-authoring-embed';
+import {
+    appendProblemBodyCard,
+    deleteProblemBodySegment,
+    deriveProblemTypeFromDocument,
+    getProblemBodyCardAuthoringTool,
+    hasEmptyProblemBodyCard,
+    isVisualAttachmentKind,
+    moveProblemBodySegment,
+    parseProblemBodySegments,
+    updateProblemBodyCard,
+} from '@/lib/problem-editor-model';
+
+type EditorProps = {
+    problem: RenderableProblemWithRelations | null;
+    subjects: ProblemEditorSubjectOption[];
+    coreProblems: ProblemEditorCoreProblemOption[];
+    initialSubjectId?: string | null;
+};
+
+type EditorState = {
+    problemId: string;
+    revisionId: string;
+    subjectId: string | null;
+    problemType: string;
+    grade: string;
+    videoUrl: string;
+    coreProblems: SelectedCoreProblem[];
+    authoringTool: string;
+    document: StructuredProblemDocument;
+    answerSpec: AnswerSpec;
+    printConfig: PrintConfig;
+    generationExtraPrompt: string;
+    authoringStateText: string;
+};
+
+const ASSET_SOURCE_TOOLS = ['MANUAL', 'GEOGEBRA', 'SVG', 'UPLOAD'] as const;
+const ASSET_KINDS = ['IMAGE', 'SVG', 'PDF', 'GEOGEBRA_STATE', 'JSON', 'THUMBNAIL'] as const;
+
+function normalizeAuthoringTool(authoringTool?: string | null) {
+    return authoringTool ?? 'MANUAL';
+}
+
+function getCardUploadAssetSpec(file: File): { assetKind: 'IMAGE' | 'SVG'; attachmentBlockType: 'image' | 'svg' } | null {
+    const normalizedName = file.name.toLowerCase();
+
+    if (file.type === 'image/svg+xml' || normalizedName.endsWith('.svg')) {
+        return { assetKind: 'SVG', attachmentBlockType: 'svg' };
+    }
+
+    if (
+        file.type === 'image/png'
+        || file.type === 'image/jpeg'
+        || normalizedName.endsWith('.png')
+        || normalizedName.endsWith('.jpg')
+        || normalizedName.endsWith('.jpeg')
+    ) {
+        return { assetKind: 'IMAGE', attachmentBlockType: 'image' };
+    }
+
+    return null;
+}
+
+function buildInitialState(problem: RenderableProblemWithRelations | null, initialSubjectId?: string | null): EditorState {
+    const base = buildDefaultStructuredDraft(problem?.problemType ?? 'SHORT_TEXT');
+    const draftRevision = problem?.revisions.find((revision) => revision.status === 'DRAFT') ?? problem?.publishedRevision ?? null;
+    const structuredContent = draftRevision?.structuredContent
+        ? parseStructuredDocument(draftRevision.structuredContent)
+        : base.document;
+    const answerSpec = normalizeAnswerSpecForAuthoring((draftRevision?.answerSpec as AnswerSpec | null) ?? base.answerSpec);
+    const printConfig = (draftRevision?.printConfig as PrintConfig | null) ?? base.printConfig;
+    const generationContext = parseProblemFigureGenerationContext(draftRevision?.generationContext);
+    const initialProblemType = problem?.problemType ?? 'SHORT_TEXT';
+    const normalizedAuthoringTool = normalizeAuthoringTool(draftRevision?.authoringTool);
+
+    return {
+        problemId: problem?.id ?? '',
+        revisionId: draftRevision?.id ?? '',
+        subjectId: problem?.subjectId ?? problem?.coreProblems[0]?.subjectId ?? initialSubjectId ?? null,
+        problemType: initialProblemType,
+        grade: problem?.grade ?? '',
+        videoUrl: problem?.videoUrl ?? '',
+        coreProblems: (problem?.coreProblems ?? []) as SelectedCoreProblem[],
+        authoringTool: normalizedAuthoringTool,
+        document: structuredContent,
+        answerSpec,
+        printConfig,
+        generationExtraPrompt: generationContext?.extraPrompt ?? '',
+        authoringStateText: draftRevision?.authoringState ? JSON.stringify(draftRevision.authoringState, null, 2) : '',
+    };
+}
+
+function validateEditorState(state: Pick<EditorState, 'subjectId' | 'coreProblems'>) {
+    if (!state.subjectId) {
+        return '科目を選択してください';
+    }
+
+    if (state.coreProblems.length === 0) {
+        return '単元を選択してください';
+    }
+
+    if (state.coreProblems.some((coreProblem) => coreProblem.subjectId && coreProblem.subjectId !== state.subjectId)) {
+        return '選択した科目と異なる単元が含まれています';
+    }
+
+    return null;
+}
+
+export function ProblemEditorClient({
+    problem,
+    subjects,
+    coreProblems,
+    initialSubjectId = null,
+}: EditorProps) {
+    const router = useRouter();
+    const [isPending, startTransition] = useTransition();
+    const [isGenerating, startGenerationTransition] = useTransition();
+    const [state, setState] = useState(() => buildInitialState(problem, initialSubjectId));
+    const vendorSyncHandlerRef = useRef<(() => Promise<VendorSyncPayload>) | null>(null);
+    const vendorSceneApplyHandlerRef = useRef<((payload: VendorSceneApplyPayload) => Promise<void>) | null>(null);
+    const [assetKind, setAssetKind] = useState<(typeof ASSET_KINDS)[number]>('SVG');
+    const [assetInlineContent, setAssetInlineContent] = useState('');
+    const [assetSourceTool, setAssetSourceTool] = useState<(typeof ASSET_SOURCE_TOOLS)[number]>('UPLOAD');
+    const [assetFile, setAssetFile] = useState<File | null>(null);
+    const [generationDiagnostic, setGenerationDiagnostic] = useState<string | null>(null);
+    const [activeVisualCardId, setActiveVisualCardId] = useState<string | null>(null);
+    const [uploadingCardId, setUploadingCardId] = useState<string | null>(null);
+    const [isVendorToolReady, setIsVendorToolReady] = useState(false);
+
+    const activeRevision = useMemo(() => {
+        if (!problem) return null;
+        return problem.revisions.find((revision) => revision.id === state.revisionId)
+            ?? problem.revisions.find((revision) => revision.status === 'DRAFT')
+            ?? problem.publishedRevision
+            ?? null;
+    }, [problem, state.revisionId]);
+    const bodySegments = useMemo(() => parseProblemBodySegments(state.document.blocks), [state.document.blocks]);
+    const bodyCards = useMemo(
+        () => bodySegments.flatMap((segment) => segment.kind === 'card' ? [segment.card] : []),
+        [bodySegments],
+    );
+    const effectiveProblemType = useMemo(
+        () => deriveProblemTypeFromDocument(state.document, state.problemType),
+        [state.document, state.problemType],
+    );
+    const syncedAnswerSpec = useMemo(
+        () => normalizeAnswerSpecForAuthoring(state.answerSpec),
+        [state.answerSpec],
+    );
+    const visualCards = useMemo(
+        () => bodyCards.filter((card) => isVisualAttachmentKind(card.attachmentKind)),
+        [bodyCards],
+    );
+    const currentSubjectName = useMemo(
+        () => subjects.find((subject) => subject.id === state.subjectId)?.name ?? state.coreProblems[0]?.subject?.name ?? null,
+        [subjects, state.subjectId, state.coreProblems],
+    );
+    const resolvedActiveVisualCardId = activeVisualCardId && visualCards.some((card) => card.id === activeVisualCardId)
+        ? activeVisualCardId
+        : visualCards[0]?.id ?? null;
+    const activeVisualCard = visualCards.find((card) => card.id === resolvedActiveVisualCardId) ?? null;
+    const activeVisualAuthoringTool = getProblemBodyCardAuthoringTool(activeVisualCard, state.authoringTool);
+    const effectiveAuthoringTool = activeVisualAuthoringTool ?? state.authoringTool;
+    const supportsAiFigureGeneration = isAiFigureGenerationSupported(effectiveProblemType);
+
+    useEffect(() => {
+        if (!activeVisualAuthoringTool) {
+            setIsVendorToolReady(false);
+        }
+    }, [activeVisualAuthoringTool]);
+
+    const assetOptions = activeRevision?.assets ?? problem?.publishedRevision?.assets ?? [];
+
+    const handleCardAssetUpload = async (
+        cardId: string,
+        file: File,
+    ) => {
+        const uploadSpec = getCardUploadAssetSpec(file);
+        if (!uploadSpec) {
+            toast.error('アップロードできるのは SVG / PNG / JPG / JPEG のみです');
+            return;
+        }
+
+        if (!state.problemId || !state.revisionId) {
+            toast.error('先に下書きを保存してください');
+            return;
+        }
+
+        setUploadingCardId(cardId);
+        try {
+            const formData = new FormData();
+            formData.set('problemId', state.problemId);
+            formData.set('revisionId', state.revisionId);
+            formData.set('kind', uploadSpec.assetKind);
+            formData.set('sourceTool', 'UPLOAD');
+            formData.set('file', file);
+
+            const result = await uploadProblemAsset(formData);
+            if (!result.success || !result.asset) {
+                toast.error(result.error || '図版のアップロードに失敗しました');
+                return;
+            }
+
+            setState((current) => ({
+                ...current,
+                document: updateProblemBodyCard(current.document, cardId, (card) => ({
+                    ...card,
+                    attachmentKind: 'upload',
+                    attachmentBlockType: uploadSpec.attachmentBlockType,
+                    assetId: result.asset?.id ?? '',
+                })),
+            }));
+            toast.success('図版をアップロードしました');
+            router.refresh();
+        } finally {
+            setUploadingCardId(null);
+        }
+    };
+
+    const handleSave = () => {
+        startTransition(async () => {
+            const persisted = await persistDraftState({ showSuccessToast: true });
+            if (!persisted) {
+                return;
+            }
+        });
+    };
+
+    const persistDraftState = async ({ showSuccessToast }: { showSuccessToast: boolean }) => {
+        try {
+            const validationError = validateEditorState(state);
+            if (validationError) {
+                toast.error(validationError);
+                return null;
+            }
+
+            if (hasEmptyProblemBodyCard(bodyCards)) {
+                toast.error('空の問題文カードがあります。本文を入力するか削除してください');
+                return null;
+            }
+
+            let authoringState = state.authoringStateText.trim()
+                ? JSON.parse(state.authoringStateText)
+                : undefined;
+            let vendorPayload: VendorSyncPayload | null = null;
+            const normalizedAnswerSpec = normalizeAnswerSpecForAuthoring(state.answerSpec);
+
+            if (activeVisualCard && activeVisualAuthoringTool === 'GEOGEBRA') {
+                if (!vendorSyncHandlerRef.current) {
+                    toast.error('GeoGebra エディタの初期化が完了していません');
+                    return null;
+                }
+
+                vendorPayload = await vendorSyncHandlerRef.current();
+                authoringState = vendorPayload.authoringState;
+            }
+
+            let workingDocument = state.document;
+            let result = await createProblemDraft({
+                problemId: state.problemId || undefined,
+                problemType: effectiveProblemType,
+                grade: state.grade || undefined,
+                videoUrl: state.videoUrl || undefined,
+                coreProblemIds: state.coreProblems.map((coreProblem) => coreProblem.id),
+                authoringTool: effectiveAuthoringTool as never,
+                authoringState,
+                document: workingDocument,
+                answerSpec: normalizedAnswerSpec,
+                printConfig: state.printConfig,
+            });
+
+            if (!result.success) {
+                toast.error(result.error || '保存に失敗しました');
+                return null;
+            }
+
+            let problemId = result.problemId || state.problemId;
+            let revisionId = result.revisionId || state.revisionId;
+
+            if (
+                vendorPayload
+                && problemId
+                && revisionId
+                && activeVisualCard
+                && activeVisualAuthoringTool === 'GEOGEBRA'
+            ) {
+                const syncResult = await syncProblemAuthoringArtifacts({
+                    problemId,
+                    revisionId,
+                    authoringTool: 'GEOGEBRA',
+                    authoringState: vendorPayload.authoringState,
+                    svgContent: vendorPayload.svgContent,
+                });
+
+                if (!syncResult.success) {
+                    toast.error(syncResult.error || 'vendor アセット同期に失敗しました');
+                    return null;
+                }
+
+                const svgAssetId = syncResult.svgAsset?.id;
+                if (svgAssetId) {
+                    const nextDocument = updateProblemBodyCard(
+                        workingDocument,
+                        activeVisualCard.id,
+                        (card) => ({
+                            ...card,
+                            attachmentKind: card.attachmentKind,
+                            assetId: svgAssetId,
+                        }),
+                    );
+
+                    if (JSON.stringify(nextDocument) !== JSON.stringify(workingDocument)) {
+                        workingDocument = nextDocument;
+                        result = await createProblemDraft({
+                            problemId,
+                            problemType: effectiveProblemType,
+                            grade: state.grade || undefined,
+                            videoUrl: state.videoUrl || undefined,
+                            coreProblemIds: state.coreProblems.map((coreProblem) => coreProblem.id),
+                            authoringTool: effectiveAuthoringTool as never,
+                            authoringState: vendorPayload.authoringState,
+                            document: workingDocument,
+                            answerSpec: normalizedAnswerSpec,
+                            printConfig: state.printConfig,
+                        });
+
+                        if (!result.success) {
+                            toast.error(result.error || 'vendor 連携後の再保存に失敗しました');
+                            return null;
+                        }
+
+                        problemId = result.problemId || problemId;
+                        revisionId = result.revisionId || revisionId;
+                    }
+                }
+            }
+
+            if (showSuccessToast) {
+                toast.success('下書きを保存しました');
+            }
+
+            setState((current) => ({
+                ...current,
+                problemId,
+                revisionId,
+                problemType: effectiveProblemType,
+                answerSpec: normalizedAnswerSpec,
+                document: workingDocument,
+                authoringStateText: authoringState ? JSON.stringify(authoringState, null, 2) : '',
+                authoringTool: effectiveAuthoringTool,
+            }));
+
+            if (!state.problemId && problemId) {
+                router.push(`/admin/problems/${problemId}`);
+            } else {
+                router.refresh();
+            }
+
+            return {
+                problemId,
+                revisionId,
+            };
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : '保存に失敗しました');
+            return null;
+        }
+    };
+
+    const handleGenerateFigure = () => {
+        if (!state.problemId) {
+            toast.error('先に下書きを保存してください');
+            return;
+        }
+
+        if (!activeVisualCard || !supportsAiFigureGeneration) {
+            toast.error('AI 図版生成は GEOMETRY / GRAPH_DRAW のみ対応しています');
+            return;
+        }
+
+        const sourceProblemText = activeVisualCard.text.trim();
+        const targetTool = getProblemBodyCardAuthoringTool(activeVisualCard, state.authoringTool);
+        if (!sourceProblemText) {
+            toast.error('このカードの本文を入力してください');
+            return;
+        }
+
+        if (!targetTool) {
+            toast.error('グラフまたは図形カードを選択してください');
+            return;
+        }
+
+        if (targetTool === 'GEOGEBRA' && !isVendorToolReady) {
+            toast.error('GeoGebra エディタの準備ができるまで少し待ってください');
+            return;
+        }
+
+        startGenerationTransition(async () => {
+            try {
+                setGenerationDiagnostic(null);
+
+                const result = await generateProblemFigureDraft({
+                    problemId: state.problemId,
+                    revisionId: state.revisionId || undefined,
+                    sourceProblemText,
+                    extraPrompt: state.generationExtraPrompt,
+                    targetTool,
+                });
+
+                if (!result.success) {
+                    setGenerationDiagnostic(result.error || 'AI 図版生成に失敗しました');
+                    toast.error(result.error || 'AI 図版生成に失敗しました');
+                    return;
+                }
+
+                let nextDocument = state.document;
+                let nextAuthoringStateText = '';
+                const sceneSpec = result.sceneSpec as ProblemFigureSceneSpec;
+
+                if (result.targetTool === 'SVG') {
+                    const svgContent = renderSvgSceneSpec(sceneSpec as Extract<ProblemFigureSceneSpec, { kind: 'svg' }>);
+                    const syncResult = await syncProblemAuthoringArtifacts({
+                        problemId: result.problemId,
+                        revisionId: result.revisionId,
+                        authoringTool: 'SVG',
+                        authoringState: undefined,
+                        svgContent,
+                    });
+
+                    if (!syncResult.success) {
+                        setGenerationDiagnostic(syncResult.error || 'SVG アセットの保存に失敗しました');
+                        toast.error(syncResult.error || 'SVG アセットの保存に失敗しました');
+                        return;
+                    }
+
+                    const svgAssetId = syncResult.svgAsset?.id;
+                    if (svgAssetId) {
+                        nextDocument = updateProblemBodyCard(nextDocument, activeVisualCard.id, (card) => ({
+                            ...card,
+                            attachmentKind: card.attachmentKind,
+                            assetId: svgAssetId,
+                        }));
+                    }
+                } else {
+                    if (!vendorSceneApplyHandlerRef.current || !vendorSyncHandlerRef.current) {
+                        setGenerationDiagnostic(`${result.targetTool} エディタの準備ができていません`);
+                        toast.error(`${result.targetTool} エディタの準備ができていません`);
+                        return;
+                    }
+
+                    await vendorSceneApplyHandlerRef.current({
+                        tool: result.targetTool,
+                        sceneSpec,
+                    } as VendorSceneApplyPayload);
+
+                    const vendorPayload = await vendorSyncHandlerRef.current();
+                    nextAuthoringStateText = JSON.stringify(vendorPayload.authoringState, null, 2);
+
+                    const syncResult = await syncProblemAuthoringArtifacts({
+                        problemId: result.problemId,
+                        revisionId: result.revisionId,
+                        authoringTool: result.targetTool,
+                        authoringState: vendorPayload.authoringState,
+                        svgContent: vendorPayload.svgContent,
+                    });
+
+                    if (!syncResult.success) {
+                        setGenerationDiagnostic(syncResult.error || 'vendor アセット同期に失敗しました');
+                        toast.error(syncResult.error || 'vendor アセット同期に失敗しました');
+                        return;
+                    }
+
+                    const svgAssetId = syncResult.svgAsset?.id;
+                    if (svgAssetId) {
+                        nextDocument = updateProblemBodyCard(nextDocument, activeVisualCard.id, (card) => ({
+                            ...card,
+                            attachmentKind: card.attachmentKind,
+                            assetId: svgAssetId,
+                        }));
+                    }
+                }
+
+                const saveResult = await createProblemDraft({
+                    problemId: result.problemId,
+                    problemType: deriveProblemTypeFromDocument(nextDocument, state.problemType),
+                    grade: state.grade || undefined,
+                    videoUrl: state.videoUrl || undefined,
+                    coreProblemIds: state.coreProblems.map((coreProblem) => coreProblem.id),
+                    authoringTool: result.targetTool === 'SVG' ? 'SVG' as never : result.targetTool as never,
+                    authoringState: result.targetTool === 'SVG'
+                        ? undefined
+                        : JSON.parse(nextAuthoringStateText),
+                    document: nextDocument,
+                    answerSpec: normalizeAnswerSpecForAuthoring(state.answerSpec),
+                    printConfig: state.printConfig,
+                });
+
+                if (!saveResult.success) {
+                    setGenerationDiagnostic(saveResult.error || '生成結果の保存に失敗しました');
+                    toast.error(saveResult.error || '生成結果の保存に失敗しました');
+                    return;
+                }
+
+                setState((current) => ({
+                    ...current,
+                    problemId: saveResult.problemId || result.problemId,
+                    revisionId: saveResult.revisionId || result.revisionId,
+                    problemType: deriveProblemTypeFromDocument(nextDocument, current.problemType),
+                    answerSpec: normalizeAnswerSpecForAuthoring(current.answerSpec),
+                    document: nextDocument,
+                    authoringStateText: nextAuthoringStateText,
+                    authoringTool: result.targetTool,
+                }));
+                toast.success('AI で図版を下書きに反映しました');
+                router.refresh();
+            } catch (error) {
+                const message = error instanceof Error ? error.message : 'AI 図版生成に失敗しました';
+                setGenerationDiagnostic(message);
+                toast.error(message);
+            }
+        });
+    };
+
+    const handlePublish = () => {
+        if (!state.problemId) {
+            toast.error('先に下書きを保存してください');
+            return;
+        }
+
+        startTransition(async () => {
+            const result = await publishProblemRevision(state.problemId);
+            if (result.success) {
+                toast.success('公開しました');
+                router.refresh();
+            } else {
+                toast.error(result.error || '公開に失敗しました');
+            }
+        });
+    };
+
+    const handlePreview = async () => {
+        const persisted = await persistDraftState({ showSuccessToast: false });
+        if (!persisted) {
+            return;
+        }
+
+        const result = await previewProblemPrint({
+            problemId: persisted.problemId,
+            revisionId: persisted.revisionId || undefined,
+        });
+        if (result.success) {
+            window.open(result.url, '_blank', 'noopener,noreferrer');
+        }
+    };
+
+    const handleAssetUpload = () => {
+        if (!state.problemId || !state.revisionId) {
+            toast.error('先に下書きを保存してください');
+            return;
+        }
+
+        startTransition(async () => {
+            const formData = new FormData();
+            formData.set('problemId', state.problemId);
+            formData.set('revisionId', state.revisionId);
+            formData.set('kind', assetKind);
+            formData.set('sourceTool', assetSourceTool);
+            if (assetFile) {
+                formData.set('file', assetFile);
+            }
+            if (assetInlineContent.trim()) {
+                formData.set('inlineContent', assetInlineContent.trim());
+            }
+
+            const result = await uploadProblemAsset(formData);
+            if (result.success) {
+                toast.success('アセットを保存しました');
+                setAssetFile(null);
+                setAssetInlineContent('');
+                router.refresh();
+            } else {
+                toast.error(result.error || 'アセット保存に失敗しました');
+            }
+        });
+    };
+
+    const handleDeleteAsset = (assetId: string) => {
+        startTransition(async () => {
+            const result = await deleteProblemAsset(assetId);
+            if (result.success) {
+                toast.success('アセットを削除しました');
+                router.refresh();
+            } else {
+                toast.error(result.error || 'アセット削除に失敗しました');
+            }
+        });
+    };
+
+    return (
+        <div className="space-y-6">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                    <h1 className="text-2xl font-bold">構造化問題エディタ</h1>
+                    <p className="text-sm text-muted-foreground">
+                        理科・数学向けの revision / asset 一体型エディタです。
+                    </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" asChild>
+                        <Link href="/admin/problems">一覧へ戻る</Link>
+                    </Button>
+                    <Button variant="outline" onClick={handlePreview} disabled={isPending || !state.problemId}>
+                        プレビュー
+                    </Button>
+                    <Button variant="outline" onClick={handleSave} disabled={isPending}>
+                        下書き保存
+                    </Button>
+                    <Button onClick={handlePublish} disabled={isPending || !state.problemId}>
+                        公開
+                    </Button>
+                </div>
+            </div>
+
+            <Alert>
+                <Check className="h-4 w-4" />
+                <AlertTitle>DEV限定</AlertTitle>
+                <AlertDescription>
+                    structured problem は feature flag で有効化された環境でのみ利用されます。PRODUCTION DB には適用しません。
+                </AlertDescription>
+            </Alert>
+
+            <Tabs defaultValue="basic" className="space-y-4">
+                <TabsList className="flex h-auto w-full flex-wrap justify-start gap-2 bg-transparent p-0">
+                    <TabsTrigger value="basic">基本情報</TabsTrigger>
+                    <TabsTrigger value="body">本文</TabsTrigger>
+                    <TabsTrigger value="answer">解答仕様</TabsTrigger>
+                    <TabsTrigger value="assets">アセット</TabsTrigger>
+                    <TabsTrigger value="history">改訂履歴</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="basic">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>基本情報</CardTitle>
+                            <CardDescription>問題の識別情報と紐付けを設定します。</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="grid gap-4 md:grid-cols-3">
+                                <div className="space-y-2">
+                                    <Label>科目</Label>
+                                    <Select
+                                        value={state.subjectId ?? undefined}
+                                        onValueChange={(value) => setState((current) => ({
+                                            ...current,
+                                            subjectId: value,
+                                            coreProblems: current.subjectId === value ? current.coreProblems : [],
+                                        }))}
+                                    >
+                                        <SelectTrigger><SelectValue placeholder="科目を選択" /></SelectTrigger>
+                                        <SelectContent>
+                                            {subjects.map((subject) => (
+                                                <SelectItem key={subject.id} value={subject.id}>{subject.name}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>学年</Label>
+                                    <Input value={state.grade} onChange={(event) => setState((current) => ({ ...current, grade: event.target.value }))} placeholder="中2" />
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>解説動画 URL</Label>
+                                <Input value={state.videoUrl} onChange={(event) => setState((current) => ({ ...current, videoUrl: event.target.value }))} placeholder="https://..." />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>単元</Label>
+                                <CoreProblemSelector
+                                    selected={state.coreProblems}
+                                    onChange={(next) => setState((current) => ({
+                                        ...current,
+                                        coreProblems: next,
+                                        subjectId: next[0]?.subjectId ?? current.subjectId,
+                                    }))}
+                                    active
+                                    subjectId={state.subjectId}
+                                    subjects={subjects}
+                                    coreProblems={coreProblems}
+                                />
+                            </div>
+
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="body">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>本文</CardTitle>
+                            <CardDescription>問題文カードを積み上げて編集します。科目によって本文確認や図版操作の内容が変わります。</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="space-y-4">
+                                {bodySegments.map((segment, index) => (
+                                    <Card key={segment.kind === 'card' ? segment.card.id : segment.block.id} className="border-dashed shadow-none hover:shadow-none">
+                                        <CardHeader>
+                                            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                                <CardTitle className="text-base">
+                                                    {segment.kind === 'card' ? `問題文カード ${index + 1}` : `旧仕様ブロック ${index + 1}`}
+                                                </CardTitle>
+                                                <div className="flex gap-2">
+                                                    <Button type="button" variant="outline" size="icon" onClick={() => setState((current) => ({
+                                                        ...current,
+                                                        document: moveProblemBodySegment(current.document, index, -1),
+                                                    }))}><ChevronUp className="h-4 w-4" /></Button>
+                                                    <Button type="button" variant="outline" size="icon" onClick={() => setState((current) => ({
+                                                        ...current,
+                                                        document: moveProblemBodySegment(current.document, index, 1),
+                                                    }))}><ChevronDown className="h-4 w-4" /></Button>
+                                                    <Button type="button" variant="outline" size="icon" onClick={() => setState((current) => ({
+                                                        ...current,
+                                                        document: deleteProblemBodySegment(current.document, index),
+                                                    }))}><Trash2 className="h-4 w-4" /></Button>
+                                                </div>
+                                            </div>
+                                        </CardHeader>
+                                        <CardContent>
+                                            {segment.kind === 'card' ? (
+                                                <ProblemBodyCardEditorShared
+                                                    variant="admin"
+                                                    subjectName={currentSubjectName}
+                                                    card={segment.card}
+                                                    isActiveVisualCard={segment.card.id === resolvedActiveVisualCardId}
+                                                    problemId={state.problemId}
+                                                    revisionId={state.revisionId}
+                                                    isUploadingAsset={uploadingCardId === segment.card.id}
+                                                    authoringStateText={state.authoringStateText}
+                                                    generationExtraPrompt={state.generationExtraPrompt}
+                                                    generationDiagnostic={generationDiagnostic}
+                                                    isPending={isPending}
+                                                    isGenerating={isGenerating}
+                                                    isAuthoringToolReady={isVendorToolReady}
+                                                    supportsAiFigureGeneration={supportsAiFigureGeneration}
+                                                    onActivateVisualCard={() => setActiveVisualCardId(segment.card.id)}
+                                                    onCardChange={(updater) => setState((current) => {
+                                                        const nextDocument = updateProblemBodyCard(current.document, segment.card.id, updater);
+                                                        return {
+                                                            ...current,
+                                                            document: nextDocument,
+                                                        };
+                                                    })}
+                                                    onUploadAsset={(file) => handleCardAssetUpload(segment.card.id, file)}
+                                                    onAuthoringStateTextChange={(next) => setState((current) => ({ ...current, authoringStateText: next }))}
+                                                    onGenerationExtraPromptChange={(next) => setState((current) => ({ ...current, generationExtraPrompt: next }))}
+                                                    onGenerateFigure={handleGenerateFigure}
+                                                    syncHandlerRef={vendorSyncHandlerRef}
+                                                    sceneApplyHandlerRef={vendorSceneApplyHandlerRef}
+                                                    onAuthoringToolReadyChange={setIsVendorToolReady}
+                                                    effectiveProblemType={effectiveProblemType}
+                                                    preferredAuthoringTool={state.authoringTool}
+                                                />
+                                            ) : (
+                                                <div className="space-y-3">
+                                                    <div className="rounded-md border border-dashed bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+                                                        旧仕様ブロックです。互換表示のみ残しており、新規追加はできません。
+                                                    </div>
+                                                    <BlockEditor
+                                                        block={segment.block}
+                                                        assetOptions={assetOptions}
+                                                        onChange={(nextBlock) => updateBlock(setState, String(segment.block.id), nextBlock)}
+                                                    />
+                                                </div>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setState((current) => ({
+                                        ...current,
+                                        document: appendProblemBodyCard(current.document),
+                                    }))}
+                                >
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    問題文を追加
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="answer">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>解答仕様</CardTitle>
+                            <CardDescription>AI採点の基準になる正解と別解を設定します。</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <AnswerSpecEditor
+                                value={syncedAnswerSpec}
+                                onChange={(next) => setState((current) => ({ ...current, answerSpec: next }))}
+                            />
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="assets">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>アセット</CardTitle>
+                            <CardDescription>SVG / 画像 / state を revision に紐付けて保存します。</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="grid gap-4 md:grid-cols-3">
+                                <div className="space-y-2">
+                                    <Label>種別</Label>
+                                    <EnumSelect value={assetKind} values={ASSET_KINDS as unknown as string[]} onChange={(value) => setAssetKind(value as (typeof ASSET_KINDS)[number])} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>sourceTool</Label>
+                                    <EnumSelect value={assetSourceTool} values={ASSET_SOURCE_TOOLS as unknown as string[]} onChange={(value) => setAssetSourceTool(value as (typeof ASSET_SOURCE_TOOLS)[number])} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>ファイル</Label>
+                                    <Input type="file" onChange={(event) => setAssetFile(event.target.files?.[0] ?? null)} />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>inlineContent</Label>
+                                <Textarea value={assetInlineContent} onChange={(event) => setAssetInlineContent(event.target.value)} rows={6} placeholder="SVG や JSON を直接保存できます" />
+                            </div>
+                            <Button variant="outline" onClick={handleAssetUpload} disabled={isPending}>
+                                <FileUp className="mr-2 h-4 w-4" />
+                                アセット保存
+                            </Button>
+
+                            <div className="space-y-3">
+                                {assetOptions.length === 0 ? (
+                                    <div className="text-sm text-muted-foreground">保存済みアセットはありません。</div>
+                                ) : assetOptions.map((asset) => (
+                                    <div key={asset.id} className="rounded-lg border p-4">
+                                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                                            <div className="space-y-2">
+                                                <div className="flex flex-wrap gap-2">
+                                                    <Badge>{asset.kind}</Badge>
+                                                    <Badge variant="secondary">{asset.fileName}</Badge>
+                                                </div>
+                                                <div className="text-sm text-muted-foreground">{asset.mimeType}</div>
+                                                {asset.signedUrl && (
+                                                    <a className="text-sm text-blue-600 underline" href={asset.signedUrl} target="_blank" rel="noreferrer">
+                                                        アセットを開く
+                                                    </a>
+                                                )}
+                                            </div>
+                                            <Button variant="outline" onClick={() => handleDeleteAsset(asset.id)} disabled={isPending}>
+                                                削除
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="history">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>改訂履歴</CardTitle>
+                            <CardDescription>draft / published / superseded の revision を確認します。</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            {problem?.revisions.length ? problem.revisions.map((revision) => (
+                                <div key={revision.id} className="rounded-lg border p-4">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <Badge>{revision.status}</Badge>
+                                        <Badge variant="secondary">rev.{revision.revisionNumber}</Badge>
+                                        {revision.id === state.revisionId && <Badge variant="outline">編集中</Badge>}
+                                    </div>
+                                    <div className="mt-2 text-sm text-muted-foreground">
+                                        {new Date(revision.updatedAt).toLocaleString('ja-JP')}
+                                    </div>
+                                </div>
+                            )) : (
+                                <div className="text-sm text-muted-foreground">revision はまだありません。</div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+            </Tabs>
+        </div>
+    );
+}
+
+function EnumSelect({
+    value,
+    values,
+    onChange,
+}: {
+    value: string;
+    values: string[];
+    onChange: (value: string) => void;
+}) {
+    return (
+        <Select value={value} onValueChange={onChange}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+                {values.map((item) => (
+                    <SelectItem key={item} value={item}>{item}</SelectItem>
+                ))}
+            </SelectContent>
+        </Select>
+    );
+}
+
+function BlockEditor({
+    block,
+    assetOptions,
+    onChange,
+}: {
+    block: ProblemBlock;
+    assetOptions: RenderableProblemAsset[];
+    onChange: (block: ProblemBlock) => void;
+}) {
+    const type = block.type;
+    const update = (patch: Partial<ProblemBlock>) => onChange({ ...block, ...patch } as ProblemBlock);
+
+    if (type === 'paragraph') {
+        return (
+            <Textarea
+                value={String(block.text ?? '')}
+                onChange={(event) => update({ text: event.target.value })}
+                rows={4}
+            />
+        );
+    }
+
+    if (type === 'katexInline' || type === 'katexDisplay') {
+        return (
+            <div className="space-y-2">
+                <Textarea value={String(block.latex ?? '')} onChange={(event) => update({ latex: event.target.value })} rows={3} />
+            </div>
+        );
+    }
+
+    if (type === 'image' || type === 'svg' || type === 'graphAsset' || type === 'geometryAsset') {
+        return (
+            <div className="space-y-3">
+                <div className="space-y-2">
+                    <Label>assetId</Label>
+                    <Select
+                        value={String(block.assetId ?? '') || '__NONE__'}
+                        onValueChange={(value) => update({
+                            assetId: value === '__NONE__' ? '' : value,
+                        })}
+                    >
+                        <SelectTrigger><SelectValue placeholder="asset を選択" /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="__NONE__">未選択</SelectItem>
+                            {assetOptions.map((asset) => (
+                                <SelectItem key={asset.id} value={asset.id}>{asset.kind} / {asset.fileName}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                {type === 'image' && (
+                    <Input value={String(block.src ?? '')} onChange={(event) => update({ src: event.target.value })} placeholder="fallback image URL" />
+                )}
+                {type === 'svg' && (
+                    <Textarea value={String(block.svg ?? '')} onChange={(event) => update({ svg: event.target.value })} rows={5} placeholder="<svg>...</svg>" />
+                )}
+            </div>
+        );
+    }
+
+    if (type === 'table') {
+        return (
+            <div className="space-y-2">
+                <Textarea
+                    value={JSON.stringify(block.headers ?? [], null, 2)}
+                    onChange={(event) => update({ headers: safeJsonArray(event.target.value) })}
+                    rows={3}
+                    placeholder='["x", "y"]'
+                />
+                <Textarea
+                    value={JSON.stringify(block.rows ?? [], null, 2)}
+                    onChange={(event) => update({ rows: safeJsonMatrix(event.target.value) })}
+                    rows={6}
+                    placeholder='[["1", "2"]]'
+                />
+            </div>
+        );
+    }
+
+    if (type === 'choices') {
+        return (
+            <Textarea
+                value={JSON.stringify(block.options ?? [], null, 2)}
+                onChange={(event) => update({ options: safeJsonArrayOfObjects(event.target.value, [{ id: 'A', label: '選択肢A' }]) })}
+                rows={6}
+                placeholder='[{"id":"A","label":"選択肢A"}]'
+            />
+        );
+    }
+
+    if (type === 'blankGroup') {
+        return (
+            <Textarea
+                value={JSON.stringify(block.blanks ?? [], null, 2)}
+                onChange={(event) => update({ blanks: safeJsonArrayOfObjects(event.target.value, [{ id: 'blank-1', label: '空欄1' }]) })}
+                rows={6}
+                placeholder='[{"id":"blank-1","label":"空欄1"}]'
+            />
+        );
+    }
+
+    if (type === 'answerLines') {
+        return (
+            <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
+                旧仕様の解答欄ブロックです。現在の印刷では無視されるため、必要なら削除するか別の block に変更してください。
+            </div>
+        );
+    }
+
+    return null;
+}
+
+function AnswerSpecEditor({
+    value,
+    onChange,
+}: {
+    value: AnswerSpec;
+    onChange: (next: AnswerSpec) => void;
+}) {
+    const exactValue = normalizeAnswerSpecForAuthoring(value);
+    const update = (patch: Partial<typeof exactValue>) => onChange({ ...exactValue, ...patch });
+
+    return (
+        <div className="space-y-4">
+            <div className="space-y-3">
+                <div className="space-y-2">
+                    <Label>正解</Label>
+                    <Textarea
+                        value={exactValue.correctAnswer}
+                        onChange={(event) => update({ correctAnswer: event.target.value })}
+                        rows={4}
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label>別解(JSON)</Label>
+                    <Textarea
+                        value={JSON.stringify(exactValue.acceptedAnswers ?? [], null, 2)}
+                        onChange={(event) => update({ acceptedAnswers: safeJsonArray(event.target.value) })}
+                        rows={4}
+                    />
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function updateBlock(
+    setState: Dispatch<SetStateAction<EditorState>>,
+    blockId: string,
+    nextBlock: ProblemBlock,
+) {
+    setState((current) => ({
+        ...current,
+        document: {
+            ...current.document,
+            blocks: current.document.blocks.map((block) => (block.id === blockId ? nextBlock : block)),
+        },
+    }));
+}
+
+function safeJsonArray(value: string): string[] {
+    try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed.map((item) => String(item)) : [];
+    } catch {
+        return [];
+    }
+}
+
+function safeJsonMatrix(value: string): string[][] {
+    try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed.map((row) => Array.isArray(row) ? row.map((cell) => String(cell)) : []) : [];
+    } catch {
+        return [];
+    }
+}
+
+function safeJsonArrayOfObjects<T extends object>(value: string, fallback: T[]): T[] {
+    try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : fallback;
+    } catch {
+        return fallback;
+    }
+}

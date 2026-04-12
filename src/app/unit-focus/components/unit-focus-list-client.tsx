@@ -42,7 +42,7 @@ export function UnitFocusListClient({ subjects }: UnitFocusListClientProps) {
                             <TabsTrigger
                                 key={subject.id}
                                 value={subject.id}
-                                className="px-6 py-3 text-base data-[state=active]:bg-background data-[state=active]:shadow-sm border border-transparent data-[state=active]:border-border rounded-md transition-all gap-2"
+                                className="px-6 py-3 text-base data-[state=active]:bg-background border border-transparent data-[state=active]:border-border rounded-md transition-all gap-2"
                             >
                                 <span className={`flex items-center justify-center w-6 h-6 rounded text-xs text-white font-bold ${colorClass}`}>
                                     {subject.name.charAt(0)}
@@ -65,7 +65,7 @@ export function UnitFocusListClient({ subjects }: UnitFocusListClientProps) {
                                         href={`/unit-focus/${coreProblem.id}`}
                                         className={`group block h-full transition-all duration-200 ${!isUnlocked ? 'opacity-70' : 'hover:-translate-y-1'}`}
                                     >
-                                        <Card className={`h-full border-l-4 overflow-hidden transition-shadow ${isUnlocked ? 'hover:shadow-lg border-l-green-500' : 'border-l-gray-300 bg-muted/30'}`}>
+                                        <Card className={`h-full border-l-4 overflow-hidden transition-shadow ${isUnlocked ? 'border-l-green-500' : 'border-l-border bg-muted/30'}`}>
                                             <CardHeader className="pb-3">
                                                 <div className="flex justify-between items-start gap-2">
                                                     <Badge variant={isUnlocked ? "secondary" : "outline"} className="mb-2">

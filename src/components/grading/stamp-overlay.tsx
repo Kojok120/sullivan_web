@@ -94,7 +94,7 @@ export function StampOverlay() {
                                 transition={{ delay: 2 }} // Wait 2 seconds before showing close button to ensure they see it
                                 className="mt-8 flex justify-center"
                             >
-                                <Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-8 shadow-lg transform transition active:scale-95" onClick={handleClose}>
+                                <Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-8 transform transition active:scale-95" onClick={handleClose}>
                                     あつめる！
                                 </Button>
                             </motion.div>

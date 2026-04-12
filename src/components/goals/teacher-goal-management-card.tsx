@@ -482,7 +482,7 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
 
     return (
         <div className="space-y-4">
-            <Card className="border-primary/30 bg-gradient-to-r from-primary/[0.08] to-background">
+            <Card className="border-primary/30 bg-accent">
                 <CardHeader className="pb-3">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>

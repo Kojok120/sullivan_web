@@ -288,10 +288,10 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                                 variant="ghost"
                                 disabled={isInteractionLocked}
                                 className={cn(
-                                    'relative flex h-full min-h-[160px] w-full flex-col overflow-hidden rounded-xl border-none p-0 shadow-md transition-all duration-300',
+                                    'relative flex h-full min-h-[160px] w-full flex-col overflow-hidden rounded-lg border-none p-0 transition-all duration-300',
                                     'disabled:pointer-events-auto disabled:cursor-not-allowed disabled:opacity-80',
                                     isInteractionLocked ? 'cursor-not-allowed opacity-80' : 'cursor-pointer',
-                                    isSelected ? 'shadow-xl scale-105 ring-2 ring-offset-2 ring-gray-800' : 'hover:scale-105 hover:shadow-lg'
+                                    isSelected ? 'scale-105 ring-2 ring-offset-2 ring-foreground' : 'hover:scale-105'
                                 )}
                                 onClick={() => handleSubjectClick(subject.subjectId)}
                             >
@@ -315,9 +315,9 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                                         exit={{ opacity: 0, y: -20, height: 0 }}
                                         className="absolute top-full left-0 right-0 mt-4 z-20"
                                     >
-                                        <Card className="bg-white shadow-xl border-2 border-gray-100">
+                                        <Card className="bg-white border-2 border">
                                             <CardContent className="p-4 space-y-4">
-                                                <div className="flex items-center justify-between bg-gray-50 rounded-lg p-2">
+                                                <div className="flex items-center justify-between bg-muted rounded-lg p-2">
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
@@ -327,7 +327,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                                                             decrementSets();
                                                         }}
                                                         disabled={isInteractionLocked || sets <= 1}
-                                                        className="h-8 w-8 hover:bg-white hover:shadow-sm"
+                                                        className="h-8 w-8 hover:bg-white"
                                                     >
                                                         <Minus className="h-4 w-4" />
                                                     </Button>
@@ -344,14 +344,14 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                                                             incrementSets();
                                                         }}
                                                         disabled={isInteractionLocked || sets >= 10}
-                                                        className="h-8 w-8 hover:bg-white hover:shadow-sm"
+                                                        className="h-8 w-8 hover:bg-white"
                                                     >
                                                         <Plus className="h-4 w-4" />
                                                     </Button>
                                                 </div>
 
                                                 <Button
-                                                    className="w-full font-bold text-lg h-12 gap-2 shadow-sm hover:shadow-md transition-all active:scale-95"
+                                                    className="w-full font-bold text-lg h-12 gap-2 transition-all active:scale-95"
                                                     size="lg"
                                                     disabled={isInteractionLocked}
                                                     onClick={(event) => {
@@ -406,7 +406,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                         <div className="space-y-3">
                             <div
                                 className={cn(
-                                    'relative aspect-video w-full overflow-hidden rounded-xl border bg-black',
+                                    'relative aspect-video w-full overflow-hidden rounded-lg border bg-black',
                                     !canOpenGateVideo && 'opacity-80'
                                 )}
                             >
@@ -439,7 +439,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                                     onClick={handleOpenGateVideo}
                                     disabled={!canOpenGateVideo}
                                     className={cn(
-                                        'absolute inset-0 z-10 h-full w-full rounded-xl border-0 bg-transparent p-0 appearance-none ring-offset-background transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 disabled:cursor-default',
+                                        'absolute inset-0 z-10 h-full w-full rounded-lg border-0 bg-transparent p-0 appearance-none ring-offset-background transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 disabled:cursor-default',
                                         canOpenGateVideo ? 'cursor-pointer hover:ring-2 hover:ring-primary/70' : 'cursor-default'
                                     )}
                                 >
@@ -453,14 +453,14 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                             </p>
                         </div>
 
-                        <div className="space-y-4 rounded-xl border bg-slate-50 p-4">
+                        <div className="space-y-4 rounded-lg border bg-muted p-4">
                             <div className="space-y-2">
-                                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Core Problem</p>
-                                <p className="text-lg font-semibold text-slate-900">{gateModal?.coreProblemName ?? '講義動画'}</p>
+                                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Core Problem</p>
+                                <p className="text-lg font-semibold text-foreground">{gateModal?.coreProblemName ?? '講義動画'}</p>
                             </div>
                             <div className="flex items-center justify-between rounded-lg bg-white px-4 py-3">
-                                <span className="text-sm text-slate-600">動画本数</span>
-                                <span className="text-lg font-semibold text-slate-900">{gateModal?.lectureVideos.length ?? 0}本</span>
+                                <span className="text-sm text-muted-foreground">動画本数</span>
+                                <span className="text-lg font-semibold text-foreground">{gateModal?.lectureVideos.length ?? 0}本</span>
                             </div>
                             <div className="space-y-2 rounded-lg bg-white px-4 py-3 text-sm text-slate-600">
                                 <p>1. 左のプレビューを押して講義動画を全画面で視聴します。</p>

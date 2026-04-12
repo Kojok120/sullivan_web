@@ -10,7 +10,7 @@ import {
 } from '@/lib/guidance-recording';
 
 const execFileAsync = promisify(execFile);
-const GEMINI_GUIDANCE_AUDIO_MIME_TYPE = 'audio/ogg' as const;
+export const GEMINI_GUIDANCE_AUDIO_MIME_TYPE = 'audio/ogg' as const;
 
 export type GeminiGuidanceAudioMimeType = typeof GEMINI_GUIDANCE_AUDIO_MIME_TYPE;
 

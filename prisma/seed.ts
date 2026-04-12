@@ -1,8 +1,19 @@
 import 'dotenv/config';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, Role, ClassroomPlan } from '@prisma/client';
 import { createClient } from '@supabase/supabase-js';
+import { deriveLegacyFieldsFromStructuredData } from '../src/lib/structured-problem';
 
-const prisma = new PrismaClient();
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) {
+  throw new Error('DATABASE_URL が設定されていません');
+}
+
+const prisma = new PrismaClient({
+  adapter: new PrismaPg({
+    connectionString: databaseUrl,
+  }),
+});
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -88,17 +99,7 @@ async function ensureSupabaseAuthUser(prismaUser: {
     return;
   }
 
-  const { data, error: listError } = await supabaseAdmin.auth.admin.listUsers({
-    page: 1,
-    perPage: 200,
-  });
-
-  if (listError) {
-    console.warn(`Supabase listUsers failed for ${email}:`, listError.message);
-    return;
-  }
-
-  const existing = data.users.find((user) => user.email === email);
+  const existing = await findSupabaseAuthUserByEmail(email);
   if (!existing) {
     console.warn(`Supabase user not found for ${email}.`);
     return;
@@ -118,6 +119,34 @@ async function ensureSupabaseAuthUser(prismaUser: {
   if (updateError) {
     console.warn(`Supabase Auth update failed for ${email}:`, updateError.message);
   }
+}
+
+async function findSupabaseAuthUserByEmail(email: string) {
+  if (!supabaseAdmin) return null;
+
+  const perPage = 200;
+  for (let page = 1; page <= 20; page += 1) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({
+      page,
+      perPage,
+    });
+
+    if (error) {
+      console.warn(`Supabase listUsers failed for ${email}:`, error.message);
+      return null;
+    }
+
+    const matched = data.users.find((user) => user.email === email);
+    if (matched) {
+      return matched;
+    }
+
+    if (data.users.length < perPage) {
+      return null;
+    }
+  }
+
+  return null;
 }
 
 async function seedUsers() {
@@ -151,6 +180,16 @@ async function seedUsers() {
       loginId: 'A0001',
       name: 'Admin User',
       role: Role.ADMIN,
+    },
+    {
+      loginId: 'A9001',
+      name: 'Dev Admin',
+      role: Role.ADMIN,
+    },
+    {
+      loginId: 'M0001',
+      name: 'Material Author',
+      role: Role.MATERIAL_AUTHOR,
     },
   ];
 
@@ -320,6 +359,325 @@ async function seedCurriculum() {
         await upsertProblem(subjectRecord.id, coreProblemRecord.id, problem);
       }
     }
+  }
+}
+
+async function seedStructuredProblemSamples() {
+  const publishedAt = new Date('2026-04-01T00:00:00Z');
+
+  const samples = [
+    {
+      subject: { name: '数学', order: 2 },
+      coreProblem: { name: '図形', masterNumber: 2, order: 2 },
+      problem: {
+        customId: 'M-101',
+        masterNumber: 101,
+        grade: '中2',
+        problemType: 'GEOMETRY',
+        authoringTool: 'GEOGEBRA',
+        document: {
+          version: 1,
+          title: '三角形の面積',
+          summary: '図の三角形ABCの面積を求める。',
+          instructions: '必要なら計算も余白に書いてよい。',
+          blocks: [
+            { id: 'geo-1', type: 'paragraph', text: '底辺 8cm、高さ 5cm の三角形ABCの面積を求めなさい。' },
+            { id: 'geo-2', type: 'svg', assetId: 'math-geometry-svg', caption: '図1' },
+            { id: 'geo-3', type: 'answerLines', lines: 3 },
+          ],
+        },
+        answerSpec: {
+          kind: 'exact',
+          correctAnswer: '20cm^2',
+          acceptedAnswers: ['20', '20 cm^2', '20cm2'],
+        },
+        printConfig: {
+          template: 'WORKSPACE',
+          estimatedHeight: 'MEDIUM',
+          answerMode: 'INLINE',
+          answerLines: 3,
+          showQrOnFirstPage: true,
+        },
+        assets: [
+          {
+            kind: 'SVG',
+            fileName: 'triangle-area.svg',
+            mimeType: 'image/svg+xml',
+            inlineContent: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 220"><rect width="320" height="220" fill="#fff"/><path d="M40 180 L260 180 L120 40 Z" fill="none" stroke="#111827" stroke-width="3"/><line x1="120" y1="40" x2="120" y2="180" stroke="#ef4444" stroke-width="2" stroke-dasharray="6 4"/><text x="140" y="118" font-size="18" fill="#ef4444">5 cm</text><text x="136" y="202" font-size="18" fill="#111827">8 cm</text><text x="28" y="192" font-size="18" fill="#111827">A</text><text x="264" y="192" font-size="18" fill="#111827">B</text><text x="114" y="32" font-size="18" fill="#111827">C</text></svg>`,
+          },
+        ],
+      },
+    },
+    {
+      subject: { name: '数学', order: 2 },
+      coreProblem: { name: '二次関数', masterNumber: 3, order: 3 },
+      problem: {
+        customId: 'M-102',
+        masterNumber: 102,
+        grade: '中3',
+        problemType: 'GRAPH_DRAW',
+        authoringTool: 'GEOGEBRA',
+        document: {
+          version: 1,
+          title: '二次関数のグラフ',
+          summary: '放物線の頂点と切片を読み取る。',
+          instructions: 'グラフを見て答えなさい。',
+          blocks: [
+            { id: 'quad-1', type: 'paragraph', text: '二次関数 y = x^2 - 4x + 3 のグラフについて、頂点の座標を答えなさい。' },
+            { id: 'quad-2', type: 'katexDisplay', latex: 'y = x^2 - 4x + 3' },
+            { id: 'quad-3', type: 'graphAsset', assetId: 'math-quadratic-svg', caption: '図2' },
+          ],
+        },
+        answerSpec: {
+          kind: 'exact',
+          correctAnswer: '(2, -1)',
+          acceptedAnswers: ['(2,-1)', 'x=2,y=-1'],
+        },
+        printConfig: {
+          template: 'GRAPH',
+          estimatedHeight: 'LARGE',
+          answerMode: 'INLINE',
+          answerLines: 2,
+          showQrOnFirstPage: true,
+        },
+        assets: [
+          {
+            kind: 'SVG',
+            fileName: 'quadratic-graph.svg',
+            mimeType: 'image/svg+xml',
+            inlineContent: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 240"><rect width="320" height="240" fill="#fff"/><g stroke="#d1d5db" stroke-width="1">${Array.from({length: 11}).map((_,i)=>`<line x1="${20+i*28}" y1="20" x2="${20+i*28}" y2="220"/><line x1="20" y1="${20+i*20}" x2="300" y2="${20+i*20}"/>`).join('')}</g><line x1="20" y1="120" x2="300" y2="120" stroke="#111827" stroke-width="2"/><line x1="160" y1="20" x2="160" y2="220" stroke="#111827" stroke-width="2"/><path d="M76 180 C120 80 132 60 160 60 C188 60 200 80 244 180" fill="none" stroke="#2563eb" stroke-width="3"/><circle cx="160" cy="60" r="4" fill="#ef4444"/><text x="170" y="56" font-size="16" fill="#ef4444">(2,-1)</text></svg>`,
+          },
+        ],
+      },
+    },
+    {
+      subject: { name: '理科', order: 4 },
+      coreProblem: { name: '電流と回路', masterNumber: 1, order: 1 },
+      problem: {
+        customId: 'S-101',
+        masterNumber: 101,
+        grade: '中2',
+        problemType: 'DIAGRAM_LABEL',
+        authoringTool: 'SVG',
+        document: {
+          version: 1,
+          title: '回路図の読み取り',
+          summary: '並列回路と直列回路の違いを読み取る。',
+          instructions: '図を見て答えなさい。',
+          blocks: [
+            { id: 'circuit-1', type: 'paragraph', text: '図の回路で、スイッチを入れたときに豆電球AとBはどのように点灯するか。「直列」または「並列」で答えなさい。' },
+            { id: 'circuit-2', type: 'svg', assetId: 'science-circuit-svg', caption: '図3' },
+          ],
+        },
+        answerSpec: {
+          kind: 'exact',
+          correctAnswer: '並列',
+          acceptedAnswers: [],
+        },
+        printConfig: {
+          template: 'STANDARD',
+          estimatedHeight: 'MEDIUM',
+          answerMode: 'INLINE',
+          answerLines: 2,
+          showQrOnFirstPage: true,
+        },
+        assets: [
+          {
+            kind: 'SVG',
+            fileName: 'circuit.svg',
+            mimeType: 'image/svg+xml',
+            inlineContent: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200"><rect width="320" height="200" fill="#fff"/><path d="M30 100 H90 V50 H230 V100 H290" fill="none" stroke="#111827" stroke-width="3"/><path d="M90 100 V150 H230 V100" fill="none" stroke="#111827" stroke-width="3"/><circle cx="120" cy="50" r="18" fill="none" stroke="#111827" stroke-width="3"/><circle cx="200" cy="150" r="18" fill="none" stroke="#111827" stroke-width="3"/><text x="114" y="56" font-size="16">A</text><text x="194" y="156" font-size="16">B</text><rect x="145" y="36" width="30" height="28" fill="none" stroke="#111827" stroke-width="3"/><line x1="30" y1="88" x2="30" y2="112" stroke="#111827" stroke-width="3"/><line x1="290" y1="88" x2="290" y2="112" stroke="#111827" stroke-width="3"/></svg>`,
+          },
+        ],
+      },
+    },
+    {
+      subject: { name: '理科', order: 4 },
+      coreProblem: { name: '実験とグラフ', masterNumber: 2, order: 2 },
+      problem: {
+        customId: 'S-102',
+        masterNumber: 102,
+        grade: '中1',
+        problemType: 'GRAPH_READ',
+        authoringTool: 'SVG',
+        document: {
+          version: 1,
+          title: '実験グラフの読解',
+          summary: '温度変化のグラフから読み取る。',
+          instructions: 'グラフを見て答えなさい。',
+          blocks: [
+            { id: 'exp-1', type: 'paragraph', text: '水を加熱したときの温度変化を表すグラフで、沸騰が始まったのは何分後か答えなさい。' },
+            { id: 'exp-2', type: 'graphAsset', assetId: 'science-graph-svg', caption: '図4' },
+          ],
+        },
+        answerSpec: {
+          kind: 'numeric',
+          correctAnswer: '6',
+          acceptedAnswers: ['6分'],
+          tolerance: 0,
+          unit: '分',
+        },
+        printConfig: {
+          template: 'GRAPH',
+          estimatedHeight: 'LARGE',
+          answerMode: 'INLINE',
+          answerLines: 2,
+          showQrOnFirstPage: true,
+        },
+        assets: [
+          {
+            kind: 'SVG',
+            fileName: 'experiment-graph.svg',
+            mimeType: 'image/svg+xml',
+            inlineContent: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 220"><rect width="320" height="220" fill="#fff"/><g stroke="#d1d5db" stroke-width="1">${Array.from({length: 11}).map((_,i)=>`<line x1="${40+i*24}" y1="20" x2="${40+i*24}" y2="190"/><line x1="40" y1="${20+i*17}" x2="280" y2="${20+i*17}"/>`).join('')}</g><line x1="40" y1="190" x2="280" y2="190" stroke="#111827" stroke-width="2"/><line x1="40" y1="190" x2="40" y2="20" stroke="#111827" stroke-width="2"/><path d="M40 180 L88 150 L136 118 L184 70 L232 70 L280 70" fill="none" stroke="#dc2626" stroke-width="3"/><text x="246" y="62" font-size="14" fill="#dc2626">沸騰</text><text x="265" y="206" font-size="14">分</text><text x="16" y="22" font-size="14">℃</text></svg>`,
+          },
+        ],
+      },
+    },
+    {
+      subject: { name: '理科', order: 4 },
+      coreProblem: { name: '考察', masterNumber: 3, order: 3 },
+      problem: {
+        customId: 'S-103',
+        masterNumber: 103,
+        grade: '中3',
+        problemType: 'SHORT_EXPLANATION',
+        authoringTool: 'MANUAL',
+        document: {
+          version: 1,
+          title: '蒸散の考察',
+          summary: '植物の蒸散の役割を説明する。',
+          instructions: '2〜3文で簡潔に説明しなさい。',
+          blocks: [
+            { id: 'essay-1', type: 'paragraph', text: '植物が蒸散を行う理由を、体内の水の移動という観点から説明しなさい。' },
+            { id: 'essay-2', type: 'answerLines', lines: 6 },
+          ],
+        },
+        answerSpec: {
+          kind: 'rubric',
+          modelAnswer: '蒸散によって葉から水が失われると、根から水を吸い上げる力がはたらき、体内で水や無機養分が運ばれやすくなる。',
+          rubric: '蒸散が根からの吸水と水・無機養分の移動に関係することを説明しているかを評価する。',
+          criteria: [
+            { id: 'c1', label: '吸水', description: '根から水を吸い上げることに触れている', maxPoints: 50 },
+            { id: 'c2', label: '移動', description: '水や無機養分の移動に触れている', maxPoints: 50 },
+          ],
+        },
+        printConfig: {
+          template: 'EXPLANATION',
+          estimatedHeight: 'LARGE',
+          answerMode: 'INLINE',
+          answerLines: 6,
+          showQrOnFirstPage: true,
+        },
+        assets: [],
+      },
+    },
+  ];
+
+  for (const sample of samples) {
+    const subject = await prisma.subject.upsert({
+      where: { name: sample.subject.name },
+      update: { order: sample.subject.order },
+      create: { name: sample.subject.name, order: sample.subject.order },
+    });
+
+    const coreProblem = await upsertCoreProblem(subject.id, {
+      ...sample.coreProblem,
+      problems: [],
+    });
+
+    const legacy = deriveLegacyFieldsFromStructuredData({
+      document: sample.problem.document as never,
+      answerSpec: sample.problem.answerSpec as never,
+    });
+
+    const problem = await prisma.problem.upsert({
+      where: {
+        subjectId_customId: {
+          subjectId: subject.id,
+          customId: sample.problem.customId,
+        },
+      },
+      update: {
+        question: legacy.question,
+        answer: legacy.answer,
+        acceptedAnswers: legacy.acceptedAnswers,
+        grade: sample.problem.grade,
+        masterNumber: sample.problem.masterNumber,
+        subjectId: subject.id,
+        problemType: sample.problem.problemType as never,
+        contentFormat: 'STRUCTURED_V1' as never,
+        status: 'PUBLISHED' as never,
+        hasStructuredContent: true,
+        coreProblems: { set: [{ id: coreProblem.id }] },
+      },
+      create: {
+        subjectId: subject.id,
+        customId: sample.problem.customId,
+        question: legacy.question,
+        answer: legacy.answer,
+        acceptedAnswers: legacy.acceptedAnswers,
+        grade: sample.problem.grade,
+        masterNumber: sample.problem.masterNumber,
+        order: sample.problem.masterNumber,
+        problemType: sample.problem.problemType as never,
+        contentFormat: 'STRUCTURED_V1' as never,
+        status: 'PUBLISHED' as never,
+        hasStructuredContent: true,
+        coreProblems: { connect: [{ id: coreProblem.id }] },
+      },
+    });
+
+    const revision = await prisma.problemRevision.upsert({
+      where: {
+        problemId_revisionNumber: {
+          problemId: problem.id,
+          revisionNumber: 1,
+        },
+      },
+      update: {
+        status: 'PUBLISHED',
+        structuredContent: sample.problem.document as never,
+        answerSpec: sample.problem.answerSpec as never,
+        printConfig: sample.problem.printConfig as never,
+        authoringTool: sample.problem.authoringTool as never,
+        publishedAt,
+        assets: {
+          deleteMany: {},
+          create: sample.problem.assets.map((asset) => ({
+            kind: asset.kind as never,
+            fileName: asset.fileName,
+            mimeType: asset.mimeType,
+            inlineContent: asset.inlineContent,
+            sourceTool: sample.problem.authoringTool as never,
+          })),
+        },
+      },
+      create: {
+        problemId: problem.id,
+        revisionNumber: 1,
+        status: 'PUBLISHED',
+        structuredContent: sample.problem.document as never,
+        answerSpec: sample.problem.answerSpec as never,
+        printConfig: sample.problem.printConfig as never,
+        authoringTool: sample.problem.authoringTool as never,
+        publishedAt,
+        assets: {
+          create: sample.problem.assets.map((asset) => ({
+            kind: asset.kind as never,
+            fileName: asset.fileName,
+            mimeType: asset.mimeType,
+            inlineContent: asset.inlineContent,
+            sourceTool: sample.problem.authoringTool as never,
+          })),
+        },
+      },
+    });
+
+    await prisma.problem.update({
+      where: { id: problem.id },
+      data: { publishedRevisionId: revision.id },
+    });
   }
 }
 
@@ -501,6 +859,7 @@ async function main() {
   console.log('Start seeding...');
   await seedUsers();
   await seedCurriculum();
+  await seedStructuredProblemSamples();
   await seedAchievements();
   console.log('Seeding finished.');
 }

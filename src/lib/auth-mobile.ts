@@ -4,7 +4,7 @@
 import { getSupabaseUserByAccessToken } from '@/lib/auth-admin';
 import type { SessionPayload } from '@/lib/auth';
 
-const ALLOWED_ROLES = ['STUDENT', 'TEACHER', 'HEAD_TEACHER', 'PARENT', 'ADMIN'] as const;
+const ALLOWED_ROLES = ['STUDENT', 'TEACHER', 'HEAD_TEACHER', 'PARENT', 'ADMIN', 'MATERIAL_AUTHOR'] as const;
 type AllowedRole = (typeof ALLOWED_ROLES)[number];
 
 function isAllowedRole(value: unknown): value is AllowedRole {

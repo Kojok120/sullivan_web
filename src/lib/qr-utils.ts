@@ -4,6 +4,7 @@ export type QRData = {
     p?: string | string[]; // Comma-separated full IDs or array of IDs
     c?: string; // Compressed format: "<prefix>|<ranges>"
     u?: string; // Unit token (base36 of CoreProblem.masterNumber)
+    r?: string | string[]; // Printed revision IDs in order
 };
 
 // Compression Helpers
@@ -55,6 +56,17 @@ export function expandProblemIds(data: QRData): string[] {
         const [prefix, ranges] = data.c.split('|');
         if (!prefix || ranges === undefined) return [];
         return expandNumberRanges(prefix, ranges);
+    }
+    return [];
+}
+
+export function expandRevisionIds(data: QRData): string[] {
+    if (!data.r) return [];
+    if (Array.isArray(data.r)) {
+        return data.r.map((id: string) => String(id).trim()).filter(Boolean);
+    }
+    if (typeof data.r === 'string') {
+        return data.r.split(',').map((id: string) => id.trim()).filter(Boolean);
     }
     return [];
 }
