@@ -41,6 +41,13 @@ import { SimpleCalendar } from '@/components/ui/simple-calendar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { addDaysToDateKey, getBrowserTimeZoneSafe, normalizeTimeZone, parseDateKeyAsUTC } from '@/lib/date-key';
+import {
+    formatGoalDateKeyLabel,
+    formatGoalMonthLabel,
+    getGoalRelativeDateLabel,
+    hasGoalTargetValue,
+    resolveGoalTargetForDate,
+} from '@/lib/student-goal-ui';
 import { cn } from '@/lib/utils';
 import type {
     DraftGranularity,
@@ -88,47 +95,6 @@ type DraftDialogState = {
 };
 
 const MAX_ACTIVE_GOALS = 10;
-
-function formatDateKeyLabel(dateKey: string, timeZone: string) {
-    const [year, month, day] = dateKey.split('-').map(Number);
-    const date = new Date(Date.UTC(year, month - 1, day));
-    return new Intl.DateTimeFormat('ja-JP', {
-        timeZone: normalizeTimeZone(timeZone),
-        month: 'numeric',
-        day: 'numeric',
-        weekday: 'short',
-    }).format(date);
-}
-
-function formatMonthLabel(dateKey: string, timeZone: string) {
-    const [year, month] = dateKey.split('-').map(Number);
-    const date = new Date(Date.UTC(year, month - 1, 1));
-    return new Intl.DateTimeFormat('ja-JP', {
-        timeZone: normalizeTimeZone(timeZone),
-        year: 'numeric',
-        month: 'long',
-    }).format(date);
-}
-
-function hasGoalValue(targetCount: number | null, targetText: string | null | undefined): boolean {
-    if (targetCount !== null) return true;
-    return !!(targetText && targetText.trim().length > 0);
-}
-
-function resolveGoalValueForDate(goal: EditableGoal, dateKey: string) {
-    let count: number | null = null;
-    let text: string | null = null;
-
-    for (const milestone of goal.milestones) {
-        if (milestone.dateKey > dateKey) break;
-        if (hasGoalValue(milestone.targetCount, milestone.targetText)) {
-            count = milestone.targetCount;
-            text = milestone.targetText;
-        }
-    }
-
-    return { targetCount: count, targetText: text };
-}
 
 function upsertMilestone(milestones: EditableMilestone[], nextMilestone: EditableMilestone): EditableMilestone[] {
     const byDate = new Map<string, EditableMilestone>();
@@ -191,12 +157,6 @@ function createTemporaryGoal(params: {
 
 function getGoalTypeLabel(type: GoalType): string {
     return type === 'PROBLEM_COUNT' ? '問題数目標' : '任意目標';
-}
-
-function getRelativeDateLabel(dateKey: string, todayKey: string, tomorrowKey: string): string | null {
-    if (dateKey === todayKey) return '今日';
-    if (dateKey === tomorrowKey) return '明日';
-    return null;
 }
 
 function getRemainingDays(baseDateKey: string, targetDateKey: string): number {
@@ -286,7 +246,7 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
         const nextDraft: Record<string, { targetCount: string; targetText: string }> = {};
 
         for (const goal of persistedGoals) {
-            const resolved = resolveGoalValueForDate(goal, selectedDateKey);
+            const resolved = resolveGoalTargetForDate(goal.milestones, selectedDateKey);
             nextDraft[goal.id] = {
                 targetCount: resolved.targetCount !== null ? String(resolved.targetCount) : '',
                 targetText: resolved.targetText ?? '',
@@ -368,9 +328,9 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
         setSavingAll(true);
 
         const payload = goals.map((goal) => {
-            let milestones = goal.milestones.filter((milestone) => hasGoalValue(milestone.targetCount, milestone.targetText));
+            let milestones = goal.milestones.filter((milestone) => hasGoalTargetValue(milestone.targetCount, milestone.targetText));
 
-            if (hasGoalValue(goal.periodTargetCount, goal.periodTargetText)) {
+            if (hasGoalTargetValue(goal.periodTargetCount, goal.periodTargetText)) {
                 milestones = upsertMilestone(milestones, {
                     dateKey: goal.dueDateKey,
                     targetCount: goal.periodTargetCount,
@@ -478,7 +438,7 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
         }));
     }
 
-    const selectedRelativeLabel = getRelativeDateLabel(selectedDateKey, data.todayKey, data.tomorrowKey);
+    const selectedRelativeLabel = getGoalRelativeDateLabel(selectedDateKey, data.todayKey, data.tomorrowKey);
 
     return (
         <div className="space-y-4">
@@ -596,7 +556,7 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
                                                         <div className="flex flex-wrap items-center gap-2">
                                                             <span className="truncate text-sm font-semibold">{goal.name}</span>
                                                             <Badge variant="outline" className="text-[11px]">{getGoalTypeLabel(goal.type)}</Badge>
-                                                            <Badge variant="outline" className="text-[11px]">{formatDateKeyLabel(goal.dueDateKey, timeZone)}まで</Badge>
+                                                            <Badge variant="outline" className="text-[11px]">{formatGoalDateKeyLabel(goal.dueDateKey, timeZone)}まで</Badge>
                                                             <Badge variant="secondary" className="text-[11px]">残り{Math.max(0, remainingDays)}日</Badge>
                                                             {!goal.persisted ? (
                                                                 <Badge className="text-[11px]" variant="secondary">未保存</Badge>
@@ -626,7 +586,7 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
                                                                 onClick={() => toggleCalendar(goal.id)}
                                                             >
                                                                 <CalendarClock className="mr-2 h-4 w-4" />
-                                                                {formatDateKeyLabel(goal.dueDateKey, timeZone)}
+                                                                {formatGoalDateKeyLabel(goal.dueDateKey, timeZone)}
                                                             </Button>
                                                             {calendarOpenByGoalId[goal.id] ? (
                                                                 <SimpleCalendar
@@ -791,13 +751,13 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
                                         const monthChanged = prevMonth !== row.dateKey.slice(0, 7);
                                         const isToday = row.dateKey === data.todayKey;
                                         const isSelected = row.dateKey === selectedDateKey;
-                                        const relativeLabel = getRelativeDateLabel(row.dateKey, data.todayKey, data.tomorrowKey);
+                                        const relativeLabel = getGoalRelativeDateLabel(row.dateKey, data.todayKey, data.tomorrowKey);
 
                                         return (
                                             <div key={row.dateKey}>
                                                 {monthChanged ? (
                                                     <div className="sticky top-0 z-10 border-y bg-background/95 px-3 py-1.5 text-xs font-medium text-muted-foreground backdrop-blur">
-                                                        {formatMonthLabel(row.dateKey, timeZone)}
+                                                        {formatGoalMonthLabel(row.dateKey, timeZone)}
                                                     </div>
                                                 ) : null}
 
@@ -812,7 +772,7 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
                                                     )}
                                                 >
                                                     <div className="flex items-center justify-between gap-2">
-                                                        <p className="text-sm font-medium">{formatDateKeyLabel(row.dateKey, timeZone)}</p>
+                                                        <p className="text-sm font-medium">{formatGoalDateKeyLabel(row.dateKey, timeZone)}</p>
                                                         <div className="flex items-center gap-1">
                                                             {relativeLabel ? (
                                                                 <Badge variant="secondary" className="text-[10px]">{relativeLabel}</Badge>
@@ -832,7 +792,7 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
                             <CardHeader className="pb-3">
                                 <div className="flex flex-wrap items-center justify-between gap-2">
                                     <div>
-                                        <CardTitle className="text-base">{formatDateKeyLabel(selectedDateKey, timeZone)} の目標編集</CardTitle>
+                                        <CardTitle className="text-base">{formatGoalDateKeyLabel(selectedDateKey, timeZone)} の目標編集</CardTitle>
                                         <p className="mt-1 text-xs text-muted-foreground">
                                             {selectedRelativeLabel ? `${selectedRelativeLabel}の編集` : '選択日の編集'}
                                         </p>
@@ -870,7 +830,7 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
                                                         <Badge variant="outline" className="text-[11px]">{getGoalTypeLabel(goal.type)}</Badge>
                                                     </div>
                                                     <Badge variant="secondary" className="text-[11px]">
-                                                        {formatDateKeyLabel(goal.dueDateKey, timeZone)}まで
+                                                        {formatGoalDateKeyLabel(goal.dueDateKey, timeZone)}まで
                                                     </Badge>
                                                 </div>
 
@@ -963,7 +923,7 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
                             {draftDialog.proposals.map((proposal) => {
                                 const goal = goals.find((item) => item.id === draftDialog.goalId);
                                 const currentValue = goal
-                                    ? resolveGoalValueForDate(goal, proposal.dateKey)
+                                    ? resolveGoalTargetForDate(goal.milestones, proposal.dateKey)
                                     : { targetCount: null, targetText: null };
                                 const checked = draftDialog.selectedDateKeys.includes(proposal.dateKey);
 
@@ -982,7 +942,7 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
                                         />
                                         <div className="min-w-0 flex-1 space-y-1">
                                             <div className="flex flex-wrap items-center justify-between gap-2">
-                                                <div className="text-sm font-semibold">{formatDateKeyLabel(proposal.dateKey, timeZone)}</div>
+                                                <div className="text-sm font-semibold">{formatGoalDateKeyLabel(proposal.dateKey, timeZone)}</div>
                                                 <Badge variant="outline" className="text-[11px]">提案</Badge>
                                             </div>
                                             <div className="text-xs text-muted-foreground">

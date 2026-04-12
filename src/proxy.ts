@@ -15,8 +15,34 @@ function isAllowedMaterialAuthorPath(pathname: string) {
     return MATERIAL_AUTHOR_ALLOWED_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
+function withRequestPathnameHeader(request: NextRequest, response: NextResponse) {
+    const forwardedHeaders = new Headers(request.headers);
+    forwardedHeaders.set('x-pathname', request.nextUrl.pathname);
+
+    const nextResponse = NextResponse.next({
+        request: {
+            headers: forwardedHeaders,
+        },
+    });
+
+    for (const [key, value] of response.headers.entries()) {
+        const normalizedKey = key.toLowerCase();
+        if (normalizedKey === 'set-cookie' || normalizedKey.startsWith('x-middleware-')) {
+            continue;
+        }
+        nextResponse.headers.set(key, value);
+    }
+
+    for (const cookie of response.headers.getSetCookie()) {
+        nextResponse.headers.append('set-cookie', cookie);
+    }
+
+    return nextResponse;
+}
+
 export async function proxy(request: NextRequest) {
     const { supabaseResponse, user } = await updateSession(request);
+    const continueResponse = withRequestPathnameHeader(request, supabaseResponse);
     const maybeApplyNoStoreHeaders = (response: NextResponse) =>
         isPrintPagePath(request.nextUrl.pathname)
             ? applyNoStoreHeaders(response)
@@ -31,7 +57,7 @@ export async function proxy(request: NextRequest) {
         if (!request.nextUrl.pathname.startsWith('/force-password-change')) {
             return maybeApplyNoStoreHeaders(NextResponse.redirect(new URL('/force-password-change', request.url)));
         }
-        return maybeApplyNoStoreHeaders(supabaseResponse);
+        return maybeApplyNoStoreHeaders(continueResponse);
     }
 
     // Prevent access to force-password-change if not required
@@ -53,7 +79,7 @@ export async function proxy(request: NextRequest) {
         if (userRole !== 'ADMIN') {
             return maybeApplyNoStoreHeaders(NextResponse.redirect(new URL('/', request.url)));
         }
-        return maybeApplyNoStoreHeaders(supabaseResponse);
+        return maybeApplyNoStoreHeaders(continueResponse);
     }
 
     if (request.nextUrl.pathname.startsWith('/materials')) {
@@ -63,7 +89,7 @@ export async function proxy(request: NextRequest) {
         if (userRole !== 'MATERIAL_AUTHOR' && userRole !== 'ADMIN') {
             return maybeApplyNoStoreHeaders(NextResponse.redirect(new URL('/', request.url)));
         }
-        return maybeApplyNoStoreHeaders(supabaseResponse);
+        return maybeApplyNoStoreHeaders(continueResponse);
     }
 
     // Teacher routes check - must be authenticated AND have TEACHER/HEAD_TEACHER or ADMIN role
@@ -74,7 +100,7 @@ export async function proxy(request: NextRequest) {
         if (userRole !== 'TEACHER' && userRole !== 'HEAD_TEACHER' && userRole !== 'ADMIN') {
             return maybeApplyNoStoreHeaders(NextResponse.redirect(new URL('/', request.url)));
         }
-        return maybeApplyNoStoreHeaders(supabaseResponse);
+        return maybeApplyNoStoreHeaders(continueResponse);
     }
 
     if (!user && !isPublicPath) {
@@ -109,7 +135,7 @@ export async function proxy(request: NextRequest) {
         return maybeApplyNoStoreHeaders(NextResponse.redirect(new URL('/materials/problems', request.url)));
     }
 
-    return maybeApplyNoStoreHeaders(supabaseResponse);
+    return maybeApplyNoStoreHeaders(continueResponse);
 }
 
 export const config = {

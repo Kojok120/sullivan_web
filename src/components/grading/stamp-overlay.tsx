@@ -8,11 +8,25 @@ import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
 import { triggerCelebrationConfetti } from '@/lib/confetti';
 
-export function StampOverlay() {
-    const [isOpen, setIsOpen] = useState(false);
-    const [data, setData] = useState<{ total: number, newCount: number } | null>(null);
+type StampOverlayProps = {
+    initialData?: { total: number; newCount: number } | null;
+};
+
+export function StampOverlay({ initialData }: StampOverlayProps) {
+    const [isOpen, setIsOpen] = useState(() => Boolean(initialData));
+    const [data, setData] = useState<{ total: number, newCount: number } | null>(() => initialData ?? null);
 
     useEffect(() => {
+        if (initialData) {
+            triggerCelebrationConfetti();
+        }
+    }, [initialData]);
+
+    useEffect(() => {
+        if (initialData !== undefined) {
+            return;
+        }
+
         const checkStamps = async () => {
             try {
                 const stampData = await getStampData();
@@ -32,7 +46,7 @@ export function StampOverlay() {
         // Optional: Poll every 30 seconds for external updates (e.g. if grading finished in bg)
         // const interval = setInterval(checkStamps, 30000);
         // return () => clearInterval(interval);
-    }, []);
+    }, [initialData]);
 
     const handleClose = async () => {
         setIsOpen(false);

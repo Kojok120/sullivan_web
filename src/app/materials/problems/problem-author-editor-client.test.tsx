@@ -164,10 +164,12 @@ describe('ProblemAuthorEditorClient', () => {
             />,
         );
 
-        fireEvent.mouseDown(screen.getByRole('tab', { name: '答え' }), { button: 0 });
-        expect(screen.getByText('答えと正解判定')).toBeInTheDocument();
+        const answerTab = screen.getByRole('tab', { name: '答え' });
+        fireEvent.mouseDown(answerTab, { button: 0 });
+        fireEvent.click(answerTab);
+        expect(screen.getByText('解答仕様')).toBeInTheDocument();
         expect(screen.getByText('正解')).toBeInTheDocument();
-        expect(screen.getByText('別解')).toBeInTheDocument();
+        expect(screen.getByText('別解(JSON)')).toBeInTheDocument();
         expect(screen.queryByRole('tab', { name: '採点' })).not.toBeInTheDocument();
     });
 });

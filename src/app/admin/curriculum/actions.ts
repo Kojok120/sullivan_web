@@ -75,6 +75,45 @@ function extractUniqueConstraintMessage(error: unknown): string | null {
 
 const CORE_PROBLEM_RESEQUENCE_OFFSET = 1_000_000;
 
+async function bulkUpdateCoreProblemOrdersInTransaction(
+    tx: Prisma.TransactionClient,
+    updates: Array<{ id: string; order: number }>,
+) {
+    if (updates.length === 0) {
+        return;
+    }
+
+    // 逐次 update を避けるため、VALUES テーブルでまとめて反映する。
+    await tx.$executeRaw(Prisma.sql`
+        UPDATE "CoreProblem" AS cp
+        SET "order" = next_values."order"
+        FROM (
+            VALUES ${Prisma.join(updates.map((update) => Prisma.sql`(${update.id}, ${update.order})`))}
+        ) AS next_values(id, "order")
+        WHERE cp.id = next_values.id
+    `);
+}
+
+async function bulkResequenceCoreProblemsInTransaction(
+    tx: Prisma.TransactionClient,
+    updates: Array<{ id: string; order: number; masterNumber: number }>,
+) {
+    if (updates.length === 0) {
+        return;
+    }
+
+    await tx.$executeRaw(Prisma.sql`
+        UPDATE "CoreProblem" AS cp
+        SET
+            "order" = next_values."order",
+            "masterNumber" = next_values."masterNumber"
+        FROM (
+            VALUES ${Prisma.join(updates.map((update) => Prisma.sql`(${update.id}, ${update.order}, ${update.masterNumber})`))}
+        ) AS next_values(id, "order", "masterNumber")
+        WHERE cp.id = next_values.id
+    `);
+}
+
 async function resequenceCoreProblemsInTransaction(subjectId: string, tx: Prisma.TransactionClient) {
     const orderedCoreProblems = await tx.coreProblem.findMany({
         where: { subjectId },
@@ -103,16 +142,17 @@ async function resequenceCoreProblemsInTransaction(subjectId: string, tx: Prisma
         },
     });
 
-    for (const [index, coreProblem] of orderedCoreProblems.entries()) {
-        const resequencedNumber = index + 1;
-        await tx.coreProblem.update({
-            where: { id: coreProblem.id },
-            data: {
+    await bulkResequenceCoreProblemsInTransaction(
+        tx,
+        orderedCoreProblems.map((coreProblem, index) => {
+            const resequencedNumber = index + 1;
+            return {
+                id: coreProblem.id,
                 order: resequencedNumber,
                 masterNumber: resequencedNumber,
-            },
-        });
-    }
+            };
+        }),
+    );
 }
 
 async function resequenceCoreProblemsForSubject(subjectId: string) {
@@ -513,13 +553,7 @@ export async function reorderCoreProblems(items: { id: string, order: number }[]
         const subjectId = subjectIds[0];
 
         await prisma.$transaction(async (tx) => {
-            for (const item of items) {
-                await tx.coreProblem.update({
-                    where: { id: item.id },
-                    data: { order: item.order },
-                });
-            }
-
+            await bulkUpdateCoreProblemOrdersInTransaction(tx, items);
             await resequenceCoreProblemsInTransaction(subjectId, tx);
         });
 

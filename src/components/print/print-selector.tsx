@@ -1,11 +1,11 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Minus, Plus, Printer } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
-import { FullScreenVideoPlayer } from '@/components/full-screen-video-player';
 import { appendCacheBust } from '@/components/print/cache-bust';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -23,6 +23,11 @@ import { getPreferredPrintView } from '@/lib/print-view';
 import { getSubjectConfig } from '@/lib/subject-config';
 import { cn } from '@/lib/utils';
 import { getEmbedUrl, getYouTubeId } from '@/lib/youtube';
+
+const LazyFullScreenVideoPlayer = dynamic(
+    () => import('@/components/full-screen-video-player').then((module) => module.FullScreenVideoPlayer),
+    { ssr: false },
+);
 
 interface PrintSubject {
     subjectId: string;
@@ -490,8 +495,8 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                 </DialogContent>
             </Dialog>
 
-            {gateModal && (
-                <FullScreenVideoPlayer
+            {gateModal && isGateVideoOpen ? (
+                <LazyFullScreenVideoPlayer
                     isOpen={isGateVideoOpen}
                     onClose={handleGateVideoClose}
                     initialIndex={0}
@@ -503,7 +508,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                     autoCloseOnLastVideoEnd={false}
                     requiresTrackedCompletion
                 />
-            )}
+            ) : null}
         </>
     );
 }

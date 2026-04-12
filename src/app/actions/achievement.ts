@@ -1,6 +1,7 @@
 'use server';
 
 import { getSession } from '@/lib/auth';
+import { getUnseenAchievementsForUser } from '@/lib/achievement-service';
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 
@@ -8,17 +9,7 @@ export async function getUnseenAchievements() {
     const session = await getSession();
     if (!session) return [];
 
-    const userAchievements = await prisma.userAchievement.findMany({
-        where: {
-            userId: session.userId,
-            isSeen: false,
-        },
-        include: {
-            achievement: true,
-        },
-    });
-
-    return userAchievements;
+    return getUnseenAchievementsForUser(session.userId);
 }
 
 export async function markAchievementsAsSeen(ids: string[]) {
