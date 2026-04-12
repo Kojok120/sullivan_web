@@ -61,7 +61,7 @@ describe('RankingPageClient', () => {
     });
 
     it('3つの指標タブを切り替えて表示できる', async () => {
-        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+        vi.stubGlobal('fetch', vi.fn().mockImplementation(async () =>
             new Response(JSON.stringify(createPayload()), {
                 status: 200,
                 headers: {
@@ -143,7 +143,7 @@ describe('RankingPageClient', () => {
     });
 
     it('自由指定では月入力を表示し、不正な入力中は取得しない', async () => {
-        const fetchMock = vi.fn().mockResolvedValue(
+        const fetchMock = vi.fn().mockImplementation(async () =>
             new Response(JSON.stringify(createPayload()), { status: 200 }),
         );
         vi.stubGlobal('fetch', fetchMock);
