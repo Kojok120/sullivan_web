@@ -1,6 +1,5 @@
 import { notFound } from 'next/navigation';
 
-import { isStructuredProblemsEnabled } from '@/lib/feature-flags';
 import { getProblemEditorContext } from '../actions';
 import { ProblemEditorClient } from '../problem-editor-client';
 
@@ -11,10 +10,6 @@ export default async function ProblemDetailPage({
 }: {
     params: Promise<{ problemId: string }>;
 }) {
-    if (!isStructuredProblemsEnabled()) {
-        notFound();
-    }
-
     const { problemId } = await params;
     const context = await getProblemEditorContext(problemId);
 

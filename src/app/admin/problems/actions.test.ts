@@ -11,7 +11,6 @@ const {
     bulkUpsertProblemsCoreMock,
     deleteProblemsWithRelationsMock,
     revalidatePathMock,
-    isStructuredProblemsEnabledMock,
     getNextCustomIdMock,
     parseStructuredDocumentMock,
     parseAnswerSpecMock,
@@ -34,7 +33,6 @@ const {
     bulkUpsertProblemsCoreMock: vi.fn(),
     deleteProblemsWithRelationsMock: vi.fn(),
     revalidatePathMock: vi.fn(),
-    isStructuredProblemsEnabledMock: vi.fn(),
     getNextCustomIdMock: vi.fn(),
     parseStructuredDocumentMock: vi.fn(),
     parseAnswerSpecMock: vi.fn(),
@@ -94,10 +92,6 @@ vi.mock('@/lib/curriculum-service', () => ({
     getNextCustomId: getNextCustomIdMock,
 }));
 
-vi.mock('@/lib/feature-flags', () => ({
-    isStructuredProblemsEnabled: isStructuredProblemsEnabledMock,
-}));
-
 vi.mock('@/lib/structured-problem', () => ({
     buildDefaultStructuredDraft: vi.fn(),
     deriveLegacyFieldsFromStructuredData: deriveLegacyFieldsFromStructuredDataMock,
@@ -135,7 +129,6 @@ describe('problem actions permissions', () => {
             role: 'MATERIAL_AUTHOR',
             name: 'Author',
         });
-        isStructuredProblemsEnabledMock.mockReturnValue(true);
         getNextCustomIdMock.mockResolvedValue('E-1001');
         parseStructuredDocumentMock.mockImplementation((value) => value);
         parseAnswerSpecMock.mockImplementation((value) => value);

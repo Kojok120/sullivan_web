@@ -1,17 +1,10 @@
-import { notFound } from 'next/navigation';
-
 import { getSubjects } from '@/app/admin/curriculum/actions';
-import { isStructuredProblemsEnabled } from '@/lib/feature-flags';
 
 import { MaterialsCoreProblemManager } from './materials-core-problem-manager';
 
 export const dynamic = 'force-dynamic';
 
 export default async function MaterialsCoreProblemsPage() {
-    if (!isStructuredProblemsEnabled()) {
-        notFound();
-    }
-
     const { subjects, error } = await getSubjects();
 
     if (error || !subjects) {

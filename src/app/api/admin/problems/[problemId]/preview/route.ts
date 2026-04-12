@@ -3,7 +3,6 @@ import crypto from 'node:crypto';
 import { NextRequest } from 'next/server';
 
 import { requireProblemAuthor } from '@/lib/auth';
-import { isStructuredProblemsEnabled } from '@/lib/feature-flags';
 import { prisma } from '@/lib/prisma';
 import { getOrCreatePrintPdf } from '@/lib/print-pdf/render-service';
 import { createProblemAssetSignedUrl } from '@/lib/problem-assets';
@@ -17,10 +16,6 @@ export async function GET(
     context: { params: Promise<{ problemId: string }> },
 ) {
     await requireProblemAuthor();
-
-    if (!isStructuredProblemsEnabled()) {
-        return new Response('Not Found', { status: 404 });
-    }
 
     const { problemId } = await context.params;
     const revisionId = request.nextUrl.searchParams.get('revisionId')?.trim();

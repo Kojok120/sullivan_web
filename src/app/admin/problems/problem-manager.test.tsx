@@ -137,7 +137,6 @@ describe('ProblemManager', () => {
                 sortOrder="desc"
                 subjects={subjects}
                 currentSubject={currentSubject}
-                structuredProblemsEnabled
             />,
         );
 
@@ -159,7 +158,6 @@ describe('ProblemManager', () => {
                 sortOrder="desc"
                 subjects={subjects}
                 currentSubject={currentSubject}
-                structuredProblemsEnabled
                 routeBase="/materials/problems"
                 viewMode="author"
             />,
@@ -181,7 +179,6 @@ describe('ProblemManager', () => {
                 sortOrder="desc"
                 subjects={subjects}
                 currentSubject={currentSubject}
-                structuredProblemsEnabled
             />,
         );
 
@@ -204,7 +201,6 @@ describe('ProblemManager', () => {
                 sortOrder="desc"
                 subjects={subjects}
                 currentSubject={currentSubject}
-                structuredProblemsEnabled
                 routeBase="/materials/problems"
                 viewMode="author"
             />,
@@ -226,7 +222,6 @@ describe('ProblemManager', () => {
                 sortOrder="desc"
                 subjects={subjects}
                 currentSubject={subjects[1]}
-                structuredProblemsEnabled
                 showBulkImport
                 bulkImportLabel="英語シート一括登録"
             />,
@@ -246,7 +241,6 @@ describe('ProblemManager', () => {
                 sortOrder="desc"
                 subjects={subjects}
                 currentSubject={subjects[1]}
-                structuredProblemsEnabled
                 routeBase="/materials/problems"
                 viewMode="author"
                 showBulkImport
@@ -268,7 +262,6 @@ describe('ProblemManager', () => {
                 sortOrder="desc"
                 subjects={subjects}
                 currentSubject={currentSubject}
-                structuredProblemsEnabled
                 routeBase="/materials/problems"
                 viewMode="author"
                 showBulkImport={false}
@@ -290,7 +283,6 @@ describe('ProblemManager', () => {
                 sortOrder="desc"
                 subjects={subjects}
                 currentSubject={currentSubject}
-                structuredProblemsEnabled
                 showMasterNumber={false}
             />,
         );
