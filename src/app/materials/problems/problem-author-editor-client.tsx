@@ -2,12 +2,11 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
-import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { ChevronDown, ChevronUp, Plus, Sparkles, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react';
 
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -15,7 +14,6 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { TeXHelpLink } from '@/components/problem-authoring/tex-help-link';
 import {
     buildDefaultStructuredDraft,
     normalizeAnswerSpecForAuthoring,
@@ -49,8 +47,8 @@ import {
     type ProblemEditorSubjectOption,
     type SelectedCoreProblem,
 } from '@/app/admin/problems/components/core-problem-selector';
-import { ProblemTextPreview } from '@/app/admin/problems/components/problem-text-preview';
-import { ProblemAuthoringEmbed, type VendorSceneApplyPayload, type VendorSyncPayload } from '@/app/admin/problems/problem-authoring-embed';
+import { ProblemBodyCardEditorShared } from '@/app/admin/problems/components/problem-body-card-editor-shared';
+import { type VendorSceneApplyPayload, type VendorSyncPayload } from '@/app/admin/problems/problem-authoring-embed';
 import {
     appendProblemBodyCard,
     deleteProblemBodySegment,
@@ -61,9 +59,6 @@ import {
     moveProblemBodySegment,
     parseProblemBodySegments,
     updateProblemBodyCard,
-    type ProblemBodyAttachmentBlockType,
-    type ProblemBodyAttachmentKind,
-    type ProblemBodyCard,
 } from '@/lib/problem-editor-model';
 
 type ProblemAuthorEditorProps = {
@@ -89,8 +84,6 @@ type EditorState = {
     generationExtraPrompt: string;
     authoringStateText: string;
 };
-
-const CARD_UPLOAD_ACCEPT = '.svg,.png,.jpg,.jpeg';
 
 function normalizeAuthoringTool(authoringTool?: string | null) {
     return authoringTool ?? 'MANUAL';
@@ -203,6 +196,10 @@ export function ProblemAuthorEditorClient({
     const visualCards = useMemo(
         () => bodyCards.filter((card) => isVisualAttachmentKind(card.attachmentKind)),
         [bodyCards],
+    );
+    const currentSubjectName = useMemo(
+        () => subjects.find((subject) => subject.id === state.subjectId)?.name ?? state.coreProblems[0]?.subject?.name ?? null,
+        [subjects, state.subjectId, state.coreProblems],
     );
     const resolvedActiveVisualCardId = activeVisualCardId && visualCards.some((card) => card.id === activeVisualCardId)
         ? activeVisualCardId
@@ -681,7 +678,7 @@ export function ProblemAuthorEditorClient({
                     <Card>
                         <CardHeader>
                             <CardTitle>問題文</CardTitle>
-                            <CardDescription>問題文カードを積み上げ、必要なカードだけに図・画像を添付します。</CardDescription>
+                            <CardDescription>問題文カードを積み上げて編集します。科目によって本文確認や図版操作の内容が変わります。</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="space-y-4">
@@ -716,7 +713,9 @@ export function ProblemAuthorEditorClient({
                                         </CardHeader>
                                         <CardContent>
                                             {segment.kind === 'card' ? (
-                                                <AuthorProblemBodyCardEditor
+                                                <ProblemBodyCardEditorShared
+                                                    variant="author"
+                                                    subjectName={currentSubjectName}
                                                     card={segment.card}
                                                     isActiveVisualCard={segment.card.id === resolvedActiveVisualCardId}
                                                     problemId={state.problemId}
@@ -794,275 +793,6 @@ export function ProblemAuthorEditorClient({
                 </TabsContent>
 
             </Tabs>
-        </div>
-    );
-}
-
-function FriendlySelect({
-    value,
-    options,
-    onChange,
-}: {
-    value: string;
-    options: ReadonlyArray<{ value: string; label: string }>;
-    onChange: (value: string) => void;
-}) {
-    return (
-        <Select value={value} onValueChange={onChange}>
-            <SelectTrigger>
-                <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-                {options.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                ))}
-            </SelectContent>
-        </Select>
-    );
-}
-
-function AttachmentKindFriendlySelect({
-    value,
-    onChange,
-}: {
-    value: ProblemBodyAttachmentKind;
-    onChange: (value: ProblemBodyAttachmentKind) => void;
-}) {
-    return (
-        <Select value={value === 'none' ? undefined : value} onValueChange={(next) => onChange(next as ProblemBodyAttachmentKind)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-                <SelectItem value="upload">アップロード</SelectItem>
-                <SelectItem value="graph">グラフ</SelectItem>
-                <SelectItem value="geometry">図形</SelectItem>
-            </SelectContent>
-        </Select>
-    );
-}
-
-function AuthorProblemBodyCardEditor({
-    card,
-    isActiveVisualCard,
-    problemId,
-    revisionId,
-    isUploadingAsset,
-    authoringStateText,
-    generationExtraPrompt,
-    generationDiagnostic,
-    isPending,
-    isGenerating,
-    isAuthoringToolReady,
-    supportsAiFigureGeneration,
-    onActivateVisualCard,
-    onCardChange,
-    onUploadAsset,
-    onAuthoringStateTextChange,
-    onGenerationExtraPromptChange,
-    onGenerateFigure,
-    syncHandlerRef,
-    sceneApplyHandlerRef,
-    onAuthoringToolReadyChange,
-    effectiveProblemType,
-    preferredAuthoringTool,
-}: {
-    card: ProblemBodyCard;
-    isActiveVisualCard: boolean;
-    problemId: string;
-    revisionId: string;
-    isUploadingAsset: boolean;
-    authoringStateText: string;
-    generationExtraPrompt: string;
-    generationDiagnostic: string | null;
-    isPending: boolean;
-    isGenerating: boolean;
-    isAuthoringToolReady: boolean;
-    supportsAiFigureGeneration: boolean;
-    onActivateVisualCard: () => void;
-    onCardChange: (updater: (card: ProblemBodyCard) => ProblemBodyCard) => void;
-    onUploadAsset: (file: File) => Promise<void> | void;
-    onAuthoringStateTextChange: (value: string) => void;
-    onGenerationExtraPromptChange: (value: string) => void;
-    onGenerateFigure: () => void;
-    syncHandlerRef: MutableRefObject<(() => Promise<VendorSyncPayload>) | null>;
-    sceneApplyHandlerRef: MutableRefObject<((payload: VendorSceneApplyPayload) => Promise<void>) | null>;
-    onAuthoringToolReadyChange: (ready: boolean) => void;
-    effectiveProblemType: string;
-    preferredAuthoringTool: string;
-}) {
-    const isVisualCard = isVisualAttachmentKind(card.attachmentKind);
-    const isUploadCard = card.attachmentKind === 'upload';
-    const authoringTool = getProblemBodyCardAuthoringTool(card, preferredAuthoringTool);
-    const canUploadAsset = Boolean(problemId && revisionId);
-
-    return (
-        <div className="space-y-4">
-            <div className="space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                    <Label>本文</Label>
-                    <TeXHelpLink />
-                </div>
-                <Textarea
-                    value={card.text}
-                    onChange={(event) => onCardChange((current) => ({ ...current, text: event.target.value }))}
-                    rows={5}
-                    placeholder="問題文を入力してください。数式は $...$ / $$...$$ で書けます。"
-                />
-            </div>
-            <div className="space-y-2">
-                <Label>本文確認</Label>
-                <ProblemTextPreview text={card.text} />
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                    <Label>図・画像など</Label>
-                    <AttachmentKindFriendlySelect
-                        value={card.attachmentKind}
-                        onChange={(nextKind) => onCardChange((current) => {
-                            const nextAttachmentBlockType: ProblemBodyAttachmentBlockType =
-                                nextKind === 'upload'
-                                    ? current.attachmentBlockType === 'svg' || current.attachmentBlockType === 'image'
-                                        ? current.attachmentBlockType
-                                        : 'image'
-                                    : nextKind === 'graph'
-                                        ? 'graphAsset'
-                                        : 'geometryAsset';
-
-                            return {
-                                ...current,
-                                attachmentKind: nextKind,
-                                attachmentBlockType: nextAttachmentBlockType,
-                                assetId: '',
-                            };
-                        })}
-                    />
-                </div>
-                {card.attachmentKind !== 'none' && (
-                    <div className="flex items-end">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => onCardChange((current) => ({
-                                ...current,
-                                attachmentKind: 'none',
-                                attachmentBlockType: null,
-                                assetId: '',
-                            }))}
-                        >
-                            添付を外す
-                        </Button>
-                    </div>
-                )}
-            </div>
-
-            {isUploadCard && (
-                <>
-                    <div className="space-y-2">
-                        <Label>アップロード</Label>
-                        <Input
-                            type="file"
-                            accept={CARD_UPLOAD_ACCEPT}
-                            disabled={!canUploadAsset || isPending || isGenerating || isUploadingAsset}
-                            onChange={(event) => {
-                                const file = event.target.files?.[0];
-                                event.currentTarget.value = '';
-                                if (!file) {
-                                    return;
-                                }
-
-                                void onUploadAsset(file);
-                            }}
-                        />
-                        {!canUploadAsset && (
-                            <p className="text-xs text-muted-foreground">先に下書き保存するとアップロードできます。</p>
-                        )}
-                    </div>
-                </>
-            )}
-
-            {isVisualCard && (
-                <div className="space-y-4 rounded-lg border border-dashed p-4">
-                    <div className="space-y-1">
-                        <div className="text-sm font-medium">図形・グラフ作成</div>
-                        <p className="text-sm text-muted-foreground">
-                            このカードに紐づく図版を作成・生成します。
-                        </p>
-                    </div>
-
-                    {!isActiveVisualCard && (
-                        <Button type="button" variant="outline" onClick={onActivateVisualCard}>
-                            このカードを作図対象にする
-                        </Button>
-                    )}
-
-                    {isActiveVisualCard && authoringTool === 'GEOGEBRA' && (
-                        <div className="space-y-2">
-                            <Label>作図エディタ</Label>
-                            <ProblemAuthoringEmbed
-                                problemType={effectiveProblemType}
-                                tool={authoringTool}
-                                authoringStateText={authoringStateText}
-                                onAuthoringStateTextChange={onAuthoringStateTextChange}
-                                syncHandlerRef={syncHandlerRef}
-                                sceneApplyHandlerRef={sceneApplyHandlerRef}
-                                disabled={isPending}
-                                onReadyStateChange={onAuthoringToolReadyChange}
-                            />
-                        </div>
-                    )}
-
-                    {isActiveVisualCard && (
-                        <div className="space-y-4 rounded-lg border border-dashed p-4">
-                            <div className="space-y-1">
-                                <div className="flex items-center gap-2 text-sm font-medium">
-                                    <Sparkles className="h-4 w-4" />
-                                    AIで図を作成
-                                </div>
-                                <p className="text-sm text-muted-foreground">
-                                    このカードの本文と補足指示から、図形やグラフの素材だけを自動生成します。
-                                </p>
-                            </div>
-                            {supportsAiFigureGeneration ? (
-                                <>
-                                    <div className="space-y-2">
-                                        <Label>追加の指示</Label>
-                                        <Textarea
-                                            value={generationExtraPrompt}
-                                            onChange={(event) => onGenerationExtraPromptChange(event.target.value)}
-                                            rows={4}
-                                            placeholder="例: 頂点を明示する / 整数座標にする / 補助線なし"
-                                        />
-                                    </div>
-                                    {generationDiagnostic && (
-                                        <Alert variant="destructive">
-                                            <AlertTitle>生成エラー</AlertTitle>
-                                            <AlertDescription>{generationDiagnostic}</AlertDescription>
-                                        </Alert>
-                                    )}
-                                    <div className="flex flex-wrap gap-2">
-                                        <Button
-                                            type="button"
-                                            onClick={onGenerateFigure}
-                                            disabled={isPending || isGenerating || !supportsAiFigureGeneration || (authoringTool === 'GEOGEBRA' && !isAuthoringToolReady)}
-                                        >
-                                            <Sparkles className="mr-2 h-4 w-4" />
-                                            AIで生成して反映
-                                        </Button>
-                                    </div>
-                                    {authoringTool === 'GEOGEBRA' && !isAuthoringToolReady && (
-                                        <p className="text-sm text-muted-foreground">
-                                            GeoGebra エディタの読み込み完了後に生成できます。
-                                        </p>
-                                    )}
-                                </>
-                            ) : (
-                                <p className="text-sm text-muted-foreground">
-                                    AI生成は図形問題と関数・グラフ問題で使えます。
-                                </p>
-                            )}
-                        </div>
-                    )}
-                </div>
-            )}
         </div>
     );
 }
@@ -1339,56 +1069,6 @@ function AuthorAnswerSpecEditor({
                     JSON ではなく、候補を 1 行ずつ追加します。
                 </div>
             </div>
-        </div>
-    );
-}
-
-function RubricCriteriaEditor({
-    criteria,
-    onChange,
-}: {
-    criteria: Array<{ id: string; label: string; description: string; maxPoints: number }>;
-    onChange: (criteria: Array<{ id: string; label: string; description: string; maxPoints: number }>) => void;
-}) {
-    const addCriterion = () => {
-        onChange([
-            ...criteria,
-            {
-                id: `criterion-${criteria.length + 1}`,
-                label: '',
-                description: '',
-                maxPoints: 0,
-            },
-        ]);
-    };
-
-    const updateCriterion = (index: number, patch: Partial<{ id: string; label: string; description: string; maxPoints: number }>) => {
-        onChange(criteria.map((criterion, currentIndex) => currentIndex === index ? { ...criterion, ...patch } : criterion));
-    };
-
-    const removeCriterion = (index: number) => {
-        onChange(criteria.filter((_, currentIndex) => currentIndex !== index));
-    };
-
-    return (
-        <div className="space-y-3">
-            <Label>評価の観点</Label>
-            {criteria.map((criterion, index) => (
-                <div key={criterion.id} className="space-y-2 rounded-md border p-3">
-                    <div className="grid gap-2 md:grid-cols-[1fr_120px_auto]">
-                        <Input value={criterion.label} onChange={(event) => updateCriterion(index, { label: event.target.value })} placeholder="観点名" />
-                        <Input type="number" value={criterion.maxPoints} onChange={(event) => updateCriterion(index, { maxPoints: Number.parseInt(event.target.value || '0', 10) || 0 })} placeholder="配点" />
-                        <Button type="button" variant="outline" size="icon" onClick={() => removeCriterion(index)}>
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
-                    </div>
-                    <Textarea value={criterion.description} onChange={(event) => updateCriterion(index, { description: event.target.value })} rows={3} placeholder="この観点で何を見るか" />
-                </div>
-            ))}
-            <Button type="button" variant="outline" onClick={addCriterion}>
-                <Plus className="mr-2 h-4 w-4" />
-                観点を追加
-            </Button>
         </div>
     );
 }

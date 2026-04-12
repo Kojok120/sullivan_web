@@ -77,6 +77,12 @@ const baseProblem = {
     }],
 } as const;
 
+const mathProblem = {
+    ...baseProblem,
+    subjectId: 'subject-math',
+    coreProblems: [{ id: 'core-1', name: '一次方程式', subjectId: 'subject-math', subject: { name: '数学' } }],
+} as const;
+
 describe('ProblemAuthorEditorClient', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -113,6 +119,39 @@ describe('ProblemAuthorEditorClient', () => {
         expect(screen.queryByText('state を再同期')).not.toBeInTheDocument();
         expect(screen.queryByText('全体表示に合わせる')).not.toBeInTheDocument();
         expect(screen.queryByText('SVG 書き出しテスト')).not.toBeInTheDocument();
+    });
+
+    it('英語では本文確認と図・画像UIを表示しない', () => {
+        render(
+            <ProblemAuthorEditorClient
+                problem={baseProblem as never}
+                subjects={[{ id: 'subject-1', name: '英語' }]}
+                coreProblems={[{ id: 'core-1', name: '現在完了', subjectId: 'subject-1', subject: { name: '英語' } }]}
+                initialSubjectId="subject-1"
+            />,
+        );
+
+        fireEvent.mouseDown(screen.getByRole('tab', { name: '問題文' }), { button: 0 });
+
+        expect(screen.queryByText('本文確認')).not.toBeInTheDocument();
+        expect(screen.queryByText('図・画像など')).not.toBeInTheDocument();
+    });
+
+    it('数学では本文確認を右配置で表示する', () => {
+        render(
+            <ProblemAuthorEditorClient
+                problem={mathProblem as never}
+                subjects={[{ id: 'subject-math', name: '数学' }]}
+                coreProblems={[{ id: 'core-1', name: '一次方程式', subjectId: 'subject-math', subject: { name: '数学' } }]}
+                initialSubjectId="subject-math"
+            />,
+        );
+
+        fireEvent.mouseDown(screen.getByRole('tab', { name: '問題文' }), { button: 0 });
+
+        expect(screen.getAllByText('本文確認')).not.toHaveLength(0);
+        expect(screen.getAllByText('図・画像など')).not.toHaveLength(0);
+        expect(screen.getAllByTestId('problem-body-card-text-layout')[0]).toHaveAttribute('data-preview-placement', 'right');
     });
 
     it('採点タブを表示せず、正解と別解だけを扱う', () => {
