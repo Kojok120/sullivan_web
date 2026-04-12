@@ -67,12 +67,15 @@ import {
     parseProblemBodySegments,
     updateProblemBodyCard,
 } from '@/lib/problem-editor-model';
+import type { ProblemEditorViewMode } from '@/lib/problem-ui';
 
-type EditorProps = {
+export type ProblemEditorClientProps = {
     problem: RenderableProblemWithRelations | null;
     subjects: ProblemEditorSubjectOption[];
     coreProblems: ProblemEditorCoreProblemOption[];
     initialSubjectId?: string | null;
+    routeBase?: string;
+    variant?: ProblemEditorViewMode;
 };
 
 type EditorState = {
@@ -167,8 +170,10 @@ export function ProblemEditorClient({
     problem,
     subjects,
     coreProblems,
+    routeBase = '/admin/problems',
     initialSubjectId = null,
-}: EditorProps) {
+    variant = 'admin',
+}: ProblemEditorClientProps) {
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
     const [isGenerating, startGenerationTransition] = useTransition();
@@ -183,6 +188,13 @@ export function ProblemEditorClient({
     const [activeVisualCardId, setActiveVisualCardId] = useState<string | null>(null);
     const [uploadingCardId, setUploadingCardId] = useState<string | null>(null);
     const [isVendorToolReady, setIsVendorToolReady] = useState(false);
+    const isAuthorView = variant === 'author';
+    const title = isAuthorView
+        ? (problem ? '問題を編集' : '新しい問題を作成')
+        : '構造化問題エディタ';
+    const description = isAuthorView
+        ? '問題文、解答、図形・グラフをまとめて設定できます。'
+        : '理科・数学向けの revision / asset 一体型エディタです。';
 
     const activeRevision = useMemo(() => {
         if (!problem) return null;
@@ -408,7 +420,7 @@ export function ProblemEditorClient({
             }));
 
             if (!state.problemId && problemId) {
-                router.push(`/admin/problems/${problemId}`);
+                router.push(`${routeBase}/${problemId}`);
             } else {
                 router.refresh();
             }
@@ -656,14 +668,12 @@ export function ProblemEditorClient({
         <div className="space-y-6">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold">構造化問題エディタ</h1>
-                    <p className="text-sm text-muted-foreground">
-                        理科・数学向けの revision / asset 一体型エディタです。
-                    </p>
+                    <h1 className="text-2xl font-bold">{title}</h1>
+                    <p className="text-sm text-muted-foreground">{description}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                     <Button variant="outline" asChild>
-                        <Link href="/admin/problems">一覧へ戻る</Link>
+                        <Link href={routeBase}>一覧へ戻る</Link>
                     </Button>
                     <Button variant="outline" onClick={handlePreview} disabled={isPending || !state.problemId}>
                         プレビュー
@@ -677,21 +687,23 @@ export function ProblemEditorClient({
                 </div>
             </div>
 
-            <Alert>
-                <Check className="h-4 w-4" />
-                <AlertTitle>DEV限定</AlertTitle>
-                <AlertDescription>
-                    structured problem は feature flag で有効化された環境でのみ利用されます。PRODUCTION DB には適用しません。
-                </AlertDescription>
-            </Alert>
+            {!isAuthorView && (
+                <Alert>
+                    <Check className="h-4 w-4" />
+                    <AlertTitle>DEV限定</AlertTitle>
+                    <AlertDescription>
+                        structured problem は feature flag で有効化された環境でのみ利用されます。PRODUCTION DB には適用しません。
+                    </AlertDescription>
+                </Alert>
+            )}
 
             <Tabs defaultValue="basic" className="space-y-4">
                 <TabsList className="flex h-auto w-full flex-wrap justify-start gap-2 bg-transparent p-0">
-                    <TabsTrigger value="basic">基本情報</TabsTrigger>
-                    <TabsTrigger value="body">本文</TabsTrigger>
-                    <TabsTrigger value="answer">解答仕様</TabsTrigger>
-                    <TabsTrigger value="assets">アセット</TabsTrigger>
-                    <TabsTrigger value="history">改訂履歴</TabsTrigger>
+                    <TabsTrigger value="basic">{isAuthorView ? '基本設定' : '基本情報'}</TabsTrigger>
+                    <TabsTrigger value="body">{isAuthorView ? '問題文' : '本文'}</TabsTrigger>
+                    <TabsTrigger value="answer">{isAuthorView ? '答え' : '解答仕様'}</TabsTrigger>
+                    {!isAuthorView && <TabsTrigger value="assets">アセット</TabsTrigger>}
+                    {!isAuthorView && <TabsTrigger value="history">改訂履歴</TabsTrigger>}
                 </TabsList>
 
                 <TabsContent value="basic">
@@ -785,7 +797,7 @@ export function ProblemEditorClient({
                                         <CardContent>
                                             {segment.kind === 'card' ? (
                                                 <ProblemBodyCardEditorShared
-                                                    variant="admin"
+                                                    variant={variant}
                                                     subjectName={currentSubjectName}
                                                     card={segment.card}
                                                     isActiveVisualCard={segment.card.id === resolvedActiveVisualCardId}
@@ -863,89 +875,93 @@ export function ProblemEditorClient({
                     </Card>
                 </TabsContent>
 
-                <TabsContent value="assets">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>アセット</CardTitle>
-                            <CardDescription>SVG / 画像 / state を revision に紐付けて保存します。</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            <div className="grid gap-4 md:grid-cols-3">
-                                <div className="space-y-2">
-                                    <Label>種別</Label>
-                                    <EnumSelect value={assetKind} values={ASSET_KINDS as unknown as string[]} onChange={(value) => setAssetKind(value as (typeof ASSET_KINDS)[number])} />
+                {!isAuthorView && (
+                    <TabsContent value="assets">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>アセット</CardTitle>
+                                <CardDescription>SVG / 画像 / state を revision に紐付けて保存します。</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-6">
+                                <div className="grid gap-4 md:grid-cols-3">
+                                    <div className="space-y-2">
+                                        <Label>種別</Label>
+                                        <EnumSelect value={assetKind} values={ASSET_KINDS as unknown as string[]} onChange={(value) => setAssetKind(value as (typeof ASSET_KINDS)[number])} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>sourceTool</Label>
+                                        <EnumSelect value={assetSourceTool} values={ASSET_SOURCE_TOOLS as unknown as string[]} onChange={(value) => setAssetSourceTool(value as (typeof ASSET_SOURCE_TOOLS)[number])} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>ファイル</Label>
+                                        <Input type="file" onChange={(event) => setAssetFile(event.target.files?.[0] ?? null)} />
+                                    </div>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label>sourceTool</Label>
-                                    <EnumSelect value={assetSourceTool} values={ASSET_SOURCE_TOOLS as unknown as string[]} onChange={(value) => setAssetSourceTool(value as (typeof ASSET_SOURCE_TOOLS)[number])} />
+                                    <Label>inlineContent</Label>
+                                    <Textarea value={assetInlineContent} onChange={(event) => setAssetInlineContent(event.target.value)} rows={6} placeholder="SVG や JSON を直接保存できます" />
                                 </div>
-                                <div className="space-y-2">
-                                    <Label>ファイル</Label>
-                                    <Input type="file" onChange={(event) => setAssetFile(event.target.files?.[0] ?? null)} />
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <Label>inlineContent</Label>
-                                <Textarea value={assetInlineContent} onChange={(event) => setAssetInlineContent(event.target.value)} rows={6} placeholder="SVG や JSON を直接保存できます" />
-                            </div>
-                            <Button variant="outline" onClick={handleAssetUpload} disabled={isPending}>
-                                <FileUp className="mr-2 h-4 w-4" />
-                                アセット保存
-                            </Button>
+                                <Button variant="outline" onClick={handleAssetUpload} disabled={isPending}>
+                                    <FileUp className="mr-2 h-4 w-4" />
+                                    アセット保存
+                                </Button>
 
-                            <div className="space-y-3">
-                                {assetOptions.length === 0 ? (
-                                    <div className="text-sm text-muted-foreground">保存済みアセットはありません。</div>
-                                ) : assetOptions.map((asset) => (
-                                    <div key={asset.id} className="rounded-lg border p-4">
-                                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                                            <div className="space-y-2">
-                                                <div className="flex flex-wrap gap-2">
-                                                    <Badge>{asset.kind}</Badge>
-                                                    <Badge variant="secondary">{asset.fileName}</Badge>
+                                <div className="space-y-3">
+                                    {assetOptions.length === 0 ? (
+                                        <div className="text-sm text-muted-foreground">保存済みアセットはありません。</div>
+                                    ) : assetOptions.map((asset) => (
+                                        <div key={asset.id} className="rounded-lg border p-4">
+                                            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                                                <div className="space-y-2">
+                                                    <div className="flex flex-wrap gap-2">
+                                                        <Badge>{asset.kind}</Badge>
+                                                        <Badge variant="secondary">{asset.fileName}</Badge>
+                                                    </div>
+                                                    <div className="text-sm text-muted-foreground">{asset.mimeType}</div>
+                                                    {asset.signedUrl && (
+                                                        <a className="text-sm text-blue-600 underline" href={asset.signedUrl} target="_blank" rel="noreferrer">
+                                                            アセットを開く
+                                                        </a>
+                                                    )}
                                                 </div>
-                                                <div className="text-sm text-muted-foreground">{asset.mimeType}</div>
-                                                {asset.signedUrl && (
-                                                    <a className="text-sm text-blue-600 underline" href={asset.signedUrl} target="_blank" rel="noreferrer">
-                                                        アセットを開く
-                                                    </a>
-                                                )}
+                                                <Button variant="outline" onClick={() => handleDeleteAsset(asset.id)} disabled={isPending}>
+                                                    削除
+                                                </Button>
                                             </div>
-                                            <Button variant="outline" onClick={() => handleDeleteAsset(asset.id)} disabled={isPending}>
-                                                削除
-                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                )}
+
+                {!isAuthorView && (
+                    <TabsContent value="history">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>改訂履歴</CardTitle>
+                                <CardDescription>draft / published / superseded の revision を確認します。</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                {problem?.revisions.length ? problem.revisions.map((revision) => (
+                                    <div key={revision.id} className="rounded-lg border p-4">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <Badge>{revision.status}</Badge>
+                                            <Badge variant="secondary">rev.{revision.revisionNumber}</Badge>
+                                            {revision.id === state.revisionId && <Badge variant="outline">編集中</Badge>}
+                                        </div>
+                                        <div className="mt-2 text-sm text-muted-foreground">
+                                            {new Date(revision.updatedAt).toLocaleString('ja-JP')}
                                         </div>
                                     </div>
-                                ))}
-                            </div>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-
-                <TabsContent value="history">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>改訂履歴</CardTitle>
-                            <CardDescription>draft / published / superseded の revision を確認します。</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            {problem?.revisions.length ? problem.revisions.map((revision) => (
-                                <div key={revision.id} className="rounded-lg border p-4">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <Badge>{revision.status}</Badge>
-                                        <Badge variant="secondary">rev.{revision.revisionNumber}</Badge>
-                                        {revision.id === state.revisionId && <Badge variant="outline">編集中</Badge>}
-                                    </div>
-                                    <div className="mt-2 text-sm text-muted-foreground">
-                                        {new Date(revision.updatedAt).toLocaleString('ja-JP')}
-                                    </div>
-                                </div>
-                            )) : (
-                                <div className="text-sm text-muted-foreground">revision はまだありません。</div>
-                            )}
-                        </CardContent>
-                    </Card>
-                </TabsContent>
+                                )) : (
+                                    <div className="text-sm text-muted-foreground">revision はまだありません。</div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                )}
             </Tabs>
         </div>
     );

@@ -25,6 +25,8 @@ export type DailyActivity = {
     count: number;
 };
 
+type ComputedStudentSortKey = 'totalProblemsSolved' | 'lastActivity';
+
 const studentLoginIdCollator = new Intl.Collator('ja', {
     numeric: true,
     sensitivity: 'base',
@@ -42,6 +44,80 @@ function compareNullableDate(a: Date | null, b: Date | null, sortOrder: StudentS
     return sortOrder === 'asc'
         ? a.getTime() - b.getTime()
         : b.getTime() - a.getTime();
+}
+
+function createEmptyStudentStats(user?: { xp: number; level: number; currentStreak: number }): StudentStats {
+    return {
+        totalProblemsSolved: 0,
+        totalCorrect: 0,
+        accuracy: 0,
+        currentStreak: user?.currentStreak || 0,
+        lastActivity: null,
+        xp: user?.xp || 0,
+        level: user?.level || 1,
+    };
+}
+
+async function fetchStudentIdsForComputedSort(params: {
+    query?: string;
+    skip: number;
+    take: number;
+    classroomId?: string | null;
+    sortBy: ComputedStudentSortKey;
+    sortOrder: StudentSortOrder;
+}) {
+    const searchPattern = params.query?.trim() ? `%${params.query.trim()}%` : null;
+    const orderDirection = Prisma.raw(params.sortOrder.toUpperCase());
+
+    if (params.sortBy === 'totalProblemsSolved') {
+        return prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+            SELECT u.id
+            FROM "User" u
+            LEFT JOIN (
+                SELECT
+                    "userId",
+                    COUNT(*)::bigint AS "totalProblemsSolved"
+                FROM "LearningHistory"
+                GROUP BY "userId"
+            ) stats ON stats."userId" = u.id
+            WHERE u.role = 'STUDENT'
+            ${params.classroomId ? Prisma.sql`AND u."classroomId" = ${params.classroomId}` : Prisma.empty}
+            ${searchPattern ? Prisma.sql`
+                AND (
+                    u.name ILIKE ${searchPattern}
+                    OR u."loginId" ILIKE ${searchPattern}
+                    OR COALESCE(u."group", '') ILIKE ${searchPattern}
+                )
+            ` : Prisma.empty}
+            ORDER BY COALESCE(stats."totalProblemsSolved", 0) ${orderDirection}, u."loginId" ASC, u.id ASC
+            LIMIT ${params.take}
+            OFFSET ${params.skip}
+        `);
+    }
+
+    return prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+        SELECT u.id
+        FROM "User" u
+        LEFT JOIN (
+            SELECT
+                "userId",
+                MAX("answeredAt") AS "lastActivity"
+            FROM "LearningHistory"
+            GROUP BY "userId"
+        ) stats ON stats."userId" = u.id
+        WHERE u.role = 'STUDENT'
+        ${params.classroomId ? Prisma.sql`AND u."classroomId" = ${params.classroomId}` : Prisma.empty}
+        ${searchPattern ? Prisma.sql`
+            AND (
+                u.name ILIKE ${searchPattern}
+                OR u."loginId" ILIKE ${searchPattern}
+                OR COALESCE(u."group", '') ILIKE ${searchPattern}
+            )
+        ` : Prisma.empty}
+        ORDER BY (stats."lastActivity" IS NULL) ASC, stats."lastActivity" ${orderDirection}, u."loginId" ASC, u.id ASC
+        LIMIT ${params.take}
+        OFFSET ${params.skip}
+    `);
 }
 
 function sortStudentsWithStats<T extends {
@@ -84,15 +160,7 @@ function sortStudentsWithStats<T extends {
 export async function getStudentStats(userId: string): Promise<StudentStats> {
     // 1. Get Aggregates using shared helper
     const statsMap = await fetchInternalStudentStats([userId]);
-    const stats = statsMap.get(userId) || {
-        totalProblemsSolved: 0,
-        totalCorrect: 0,
-        accuracy: 0,
-        currentStreak: 0,
-        lastActivity: null,
-        xp: 0,
-        level: 1
-    };
+    const stats = statsMap.get(userId) || createEmptyStudentStats();
 
     return stats;
 }
@@ -133,15 +201,7 @@ async function fetchInternalStudentStats(userIds: string[]): Promise<Map<string,
     // Initialize
     userIds.forEach(id => {
         const u = userMap.get(id);
-        statsMap.set(id, {
-            totalProblemsSolved: 0,
-            totalCorrect: 0,
-            accuracy: 0,
-            currentStreak: u?.currentStreak || 0,
-            lastActivity: null,
-            xp: u?.xp || 0,
-            level: u?.level || 1
-        });
+        statsMap.set(id, createEmptyStudentStats(u));
     });
 
     // Merge Aggregates
@@ -174,9 +234,46 @@ export async function getStudentsWithStats(
     sortOrder: StudentSortOrder = 'asc',
 ) {
     const requiresComputedStatsSort = sortBy === 'totalProblemsSolved' || sortBy === 'lastActivity';
+    if (requiresComputedStatsSort && sortBy) {
+        const sortedRows = await fetchStudentIdsForComputedSort({
+            query,
+            skip,
+            take,
+            classroomId,
+            sortBy,
+            sortOrder,
+        });
+
+        if (sortedRows.length === 0) return [];
+
+        const studentIds = sortedRows.map((row) => row.id);
+        const [students, statsMap] = await Promise.all([
+            prisma.user.findMany({
+                where: {
+                    id: {
+                        in: studentIds,
+                    },
+                },
+            }),
+            fetchInternalStudentStats(studentIds),
+        ]);
+
+        const studentMap = new Map(students.map((student) => [student.id, student]));
+
+        return studentIds.flatMap((studentId) => {
+            const student = studentMap.get(studentId);
+            if (!student) return [];
+
+            return [{
+                ...student,
+                stats: statsMap.get(student.id) || createEmptyStudentStats(student),
+            }];
+        });
+    }
+
     const students = await prisma.user.findMany({
-        skip: requiresComputedStatsSort ? 0 : skip,
-        take: requiresComputedStatsSort ? undefined : take,
+        skip,
+        take,
         where: {
             role: 'STUDENT',
             classroomId: classroomId ?? undefined,
