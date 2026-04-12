@@ -37,7 +37,6 @@ interface ProblemManagerProps {
     sortOrder: 'asc' | 'desc';
     subjects: ProblemManagerSubject[];
     currentSubject: ProblemManagerSubject;
-    structuredProblemsEnabled: boolean;
     routeBase?: string;
     viewMode?: ProblemEditorViewMode;
     showMasterNumber?: boolean;
@@ -59,7 +58,6 @@ export function ProblemManager({
     sortOrder,
     subjects,
     currentSubject,
-    structuredProblemsEnabled,
     routeBase = '/admin/problems',
     viewMode = 'admin',
     showMasterNumber = true,
@@ -267,19 +265,12 @@ export function ProblemManager({
                             {bulkImportLabel}
                         </Button>
                     )}
-                    {structuredProblemsEnabled ? (
-                        <Button asChild className="min-h-11 flex-1 sm:min-h-10 sm:flex-none">
-                            <Link href={`${routeBase}/new?subjectId=${currentSubject.id}`}>
-                                <Plus className="mr-2 h-4 w-4" />
-                                {isAuthorView ? '新しい問題を作成' : '問題を作成'}
-                            </Link>
-                        </Button>
-                    ) : (
-                        <Button disabled className="min-h-11 flex-1 sm:min-h-10 sm:flex-none">
+                    <Button asChild className="min-h-11 flex-1 sm:min-h-10 sm:flex-none">
+                        <Link href={`${routeBase}/new?subjectId=${currentSubject.id}`}>
                             <Plus className="mr-2 h-4 w-4" />
                             {isAuthorView ? '新しい問題を作成' : '問題を作成'}
-                        </Button>
-                    )}
+                        </Link>
+                    </Button>
                 </div>
             </div>
 

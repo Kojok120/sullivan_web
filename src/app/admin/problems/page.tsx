@@ -2,7 +2,6 @@ import { getProblems, getProblemSubjects } from './actions';
 import { ProblemManager } from './problem-manager';
 import { buildProblemListUiPolicy, normalizeProblemSortBy } from './problem-list-policy';
 import { ProblemSubjectRequiredState } from './problem-subject-required-state';
-import { isStructuredProblemsEnabled } from '@/lib/feature-flags';
 
 export const dynamic = 'force-dynamic';
 
@@ -78,7 +77,6 @@ export default async function ProblemsPage({
                 sortOrder={sortOrder}
                 subjects={subjects}
                 currentSubject={currentSubject}
-                structuredProblemsEnabled={isStructuredProblemsEnabled()}
                 showMasterNumber={policy.showMasterNumber}
                 showBulkImport={policy.showBulkImport}
                 bulkImportLabel={policy.bulkImportLabel}

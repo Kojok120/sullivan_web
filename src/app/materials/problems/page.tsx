@@ -1,4 +1,3 @@
-import { isStructuredProblemsEnabled } from '@/lib/feature-flags';
 import { notFound, redirect } from 'next/navigation';
 import { getProblemSubjects, getProblems } from '@/app/admin/problems/actions';
 import { ProblemManager } from '@/app/admin/problems/problem-manager';
@@ -11,10 +10,6 @@ export default async function MaterialsProblemsPage({
 }: {
     searchParams: Promise<{ page?: string; q?: string; grade?: string; coreProblemId?: string; subjectId?: string; sortBy?: string; sortOrder?: string; video?: string; problemType?: string; contentFormat?: string; status?: string }>;
 }) {
-    if (!isStructuredProblemsEnabled()) {
-        notFound();
-    }
-
     const params = await searchParams;
     const page = Number(params.page) || 1;
     const query = params.q || '';
@@ -97,7 +92,6 @@ export default async function MaterialsProblemsPage({
                 sortOrder={sortOrder}
                 subjects={subjects}
                 currentSubject={currentSubject}
-                structuredProblemsEnabled={isStructuredProblemsEnabled()}
                 routeBase="/materials/problems"
                 viewMode="author"
                 showMasterNumber={buildProblemListUiPolicy(currentSubject, 'author').showMasterNumber}

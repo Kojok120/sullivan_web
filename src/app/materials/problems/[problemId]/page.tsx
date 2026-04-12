@@ -1,7 +1,6 @@
 import { notFound } from 'next/navigation';
 
 import { getProblemEditorContext } from '@/app/admin/problems/actions';
-import { isStructuredProblemsEnabled } from '@/lib/feature-flags';
 import { ProblemAuthorEditorClient } from '../problem-author-editor-client';
 
 export const dynamic = 'force-dynamic';
@@ -11,10 +10,6 @@ export default async function MaterialProblemDetailPage({
 }: {
     params: Promise<{ problemId: string }>;
 }) {
-    if (!isStructuredProblemsEnabled()) {
-        notFound();
-    }
-
     const { problemId } = await params;
     const context = await getProblemEditorContext(problemId);
 

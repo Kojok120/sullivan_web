@@ -9,7 +9,6 @@ import { figureGenerationTargetSchema, type FigureGenerationTarget, isAiFigureGe
 import { prisma } from '@/lib/prisma';
 import { getNextCustomId } from '@/lib/curriculum-service';
 import { deleteProblemsWithRelations, bulkUpsertProblemsCore, createProblemCore } from '@/lib/problem-service';
-import { isStructuredProblemsEnabled } from '@/lib/feature-flags';
 import {
     buildDefaultStructuredDraft,
     deriveLegacyFieldsFromStructuredData,
@@ -43,12 +42,6 @@ type FilterCondition =
     | { type: 'status'; value: string };
 
 const SEARCH_SCALAR_FIELDS = ['question', 'answer', 'customId'] as const;
-
-function ensureStructuredProblems() {
-    if (!isStructuredProblemsEnabled()) {
-        throw new Error('Structured problems is disabled');
-    }
-}
 
 function revalidateProblemPaths(problemId?: string) {
     revalidatePath('/admin/problems');
@@ -583,7 +576,6 @@ export async function createProblemDraft(data: {
     printConfig?: unknown;
 }) {
     await requireProblemAuthor();
-    ensureStructuredProblems();
 
     try {
         const normalized = normalizeStructuredDraftInput(data);
@@ -705,7 +697,6 @@ export async function createProblemDraft(data: {
 
 export async function publishProblemRevision(problemId: string) {
     await requireProblemAuthor();
-    ensureStructuredProblems();
 
     try {
         const problem = await prisma.problem.findUnique({
@@ -779,7 +770,6 @@ export async function previewProblemPrint(params: {
     revisionId?: string;
 }) {
     await requireProblemAuthor();
-    ensureStructuredProblems();
     const query = new URLSearchParams();
     if (params.revisionId) query.set('revisionId', params.revisionId);
 
@@ -797,7 +787,6 @@ export async function generateProblemFigureDraft(input: {
     targetTool: FigureGenerationTarget;
 }) {
     const session = await requireProblemAuthor();
-    ensureStructuredProblems();
 
     try {
         const sourceProblemText = input.sourceProblemText.trim();
@@ -859,7 +848,6 @@ export async function generateProblemFigureDraft(input: {
 
 export async function uploadProblemAsset(formData: FormData) {
     await requireProblemAuthor();
-    ensureStructuredProblems();
 
     try {
         const problemId = String(formData.get('problemId') || '');
@@ -921,7 +909,6 @@ export async function syncProblemAuthoringArtifacts(input: {
     svgContent?: string;
 }) {
     await requireProblemAuthor();
-    ensureStructuredProblems();
 
     try {
         const revision = await prisma.problemRevision.findFirst({
@@ -999,7 +986,6 @@ export async function syncProblemAuthoringArtifacts(input: {
 
 export async function deleteProblemAsset(assetId: string) {
     await requireAdmin();
-    ensureStructuredProblems();
 
     try {
         const asset = await prisma.problemAsset.findUnique({
