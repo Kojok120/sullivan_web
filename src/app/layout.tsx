@@ -7,6 +7,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { MainNav } from "@/components/main-nav";
 import { StudentRealtimeEvents } from "@/components/student-realtime-events";
 
+export const dynamic = 'force-dynamic';
+
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",

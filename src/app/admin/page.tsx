@@ -4,6 +4,8 @@ import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Users, BookOpen, School } from "lucide-react";
 
+export const dynamic = 'force-dynamic';
+
 export default async function AdminDashboard() {
     const session = await getSession();
     if (!session || session.role !== 'ADMIN') redirect('/');

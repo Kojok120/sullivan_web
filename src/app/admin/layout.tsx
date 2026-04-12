@@ -1,6 +1,8 @@
 import { AdminShell } from './admin-shell';
 import { getProblemNavSubjects } from './problems/actions';
 
+export const dynamic = 'force-dynamic';
+
 export default async function AdminLayout({
     children,
 }: {

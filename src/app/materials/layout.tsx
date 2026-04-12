@@ -1,6 +1,8 @@
 import { MaterialsShell } from './materials-shell';
 import { getProblemNavSubjects } from '@/app/admin/problems/actions';
 
+export const dynamic = 'force-dynamic';
+
 export default async function MaterialsLayout({
     children,
 }: {

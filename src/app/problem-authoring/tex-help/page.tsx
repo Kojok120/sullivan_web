@@ -5,6 +5,8 @@ import { renderProblemTextHtml } from '@/lib/problem-text';
 import { TEX_HELP_SECTIONS } from './tex-help-content';
 import { TexHelpExampleCard } from './tex-help-example-card';
 
+export const dynamic = 'force-dynamic';
+
 export default async function ProblemAuthoringTeXHelpPage() {
     await requireProblemAuthor();
 
