@@ -18,6 +18,14 @@ type ScoredProblem = {
     score: number;
 };
 
+function requirePrintableCustomId(problem: { id: string; customId: string | null }): string {
+    if (!problem.customId) {
+        throw new Error(`印刷対象の問題 ${problem.id} に customId が設定されていません`);
+    }
+
+    return problem.customId;
+}
+
 
 export async function selectProblemsForPrint(
     userId: string,
@@ -107,6 +115,7 @@ export async function selectProblemsForPrint(
     // 4. Calculate Score
     const now = Date.now();
     const scoredProblems: ScoredProblem[] = candidateProblems.map(problem => {
+        const customId = requirePrintableCustomId(problem);
         // Integrated userState
         const state = problem.userStates[0];
         let score = 0;
@@ -128,7 +137,7 @@ export async function selectProblemsForPrint(
         return {
             problem: {
                 id: problem.id,
-                customId: problem.customId,
+                customId,
                 question: problem.question,
                 order: problem.order,
                 problemType: problem.problemType,

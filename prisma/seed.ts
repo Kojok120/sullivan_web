@@ -337,8 +337,8 @@ async function seedCurriculum() {
           masterNumber: 1,
           order: 1,
           problems: [
-            { customId: 'J-1', question: '「挑戦」の読み方は？', answer: 'ちょうせん', order: 1 },
-            { customId: 'J-2', question: '「努力」の読み方は？', answer: 'どりょく', order: 2 },
+            { customId: 'N-1', question: '「挑戦」の読み方は？', answer: 'ちょうせん', order: 1 },
+            { customId: 'N-2', question: '「努力」の読み方は？', answer: 'どりょく', order: 2 },
           ],
         },
       ],
@@ -387,7 +387,6 @@ async function seedStructuredProblemSamples() {
           ],
         },
         answerSpec: {
-          kind: 'exact',
           correctAnswer: '20cm^2',
           acceptedAnswers: ['20', '20 cm^2', '20cm2'],
         },
@@ -429,7 +428,6 @@ async function seedStructuredProblemSamples() {
           ],
         },
         answerSpec: {
-          kind: 'exact',
           correctAnswer: '(2, -1)',
           acceptedAnswers: ['(2,-1)', 'x=2,y=-1'],
         },
@@ -457,7 +455,7 @@ async function seedStructuredProblemSamples() {
         customId: 'S-101',
         masterNumber: 101,
         grade: '中2',
-        problemType: 'DIAGRAM_LABEL',
+        problemType: 'SHORT_TEXT',
         authoringTool: 'SVG',
         document: {
           version: 1,
@@ -470,7 +468,6 @@ async function seedStructuredProblemSamples() {
           ],
         },
         answerSpec: {
-          kind: 'exact',
           correctAnswer: '並列',
           acceptedAnswers: [],
         },
@@ -498,7 +495,7 @@ async function seedStructuredProblemSamples() {
         customId: 'S-102',
         masterNumber: 102,
         grade: '中1',
-        problemType: 'GRAPH_READ',
+        problemType: 'GRAPH_DRAW',
         authoringTool: 'SVG',
         document: {
           version: 1,
@@ -511,11 +508,8 @@ async function seedStructuredProblemSamples() {
           ],
         },
         answerSpec: {
-          kind: 'numeric',
           correctAnswer: '6',
           acceptedAnswers: ['6分'],
-          tolerance: 0,
-          unit: '分',
         },
         printConfig: {
           template: 'GRAPH',
@@ -541,7 +535,7 @@ async function seedStructuredProblemSamples() {
         customId: 'S-103',
         masterNumber: 103,
         grade: '中3',
-        problemType: 'SHORT_EXPLANATION',
+        problemType: 'SHORT_TEXT',
         authoringTool: 'MANUAL',
         document: {
           version: 1,
@@ -554,13 +548,8 @@ async function seedStructuredProblemSamples() {
           ],
         },
         answerSpec: {
-          kind: 'rubric',
-          modelAnswer: '蒸散によって葉から水が失われると、根から水を吸い上げる力がはたらき、体内で水や無機養分が運ばれやすくなる。',
-          rubric: '蒸散が根からの吸水と水・無機養分の移動に関係することを説明しているかを評価する。',
-          criteria: [
-            { id: 'c1', label: '吸水', description: '根から水を吸い上げることに触れている', maxPoints: 50 },
-            { id: 'c2', label: '移動', description: '水や無機養分の移動に触れている', maxPoints: 50 },
-          ],
+          correctAnswer: '蒸散によって葉から水が失われると、根から水を吸い上げる力がはたらき、体内で水や無機養分が運ばれやすくなる。',
+          acceptedAnswers: [],
         },
         printConfig: {
           template: 'EXPLANATION',

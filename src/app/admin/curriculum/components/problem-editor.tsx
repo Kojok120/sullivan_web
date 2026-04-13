@@ -99,7 +99,7 @@ function ProblemItem({ problem }: { problem: ProblemEditorProblem }) {
                         icon={<KeyRound className="h-3 w-3" />}
                         label="ID"
                     >
-                        <span className="font-mono">{problem.customId ?? '-'}</span>
+                        <span className="font-mono">{problem.customId}</span>
                     </MetaField>
 
                     <MetaField

@@ -16,7 +16,6 @@ function createProblem(overrides: Partial<ProblemForGrading> = {}): ProblemForGr
         answer: '42',
         acceptedAnswers: ['四十二'],
         contentFormat: 'PLAIN_TEXT',
-        problemType: 'SHORT_TEXT',
         publishedRevisionId: 'revision-1',
         structuredContent: null,
         answerSpec: null,
@@ -31,7 +30,6 @@ describe('grading-service helpers', () => {
         const context = buildProblemContextForGemini(createProblem({
             subjectName: '理科',
             contentFormat: 'STRUCTURED_V1',
-            problemType: 'GEOMETRY',
             structuredContent: {
                 version: 1,
                 title: '作図問題',
@@ -43,8 +41,8 @@ describe('grading-service helpers', () => {
                 ],
             },
             answerSpec: {
-                kind: 'choice',
-                correctChoiceId: 'B',
+                correctAnswer: 'B',
+                acceptedAnswers: [],
             },
             revisionAssets: [{
                 id: 'asset-graph',
@@ -58,7 +56,6 @@ describe('grading-service helpers', () => {
             index: 0,
             displayId: 'S-1',
             subjectName: '理科',
-            problemType: 'GEOMETRY',
             referenceAnswer: 'B',
             hasReferenceFigures: true,
         });

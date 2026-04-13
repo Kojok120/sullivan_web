@@ -11,6 +11,14 @@ import { withNoStoreHeaders } from '@/lib/no-store';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+function requireProblemCustomId(problem: { id: string; customId: string | null }): string {
+    if (!problem.customId) {
+        throw new Error(`Problem ${problem.id} に customId が設定されていません`);
+    }
+
+    return problem.customId;
+}
+
 export async function GET(
     request: NextRequest,
     context: { params: Promise<{ problemId: string }> },
@@ -49,9 +57,11 @@ export async function GET(
         return new Response('Revision not found', { status: 404 });
     }
 
+    const customId = requireProblemCustomId(problem);
+
     const printableProblem = {
         id: problem.id,
-        customId: problem.customId,
+        customId,
         question: problem.question,
         order: problem.order,
         problemType: problem.problemType,
@@ -93,7 +103,7 @@ export async function GET(
         status: 200,
         headers: withNoStoreHeaders({
             'Content-Type': 'application/pdf',
-            'Content-Disposition': `inline; filename="problem-preview-${problem.customId || problem.id}.pdf"`,
+            'Content-Disposition': `inline; filename="problem-preview-${customId}.pdf"`,
             'X-Frame-Options': 'SAMEORIGIN',
         }),
     });

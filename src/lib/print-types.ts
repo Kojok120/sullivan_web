@@ -18,7 +18,7 @@ export type PrintableProblemAsset = {
 
 export type PrintableProblem = {
     id: string;
-    customId: string | null;
+    customId: string;
     question: string;
     order: number;
     problemType?: string;

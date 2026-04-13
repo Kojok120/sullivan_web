@@ -97,7 +97,7 @@ describe('problem-editor-model', () => {
         ]);
     });
 
-    it('図版や選択肢など明白な構造だけで problemType を補正し、それ以外は既存値を保つ', () => {
+    it('図版ブロックだけで problemType を補正し、それ以外は SHORT_TEXT に寄せる', () => {
         expect(deriveProblemTypeFromDocument({
             version: 1,
             blocks: [{ id: 'g1', type: 'graphAsset', assetId: 'asset-1' }],
@@ -111,17 +111,17 @@ describe('problem-editor-model', () => {
         expect(deriveProblemTypeFromDocument({
             version: 1,
             blocks: [{ id: 'choice-1', type: 'choices', options: [{ id: 'A', label: '1' }, { id: 'B', label: '2' }] }],
-        }, 'SHORT_TEXT')).toBe('MULTIPLE_CHOICE');
+        }, 'SHORT_TEXT')).toBe('SHORT_TEXT');
 
         expect(deriveProblemTypeFromDocument({
             version: 1,
             blocks: [{ id: 'blank-1', type: 'blankGroup', blanks: [{ id: 'b1', label: '空欄1' }] }],
-        }, 'SHORT_TEXT')).toBe('MULTI_BLANK');
+        }, 'SHORT_TEXT')).toBe('SHORT_TEXT');
 
         expect(deriveProblemTypeFromDocument({
             version: 1,
             blocks: [{ id: 'p1', type: 'paragraph', text: '説明しなさい。' }],
-        }, 'SHORT_EXPLANATION')).toBe('SHORT_EXPLANATION');
+        }, 'GRAPH_DRAW')).toBe('SHORT_TEXT');
     });
 
     it('本文も添付もないカードを検出する', () => {

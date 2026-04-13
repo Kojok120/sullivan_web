@@ -370,18 +370,15 @@ export async function buildPrintDocumentMarkup(input: PrintDocumentInput): Promi
 }> {
     const qrCodeBySet = await Promise.all(input.problemSets.map(async (setProblems) => {
         const problemIds = setProblems.map((problem) => getProblemDisplayId(problem));
-        const revisionIds = setProblems
-            .map((problem) => problem.publishedRevisionId)
-            .filter((revisionId): revisionId is string => Boolean(revisionId));
         const compressed = compressProblemIds(problemIds);
-        const qrPayload = {
-            s: input.studentLoginId,
-            ...compressed,
-            ...(input.unitToken ? { u: input.unitToken } : {}),
-            ...(revisionIds.length > 0 ? { r: revisionIds } : {}),
-        };
 
         try {
+            const qrPayload = {
+                s: input.studentLoginId,
+                ...compressed,
+                ...(input.unitToken ? { u: input.unitToken } : {}),
+            };
+
             return await QRCode.toDataURL(JSON.stringify(qrPayload), {
                 errorCorrectionLevel: 'M',
                 width: 280,
@@ -391,7 +388,7 @@ export async function buildPrintDocumentMarkup(input: PrintDocumentInput): Promi
             console.error('[print-document] QRコード生成に失敗しました', {
                 error,
                 studentLoginId: input.studentLoginId,
-                problemIds,
+                problemIds: setProblems.map((problem) => problem.customId),
             });
             return buildQrFallbackDataUrl();
         }
@@ -765,7 +762,7 @@ function isStructuredPrintableProblem(problem: PrintableProblem): boolean {
 }
 
 export function getProblemDisplayId(problem: PrintableProblem): string {
-    return problem.customId || problem.id;
+    return problem.customId;
 }
 
 function buildQrFallbackDataUrl(): string {

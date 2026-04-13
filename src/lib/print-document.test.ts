@@ -39,6 +39,30 @@ describe('print-document', () => {
         expect(markup).toContain('Set 2');
     });
 
+    it('QR payload は s/c/u のみを含む', async () => {
+        const qrSpy = vi.spyOn(QRCode, 'toDataURL').mockImplementationOnce(async () => 'data:image/png;base64,qr');
+
+        await buildPrintDocumentMarkup({
+            studentName: '生徒B',
+            studentLoginId: 'student-b',
+            subjectName: '数学',
+            unitToken: '6',
+            problemSets: [[
+                { id: '1', customId: 'M-1', question: 'first', order: 1 },
+                { id: '2', customId: 'M-2', question: 'second', order: 2 },
+            ]],
+        });
+
+        expect(qrSpy).toHaveBeenCalledTimes(1);
+        expect(JSON.parse(String(qrSpy.mock.calls[0]?.[0]))).toEqual({
+            s: 'student-b',
+            c: 'M|1-2',
+            u: '6',
+        });
+
+        qrSpy.mockRestore();
+    });
+
     it('QRコード生成に失敗した場合は文脈付きのエラーを投げる', async () => {
         const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
         const qrSpy = vi.spyOn(QRCode, 'toDataURL').mockRejectedValueOnce(new Error('boom'));
@@ -47,7 +71,7 @@ describe('print-document', () => {
             studentName: '生徒C',
             studentLoginId: 'student-c',
             subjectName: '国語',
-            problemSets: [[{ id: '1', customId: 'J-1', question: 'question', order: 1 }]],
+            problemSets: [[{ id: '1', customId: 'N-1', question: 'question', order: 1 }]],
         });
 
         expect(markup).toContain('data:image/svg+xml');
@@ -56,7 +80,7 @@ describe('print-document', () => {
             '[print-document] QRコード生成に失敗しました',
             expect.objectContaining({
                 studentLoginId: 'student-c',
-                problemIds: ['J-1'],
+                problemIds: ['N-1'],
             }),
         );
 

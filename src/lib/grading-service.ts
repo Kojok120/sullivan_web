@@ -65,7 +65,7 @@ function getGenAI() {
 }
 
 import type { QRData } from '@/lib/qr-utils';
-import { decodeUnitToken, expandProblemIds, expandRevisionIds } from '@/lib/qr-utils';
+import { decodeUnitToken, expandProblemIds } from '@/lib/qr-utils';
 import {
     buildProgressionUpdateScope,
     filterCoreProblemIdsByScope,
@@ -80,6 +80,14 @@ function getDrive() {
 function getStudentIdFromQr(qrData: QRData | null): string | null {
     if (!qrData) return null;
     return qrData.s || null;
+}
+
+function requireProblemCustomId(problem: { id: string; customId: string | null }): string {
+    if (!problem.customId) {
+        throw new Error(`Problem ${problem.id} に customId が設定されていません`);
+    }
+
+    return problem.customId;
 }
 
 export async function secureDriveCheck(reason: string) {
@@ -574,13 +582,12 @@ type ProblemRevisionForGrading = {
 
 export type ProblemForGrading = {
     id: string;
-    customId: string | null;
+    customId: string;
     subjectName: string;
     question: string;
     answer: string | null;
     acceptedAnswers: string[];
     contentFormat: string;
-    problemType: string;
     publishedRevisionId: string | null;
     structuredContent: Prisma.JsonValue | null;
     answerSpec: Prisma.JsonValue | null;
@@ -592,7 +599,6 @@ export type GeminiProblemContext = {
     index: number;
     displayId: string;
     subjectName: string;
-    problemType: string;
     contentFormat: string;
     problemText: string;
     referenceAnswer: string;
@@ -680,9 +686,8 @@ export function buildProblemContextForGemini(problem: ProblemForGrading, index: 
 
     return {
         index,
-        displayId: problem.customId || `Q${index + 1}`,
+        displayId: problem.customId,
         subjectName: problem.subjectName,
-        problemType: problem.problemType,
         contentFormat: problem.contentFormat,
         problemText,
         referenceAnswer,
@@ -1001,7 +1006,6 @@ async function gradeWithGemini(
     // 1. Fetch Full Problem Context from DB
     const extractedPids = expandProblemIds(qrData);
     const uniquePids = Array.from(new Set(extractedPids));
-    const printedRevisionIds = expandRevisionIds(qrData);
 
     console.log(`Fetching problems from DB for IDs: ${uniquePids.join(', ')}`);
     const problems = await prisma.problem.findMany({
@@ -1031,22 +1035,6 @@ async function gradeWithGemini(
                     },
                 },
             },
-            revisions: printedRevisionIds.length > 0 ? {
-                where: { id: { in: printedRevisionIds } },
-                select: {
-                    id: true,
-                    structuredContent: true,
-                    answerSpec: true,
-                    assets: {
-                        select: {
-                            id: true,
-                            fileName: true,
-                            mimeType: true,
-                            storageKey: true,
-                        },
-                    },
-                },
-            } : undefined,
         }
     });
 
@@ -1089,8 +1077,10 @@ async function gradeWithGemini(
     });
 
     problems.sort((a, b) => {
-        const indexA = idToIndexMap.get(a.id) ?? idToIndexMap.get(a.customId || '') ?? Number.MAX_SAFE_INTEGER;
-        const indexB = idToIndexMap.get(b.id) ?? idToIndexMap.get(b.customId || '') ?? Number.MAX_SAFE_INTEGER;
+        const customIdA = requireProblemCustomId(a);
+        const customIdB = requireProblemCustomId(b);
+        const indexA = idToIndexMap.get(a.id) ?? idToIndexMap.get(customIdA) ?? Number.MAX_SAFE_INTEGER;
+        const indexB = idToIndexMap.get(b.id) ?? idToIndexMap.get(customIdB) ?? Number.MAX_SAFE_INTEGER;
         return indexA - indexB;
     });
 
@@ -1103,21 +1093,17 @@ async function gradeWithGemini(
 
     // Convert to ProblemForGrading type
     const problemsForGrading: ProblemForGrading[] = problems.map((p) => {
-        const qrIndex = idToIndexMap.get(p.id) ?? idToIndexMap.get(p.customId || '') ?? -1;
-        const revisionFromQrIndex = qrIndex >= 0 ? printedRevisionIds[qrIndex] : undefined;
-        const matchedRevision = (revisionFromQrIndex
-            ? p.revisions.find((revision) => revision.id === revisionFromQrIndex) ?? p.publishedRevision
-            : p.publishedRevision) as ProblemRevisionForGrading | null;
+        const matchedRevision = p.publishedRevision as ProblemRevisionForGrading | null;
+        const customId = requireProblemCustomId(p);
 
         return {
             id: p.id,
-            customId: p.customId,
+            customId,
             subjectName: p.subject.name,
             question: p.question,
             answer: p.answer,
             acceptedAnswers: p.acceptedAnswers,
             contentFormat: p.contentFormat,
-            problemType: p.problemType,
             publishedRevisionId: matchedRevision?.id ?? p.publishedRevisionId,
             structuredContent: matchedRevision?.structuredContent ?? null,
             answerSpec: matchedRevision?.answerSpec ?? null,
@@ -1282,36 +1268,7 @@ function normalizeQrData(raw: unknown): QRData | null {
         }
     }
 
-    if (raw.p !== undefined && raw.p !== null) {
-        if (Array.isArray(raw.p)) {
-            const list = raw.p.map((id) => String(id).trim()).filter(Boolean);
-            if (list.length > 0) {
-                normalized.p = list.join(',');
-            }
-        } else if (typeof raw.p === 'string') {
-            const trimmed = raw.p.trim();
-            let parsedArray = false;
-            if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-                try {
-                    const parsed = JSON.parse(trimmed);
-                    if (Array.isArray(parsed)) {
-                        parsedArray = true;
-                        const list = parsed.map((id) => String(id).trim()).filter(Boolean);
-                        if (list.length > 0) {
-                            normalized.p = list.join(',');
-                        }
-                    }
-                } catch {
-                    // Fall back to raw string when JSON parsing fails.
-                }
-            }
-            if (!normalized.p && !parsedArray) {
-                normalized.p = trimmed;
-            }
-        }
-    }
-
-    if (!normalized.s && !normalized.p && !normalized.c && !normalized.u) return null;
+    if (!normalized.s && !normalized.c && !normalized.u) return null;
     return normalized;
 }
 

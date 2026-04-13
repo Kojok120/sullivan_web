@@ -5,6 +5,7 @@ import {
     collectStructuredDocumentAssetIds,
     normalizeAnswerSpecForAi,
     normalizeAnswerSpecForAuthoring,
+    parseAnswerSpec,
     parseStructuredDocument,
 } from './structured-problem';
 
@@ -50,37 +51,41 @@ describe('structured-problem', () => {
         ]);
     });
 
-    it('legacy な answerSpec を AI 採点向けの正解/別解へ正規化する', () => {
+    it('answerSpec を AI 採点向けの正解/別解へ正規化する', () => {
         expect(normalizeAnswerSpecForAi({
-            kind: 'choice',
-            correctChoiceId: 'B',
+            correctAnswer: 'B',
+            acceptedAnswers: [],
         })).toEqual({
             referenceAnswer: 'B',
             alternativeAnswers: [],
         });
 
         expect(normalizeAnswerSpecForAi({
-            kind: 'multiBlank',
-            blanks: [
-                { id: 'b1', correctAnswer: '水', acceptedAnswers: ['みず'] },
-                { id: 'b2', correctAnswer: '空気', acceptedAnswers: [] },
-            ],
+            correctAnswer: '水',
+            acceptedAnswers: ['みず', ' 水 '],
         })).toEqual({
-            referenceAnswer: 'b1: 水\nb2: 空気',
-            alternativeAnswers: ['b1: みず'],
+            referenceAnswer: '水',
+            alternativeAnswers: ['みず', '水'],
         });
     });
 
-    it('rubric 系 answerSpec を generic な exact answerSpec へ寄せる', () => {
+    it('authoring 向け answerSpec を trim 済みの最小形へ寄せる', () => {
         expect(normalizeAnswerSpecForAuthoring({
-            kind: 'rubric',
-            modelAnswer: '蒸散で温度調節をする。',
-            rubric: '役割を説明できているかを見る。',
-            criteria: [{ id: 'c1', label: '内容', description: '役割を説明する', maxPoints: 100 }],
+            correctAnswer: '  蒸散で温度調節をする。 ',
+            acceptedAnswers: [' 蒸散 ', '', '蒸散'],
         })).toEqual({
-            kind: 'exact',
-            correctAnswer: '模範解答:\n蒸散で温度調節をする。\n\n採点基準:\n役割を説明できているかを見る。\n\n観点:\n- 内容 (100点): 役割を説明する',
-            acceptedAnswers: [],
+            correctAnswer: '蒸散で温度調節をする。',
+            acceptedAnswers: ['蒸散'],
+        });
+    });
+
+    it('answerSpec は正解と別解配列だけを受け付ける', () => {
+        expect(parseAnswerSpec({
+            correctAnswer: '20',
+            acceptedAnswers: ['20cm^2'],
+        })).toEqual({
+            correctAnswer: '20',
+            acceptedAnswers: ['20cm^2'],
         });
     });
 

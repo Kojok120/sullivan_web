@@ -398,7 +398,7 @@ export async function getProblems(
                 : sortBy === 'masterNumber'
                     ? [{ masterNumber: { sort: sortOrder, nulls: 'last' } }, { id: 'asc' }]
                     : sortBy === 'customId'
-                        ? [{ customId: { sort: sortOrder, nulls: 'last' } }, { id: 'asc' }]
+                        ? [{ customId: sortOrder }, { id: 'asc' }]
                         : [{ updatedAt: sortOrder }, { id: 'asc' }];
 
         const [problems, total] = await Promise.all([

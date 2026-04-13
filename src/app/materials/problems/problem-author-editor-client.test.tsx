@@ -70,7 +70,7 @@ const baseProblem = {
                 { id: 'i1', type: 'image', assetId: 'asset-image', src: '', alt: '' },
             ],
         },
-        answerSpec: { kind: 'exact', correctAnswer: '', acceptedAnswers: [] },
+        answerSpec: { correctAnswer: '', acceptedAnswers: [] },
         printConfig: { template: 'STANDARD', estimatedHeight: 'MEDIUM', answerMode: 'INLINE', answerLines: 3, showQrOnFirstPage: true },
         generationContext: null,
         assets: [],

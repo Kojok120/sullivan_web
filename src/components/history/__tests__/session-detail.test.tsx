@@ -60,7 +60,7 @@ type SessionDetailMock = {
     problem: {
         question: string
         answer: string | null
-        customId: string | null
+        customId: string
         videoUrl: string | null
         coreProblems: {
             name: string
