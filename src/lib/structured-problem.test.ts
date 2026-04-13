@@ -89,6 +89,14 @@ describe('structured-problem', () => {
         });
     });
 
+    it('legacy な余計なキーを含む answerSpec は受け付けない', () => {
+        expect(() => parseAnswerSpec({
+            kind: 'choice',
+            correctAnswer: '20',
+            acceptedAnswers: ['20cm^2'],
+        })).toThrow();
+    });
+
     it('AI 向け problemText に表や選択肢や空欄情報を含め、参照 asset を集める', () => {
         const document = parseStructuredDocument({
             version: 1,

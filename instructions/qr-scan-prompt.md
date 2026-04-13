@@ -1,3 +1,5 @@
+<!-- このプロンプト本文は Gemini への指示安定性のため英語で維持する -->
+
 Analyze this document. There is a QR code on it containing JSON data.
 1. Decode the QR code.
 2. Extract the JSON data from the QR code.

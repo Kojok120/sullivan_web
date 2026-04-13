@@ -105,7 +105,7 @@ export const structuredProblemDocumentSchema = z.object({
 export const answerSpecSchema = z.object({
     correctAnswer: z.string().default(''),
     acceptedAnswers: z.array(z.string()).default([]),
-});
+}).strict();
 
 export const printConfigSchema = z.object({
     template: z.enum(['COMPACT', 'STANDARD', 'WORKSPACE', 'GRAPH', 'TABLE', 'EXPLANATION']).default('STANDARD'),

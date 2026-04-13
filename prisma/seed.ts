@@ -277,6 +277,54 @@ async function upsertProblem(subjectId: string, coreProblemId: string, problem: 
   });
 }
 
+function getLegacySeedCustomId(customId: string) {
+  if (customId.startsWith('N-')) {
+    return `J-${customId.slice(2)}`;
+  }
+
+  return null;
+}
+
+async function migrateSeedProblemCustomId(subjectId: string, customId: string) {
+  const legacyCustomId = getLegacySeedCustomId(customId);
+  if (!legacyCustomId) {
+    return;
+  }
+
+  const existing = await prisma.problem.findUnique({
+    where: {
+      subjectId_customId: {
+        subjectId,
+        customId,
+      },
+    },
+    select: { id: true },
+  });
+
+  if (existing) {
+    return;
+  }
+
+  const legacy = await prisma.problem.findUnique({
+    where: {
+      subjectId_customId: {
+        subjectId,
+        customId: legacyCustomId,
+      },
+    },
+    select: { id: true },
+  });
+
+  if (!legacy) {
+    return;
+  }
+
+  await prisma.problem.update({
+    where: { id: legacy.id },
+    data: { customId },
+  });
+}
+
 async function seedCurriculum() {
   const subjects: SeedSubject[] = [
     {
@@ -356,6 +404,7 @@ async function seedCurriculum() {
       const coreProblemRecord = await upsertCoreProblem(subjectRecord.id, coreProblem);
 
       for (const problem of coreProblem.problems) {
+        await migrateSeedProblemCustomId(subjectRecord.id, problem.customId);
         await upsertProblem(subjectRecord.id, coreProblemRecord.id, problem);
       }
     }
