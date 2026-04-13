@@ -1,8 +1,24 @@
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient, Role, ClassroomPlan } from '@prisma/client';
+import {
+  Prisma,
+  PrismaClient,
+  Role,
+  ClassroomPlan,
+  ProblemAssetKind,
+  ProblemAuthoringTool,
+  ProblemContentFormat,
+  ProblemRevisionStatus,
+  ProblemStatus,
+  ProblemType,
+} from '@prisma/client';
 import { createClient } from '@supabase/supabase-js';
-import { deriveLegacyFieldsFromStructuredData } from '../src/lib/structured-problem';
+import {
+  deriveLegacyFieldsFromStructuredData,
+  type AnswerSpec,
+  type PrintConfig,
+  type StructuredProblemDocument,
+} from '../src/lib/structured-problem';
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
@@ -221,6 +237,29 @@ type SeedSubject = {
   coreProblems: SeedCoreProblem[];
 };
 
+type StructuredSeedAsset = {
+  kind: ProblemAssetKind;
+  fileName: string;
+  mimeType: string;
+  inlineContent: string;
+};
+
+type StructuredProblemSeed = {
+  subject: { name: string; order: number };
+  coreProblem: { name: string; masterNumber: number; order: number };
+  problem: {
+    customId: string;
+    masterNumber: number;
+    grade: string;
+    problemType: ProblemType;
+    authoringTool: ProblemAuthoringTool;
+    document: StructuredProblemDocument & Prisma.InputJsonObject;
+    answerSpec: AnswerSpec & Prisma.InputJsonObject;
+    printConfig: PrintConfig & Prisma.InputJsonObject;
+    assets: StructuredSeedAsset[];
+  };
+};
+
 async function upsertCoreProblem(subjectId: string, coreProblem: SeedCoreProblem) {
   const existing = await prisma.coreProblem.findFirst({
     where: { subjectId, masterNumber: coreProblem.masterNumber },
@@ -414,7 +453,7 @@ async function seedCurriculum() {
 async function seedStructuredProblemSamples() {
   const publishedAt = new Date('2026-04-01T00:00:00Z');
 
-  const samples = [
+  const samples: StructuredProblemSeed[] = [
     {
       subject: { name: '数学', order: 2 },
       coreProblem: { name: '図形', masterNumber: 2, order: 2 },
@@ -431,7 +470,7 @@ async function seedStructuredProblemSamples() {
           instructions: '必要なら計算も余白に書いてよい。',
           blocks: [
             { id: 'geo-1', type: 'paragraph', text: '底辺 8cm、高さ 5cm の三角形ABCの面積を求めなさい。' },
-            { id: 'geo-2', type: 'svg', assetId: 'math-geometry-svg', caption: '図1' },
+            { id: 'geo-2', type: 'svg', assetId: 'math-geometry-svg' },
             { id: 'geo-3', type: 'answerLines', lines: 3 },
           ],
         },
@@ -473,7 +512,7 @@ async function seedStructuredProblemSamples() {
           blocks: [
             { id: 'quad-1', type: 'paragraph', text: '二次関数 y = x^2 - 4x + 3 のグラフについて、頂点の座標を答えなさい。' },
             { id: 'quad-2', type: 'katexDisplay', latex: 'y = x^2 - 4x + 3' },
-            { id: 'quad-3', type: 'graphAsset', assetId: 'math-quadratic-svg', caption: '図2' },
+            { id: 'quad-3', type: 'graphAsset', assetId: 'math-quadratic-svg' },
           ],
         },
         answerSpec: {
@@ -513,7 +552,7 @@ async function seedStructuredProblemSamples() {
           instructions: '図を見て答えなさい。',
           blocks: [
             { id: 'circuit-1', type: 'paragraph', text: '図の回路で、スイッチを入れたときに豆電球AとBはどのように点灯するか。「直列」または「並列」で答えなさい。' },
-            { id: 'circuit-2', type: 'svg', assetId: 'science-circuit-svg', caption: '図3' },
+            { id: 'circuit-2', type: 'svg', assetId: 'science-circuit-svg' },
           ],
         },
         answerSpec: {
@@ -553,7 +592,7 @@ async function seedStructuredProblemSamples() {
           instructions: 'グラフを見て答えなさい。',
           blocks: [
             { id: 'exp-1', type: 'paragraph', text: '水を加熱したときの温度変化を表すグラフで、沸騰が始まったのは何分後か答えなさい。' },
-            { id: 'exp-2', type: 'graphAsset', assetId: 'science-graph-svg', caption: '図4' },
+            { id: 'exp-2', type: 'graphAsset', assetId: 'science-graph-svg' },
           ],
         },
         answerSpec: {
@@ -625,8 +664,8 @@ async function seedStructuredProblemSamples() {
     });
 
     const legacy = deriveLegacyFieldsFromStructuredData({
-      document: sample.problem.document as never,
-      answerSpec: sample.problem.answerSpec as never,
+      document: sample.problem.document,
+      answerSpec: sample.problem.answerSpec,
     });
 
     const problem = await prisma.problem.upsert({
@@ -643,9 +682,9 @@ async function seedStructuredProblemSamples() {
         grade: sample.problem.grade,
         masterNumber: sample.problem.masterNumber,
         subjectId: subject.id,
-        problemType: sample.problem.problemType as never,
-        contentFormat: 'STRUCTURED_V1' as never,
-        status: 'PUBLISHED' as never,
+        problemType: sample.problem.problemType,
+        contentFormat: ProblemContentFormat.STRUCTURED_V1,
+        status: ProblemStatus.PUBLISHED,
         hasStructuredContent: true,
         coreProblems: { set: [{ id: coreProblem.id }] },
       },
@@ -658,9 +697,9 @@ async function seedStructuredProblemSamples() {
         grade: sample.problem.grade,
         masterNumber: sample.problem.masterNumber,
         order: sample.problem.masterNumber,
-        problemType: sample.problem.problemType as never,
-        contentFormat: 'STRUCTURED_V1' as never,
-        status: 'PUBLISHED' as never,
+        problemType: sample.problem.problemType,
+        contentFormat: ProblemContentFormat.STRUCTURED_V1,
+        status: ProblemStatus.PUBLISHED,
         hasStructuredContent: true,
         coreProblems: { connect: [{ id: coreProblem.id }] },
       },
@@ -674,39 +713,39 @@ async function seedStructuredProblemSamples() {
         },
       },
       update: {
-        status: 'PUBLISHED',
-        structuredContent: sample.problem.document as never,
-        answerSpec: sample.problem.answerSpec as never,
-        printConfig: sample.problem.printConfig as never,
-        authoringTool: sample.problem.authoringTool as never,
+        status: ProblemRevisionStatus.PUBLISHED,
+        structuredContent: sample.problem.document,
+        answerSpec: sample.problem.answerSpec,
+        printConfig: sample.problem.printConfig,
+        authoringTool: sample.problem.authoringTool,
         publishedAt,
         assets: {
           deleteMany: {},
           create: sample.problem.assets.map((asset) => ({
-            kind: asset.kind as never,
+            kind: asset.kind,
             fileName: asset.fileName,
             mimeType: asset.mimeType,
             inlineContent: asset.inlineContent,
-            sourceTool: sample.problem.authoringTool as never,
+            sourceTool: sample.problem.authoringTool,
           })),
         },
       },
       create: {
         problemId: problem.id,
         revisionNumber: 1,
-        status: 'PUBLISHED',
-        structuredContent: sample.problem.document as never,
-        answerSpec: sample.problem.answerSpec as never,
-        printConfig: sample.problem.printConfig as never,
-        authoringTool: sample.problem.authoringTool as never,
+        status: ProblemRevisionStatus.PUBLISHED,
+        structuredContent: sample.problem.document,
+        answerSpec: sample.problem.answerSpec,
+        printConfig: sample.problem.printConfig,
+        authoringTool: sample.problem.authoringTool,
         publishedAt,
         assets: {
           create: sample.problem.assets.map((asset) => ({
-            kind: asset.kind as never,
+            kind: asset.kind,
             fileName: asset.fileName,
             mimeType: asset.mimeType,
             inlineContent: asset.inlineContent,
-            sourceTool: sample.problem.authoringTool as never,
+            sourceTool: sample.problem.authoringTool,
           })),
         },
       },
