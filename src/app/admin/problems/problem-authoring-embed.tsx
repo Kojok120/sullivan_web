@@ -558,9 +558,10 @@ export function ProblemAuthoringEmbed({
         if (!window.GGBApplet) return;
 
         const container = containerRef.current;
+        const containerWidth = container.clientWidth || container.getBoundingClientRect().width || 800;
         const applet = new window.GGBApplet({
             appName: geoGebraAppName,
-            width: '100%',
+            width: Math.round(containerWidth),
             height: 520,
             showToolBar: true,
             showAlgebraInput: true,
