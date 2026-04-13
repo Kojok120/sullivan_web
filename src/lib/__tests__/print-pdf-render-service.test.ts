@@ -1,23 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import type { Problem } from '@prisma/client';
 
 import { buildPrintPdfCacheKey, buildProblemIdsHash } from '@/lib/print-pdf/render-service';
+import type { PrintableProblem } from '@/lib/print-types';
 
-function makeProblem(id: string, customId?: string): Problem & { customId?: string | null } {
+function makeProblem(id: string, customId = `E-${id}`): PrintableProblem {
     return {
         id,
-        customId: customId ?? null,
+        customId,
         question: `question-${id}`,
-        answer: 'answer',
-        acceptedAnswers: [],
-        explanation: null,
-        hint: null,
-        imageUrl: null,
-        difficulty: null,
         order: 0,
-        createdAt: new Date(0),
-        updatedAt: new Date(0),
-    } as unknown as Problem & { customId?: string | null };
+    };
 }
 
 describe('print-pdf render service helpers', () => {

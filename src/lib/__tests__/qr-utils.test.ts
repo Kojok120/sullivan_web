@@ -34,4 +34,9 @@ describe('qr-utils', () => {
         })
         expect(expanded).toEqual(['E-10', 'E-11'])
     })
+
+    it('不正な問題IDは fail fast で弾く', () => {
+        expect(() => compressProblemIds(['invalid-id'])).toThrow('QR圧縮対象の問題IDが不正です')
+        expect(() => compressProblemIds(['M-1', 'S-2'])).toThrow('QR圧縮対象の問題IDプレフィックスが混在しています')
+    })
 })

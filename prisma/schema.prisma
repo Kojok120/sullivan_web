@@ -38,7 +38,7 @@ model Problem {
   id                   String                @id @default(cuid())
   question             String
   answer               String?
-  customId             String? // Custom ID (e.g., E-1, S-10)
+  customId             String // Custom ID (e.g., E-1, S-10)
   acceptedAnswers      String[]              @default([]) // 許容解答（複数）
   grade                String? // 学年 (e.g., "中1", "高2")
   masterNumber         Int? // マスタ内問題番号
@@ -65,17 +65,8 @@ model Problem {
 
 enum ProblemType {
   SHORT_TEXT
-  NUMERIC
-  MULTIPLE_CHOICE
-  MULTI_BLANK
-  FORMULA_FINAL
-  TABLE_FILL
-  GRAPH_READ
-  GRAPH_DRAW
   GEOMETRY
-  DIAGRAM_LABEL
-  SHORT_EXPLANATION
-  SCIENCE_EXPERIMENT
+  GRAPH_DRAW
 }
 
 enum ProblemContentFormat {

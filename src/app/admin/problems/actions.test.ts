@@ -275,7 +275,7 @@ describe('problem actions permissions', () => {
             videoUrl: 'https://example.com/video',
             coreProblemIds: ['core-1'],
             document: { blocks: [] },
-            answerSpec: { kind: 'exact' },
+            answerSpec: { correctAnswer: '', acceptedAnswers: [] },
             printConfig: {},
         });
 
@@ -299,7 +299,7 @@ describe('problem actions permissions', () => {
             grade: '中1',
             coreProblemIds: ['core-1'],
             document: { blocks: [] },
-            answerSpec: { kind: 'exact' },
+            answerSpec: { correctAnswer: '', acceptedAnswers: [] },
             printConfig: {},
         });
 
@@ -323,7 +323,7 @@ describe('problem actions permissions', () => {
             grade: '中1',
             coreProblemIds: ['core-1'],
             document: { blocks: [] },
-            answerSpec: { kind: 'exact' },
+            answerSpec: { correctAnswer: '', acceptedAnswers: [] },
             printConfig: {},
         });
 

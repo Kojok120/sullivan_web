@@ -102,71 +102,10 @@ export const structuredProblemDocumentSchema = z.object({
     blocks: z.array(problemBlockSchema).min(1),
 });
 
-const exactAnswerSpecSchema = z.object({
-    kind: z.literal('exact'),
+export const answerSpecSchema = z.object({
     correctAnswer: z.string().default(''),
     acceptedAnswers: z.array(z.string()).default([]),
-});
-
-const numericAnswerSpecSchema = z.object({
-    kind: z.literal('numeric'),
-    correctAnswer: z.string().default(''),
-    acceptedAnswers: z.array(z.string()).default([]),
-    tolerance: z.number().nonnegative().default(0),
-    unit: z.string().optional(),
-});
-
-const choiceAnswerSpecSchema = z.object({
-    kind: z.literal('choice'),
-    correctChoiceId: z.string().min(1),
-});
-
-const multiBlankAnswerSpecSchema = z.object({
-    kind: z.literal('multiBlank'),
-    blanks: z.array(z.object({
-        id: z.string().min(1),
-        correctAnswer: z.string().default(''),
-        acceptedAnswers: z.array(z.string()).default([]),
-    })).min(1),
-});
-
-const formulaAnswerSpecSchema = z.object({
-    kind: z.literal('formula'),
-    correctAnswer: z.string().default(''),
-    acceptedAnswers: z.array(z.string()).default([]),
-});
-
-const rubricCriterionSchema = z.object({
-    id: z.string().min(1),
-    label: z.string().min(1),
-    description: z.string().min(1),
-    maxPoints: z.number().min(0).default(0),
-});
-
-const rubricAnswerSpecSchema = z.object({
-    kind: z.literal('rubric'),
-    modelAnswer: z.string().optional(),
-    rubric: z.string().min(1),
-    criteria: z.array(rubricCriterionSchema).default([]),
-});
-
-const visionRubricAnswerSpecSchema = z.object({
-    kind: z.literal('visionRubric'),
-    modelAnswer: z.string().optional(),
-    rubric: z.string().min(1),
-    criteria: z.array(rubricCriterionSchema).default([]),
-    expectedElements: z.array(z.string()).default([]),
-});
-
-export const answerSpecSchema = z.discriminatedUnion('kind', [
-    exactAnswerSpecSchema,
-    numericAnswerSpecSchema,
-    choiceAnswerSpecSchema,
-    multiBlankAnswerSpecSchema,
-    formulaAnswerSpecSchema,
-    rubricAnswerSpecSchema,
-    visionRubricAnswerSpecSchema,
-]);
+}).strict();
 
 export const printConfigSchema = z.object({
     template: z.enum(['COMPACT', 'STANDARD', 'WORKSPACE', 'GRAPH', 'TABLE', 'EXPLANATION']).default('STANDARD'),
@@ -230,84 +169,16 @@ export function normalizeAnswerSpecForAi(answerSpec: AnswerSpec): {
     referenceAnswer: string;
     alternativeAnswers: string[];
 } {
-    switch (answerSpec.kind) {
-        case 'exact':
-        case 'numeric':
-        case 'formula':
-            return {
-                referenceAnswer: answerSpec.correctAnswer.trim(),
-                alternativeAnswers: uniqueNonEmpty(answerSpec.acceptedAnswers),
-            };
-        case 'choice':
-            return {
-                referenceAnswer: answerSpec.correctChoiceId.trim(),
-                alternativeAnswers: [],
-            };
-        case 'multiBlank':
-            return {
-                referenceAnswer: answerSpec.blanks
-                    .map((blank) => `${blank.id}: ${blank.correctAnswer}`.trim())
-                    .filter(Boolean)
-                    .join('\n'),
-                alternativeAnswers: uniqueNonEmpty(
-                    answerSpec.blanks.flatMap((blank) =>
-                        blank.acceptedAnswers.map((candidate) => `${blank.id}: ${candidate}`),
-                    ),
-                ),
-            };
-        case 'rubric': {
-            const referenceSections = [
-                answerSpec.modelAnswer?.trim()
-                    ? `模範解答:\n${answerSpec.modelAnswer.trim()}`
-                    : '',
-                answerSpec.rubric.trim()
-                    ? `採点基準:\n${answerSpec.rubric.trim()}`
-                    : '',
-                answerSpec.criteria.length > 0
-                    ? `観点:\n${answerSpec.criteria
-                        .map((criterion) => `- ${criterion.label} (${criterion.maxPoints}点): ${criterion.description}`)
-                        .join('\n')}`
-                    : '',
-            ].filter(Boolean);
-
-            return {
-                referenceAnswer: referenceSections.join('\n\n').trim(),
-                alternativeAnswers: [],
-            };
-        }
-        case 'visionRubric': {
-            const referenceSections = [
-                answerSpec.modelAnswer?.trim()
-                    ? `模範解答:\n${answerSpec.modelAnswer.trim()}`
-                    : '',
-                answerSpec.rubric.trim()
-                    ? `採点基準:\n${answerSpec.rubric.trim()}`
-                    : '',
-                answerSpec.criteria.length > 0
-                    ? `観点:\n${answerSpec.criteria
-                        .map((criterion) => `- ${criterion.label} (${criterion.maxPoints}点): ${criterion.description}`)
-                        .join('\n')}`
-                    : '',
-                answerSpec.expectedElements.length > 0
-                    ? `図版で確認したい要素:\n${answerSpec.expectedElements.map((element) => `- ${element}`).join('\n')}`
-                    : '',
-            ].filter(Boolean);
-
-            return {
-                referenceAnswer: referenceSections.join('\n\n').trim(),
-                alternativeAnswers: [],
-            };
-        }
-    }
+    return {
+        referenceAnswer: answerSpec.correctAnswer.trim(),
+        alternativeAnswers: uniqueNonEmpty(answerSpec.acceptedAnswers),
+    };
 }
 
-export function normalizeAnswerSpecForAuthoring(answerSpec: AnswerSpec): Extract<AnswerSpec, { kind: 'exact' }> {
-    const normalized = normalizeAnswerSpecForAi(answerSpec);
-
+export function normalizeAnswerSpecForAuthoring(answerSpec: AnswerSpec): AnswerSpec {
     return {
-        kind: 'exact',
-        correctAnswer: normalized.referenceAnswer,
-        acceptedAnswers: normalized.alternativeAnswers,
+        correctAnswer: answerSpec.correctAnswer.trim(),
+        acceptedAnswers: uniqueNonEmpty(answerSpec.acceptedAnswers),
     };
 }
 
@@ -436,13 +307,13 @@ export function buildDefaultStructuredDraft(problemType: string) {
     // 互換維持のため保持するが、構造化問題の印刷レイアウト制御には利用しない。
     const printConfig: PrintConfig = {
         template: safeType === 'GRAPH_DRAW' || safeType === 'GEOMETRY' ? 'GRAPH' : 'STANDARD',
-        estimatedHeight: safeType === 'SHORT_EXPLANATION' || safeType === 'SCIENCE_EXPERIMENT' ? 'LARGE' : 'MEDIUM',
-        answerMode: safeType === 'SHORT_TEXT' || safeType === 'NUMERIC' || safeType === 'MULTIPLE_CHOICE' ? 'SEPARATE_SHEET' : 'INLINE',
-        answerLines: safeType === 'SHORT_EXPLANATION' ? 6 : 3,
+        estimatedHeight: 'MEDIUM',
+        answerMode: safeType === 'SHORT_TEXT' ? 'SEPARATE_SHEET' : 'INLINE',
+        answerLines: 3,
         showQrOnFirstPage: true,
     };
 
-    const answerSpec: AnswerSpec = { kind: 'exact', correctAnswer: '', acceptedAnswers: [] };
+    const answerSpec: AnswerSpec = { correctAnswer: '', acceptedAnswers: [] };
 
     return { document, answerSpec, printConfig };
 }

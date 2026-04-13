@@ -161,7 +161,7 @@ export function ProblemList({
                                         {showMasterNumber && (
                                             <p className="font-mono text-sm font-bold">No.{problem.masterNumber || '-'}</p>
                                         )}
-                                        <p className="font-mono text-xs text-muted-foreground">{problem.customId || '-'}</p>
+                                        <p className="font-mono text-xs text-muted-foreground">{problem.customId}</p>
                                     </div>
                                 </div>
                                 <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
@@ -281,7 +281,7 @@ export function ProblemList({
                                     {showMasterNumber && (
                                         <TableCell className="font-mono text-sm font-bold">{problem.masterNumber || '-'}</TableCell>
                                     )}
-                                    <TableCell className="font-mono text-xs text-muted-foreground">{problem.customId || '-'}</TableCell>
+                                    <TableCell className="font-mono text-xs text-muted-foreground">{problem.customId}</TableCell>
                                     <TableCell className="min-w-[200px] whitespace-pre-wrap" title={problem.question}>
                                         {problem.question}
                                     </TableCell>

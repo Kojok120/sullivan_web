@@ -1,26 +1,25 @@
 
 export type QRData = {
     s?: string; // Student ID (LoginID)
-    p?: string | string[]; // Comma-separated full IDs or array of IDs
     c?: string; // Compressed format: "<prefix>|<ranges>"
     u?: string; // Unit token (base36 of CoreProblem.masterNumber)
-    r?: string | string[]; // Printed revision IDs in order
 };
 
 // Compression Helpers
-export function compressProblemIds(ids: string[]): Partial<QRData> {
-    if (ids.length === 0) return { p: '' };
+export function compressProblemIds(ids: string[]): Pick<QRData, 'c'> {
+    if (ids.length === 0) {
+        throw new Error('QRコードに埋め込む問題IDがありません');
+    }
 
     // Regex to capture "Prefix-Number" (e.g. "E-151" -> "E", "151")
     // Assumes customId format is "Subject-Number" or similar.
     // Adjust regex if format differs. Taking flexible approach: "Anything-Number"
-    const regex = /^([a-zA-Z]+)-(\d+)$/;
+    const regex = /^([A-Z]+)-(\d+)$/;
 
     // Check first item
     const firstMatch = ids[0].match(regex);
     if (!firstMatch) {
-        // Fallback to full list if first item doesn't match
-        return { p: ids.join(',') };
+        throw new Error(`QR圧縮対象の問題IDが不正です: ${ids[0]}`);
     }
 
     const commonPrefix = firstMatch[1];
@@ -30,8 +29,7 @@ export function compressProblemIds(ids: string[]): Partial<QRData> {
     for (const id of ids) {
         const match = id.match(regex);
         if (!match || match[1] !== commonPrefix) {
-            // Mixed or invalid format -> Fallback
-            return { p: ids.join(',') };
+            throw new Error(`QR圧縮対象の問題IDプレフィックスが混在しています: ${ids.join(', ')}`);
         }
         numbers.push(parseInt(match[2], 10)); // Store as number for compactness
     }
@@ -41,32 +39,10 @@ export function compressProblemIds(ids: string[]): Partial<QRData> {
 }
 
 export function expandProblemIds(data: QRData): string[] {
-    if (data.p) {
-        // Handle both string and array formats (Gemini may return either)
-        if (Array.isArray(data.p)) {
-            return data.p.map((id: string) => String(id).trim()).filter(Boolean);
-        }
-        if (typeof data.p === 'string') {
-            return data.p.split(',').map((id: string) => id.trim()).filter(Boolean);
-        }
-        return [];
-    }
-
     if (data.c) {
         const [prefix, ranges] = data.c.split('|');
         if (!prefix || ranges === undefined) return [];
         return expandNumberRanges(prefix, ranges);
-    }
-    return [];
-}
-
-export function expandRevisionIds(data: QRData): string[] {
-    if (!data.r) return [];
-    if (Array.isArray(data.r)) {
-        return data.r.map((id: string) => String(id).trim()).filter(Boolean);
-    }
-    if (typeof data.r === 'string') {
-        return data.r.split(',').map((id: string) => id.trim()).filter(Boolean);
     }
     return [];
 }

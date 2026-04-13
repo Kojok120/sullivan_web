@@ -269,15 +269,9 @@ export function deriveProblemTypeFromDocument(
         return 'GEOMETRY';
     }
 
-    if (document.blocks.some((block) => block.type === 'choices')) {
-        return 'MULTIPLE_CHOICE';
-    }
-
-    if (document.blocks.some((block) => block.type === 'blankGroup')) {
-        return 'MULTI_BLANK';
-    }
-
-    return fallbackProblemType || 'SHORT_TEXT';
+    return fallbackProblemType === 'GRAPH_DRAW' || fallbackProblemType === 'GEOMETRY'
+        ? 'SHORT_TEXT'
+        : (fallbackProblemType || 'SHORT_TEXT');
 }
 
 export function isVisualAttachmentKind(kind: ProblemBodyAttachmentKind) {

@@ -416,7 +416,7 @@ export async function bulkUpsertProblemsCore(
             masterNumber: problem.masterNumber as number,
         }));
 
-    const existingProblemsMap = new Map<string, { id: string; customId: string | null }>();
+    const existingProblemsMap = new Map<string, { id: string }>();
     if (lookupTargets.length > 0) {
         const existing = await client.problem.findMany({
             where: {
@@ -438,19 +438,19 @@ export async function bulkUpsertProblemsCore(
                 continue;
             }
             const key = makeSubjectMasterKey(problem.subjectId, problem.masterNumber);
-            existingProblemsMap.set(key, { id: problem.id, customId: problem.customId });
+            existingProblemsMap.set(key, { id: problem.id });
         }
     }
 
     const toCreate: CreateProblemData[] = [];
-    const toUpdate: (NormalizedProblemData & { id: string; currentCustomId: string | null })[] = [];
+    const toUpdate: (NormalizedProblemData & { id: string })[] = [];
 
     for (const problem of dedupedProblems) {
         if (typeof problem.masterNumber === 'number') {
             const key = makeSubjectMasterKey(problem.subjectId, problem.masterNumber);
             const existingProblem = existingProblemsMap.get(key);
             if (existingProblem) {
-                toUpdate.push({ ...problem, id: existingProblem.id, currentCustomId: existingProblem.customId });
+                toUpdate.push({ ...problem, id: existingProblem.id });
                 continue;
             }
         }
@@ -467,44 +467,12 @@ export async function bulkUpsertProblemsCore(
 
     let updatedCount = 0;
     if (toUpdate.length > 0) {
-        const generatedCustomIdByProblemId = new Map<string, string>();
-        const updatesWithoutCustomId = toUpdate.filter((problem) => !problem.currentCustomId);
-
-        if (updatesWithoutCustomId.length > 0) {
-            const subjectCounts = new Map<string, number>();
-            for (const problem of updatesWithoutCustomId) {
-                subjectCounts.set(problem.subjectId, (subjectCounts.get(problem.subjectId) || 0) + 1);
-            }
-
-            const generatedBySubject = new Map<string, string[]>();
-            const generatedCustomIds = await Promise.all(
-                Array.from(subjectCounts.entries()).map(async ([subjectId, count]) => ({
-                    subjectId,
-                    ids: await getNextCustomIds(subjectId, count, client),
-                }))
-            );
-            generatedCustomIds.forEach(({ subjectId, ids }) => {
-                generatedBySubject.set(subjectId, ids);
-            });
-
-            const subjectIndexes = new Map<string, number>();
-            for (const problem of updatesWithoutCustomId) {
-                const ids = generatedBySubject.get(problem.subjectId) || [];
-                const idx = subjectIndexes.get(problem.subjectId) || 0;
-                if (ids[idx]) {
-                    generatedCustomIdByProblemId.set(problem.id, ids[idx]);
-                }
-                subjectIndexes.set(problem.subjectId, idx + 1);
-            }
-        }
-
         const batchSize = options.batchSize || 50;
         for (let i = 0; i < toUpdate.length; i += batchSize) {
             const batch = toUpdate.slice(i, i + batchSize);
             try {
-                const updateOperations = batch.map((problem) => {
-                    const generatedCustomId = generatedCustomIdByProblemId.get(problem.id);
-                    return client.problem.update({
+                const updateOperations = batch.map((problem) => (
+                    client.problem.update({
                         where: { id: problem.id },
                         data: {
                             question: problem.question,
@@ -514,13 +482,12 @@ export async function bulkUpsertProblemsCore(
                             masterNumber: problem.masterNumber,
                             videoUrl: problem.videoUrl,
                             subjectId: problem.subjectId,
-                            ...(generatedCustomId ? { customId: generatedCustomId } : {}),
                             coreProblems: {
                                 set: problem.coreProblemIds.map((id) => ({ id }))
                             }
                         }
-                    });
-                });
+                    })
+                ));
 
                 await runBatchTransaction(client, updateOperations);
                 updatedCount += batch.length;
