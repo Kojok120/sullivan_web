@@ -42,7 +42,7 @@ export function HistoryFilter({ subjects }: FilterProps) {
     };
 
     return (
-        <div className="bg-white p-4 rounded-lg shadow-sm mb-6 space-y-4 md:space-y-0 md:flex md:items-end md:gap-4">
+        <div className="bg-card p-4 rounded-lg mb-6 space-y-4 md:space-y-0 md:flex md:items-end md:gap-4">
             <div className="space-y-2">
                 <label className="text-sm font-medium">科目</label>
                 <Select value={subjectId} onValueChange={setSubjectId}>

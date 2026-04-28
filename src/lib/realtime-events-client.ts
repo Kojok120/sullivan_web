@@ -1,19 +1,23 @@
+import type { RealtimeEventType } from '@/lib/realtime-events';
 import { createClient } from '@/lib/supabase/client';
 
-export type RealtimeEventRecord = {
-    type?: string;
-    payload?: unknown;
+export type RealtimeEventRecord<
+    TType extends RealtimeEventType = RealtimeEventType,
+    TPayload = unknown,
+> = {
+    type?: TType;
+    payload?: TPayload;
 };
 
-type SubscribeParams = {
+type SubscribeParams<TRecord extends RealtimeEventRecord = RealtimeEventRecord> = {
     channelName: string;
-    onInsert: (record: RealtimeEventRecord) => void | Promise<void>;
+    onInsert: (record: TRecord) => void | Promise<void>;
 };
 
-export async function subscribeToUserRealtimeEvents({
+export async function subscribeToUserRealtimeEvents<TRecord extends RealtimeEventRecord = RealtimeEventRecord>({
     channelName,
     onInsert,
-}: SubscribeParams): Promise<() => void> {
+}: SubscribeParams<TRecord>): Promise<() => void> {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -31,8 +35,8 @@ export async function subscribeToUserRealtimeEvents({
                 table: 'realtime_events',
                 filter: `user_id=eq.${prismaUserId}`,
             },
-            (payload) => {
-                const record = payload.new as RealtimeEventRecord | null;
+            (payload: { new: TRecord | null }) => {
+                const record = payload.new;
                 if (!record) return;
                 void Promise.resolve(onInsert(record)).catch((error) => {
                     console.error('[Realtime] onInsert handler failed:', error);

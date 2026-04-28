@@ -42,6 +42,8 @@ export async function loginAction(_prevState: unknown, formData: FormData) {
 
     if (role === 'ADMIN') {
         redirect('/admin');
+    } else if (role === 'MATERIAL_AUTHOR') {
+        redirect('/materials/problems');
     } else if (role === 'TEACHER' || role === 'HEAD_TEACHER') {
         redirect('/teacher');
     } else {

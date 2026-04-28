@@ -46,3 +46,11 @@ next-env.d.ts
 /src/generated/prisma
 *.xlsx
 /.serena/
+
+# seed-math-problems-dev の自動生成物
+/scripts/data/dev-deleted-snapshot-*.json
+/scripts/data/math-problems-dev.last-run.json
+
+# 数学問題抽出の中間ファイル・レビュー用 CSV
+/scripts/data/_extracted/math-cp-*.json
+/tmp/

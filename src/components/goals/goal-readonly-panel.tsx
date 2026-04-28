@@ -8,8 +8,14 @@ import { getGoalDailyViewAction } from '@/app/actions/student-goals';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getBrowserTimeZoneSafe, normalizeTimeZone, parseDateKeyAsUTC } from '@/lib/date-key';
+import {
+    formatGoalDateKeyLabel,
+    formatGoalMonthLabel,
+    getGoalRelativeDateLabel,
+    resolveGoalTargetForDate,
+} from '@/lib/student-goal-ui';
 import { cn } from '@/lib/utils';
-import type { DailyGoalEntry, GoalDailyViewPayload, StudentGoalView } from '@/lib/types/student-goal';
+import type { DailyGoalEntry, GoalDailyViewPayload } from '@/lib/types/student-goal';
 
 type GoalReadonlyPanelProps = {
     studentId: string;
@@ -19,25 +25,12 @@ type GoalReadonlyPanelProps = {
     className?: string;
 };
 
-function formatDateKeyLabel(dateKey: string, timeZone: string) {
-    const [year, month, day] = dateKey.split('-').map(Number);
-    const date = new Date(Date.UTC(year, month - 1, day));
-    return new Intl.DateTimeFormat('ja-JP', {
-        timeZone: normalizeTimeZone(timeZone),
-        month: 'numeric',
-        day: 'numeric',
-        weekday: 'short',
-    }).format(date);
-}
+function clampSelectedDateKey(selectedDateKey: string, data: GoalDailyViewPayload) {
+    if (selectedDateKey < data.fromDateKey || selectedDateKey > data.toDateKey) {
+        return data.todayKey;
+    }
 
-function formatMonthLabel(dateKey: string, timeZone: string) {
-    const [year, month] = dateKey.split('-').map(Number);
-    const date = new Date(Date.UTC(year, month - 1, 1));
-    return new Intl.DateTimeFormat('ja-JP', {
-        timeZone: normalizeTimeZone(timeZone),
-        year: 'numeric',
-        month: 'long',
-    }).format(date);
+    return selectedDateKey;
 }
 
 function toGoalValueLabel(entry: DailyGoalEntry): string {
@@ -52,34 +45,10 @@ function toGoalValueLabel(entry: DailyGoalEntry): string {
     return pieces.length > 0 ? pieces.join(' / ') : '未設定';
 }
 
-function getRelativeDateLabel(dateKey: string, todayKey: string, tomorrowKey: string): string | null {
-    if (dateKey === todayKey) return '今日';
-    if (dateKey === tomorrowKey) return '明日';
-    return null;
-}
-
 function getDaysDiff(baseDateKey: string, targetDateKey: string): number {
     const base = parseDateKeyAsUTC(baseDateKey).getTime();
     const target = parseDateKeyAsUTC(targetDateKey).getTime();
     return Math.floor((target - base) / (24 * 60 * 60 * 1000));
-}
-
-function resolveGoalValueForDate(goal: StudentGoalView, dateKey: string): { targetCount: number | null; targetText: string | null } {
-    let targetCount: number | null = null;
-    let targetText: string | null = null;
-
-    for (const milestone of goal.milestones) {
-        if (milestone.dateKey > dateKey) break;
-        if (milestone.targetCount !== null || (milestone.targetText && milestone.targetText.trim().length > 0)) {
-            targetCount = milestone.targetCount;
-            targetText = milestone.targetText;
-        }
-    }
-
-    return {
-        targetCount,
-        targetText,
-    };
 }
 
 function GoalEntryItem({ entry }: { entry: DailyGoalEntry }) {
@@ -111,7 +80,7 @@ function PriorityDayCard(props: {
                 <div className="flex items-start justify-between gap-2">
                     <div>
                         <CardTitle className="text-base">{props.title}</CardTitle>
-                        <p className="mt-1 text-xs text-muted-foreground">{formatDateKeyLabel(props.dateKey, props.timeZone)}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{formatGoalDateKeyLabel(props.dateKey, props.timeZone)}</p>
                     </div>
                     <div className="rounded-md border border-border/60 bg-background/80 p-2 text-muted-foreground">
                         {props.icon}
@@ -140,29 +109,66 @@ export function GoalReadonlyPanel({
     showTimeline = false,
     className,
 }: GoalReadonlyPanelProps) {
-    const [data, setData] = useState<GoalDailyViewPayload>(initialData);
-    const [selectedDateKey, setSelectedDateKey] = useState(initialData.todayKey);
+    const [state, setState] = useState(() => ({
+        data: initialData,
+        initialDataSnapshot: initialData,
+        selectedDateKey: initialData.todayKey,
+    }));
     const [isPending, startTransition] = useTransition();
     const timelineRef = useRef<HTMLDivElement | null>(null);
     const todayRowRef = useRef<HTMLButtonElement | null>(null);
 
+    const resolvedState = state.initialDataSnapshot === initialData
+        ? state
+        : {
+            data: initialData,
+            initialDataSnapshot: initialData,
+            selectedDateKey: clampSelectedDateKey(state.selectedDateKey, initialData),
+        };
+    const data = resolvedState.data;
+    const selectedDateKey = resolvedState.selectedDateKey;
+
     useEffect(() => {
         const browserTimeZone = getBrowserTimeZoneSafe();
+        if (normalizeTimeZone(browserTimeZone) === initialData.timeZone) {
+            return;
+        }
+
+        let cancelled = false;
 
         startTransition(() => {
             void (async () => {
                 const result = await getGoalDailyViewAction({
                     studentId,
                     timeZone: browserTimeZone,
+                    fromDateKey: initialData.fromDateKey,
+                    toDateKey: initialData.toDateKey,
                 });
 
-                if (result.success && result.data) {
-                    setData(result.data);
-                    setSelectedDateKey(result.data.todayKey);
+                if (!cancelled && result.success && result.data) {
+                    setState((current) => {
+                        const nextState = current.initialDataSnapshot === initialData
+                            ? current
+                            : {
+                                data: initialData,
+                                initialDataSnapshot: initialData,
+                                selectedDateKey: clampSelectedDateKey(current.selectedDateKey, initialData),
+                            };
+
+                        return {
+                            data: result.data,
+                            initialDataSnapshot: initialData,
+                            selectedDateKey: clampSelectedDateKey(nextState.selectedDateKey, result.data),
+                        };
+                    });
                 }
             })();
         });
-    }, [studentId]);
+
+        return () => {
+            cancelled = true;
+        };
+    }, [initialData, studentId, startTransition]);
 
     useEffect(() => {
         if (!showTimeline) return;
@@ -178,10 +184,7 @@ export function GoalReadonlyPanel({
         });
     }, [data, showTimeline]);
 
-    const effectiveSelectedDateKey =
-        selectedDateKey < data.fromDateKey || selectedDateKey > data.toDateKey
-            ? data.todayKey
-            : selectedDateKey;
+    const effectiveSelectedDateKey = clampSelectedDateKey(selectedDateKey, data);
 
     const todayEntries = useMemo(
         () => data.rows.find((row) => row.dateKey === data.todayKey)?.entries ?? [],
@@ -217,7 +220,7 @@ export function GoalReadonlyPanel({
         };
     }, [selectedEntries]);
 
-    const selectedRelativeLabel = getRelativeDateLabel(effectiveSelectedDateKey, data.todayKey, data.tomorrowKey);
+    const selectedRelativeLabel = getGoalRelativeDateLabel(effectiveSelectedDateKey, data.todayKey, data.tomorrowKey);
 
     return (
         <div className={cn('space-y-4', className)}>
@@ -261,7 +264,7 @@ export function GoalReadonlyPanel({
                         ) : (
                             data.activeGoals.map((goal) => {
                                 const remainingDays = getDaysDiff(data.todayKey, goal.dueDateKey);
-                                const dueValue = resolveGoalValueForDate(goal, goal.dueDateKey);
+                                const dueValue = resolveGoalTargetForDate(goal.milestones, goal.dueDateKey);
                                 const valueLabel = goal.type === 'PROBLEM_COUNT'
                                     ? dueValue.targetCount !== null
                                         ? `${dueValue.targetCount}問`
@@ -272,7 +275,7 @@ export function GoalReadonlyPanel({
                                     <div key={goal.id} className="rounded-lg border border-border/70 bg-background px-3 py-2.5">
                                         <div className="flex flex-wrap items-center justify-between gap-2">
                                             <div className="text-sm font-semibold">{goal.name}</div>
-                                            <Badge variant="outline">{formatDateKeyLabel(goal.dueDateKey, data.timeZone)}まで</Badge>
+                                            <Badge variant="outline">{formatGoalDateKeyLabel(goal.dueDateKey, data.timeZone)}まで</Badge>
                                         </div>
                                         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                                             {goal.subjectName ? <span>科目: {goal.subjectName}</span> : null}
@@ -308,19 +311,34 @@ export function GoalReadonlyPanel({
                                     const monthChanged = prevMonth !== row.dateKey.slice(0, 7);
                                     const isToday = row.dateKey === data.todayKey;
                                     const isSelected = row.dateKey === effectiveSelectedDateKey;
-                                    const relativeLabel = getRelativeDateLabel(row.dateKey, data.todayKey, data.tomorrowKey);
+                                    const relativeLabel = getGoalRelativeDateLabel(row.dateKey, data.todayKey, data.tomorrowKey);
 
                                     return (
                                         <div key={row.dateKey}>
                                             {monthChanged ? (
                                                 <div className="sticky top-0 z-10 border-y bg-background/95 px-3 py-1.5 text-xs font-medium text-muted-foreground backdrop-blur">
-                                                    {formatMonthLabel(row.dateKey, data.timeZone)}
+                                                    {formatGoalMonthLabel(row.dateKey, data.timeZone)}
                                                 </div>
                                             ) : null}
                                             <button
                                                 type="button"
                                                 ref={isToday ? todayRowRef : null}
-                                                onClick={() => setSelectedDateKey(row.dateKey)}
+                                                onClick={() => {
+                                                    setState((current) => {
+                                                        const nextState = current.initialDataSnapshot === initialData
+                                                            ? current
+                                                            : {
+                                                                data: initialData,
+                                                                initialDataSnapshot: initialData,
+                                                                selectedDateKey: clampSelectedDateKey(current.selectedDateKey, initialData),
+                                                            };
+
+                                                        return {
+                                                            ...nextState,
+                                                            selectedDateKey: row.dateKey,
+                                                        };
+                                                    });
+                                                }}
                                                 className={cn(
                                                     'w-full border-b px-3 py-2 text-left transition-colors last:border-b-0 hover:bg-muted/50',
                                                     isSelected && 'bg-primary/[0.08] ring-1 ring-primary/30',
@@ -328,7 +346,7 @@ export function GoalReadonlyPanel({
                                                 )}
                                             >
                                                 <div className="flex items-center justify-between gap-2">
-                                                    <p className="text-sm font-medium">{formatDateKeyLabel(row.dateKey, data.timeZone)}</p>
+                                                    <p className="text-sm font-medium">{formatGoalDateKeyLabel(row.dateKey, data.timeZone)}</p>
                                                     <div className="flex items-center gap-1">
                                                         {relativeLabel ? (
                                                             <Badge variant="secondary" className="text-[10px]">{relativeLabel}</Badge>
@@ -348,7 +366,7 @@ export function GoalReadonlyPanel({
                         <CardHeader className="pb-3">
                             <div className="flex flex-wrap items-center justify-between gap-2">
                                 <div>
-                                    <CardTitle className="text-base">{formatDateKeyLabel(effectiveSelectedDateKey, data.timeZone)} の目標</CardTitle>
+                                    <CardTitle className="text-base">{formatGoalDateKeyLabel(effectiveSelectedDateKey, data.timeZone)} の目標</CardTitle>
                                     <p className="mt-1 text-xs text-muted-foreground">
                                         {selectedRelativeLabel ? `${selectedRelativeLabel}の表示` : '選択した日付の表示'}
                                     </p>
@@ -377,7 +395,7 @@ export function GoalReadonlyPanel({
                                                     </Badge>
                                                 </div>
                                                 <Badge variant="secondary" className="text-[11px]">
-                                                    {formatDateKeyLabel(entry.dueDateKey, data.timeZone)}まで
+                                                    {formatGoalDateKeyLabel(entry.dueDateKey, data.timeZone)}まで
                                                 </Badge>
                                             </div>
                                             <p className="mt-1 text-sm text-muted-foreground">{toGoalValueLabel(entry)}</p>

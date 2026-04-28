@@ -37,7 +37,7 @@ export default async function AchievementsPage() {
                     const unlockedAt = unlockedMap.get(achievement.id);
 
                     return (
-                        <Card key={achievement.id} className={`relative overflow-hidden ${isUnlocked ? 'border-yellow-200 bg-yellow-50/30' : 'opacity-70 grayscale bg-gray-50'}`}>
+                        <Card key={achievement.id} className={`relative overflow-hidden ${isUnlocked ? 'border-yellow-200 bg-yellow-50/30' : 'opacity-70 grayscale bg-muted'}`}>
                             {isUnlocked && (
                                 <div className="absolute top-2 right-2">
                                     <CheckCircle className="h-6 w-6 text-yellow-500" />
@@ -45,9 +45,9 @@ export default async function AchievementsPage() {
                             )}
                             <CardHeader className="pb-2">
                                 <div className="flex justify-between items-start">
-                                    <div className="p-2 rounded-full bg-background border shadow-sm">
+                                    <div className="p-2 rounded-full bg-background border">
                                         {/* Icon placeholder - in real app, map icon string to Lucide icon */}
-                                        <Trophy className={`h-6 w-6 ${isUnlocked ? 'text-yellow-500' : 'text-gray-400'}`} />
+                                        <Trophy className={`h-6 w-6 ${isUnlocked ? 'text-yellow-500' : 'text-muted-foreground'}`} />
                                     </div>
                                     <Badge variant={isUnlocked ? "default" : "outline"}>
                                         {achievement.xpReward} XP
