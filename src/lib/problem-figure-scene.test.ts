@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
     buildFigureGenerationSourceText,
+    buildFigureGenerationPrompt,
     compileGeoGebraSceneSpec,
     getDefaultFigureGenerationTarget,
     parseSceneSpecForTarget,
@@ -31,6 +32,18 @@ describe('problem-figure-scene', () => {
     it('GRAPH_DRAW の既定 target は GeoGebra になる', () => {
         expect(getDefaultFigureGenerationTarget('GRAPH_DRAW')).toBe('GEOGEBRA');
         expect(getDefaultFigureGenerationTarget('GEOMETRY')).toBe('GEOGEBRA');
+    });
+
+    it('GRAPH_DRAW の生成プロンプトは明示がない限り点を追加しない方針を含む', () => {
+        const prompt = buildFigureGenerationPrompt({
+            targetTool: 'GEOGEBRA',
+            problemType: 'GRAPH_DRAW',
+            sourceProblemText: '二次関数 y=x^2-4x+3 のグラフを書きなさい。',
+        });
+
+        expect(prompt).toContain('問題文や追加指示で明示されていない限り、点は定義しないでください。');
+        expect(prompt).toContain('関数だけで十分な場合は objects には type:"function" のみを入れてください。');
+        expect(prompt).toContain('点は、問題文や追加指示で明示的に求められている場合だけ point で定義してください。');
     });
 
     it('GeoGebra scene spec を graph / geometry 両対応の command stream に変換できる', () => {
