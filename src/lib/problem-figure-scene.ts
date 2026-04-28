@@ -747,13 +747,11 @@ export function getDefaultFigureGenerationTarget(problemType: string): FigureGen
 
 export function buildFigureGenerationSourceText(document: {
     version?: number;
-    title?: string;
     summary?: string;
     instructions?: string;
     blocks: Array<Record<string, unknown>>;
 }): string {
     const sections = [
-        document.title?.trim(),
         document.summary?.trim(),
         document.instructions?.trim(),
         ...document.blocks.flatMap((block) => {

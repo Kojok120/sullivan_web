@@ -392,14 +392,37 @@ export async function getProblems(
         const normalizedSearch = search.trim();
         const where = buildProblemWhere(filters, normalizedSearch || undefined);
         const skip = (page - 1) * limit;
+
+        if (sortBy === 'customId') {
+            const idsAndCustomIds = await prisma.problem.findMany({
+                where,
+                select: { id: true, customId: true },
+            });
+            const sign = sortOrder === 'asc' ? 1 : -1;
+            const sorted = [...idsAndCustomIds].sort((a, b) => {
+                const cmp = compareCustomIdNaturally(a.customId, b.customId);
+                if (cmp !== 0) return sign * cmp;
+                return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+            });
+            const total = sorted.length;
+            const pagedIds = sorted.slice(skip, skip + limit).map((row) => row.id);
+            const pageProblems = pagedIds.length === 0
+                ? []
+                : await prisma.problem.findMany({
+                    where: { id: { in: pagedIds } },
+                    include: problemAdminInclude,
+                });
+            const indexMap = new Map(pagedIds.map((id, index) => [id, index]));
+            pageProblems.sort((a, b) => (indexMap.get(a.id) ?? 0) - (indexMap.get(b.id) ?? 0));
+            return { success: true, problems: pageProblems, total, page, limit };
+        }
+
         const orderBy: Prisma.ProblemOrderByWithRelationInput[] =
             sortBy === 'createdAt'
                 ? [{ createdAt: sortOrder }, { id: 'asc' }]
                 : sortBy === 'masterNumber'
                     ? [{ masterNumber: { sort: sortOrder, nulls: 'last' } }, { id: 'asc' }]
-                    : sortBy === 'customId'
-                        ? [{ customId: sortOrder }, { id: 'asc' }]
-                        : [{ updatedAt: sortOrder }, { id: 'asc' }];
+                    : [{ updatedAt: sortOrder }, { id: 'asc' }];
 
         const [problems, total] = await Promise.all([
             prisma.problem.findMany({
@@ -419,6 +442,25 @@ export async function getProblems(
     }
 }
 
+function compareCustomIdNaturally(a: string, b: string): number {
+    const tokenize = (value: string) => value.match(/\d+|\D+/g) ?? [];
+    const ta = tokenize(a);
+    const tb = tokenize(b);
+    const length = Math.min(ta.length, tb.length);
+    for (let i = 0; i < length; i += 1) {
+        const partA = ta[i];
+        const partB = tb[i];
+        const numA = /^\d+$/.test(partA) ? Number(partA) : null;
+        const numB = /^\d+$/.test(partB) ? Number(partB) : null;
+        if (numA !== null && numB !== null) {
+            if (numA !== numB) return numA - numB;
+        } else if (partA !== partB) {
+            return partA < partB ? -1 : 1;
+        }
+    }
+    return ta.length - tb.length;
+}
+
 export async function getProblemSubjects() {
     await requireProblemAuthor();
 
@@ -433,6 +475,7 @@ export async function getProblemSubjects() {
                     select: {
                         id: true,
                         name: true,
+                        masterNumber: true,
                     },
                 },
             },

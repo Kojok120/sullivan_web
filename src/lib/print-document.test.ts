@@ -102,7 +102,6 @@ describe('print-document', () => {
                 publishedRevisionId: 'rev-1',
                 structuredContent: {
                     version: 1,
-                    title: '回路図の読み取り',
                     summary: '図を見て答える',
                     blocks: [
                         { id: 'b1', type: 'paragraph', text: '図の回路は直列か並列か。' },
@@ -121,7 +120,7 @@ describe('print-document', () => {
         });
 
         expect(markup).toContain('problem-card');
-        expect(markup).toContain('回路図の読み取り');
+        expect(markup).toContain('図の回路は直列か並列か。');
         expect(markup).toContain('answer-sheet');
         expect(markup).not.toContain('workspace-line');
     });
@@ -140,7 +139,6 @@ describe('print-document', () => {
                 publishedRevisionId: 'rev-graph-1',
                 structuredContent: {
                     version: 1,
-                    title: '二次関数のグラフ',
                     blocks: [
                         { id: 'b1', type: 'paragraph', text: 'グラフを見て答えなさい。' },
                         { id: 'b2', type: 'graphAsset', assetId: 'mismatched-asset-id' },

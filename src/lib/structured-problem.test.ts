@@ -100,7 +100,6 @@ describe('structured-problem', () => {
     it('AI 向け problemText に表や選択肢や空欄情報を含め、参照 asset を集める', () => {
         const document = parseStructuredDocument({
             version: 1,
-            title: '水溶液',
             summary: '表を見て答える',
             instructions: '当てはまるものを選ぶ',
             blocks: [
@@ -114,7 +113,7 @@ describe('structured-problem', () => {
             ],
         });
 
-        expect(buildAiProblemText(document)).toContain('タイトル: 水溶液');
+        expect(buildAiProblemText(document)).toContain('概要: 表を見て答える');
         expect(buildAiProblemText(document)).toContain('表:');
         expect(buildAiProblemText(document)).toContain('選択肢:');
         expect(buildAiProblemText(document)).toContain('空欄:');

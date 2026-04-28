@@ -139,6 +139,15 @@ export const PRINT_DOCUMENT_CSS = `
     page-break-inside: avoid;
 }
 
+.${PRINT_DOCUMENT_ROOT_CLASS} .structured-question-list .problem-card:first-child .problem-card-header {
+    padding-right: 30mm;
+}
+
+.${PRINT_DOCUMENT_ROOT_CLASS} .structured-question-list .problem-card:first-child .problem-body > :first-child {
+    padding-right: 30mm;
+    min-height: 22mm;
+}
+
 .${PRINT_DOCUMENT_ROOT_CLASS} .problem-card-header {
     display: flex;
     align-items: baseline;
@@ -146,9 +155,11 @@ export const PRINT_DOCUMENT_CSS = `
     margin-bottom: 4mm;
 }
 
-.${PRINT_DOCUMENT_ROOT_CLASS} .problem-card-title {
-    font-size: 18px;
-    font-weight: 700;
+.${PRINT_DOCUMENT_ROOT_CLASS} .problem-card-header .question-id {
+    width: auto;
+    min-width: 0;
+    text-align: left;
+    padding-top: 0;
 }
 
 .${PRINT_DOCUMENT_ROOT_CLASS} .problem-card-summary,
@@ -297,20 +308,13 @@ export const PRINT_DOCUMENT_CSS = `
 }
 
 .${PRINT_DOCUMENT_ROOT_CLASS} .answer-id {
-    width: 28mm;
-    min-width: 28mm;
-    text-align: right;
+    flex: 0 0 auto;
+    text-align: left;
     font-size: 20px;
     font-weight: 700;
     line-height: 1.1;
-}
-
-.${PRINT_DOCUMENT_ROOT_CLASS} .answer-prefix {
-    font-size: 22px;
-    font-weight: 700;
-    line-height: 1;
-    min-width: 12mm;
-    padding-bottom: 1.5mm;
+    white-space: nowrap;
+    padding-bottom: 1mm;
 }
 
 .${PRINT_DOCUMENT_ROOT_CLASS} .answer-line {
@@ -410,7 +414,6 @@ export async function buildPrintDocumentMarkup(input: PrintDocumentInput): Promi
             return `
                 <div class="answer-row">
                     <div class="answer-id">${escapeHtml(displayId)}.</div>
-                    <div class="answer-prefix">A.</div>
                     <div class="answer-line"></div>
                 </div>
             `;
@@ -497,7 +500,6 @@ function renderSheetHeader(input: {
                 <div class="sheet-title">${escapeHtml(input.title)} ${input.sheetType}</div>
                 <div class="student-info">氏名: ${escapeHtml(input.studentName)} (ID: ${escapeHtml(input.studentLoginId)})</div>
             </div>
-            <div class="sheet-type">${input.sheetType}</div>
         </header>
     `;
 }
@@ -505,16 +507,18 @@ function renderSheetHeader(input: {
 function renderStructuredProblem(problem: PrintableProblem): string {
     const displayId = getProblemDisplayId(problem);
     const document = parseStructuredDocumentSafely(problem);
-    const title = document?.title?.trim() || problem.question || displayId;
-    const summary = document?.summary?.trim();
 
-    const blocksMarkup = document?.blocks.map((block) => renderStructuredBlock(problem, block)).join('') ?? '';
+    if (!document) {
+        return renderPlainProblem(problem);
+    }
+
+    const summary = document.summary?.trim();
+    const blocksMarkup = document.blocks.map((block) => renderStructuredBlock(problem, block)).join('');
 
     return `
         <article class="problem-card">
             <div class="problem-card-header">
                 <div class="question-id">${escapeHtml(displayId)}.</div>
-                <div class="problem-card-title">${escapeHtml(title)}</div>
             </div>
             ${summary ? `<div class="problem-card-summary">${escapeHtml(summary)}</div>` : ''}
             <div class="problem-body">

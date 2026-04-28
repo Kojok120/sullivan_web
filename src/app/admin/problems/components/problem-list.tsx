@@ -26,8 +26,30 @@ import {
     getProblemTypeLabel,
     type ProblemEditorViewMode,
 } from '@/lib/problem-ui';
+import { renderProblemTextHtml } from '@/lib/problem-text';
 import { bulkDeleteProblems, deleteStandaloneProblem } from '../actions';
 import type { ProblemWithRelations } from '../types';
+
+function RenderedProblemText({
+    text,
+    className,
+    fallback = '-',
+}: {
+    text: string | null | undefined;
+    className?: string;
+    fallback?: string;
+}) {
+    const trimmed = (text ?? '').trim();
+    if (!trimmed) {
+        return <span className="text-xs text-muted-foreground">{fallback}</span>;
+    }
+    return (
+        <div
+            className={className}
+            dangerouslySetInnerHTML={{ __html: renderProblemTextHtml(text ?? '') }}
+        />
+    );
+}
 
 interface ProblemListProps {
     problems: ProblemWithRelations[];
@@ -191,11 +213,17 @@ export function ProblemList({
                                 </div>
                                 <div>
                                     <p className="text-xs text-muted-foreground">問題文</p>
-                                    <p className="whitespace-pre-wrap">{problem.question}</p>
+                                    <RenderedProblemText
+                                        text={problem.question}
+                                        className="whitespace-pre-wrap text-sm leading-7 [&_.katex-display]:overflow-x-auto [&_.katex-display]:py-1"
+                                    />
                                 </div>
                                 <div>
                                     <p className="text-xs text-muted-foreground">解答</p>
-                                    <p className="whitespace-pre-wrap">{problem.answer || '-'}</p>
+                                    <RenderedProblemText
+                                        text={problem.answer}
+                                        className="whitespace-pre-wrap text-sm leading-7 [&_.katex-display]:overflow-x-auto [&_.katex-display]:py-1"
+                                    />
                                 </div>
                                 <div>
                                     <p className="text-xs text-muted-foreground">所属単元</p>
@@ -282,14 +310,20 @@ export function ProblemList({
                                         <TableCell className="font-mono text-sm font-bold">{problem.masterNumber || '-'}</TableCell>
                                     )}
                                     <TableCell className="font-mono text-xs text-muted-foreground">{problem.customId}</TableCell>
-                                    <TableCell className="min-w-[200px] whitespace-pre-wrap" title={problem.question}>
-                                        {problem.question}
+                                    <TableCell className="min-w-[200px]" title={problem.question}>
+                                        <RenderedProblemText
+                                            text={problem.question}
+                                            className="whitespace-pre-wrap text-sm leading-7 [&_.katex-display]:overflow-x-auto [&_.katex-display]:py-1"
+                                        />
                                     </TableCell>
                                     <TableCell className="text-xs">{getProblemTypeLabel(problem.problemType)}</TableCell>
                                     {!isAuthorView && <TableCell className="text-xs">{getContentFormatLabel(problem.contentFormat)}</TableCell>}
                                     <TableCell className="text-xs">{getProblemStatusLabel(problem.status)}</TableCell>
-                                    <TableCell className="min-w-[150px] whitespace-pre-wrap" title={problem.answer || ''}>
-                                        {problem.answer || '-'}
+                                    <TableCell className="min-w-[150px]" title={problem.answer || ''}>
+                                        <RenderedProblemText
+                                            text={problem.answer}
+                                            className="whitespace-pre-wrap text-sm leading-7 [&_.katex-display]:overflow-x-auto [&_.katex-display]:py-1"
+                                        />
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex flex-wrap gap-1">

@@ -25,6 +25,7 @@ type ProblemManagerSubject = {
     coreProblems: {
         id: string;
         name: string;
+        masterNumber?: number | null;
     }[];
 };
 
@@ -206,7 +207,7 @@ export function ProblemManager({
                                 <SelectItem value="ALL">全単元</SelectItem>
                                 {availableCoreProblems.map((coreProblem) => (
                                     <SelectItem key={coreProblem.id} value={coreProblem.id}>
-                                        {coreProblem.name}
+                                        {`#${coreProblem.masterNumber ?? '-'} ${coreProblem.name}`}
                                     </SelectItem>
                                 ))}
                             </SelectContent>

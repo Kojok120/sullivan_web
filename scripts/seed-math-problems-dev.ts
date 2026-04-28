@@ -29,6 +29,8 @@ import {
     type CoreProblemDef,
     type MathProblemDef,
 } from './data/math-problems-dev';
+import { buildDefaultStructuredDraft } from '../src/lib/structured-problem';
+import { randomUUID } from 'node:crypto';
 
 const DEV_ENV_FILE = resolve(__dirname, '..', '.env.DEV');
 const SUBJECT_NAMES_TO_RESET = ['数学', '理科'] as const;
@@ -340,14 +342,16 @@ async function insertProblems(
                 masterNumber,
                 order,
                 problemType: def.problemType,
-                contentFormat: def.figure ? 'STRUCTURED_V1' : 'PLAIN_TEXT',
-                hasStructuredContent: Boolean(def.figure),
+                contentFormat: 'STRUCTURED_V1',
+                hasStructuredContent: true,
                 status: 'DRAFT',
                 subject: { connect: { id: subjectId } },
                 coreProblems: { connect: [{ id: coreProblemId }] },
             },
             select: { id: true, customId: true, masterNumber: true },
         });
+
+        await createProblemRevision(prisma, created.id, def);
 
         inserted.push({
             customId: created.customId,
@@ -364,6 +368,67 @@ async function insertProblems(
     }
 
     return inserted;
+}
+
+async function createProblemRevision(
+    prisma: Prisma.TransactionClient,
+    problemId: string,
+    def: MathProblemDef,
+) {
+    const draft = buildDefaultStructuredDraft(def.problemType);
+
+    // 問題文 (LaTeX 込み) を paragraph ブロックとして格納し、
+    // admin 編集画面で初期表示できるようにする。
+    const document = {
+        ...draft.document,
+        blocks: [
+            {
+                id: randomUUID(),
+                type: 'paragraph' as const,
+                text: def.question,
+            },
+        ],
+    };
+
+    const answerSpec = {
+        correctAnswer: def.answer ?? '',
+        acceptedAnswers: def.acceptedAnswers ?? [],
+    };
+
+    // figure があれば authoringTool='GEOGEBRA' とし、authoringState に spec を保存。
+    // 現状の `def.figure.kind` は 'geogebra' のみ (Desmos 対応時は分岐追加)。
+    const hasFigure = Boolean(def.figure);
+    const authoringTool = hasFigure ? 'GEOGEBRA' : 'MANUAL';
+
+    const revision = await prisma.problemRevision.create({
+        data: {
+            problemId,
+            revisionNumber: 1,
+            status: 'DRAFT',
+            structuredContent: document as unknown as Prisma.InputJsonValue,
+            answerSpec: answerSpec as unknown as Prisma.InputJsonValue,
+            printConfig: draft.printConfig as unknown as Prisma.InputJsonValue,
+            authoringTool,
+            authoringState: hasFigure
+                ? (def.figure as unknown as Prisma.InputJsonValue)
+                : Prisma.JsonNull,
+        },
+        select: { id: true },
+    });
+
+    if (hasFigure) {
+        await prisma.problemAsset.create({
+            data: {
+                problemRevisionId: revision.id,
+                kind: 'GEOGEBRA_STATE',
+                fileName: 'geogebra-state.json',
+                mimeType: 'application/json',
+                sourceTool: 'GEOGEBRA',
+                inlineContent: JSON.stringify(def.figure, null, 2),
+                metadata: { authoringTool: 'GEOGEBRA' } as Prisma.InputJsonValue,
+            },
+        });
+    }
 }
 
 async function getNextProblemMasterNumber(

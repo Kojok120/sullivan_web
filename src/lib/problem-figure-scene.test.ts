@@ -15,7 +15,6 @@ describe('problem-figure-scene', () => {
     it('問題文の主要テキストから AI 生成用の source text を作る', () => {
         const sourceText = buildFigureGenerationSourceText({
             version: 1,
-            title: '二次関数のグラフ',
             summary: '放物線を読み取る',
             instructions: '頂点を答えなさい。',
             blocks: [
@@ -24,7 +23,7 @@ describe('problem-figure-scene', () => {
             ],
         });
 
-        expect(sourceText).toContain('二次関数のグラフ');
+        expect(sourceText).toContain('放物線を読み取る');
         expect(sourceText).toContain('頂点を答えなさい');
         expect(sourceText).toContain('y=x^2-4x+3');
     });

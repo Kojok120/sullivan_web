@@ -23,7 +23,7 @@ export default async function ProblemsPage({
 
     const subjectsResult = await getProblemSubjects();
     const subjects = subjectsResult.success && subjectsResult.subjects
-        ? subjectsResult.subjects.map((subject: { id: string; name: string; coreProblems: { id: string; name: string }[] }) => ({
+        ? subjectsResult.subjects.map((subject: { id: string; name: string; coreProblems: { id: string; name: string; masterNumber?: number | null }[] }) => ({
             id: subject.id,
             name: subject.name,
             coreProblems: subject.coreProblems,

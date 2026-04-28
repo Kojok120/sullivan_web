@@ -96,7 +96,6 @@ export const problemBlockSchema = z.discriminatedUnion('type', [
 
 export const structuredProblemDocumentSchema = z.object({
     version: z.literal(1).default(1),
-    title: z.string().optional(),
     summary: z.string().optional(),
     instructions: z.string().optional(),
     blocks: z.array(problemBlockSchema).min(1),
@@ -185,10 +184,6 @@ export function normalizeAnswerSpecForAuthoring(answerSpec: AnswerSpec): AnswerS
 export function buildAiProblemText(document: StructuredProblemDocument): string {
     const sections: string[] = [];
 
-    if (document.title?.trim()) {
-        sections.push(`タイトル: ${document.title.trim()}`);
-    }
-
     if (document.summary?.trim()) {
         sections.push(`概要: ${document.summary.trim()}`);
     }
@@ -270,7 +265,6 @@ export function deriveLegacyFieldsFromStructuredData(input: {
     const { document, answerSpec } = input;
     const normalizedAnswer = normalizeAnswerSpecForAi(answerSpec);
     const question = [
-        document.title,
         document.summary,
         ...document.blocks
             .filter((block) => block.type === 'paragraph')
@@ -292,7 +286,6 @@ export function buildDefaultStructuredDraft(problemType: string) {
 
     const document: StructuredProblemDocument = {
         version: 1,
-        title: '',
         summary: '',
         instructions: '',
         blocks: [
