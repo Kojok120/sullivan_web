@@ -1,7 +1,6 @@
 'use server';
 
 import { redirect } from 'next/navigation';
-import { getSession } from '@/lib/auth';
 import { passwordUpdateSchema, updateUserPassword } from '@/lib/password-service';
 
 export async function forceUpdatePassword(_prevState: unknown, formData: FormData) {
@@ -22,20 +21,6 @@ export async function forceUpdatePassword(_prevState: unknown, formData: FormDat
 
     if (!updateResult.success) {
         return { error: updateResult.error };
-    }
-
-    const session = await getSession();
-
-    if (session?.role === 'ADMIN') {
-        redirect('/admin');
-    }
-
-    if (session?.role === 'MATERIAL_AUTHOR') {
-        redirect('/materials/problems');
-    }
-
-    if (session?.role === 'TEACHER' || session?.role === 'HEAD_TEACHER') {
-        redirect('/teacher');
     }
 
     redirect('/');

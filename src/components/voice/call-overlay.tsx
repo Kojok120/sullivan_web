@@ -80,7 +80,7 @@ function CallOverlayContent({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-            <div className="bg-background w-full max-w-md p-6 rounded-lg shadow-xl flex flex-col items-center space-y-8 animate-in fade-in zoom-in duration-300">
+            <div className="bg-background w-full max-w-md p-6 rounded-2xl shadow-xl flex flex-col items-center space-y-8 animate-in fade-in zoom-in duration-300">
 
                 {/* Header */}
                 <div className="text-center space-y-2">

@@ -137,9 +137,9 @@ export function PrintAssistClient({ backFallbackPath, pdfUrl }: PrintAssistClien
     }, [isPreparing, pdfUrl, preparedFile, runPreparePdf]);
 
     return (
-        <div className="min-h-screen bg-muted px-4 py-4 md:px-6 md:py-6">
+        <div className="min-h-screen bg-gray-100 px-4 py-4 md:px-6 md:py-6">
             <div className="mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-[720px] items-center justify-center">
-                <div className="w-full rounded-lg bg-white p-5 sm:p-6">
+                <div className="w-full rounded-xl bg-white p-5 shadow-sm sm:p-6">
                     <div className="flex flex-col gap-5">
                         <div className="flex items-center justify-between gap-3">
                             <Button variant="outline" onClick={handleBack}>

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { GuidanceRecord, GuidanceRecordStatus } from '@prisma/client';
+import { GuidanceRecord } from '@prisma/client';
 import {
     Calendar,
     Loader2,
@@ -32,7 +32,6 @@ import {
     normalizeGuidanceAudioMimeType,
     pickGuidanceRecordingFormat,
 } from '@/lib/guidance-recording';
-import { subscribeToUserRealtimeEvents } from '@/lib/realtime-events-client';
 
 interface GuidanceListProps {
     userId: string;
@@ -53,64 +52,6 @@ function formatElapsedTime(ms: number): string {
     const minutes = String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0');
     const seconds = String(totalSec % 60).padStart(2, '0');
     return `${hours}:${minutes}:${seconds}`;
-}
-
-function getGuidanceTypeLabel(type: GuidanceRecord['type']) {
-    if (type === 'INTERVIEW') return '面談';
-    if (type === 'GUIDANCE') return '指導';
-    return 'その他';
-}
-
-function getGuidanceTypeBadgeClass(type: GuidanceRecord['type']) {
-    if (type === 'INTERVIEW') {
-        return 'bg-blue-50 text-blue-700 border-blue-200';
-    }
-
-    if (type === 'GUIDANCE') {
-        return 'bg-green-50 text-green-700 border-green-200';
-    }
-
-    return 'bg-muted text-foreground border';
-}
-
-function getGuidanceStatusLabel(status: GuidanceRecordStatus) {
-    if (status === 'PENDING') return '要約待ち';
-    if (status === 'PROCESSING') return '要約中';
-    if (status === 'FAILED') return '要約失敗';
-    return '完了';
-}
-
-function getGuidanceStatusBadgeClass(status: GuidanceRecordStatus) {
-    if (status === 'PENDING') {
-        return 'bg-amber-50 text-amber-700 border-amber-200';
-    }
-
-    if (status === 'PROCESSING') {
-        return 'bg-sky-50 text-sky-700 border-sky-200';
-    }
-
-    if (status === 'FAILED') {
-        return 'bg-red-50 text-red-700 border-red-200';
-    }
-
-    return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-}
-
-function getGuidanceRecordBody(record: GuidanceRecord) {
-    if (record.status === 'PENDING') {
-        return 'AI要約の準備中です。しばらくすると面談記録が反映されます。';
-    }
-
-    if (record.status === 'PROCESSING') {
-        return 'AI要約を生成中です。完了するとここに面談記録が表示されます。';
-    }
-
-    if (record.status === 'FAILED') {
-        return record.summaryErrorMessage
-            || 'AI要約に失敗しました。右上の新規記録から手動入力をご利用ください。';
-    }
-
-    return record.content;
 }
 
 export function GuidanceList({ userId, records }: GuidanceListProps) {
@@ -405,26 +346,18 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
                 method: 'POST',
                 body: formData,
             });
-            const payload = (await response.json()) as {
-                success?: boolean;
-                queued?: boolean;
-                error?: string;
-                recordId?: string;
-            };
+            const payload = (await response.json()) as { success?: boolean; error?: string };
 
-            if (!response.ok || !payload.success || !payload.queued || !payload.recordId) {
-                if (payload.recordId) {
-                    router.refresh();
-                }
+            if (!response.ok || !payload.success) {
                 throw new Error(payload.error || 'AI要約に失敗しました');
             }
 
             toast.success(
                 limitReason === 'size'
-                    ? `音声サイズが${MAX_GUIDANCE_AUDIO_SIZE_LIMIT_LABEL}に近づいたためAI要約の生成を開始しました`
+                    ? `音声サイズが${MAX_GUIDANCE_AUDIO_SIZE_LIMIT_LABEL}に近づいたため要約を保存しました`
                     : limitReason === 'time'
-                        ? '録音時間の上限に到達したためAI要約の生成を開始しました'
-                        : 'AI要約の生成を開始しました',
+                        ? '録音時間の上限に到達したため要約を保存しました'
+                        : 'AI要約を保存しました',
             );
             router.refresh();
             setIsAdding(false);
@@ -474,40 +407,6 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
             cleanupMediaResources();
         };
     }, []);
-
-    useEffect(() => {
-        let unsubscribe = () => { };
-
-        void (async () => {
-            unsubscribe = await subscribeToUserRealtimeEvents({
-                channelName: 'realtime-events:guidance-summary',
-                onInsert: (record) => {
-                    if (record.type !== 'guidance_summary_completed' && record.type !== 'guidance_summary_failed') {
-                        return;
-                    }
-
-                    const payload = record.payload as { studentId?: string; message?: string | null } | undefined;
-                    if (payload?.studentId !== userId) {
-                        return;
-                    }
-
-                    if (record.type === 'guidance_summary_completed') {
-                        toast.success('AI要約が完了しました');
-                    } else {
-                        toast.error('AI要約に失敗しました', {
-                            description: payload?.message || '右上の新規記録から手動入力をご利用ください。',
-                        });
-                    }
-
-                    router.refresh();
-                },
-            });
-        })();
-
-        return () => {
-            unsubscribe();
-        };
-    }, [router, userId]);
 
     return (
         <Card className="h-full">
@@ -653,14 +552,13 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
                             <div key={record.id} className="flex flex-col space-y-2 border-b pb-4 last:border-0">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
-                                        <span className={`text-xs px-2 py-0.5 rounded-full border ${getGuidanceTypeBadgeClass(record.type)}`}>
-                                            {getGuidanceTypeLabel(record.type)}
+                                        <span className={`text-xs px-2 py-0.5 rounded-full border ${record.type === 'INTERVIEW' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                            record.type === 'GUIDANCE' ? 'bg-green-50 text-green-700 border-green-200' :
+                                                'bg-gray-50 text-gray-700 border-gray-200'
+                                            }`}>
+                                            {record.type === 'INTERVIEW' ? '面談' :
+                                                record.type === 'GUIDANCE' ? '指導' : 'その他'}
                                         </span>
-                                        {record.status !== 'COMPLETED' ? (
-                                            <span className={`text-xs px-2 py-0.5 rounded-full border ${getGuidanceStatusBadgeClass(record.status)}`}>
-                                                {getGuidanceStatusLabel(record.status)}
-                                            </span>
-                                        ) : null}
                                         <span className="text-sm font-medium flex items-center gap-1 text-muted-foreground">
                                             <Calendar className="h-3 w-3" />
                                             <DateDisplay date={record.date} />
@@ -680,8 +578,8 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
                                         </Button>
                                     </div>
                                 </div>
-                                <div className={`whitespace-pre-wrap pl-1 text-sm ${record.status === 'FAILED' ? 'text-red-700' : ''}`}>
-                                    {getGuidanceRecordBody(record)}
+                                <div className="whitespace-pre-wrap pl-1 text-sm">
+                                    {record.content}
                                 </div>
                             </div>
                         ))

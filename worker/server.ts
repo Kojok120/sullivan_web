@@ -110,37 +110,6 @@ async function handleDriveCheck(rawBody: string, res: ServerResponse) {
     sendJson(res, 200, { success: true });
 }
 
-async function handleGuidanceSummary(rawBody: string, res: ServerResponse) {
-    let payload: unknown;
-    try {
-        payload = JSON.parse(rawBody);
-    } catch {
-        sendJson(res, 400, { error: 'Invalid JSON body' });
-        return;
-    }
-
-    const data = payload as { recordId?: unknown; durationMinutes?: unknown; timeZone?: unknown };
-    const recordId = typeof data.recordId === 'string' ? data.recordId.trim() : '';
-    const durationMinutes = typeof data.durationMinutes === 'number' && Number.isFinite(data.durationMinutes)
-        ? Math.max(1, Math.round(data.durationMinutes))
-        : null;
-    const timeZone = typeof data.timeZone === 'string' ? data.timeZone.trim() : null;
-
-    if (!recordId) {
-        sendJson(res, 400, { error: 'Missing recordId' });
-        return;
-    }
-
-    const { processGuidanceSummaryJob } = await import('../src/lib/guidance-summary-job');
-    const result = await processGuidanceSummaryJob({
-        recordId,
-        durationMinutes,
-        timeZone,
-    });
-
-    sendJson(res, 200, { success: true, ...result });
-}
-
 async function handleManualDriveCheck(req: IncomingMessage, res: ServerResponse) {
     const authHeader = getSingleHeader(req.headers.authorization);
     const secretHeader = getSingleHeader(req.headers[INTERNAL_API_SECRET_HEADER_NAME]);
@@ -257,21 +226,12 @@ const server = createServer(async (req, res) => {
 
         if (
             method === 'POST'
-            && (
-                pathname === '/api/queue/grading'
-                || pathname === '/api/queue/drive-check'
-                || pathname === '/api/queue/guidance-summary'
-            )
+            && (pathname === '/api/queue/grading' || pathname === '/api/queue/drive-check')
         ) {
             const rawBody = await readRawBody(req);
 
             if (pathname === '/api/queue/grading') {
                 await handleGrading(rawBody, res);
-                return;
-            }
-
-            if (pathname === '/api/queue/guidance-summary') {
-                await handleGuidanceSummary(rawBody, res);
                 return;
             }
 

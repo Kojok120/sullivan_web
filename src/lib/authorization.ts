@@ -20,20 +20,12 @@ export function isAdminRole(role: string | null | undefined): boolean {
   return role === 'ADMIN';
 }
 
-export function isMaterialAuthorRole(role: string | null | undefined): boolean {
-  return role === 'MATERIAL_AUTHOR';
-}
-
 export function isTeacherRole(role: string | null | undefined): boolean {
   return role === 'TEACHER' || role === 'HEAD_TEACHER';
 }
 
 export function isTeacherOrAdminRole(role: string | null | undefined): boolean {
   return isAdminRole(role) || isTeacherRole(role);
-}
-
-export function isProblemAuthorRole(role: string | null | undefined): boolean {
-  return isAdminRole(role) || isMaterialAuthorRole(role);
 }
 
 export function canCreateTeacherUser(role: string | null | undefined): boolean {

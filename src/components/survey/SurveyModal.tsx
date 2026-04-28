@@ -66,10 +66,10 @@ export function SurveyModal({ userId, onComplete }: SurveyModalProps) {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 overflow-y-auto">
-            <div className="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] flex flex-col">
-                <div className="p-6 border-b border">
-                    <h2 className="text-xl font-bold text-foreground">定期振り返りアンケート</h2>
-                    <p className="mt-2 text-sm text-muted-foreground">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+                <div className="p-6 border-b border-gray-200">
+                    <h2 className="text-xl font-bold text-gray-900">定期振り返りアンケート</h2>
+                    <p className="mt-2 text-sm text-gray-600">
                         日頃の学習についての振り返りをお願いします。<br />
                         直感で「とてもあてはまる（5）」〜「まったくあてはまらない（1）」を選んでください。
                     </p>
@@ -78,8 +78,8 @@ export function SurveyModal({ userId, onComplete }: SurveyModalProps) {
                 <div className="flex-1 overflow-y-auto p-6 space-y-8">
                     {questions.map((q, index) => (
                         <div key={q.id} className="space-y-3">
-                            <p className="font-medium text-foreground">
-                                <span className="text-muted-foreground mr-2">Q{index + 1}.</span>
+                            <p className="font-medium text-gray-800">
+                                <span className="text-gray-500 mr-2">Q{index + 1}.</span>
                                 {q.question}
                             </p>
                             <div className="flex justify-between items-center sm:justify-start sm:space-x-8 px-2">
@@ -91,15 +91,15 @@ export function SurveyModal({ userId, onComplete }: SurveyModalProps) {
                                             value={val}
                                             checked={answers[q.id] === val}
                                             onChange={() => handleAnswer(q.id, val)}
-                                            className="w-5 h-5 text-primary border focus:ring-ring mb-1"
+                                            className="w-5 h-5 text-blue-600 border-gray-300 focus:ring-blue-500 mb-1"
                                         />
-                                        <span className={`text-xs ${answers[q.id] === val ? 'font-bold text-primary' : 'text-muted-foreground group-hover:text-foreground'}`}>
+                                        <span className={`text-xs ${answers[q.id] === val ? 'font-bold text-blue-600' : 'text-gray-500 group-hover:text-gray-700'}`}>
                                             {val}
                                         </span>
                                     </label>
                                 ))}
                             </div>
-                            <div className="flex justify-between text-xs text-muted-foreground px-2 sm:w-[300px]">
+                            <div className="flex justify-between text-xs text-gray-400 px-2 sm:w-[300px]">
                                 <span>まったく<br />あてはまらない</span>
                                 <span className="text-right">とても<br />あてはまる</span>
                             </div>
@@ -107,14 +107,14 @@ export function SurveyModal({ userId, onComplete }: SurveyModalProps) {
                     ))}
                 </div>
 
-                <div className="p-6 border-t border bg-muted rounded-b-lg flex justify-end">
+                <div className="p-6 border-t border-gray-200 bg-gray-50 rounded-b-lg flex justify-end">
                     <button
                         onClick={handleSubmit}
                         disabled={!isComplete || submitting}
                         className={`px-6 py-2.5 rounded-lg text-white font-medium transition-all
                             ${isComplete && !submitting
-                                ? 'bg-primary hover:bg-primary/90'
-                                : 'bg-muted-foreground cursor-not-allowed'}`}
+                                ? 'bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl'
+                                : 'bg-gray-400 cursor-not-allowed'}`}
                     >
                         {submitting ? '送信中...' : '回答を送信して結果を見る'}
                     </button>

@@ -6,8 +6,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-inter), var(--font-noto-sans-jp), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
   --spacing-25: 6.25rem;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -45,86 +45,78 @@
 }
 
 :root {
-  --radius: 0.5rem; /* 8px */
-
-  /* --- Base Colors (Stone) --- */
-  --background: #FAFAF9;
-  --foreground: #1C1917;
+  --font-geist-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji",
+    "Segoe UI Emoji", "Segoe UI Symbol";
+  --font-geist-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+  --radius: 0.75rem; /* 12px */
+  --background: #F9FAFB; /* Gray 50 */
+  --foreground: #111827; /* Gray 900 */
   --card: #FFFFFF;
-  --card-foreground: #1C1917;
+  --card-foreground: #111827;
   --popover: #FFFFFF;
-  --popover-foreground: #1C1917;
-  --muted: #F5F5F4;
-  --muted-foreground: #78716C;
-
-  /* --- Accent (Teal) --- */
-  --primary: #0D9488;
+  --popover-foreground: #111827;
+  --primary: #4F46E5; /* Indigo 600 */
   --primary-foreground: #FFFFFF;
   --secondary: #FFFFFF;
-  --secondary-foreground: #0D9488;
-  --accent: #F0FDFA;
-  --accent-foreground: #0D9488;
-
-  /* --- Feedback --- */
-  --destructive: #DC2626;
+  --secondary-foreground: #4F46E5;
+  --muted: #F3F4F6; /* Gray 100 */
+  --muted-foreground: #6B7280; /* Gray 500 */
+  --accent: #EEF2FF; /* Indigo 50 */
+  --accent-foreground: #4F46E5;
+  --destructive: #EF4444; /* Red 500 */
   --destructive-foreground: #FFFFFF;
-
-  /* --- Border & Input --- */
-  --border: #E7E5E4;
-  --input: #E7E5E4;
-  --ring: #0D9488;
-
-  /* --- Chart --- */
-  --chart-1: #0D9488;
-  --chart-2: #16A34A;
-  --chart-3: #D97706;
-  --chart-4: #DC2626;
+  --border: #E5E7EB; /* Gray 200 */
+  --input: #E5E7EB;
+  --ring: #4F46E5;
+  --chart-1: #4F46E5;
+  --chart-2: #10B981;
+  --chart-3: #F59E0B;
+  --chart-4: #EF4444;
   --chart-5: #3B82F6;
-
-  /* --- Sidebar --- */
-  --sidebar: #FAFAF9;
-  --sidebar-foreground: #1C1917;
-  --sidebar-primary: #0D9488;
+  --sidebar: #F9FAFB;
+  --sidebar-foreground: #111827;
+  --sidebar-primary: #4F46E5;
   --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #F0FDFA;
-  --sidebar-accent-foreground: #0D9488;
-  --sidebar-border: #E7E5E4;
-  --sidebar-ring: #0D9488;
+  --sidebar-accent: #EEF2FF;
+  --sidebar-accent-foreground: #4F46E5;
+  --sidebar-border: #E5E7EB;
+  --sidebar-ring: #4F46E5;
 }
 
 .dark {
-  --background: #1C1917;
-  --foreground: #FAFAF9;
-  --card: #292524;
-  --card-foreground: #FAFAF9;
-  --popover: #292524;
-  --popover-foreground: #FAFAF9;
-  --muted: #292524;
-  --muted-foreground: #A8A29E;
-  --primary: #2DD4BF;
-  --primary-foreground: #1C1917;
-  --secondary: #292524;
-  --secondary-foreground: #FAFAF9;
-  --accent: #292524;
-  --accent-foreground: #FAFAF9;
-  --destructive: #EF4444;
-  --destructive-foreground: #FFFFFF;
-  --border: #44403C;
-  --input: #44403C;
-  --ring: #2DD4BF;
-  --chart-1: #2DD4BF;
-  --chart-2: #4ADE80;
-  --chart-3: #FBBF24;
-  --chart-4: #F87171;
-  --chart-5: #60A5FA;
-  --sidebar: #1C1917;
-  --sidebar-foreground: #FAFAF9;
-  --sidebar-primary: #2DD4BF;
-  --sidebar-primary-foreground: #1C1917;
-  --sidebar-accent: #292524;
-  --sidebar-accent-foreground: #FAFAF9;
-  --sidebar-border: #44403C;
-  --sidebar-ring: #2DD4BF;
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
 }
 
 @layer base {

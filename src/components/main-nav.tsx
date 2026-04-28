@@ -24,14 +24,8 @@ export function MainNav({ role }: { role?: string }) {
     const isAdmin = role === 'ADMIN';
     const isTeacherDashboardActive = pathname === '/teacher' || pathname.startsWith('/teacher/students');
 
-    // Do not render on admin/materials pages or login/signup pages
-    if (
-        pathname.startsWith("/admin")
-        || pathname.startsWith("/materials")
-        || pathname.startsWith("/login")
-        || pathname.startsWith("/signup")
-        || role === 'MATERIAL_AUTHOR'
-    ) {
+    // Do not render on admin pages or login/signup pages
+    if (pathname.startsWith("/admin") || pathname.startsWith("/login") || pathname.startsWith("/signup")) {
         return null;
     }
 

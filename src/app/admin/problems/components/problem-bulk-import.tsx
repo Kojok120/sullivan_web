@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useState, useTransition, useMemo } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -14,16 +14,12 @@ import { bulkUpsertStandaloneProblems, bulkSearchCoreProblems, searchProblemsByM
 import { toast } from 'sonner';
 import { parseProblemTSV } from '@/lib/tsv-parser';
 import { CoreProblemSelector, SelectedCoreProblem } from './core-problem-selector';
-import type { BulkImportVariant } from '../problem-list-policy';
 
 interface BulkImportDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     subjects: { id: string; name: string }[];
     onSuccess: () => void;
-    defaultSubjectId?: string;
-    lockSubjectSelection?: boolean;
-    variant?: BulkImportVariant;
 }
 
 const RESOLVED_CORE_PROBLEM_PREVIEW_LIMIT = 24;
@@ -78,10 +74,6 @@ type RowDiffResult = {
 };
 
 const AUTO_SUBJECT_VALUE = '__AUTO_SUBJECT__';
-
-function getInitialSelectedSubjectId(defaultSubjectId?: string) {
-    return defaultSubjectId ?? AUTO_SUBJECT_VALUE;
-}
 
 function makeSubjectMasterKey(subjectId: string, masterNumber: number): string {
     return `${subjectId}:${masterNumber}`;
@@ -193,15 +185,7 @@ function resolveRowSubjectId(
     return undefined;
 }
 
-export function BulkImportDialog({
-    open,
-    onOpenChange,
-    subjects,
-    onSuccess,
-    defaultSubjectId,
-    lockSubjectSelection = false,
-    variant = 'default',
-}: BulkImportDialogProps) {
+export function BulkImportDialog({ open, onOpenChange, subjects, onSuccess }: BulkImportDialogProps) {
     const [step, setStep] = useState<'input' | 'preview'>('input');
     const [rawInput, setRawInput] = useState('');
     const [parsedData, setParsedData] = useState<ParsedProblem[]>([]);
@@ -212,7 +196,7 @@ export function BulkImportDialog({
 
     // Shared CoreProblem selection
     const [coreProblems, setCoreProblems] = useState<SelectedCoreProblem[]>([]);
-    const [selectedSubjectId, setSelectedSubjectId] = useState(() => getInitialSelectedSubjectId(defaultSubjectId));
+    const [selectedSubjectId, setSelectedSubjectId] = useState(AUTO_SUBJECT_VALUE);
 
     // Map of CoreProblem name -> CoreProblem data (auto-resolved)
     const [resolvedCoreProblems, setResolvedCoreProblems] = useState<Map<string, ResolvedCoreProblem>>(new Map());
@@ -250,22 +234,6 @@ export function BulkImportDialog({
         0,
         resolvedCoreProblemItems.length - visibleResolvedCoreProblemItems.length
     );
-    const fixedSubject = useMemo(
-        () => subjects.find((subject) => subject.id === defaultSubjectId) ?? null,
-        [defaultSubjectId, subjects],
-    );
-    const isEnglishSheetVariant = variant === 'english-sheet';
-    const dialogTitle = isEnglishSheetVariant ? '英語シート一括登録' : '問題の一括登録・更新';
-    const dialogDescription = isEnglishSheetVariant
-        ? '元の英語スプレッドシートからコピー＆ペーストで一括登録・更新できます。'
-        : 'Excelやスプレッドシートからコピー＆ペーストで一括登録・更新できます。';
-    const subjectLabel = lockSubjectSelection ? 'ID採番用の科目（固定）' : 'ID採番用の科目（任意）';
-    const subjectDescription = lockSubjectSelection
-        ? `${fixedSubject?.name ?? '指定科目'}で固定しています。CoreProblemから科目が判定できない行にのみ、この科目をID採番のフォールバックとして使います。`
-        : 'CoreProblemから科目が判定できない行にのみ、この科目をID採番のフォールバックとして使います。';
-    const textareaPlaceholder = isEnglishSheetVariant
-        ? '例:\n1001\t中1\tbe動詞の文_肯定文\t私は新入生です I (A) a new student.\tA: am\t\thttps://youtube.com/...'
-        : '例:\n1001\t中1\tbe動詞の文_肯定文\t私は新入生です I (A) a new student.\tA: am\t\thttps://youtube.com/...';
 
     // parseTSV is now imported from @/lib/tsv-parser
 
@@ -420,7 +388,7 @@ export function BulkImportDialog({
                 setParsedData([]);
                 setCoreProblems([]);
                 setResolvedCoreProblems(new Map());
-                setSelectedSubjectId(getInitialSelectedSubjectId(defaultSubjectId));
+                setSelectedSubjectId(AUTO_SUBJECT_VALUE);
                 setShowAllResolvedCoreProblems(false);
             } else {
                 toast.error(result.error || '登録に失敗しました', {
@@ -435,9 +403,9 @@ export function BulkImportDialog({
             <Dialog open={open} onOpenChange={onOpenChange}>
                 <DialogContent className="!max-w-none w-[95vw] max-w-[95vw] h-[90dvh] max-h-[90dvh] grid grid-rows-[auto,minmax(0,1fr),auto] overflow-hidden p-0">
                     <DialogHeader className="shrink-0 border-b px-6 pt-6 pb-3">
-                        <DialogTitle>{dialogTitle}</DialogTitle>
+                        <DialogTitle>問題の一括登録・更新</DialogTitle>
                         <DialogDescription>
-                            {dialogDescription}<br />
+                            Excelやスプレッドシートからコピー＆ペーストで一括登録・更新できます。<br />
                             マスタ内問題番号が既存の場合は更新、新規の場合は作成されます。
                         </DialogDescription>
                     </DialogHeader>
@@ -451,15 +419,13 @@ export function BulkImportDialog({
                                 </AlertDescription>
                             </Alert>
                             <div className="space-y-2">
-                                <Label htmlFor="bulk-import-subject">{subjectLabel}</Label>
-                                <Select value={selectedSubjectId} onValueChange={setSelectedSubjectId} disabled={lockSubjectSelection}>
+                                <Label htmlFor="bulk-import-subject">ID採番用の科目（任意）</Label>
+                                <Select value={selectedSubjectId} onValueChange={setSelectedSubjectId}>
                                     <SelectTrigger id="bulk-import-subject" className="w-full sm:w-[320px]">
                                         <SelectValue placeholder="科目を選択" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {!lockSubjectSelection && (
-                                            <SelectItem value={AUTO_SUBJECT_VALUE}>自動判定（CoreProblemから）</SelectItem>
-                                        )}
+                                        <SelectItem value={AUTO_SUBJECT_VALUE}>自動判定（CoreProblemから）</SelectItem>
                                         {subjects.map((subject) => (
                                             <SelectItem key={subject.id} value={subject.id}>
                                                 {subject.name}
@@ -468,11 +434,11 @@ export function BulkImportDialog({
                                     </SelectContent>
                                 </Select>
                                 <p className="text-xs text-muted-foreground">
-                                    {subjectDescription}
+                                    CoreProblemから科目が判定できない行にのみ、この科目をID採番のフォールバックとして使います。
                                 </p>
                             </div>
                             <Textarea
-                                placeholder={textareaPlaceholder}
+                                placeholder={`例:\n1001\t中1\tbe動詞の文_肯定文\t私は新入生です I (A) a new student.\tA: am\t\thttps://youtube.com/...`}
                                 value={rawInput}
                                 onChange={(e) => setRawInput(e.target.value)}
                                 spellCheck={false}
@@ -485,15 +451,13 @@ export function BulkImportDialog({
                         <div className="min-h-0 flex h-full flex-col gap-4 overflow-hidden px-6 py-4">
                             <div className="space-y-3 p-3 border rounded bg-muted/10 shrink-0 max-h-[38dvh] overflow-y-auto">
                                 <div className="space-y-2">
-                                    <Label htmlFor="bulk-import-subject-preview">{subjectLabel}</Label>
-                                    <Select value={selectedSubjectId} onValueChange={setSelectedSubjectId} disabled={lockSubjectSelection}>
+                                    <Label htmlFor="bulk-import-subject-preview">ID採番用の科目（任意）</Label>
+                                    <Select value={selectedSubjectId} onValueChange={setSelectedSubjectId}>
                                         <SelectTrigger id="bulk-import-subject-preview" className="w-full sm:w-[320px] bg-background">
                                             <SelectValue placeholder="科目を選択" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {!lockSubjectSelection && (
-                                                <SelectItem value={AUTO_SUBJECT_VALUE}>自動判定（CoreProblemから）</SelectItem>
-                                            )}
+                                            <SelectItem value={AUTO_SUBJECT_VALUE}>自動判定（CoreProblemから）</SelectItem>
                                             {subjects.map((subject) => (
                                                 <SelectItem key={subject.id} value={subject.id}>
                                                     {subject.name}
@@ -502,7 +466,7 @@ export function BulkImportDialog({
                                         </SelectContent>
                                     </Select>
                                     <p className="text-xs text-muted-foreground">
-                                        {subjectDescription}
+                                        CoreProblemから科目が判定できない行にのみ、この科目をID採番のフォールバックとして使います。
                                     </p>
                                 </div>
                                 {missingCoreProblemCount > 0 && (
