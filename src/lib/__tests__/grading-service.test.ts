@@ -33,7 +33,7 @@ describe('grading-service helpers', () => {
             contentFormat: 'STRUCTURED_V1',
             structuredContent: {
                 version: 1,
-                title: '作図問題',
+                summary: '作図問題',
                 instructions: '図を見て答えなさい。',
                 blocks: [
                     { id: 'p1', type: 'paragraph', text: '三角形の面積を答えなさい。' },
@@ -60,7 +60,7 @@ describe('grading-service helpers', () => {
             referenceAnswer: 'B',
             hasReferenceFigures: true,
         });
-        expect(context.problemText).toContain('タイトル: 作図問題');
+        expect(context.problemText).toContain('概要: 作図問題');
         expect(context.problemText).toContain('選択肢:');
     });
 

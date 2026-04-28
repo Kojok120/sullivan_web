@@ -107,15 +107,15 @@ describe('ProblemManager', () => {
             id: 'subject-math',
             name: '数学',
             coreProblems: [
-                { id: 'core-1', name: '一次方程式' },
-                { id: 'core-2', name: '連立方程式' },
+                { id: 'core-1', name: '一次方程式', masterNumber: 1 },
+                { id: 'core-2', name: '連立方程式', masterNumber: 2 },
             ],
         },
         {
             id: 'subject-english',
             name: '英語',
             coreProblems: [
-                { id: 'core-3', name: '現在完了' },
+                { id: 'core-3', name: '現在完了', masterNumber: 1 },
             ],
         },
     ];
@@ -141,9 +141,9 @@ describe('ProblemManager', () => {
         );
 
         expect(screen.queryByRole('option', { name: '数学' })).not.toBeInTheDocument();
-        expect(screen.getByRole('option', { name: '一次方程式' })).toBeInTheDocument();
-        expect(screen.getByRole('option', { name: '連立方程式' })).toBeInTheDocument();
-        expect(screen.queryByRole('option', { name: '現在完了' })).not.toBeInTheDocument();
+        expect(screen.getByRole('option', { name: '#1 一次方程式' })).toBeInTheDocument();
+        expect(screen.getByRole('option', { name: '#2 連立方程式' })).toBeInTheDocument();
+        expect(screen.queryByRole('option', { name: '#1 現在完了' })).not.toBeInTheDocument();
     });
 
     it('単元変更時はcoreProblemIdを更新して1ページ目へ戻す', () => {
@@ -163,7 +163,7 @@ describe('ProblemManager', () => {
             />,
         );
 
-        fireEvent.click(screen.getByRole('option', { name: '一次方程式' }));
+        fireEvent.click(screen.getByRole('option', { name: '#1 一次方程式' }));
 
         expect(pushMock).toHaveBeenCalledWith('/materials/problems?subjectId=subject-math&page=1&coreProblemId=core-1');
     });
