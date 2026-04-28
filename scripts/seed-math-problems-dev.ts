@@ -14,7 +14,6 @@
  * 接続先 DB は dotenv で .env.DEV から読み込む。本番環境では絶対に実行しないこと。
  */
 
-import 'dotenv/config';
 import { Prisma } from '@prisma/client';
 import { config as loadDotenv } from 'dotenv';
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
@@ -38,10 +37,14 @@ const CUSTOM_ID_PREFIX = 'M' as const;
 const SCRIPT_DATA_DIR = resolve(__dirname, 'data');
 const LAST_RUN_LOG_PATH = resolve(SCRIPT_DATA_DIR, 'math-problems-dev.last-run.json');
 
-// .env.DEV を最優先で読み込む (.env 既存値より優先したいので override:true)。
-if (existsSync(DEV_ENV_FILE)) {
-    loadDotenv({ path: DEV_ENV_FILE, override: true });
+// 本スクリプトは DEV DB 専用のため、.env.DEV を必須とし、誤って .env (本番接続情報の可能性) に
+// フォールバックしないように `dotenv/config` の暗黙ロードは行わない。
+if (!existsSync(DEV_ENV_FILE)) {
+    console.error(`.env.DEV が見つかりません: ${DEV_ENV_FILE}`);
+    console.error('DEV 環境用の .env.DEV を用意してから再実行してください。');
+    process.exit(1);
 }
+loadDotenv({ path: DEV_ENV_FILE });
 
 // 動的 import: env 反映後に prisma シングルトンを生成させる。
 async function loadPrisma() {
