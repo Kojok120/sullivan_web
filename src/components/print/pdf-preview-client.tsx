@@ -131,9 +131,9 @@ function PdfPreviewClientInner({
 
     if (isResolvingPreferredPrintView) {
         return (
-            <div className="min-h-screen bg-muted px-4 py-4 md:px-6 md:py-6">
+            <div className="min-h-screen bg-gray-100 px-4 py-4 md:px-6 md:py-6">
                 <div className="mx-auto flex w-full max-w-[720px] flex-col gap-4">
-                    <div className="rounded-md bg-white p-5">
+                    <div className="rounded-md bg-white p-5 shadow-sm">
                         <div className="flex items-center gap-3 text-sm text-muted-foreground">
                             <Loader2 className="h-4 w-4 animate-spin" />
                             印刷方法を判定中です...
@@ -146,9 +146,9 @@ function PdfPreviewClientInner({
 
     if (prefersAssistView && assistViewUrl) {
         return (
-            <div className="min-h-screen bg-muted px-4 py-4 md:px-6 md:py-6">
+            <div className="min-h-screen bg-gray-100 px-4 py-4 md:px-6 md:py-6">
                 <div className="mx-auto flex w-full max-w-[720px] flex-col gap-4">
-                    <div className="rounded-md bg-white p-5">
+                    <div className="rounded-md bg-white p-5 shadow-sm">
                         <div className="flex flex-col gap-4">
                             <div className="flex items-center gap-2">
                                 <Button variant="outline" onClick={handleBack}>
@@ -186,9 +186,9 @@ function PdfPreviewClientInner({
     }
 
     return (
-        <div className="min-h-screen bg-muted px-4 py-4 md:px-6 md:py-6">
+        <div className="min-h-screen bg-gray-100 px-4 py-4 md:px-6 md:py-6">
             <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-4">
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-white p-3">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-white p-3 shadow-sm">
                     <div className="flex items-center gap-2">
                         <Button variant="outline" onClick={handleBack}>
                             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -227,7 +227,7 @@ function PdfPreviewClientInner({
                     </Button>
                 </div>
 
-                <div className="rounded-md border bg-white">
+                <div className="rounded-md border bg-white shadow-sm">
                     <iframe
                         ref={iframeRef}
                         title="印刷プレビュー"

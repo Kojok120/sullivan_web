@@ -23,6 +23,7 @@ type ProblemFormState = {
     question: string;
     answer: string;
     grade: string;
+    masterNumber: number | undefined;
     videoUrl: string;
     coreProblems: SelectedCoreProblem[];
 };
@@ -32,6 +33,7 @@ function createInitialFormState(problem: ProblemWithRelations | null): ProblemFo
         question: problem?.question ?? '',
         answer: problem?.answer ?? '',
         grade: problem?.grade ?? '',
+        masterNumber: problem?.masterNumber ?? undefined,
         videoUrl: problem?.videoUrl ?? '',
         coreProblems: problem?.coreProblems ?? [],
     };
@@ -52,6 +54,7 @@ function ProblemDialogForm({
                 question: formData.question,
                 answer: formData.answer,
                 grade: formData.grade || undefined,
+                masterNumber: formData.masterNumber,
                 videoUrl: formData.videoUrl || undefined,
                 coreProblemIds: formData.coreProblems.map((cp) => cp.id),
             };
@@ -79,15 +82,29 @@ function ProblemDialogForm({
             </DialogHeader>
 
             <form onSubmit={handleSubmit} className="space-y-6 py-4">
-                <div className="space-y-2">
-                    <Label>問題文</Label>
-                    <Textarea
-                        required
-                        value={formData.question}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, question: e.target.value }))}
-                        placeholder="問題文を入力してください"
-                        rows={3}
-                    />
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+                    <div className="space-y-2 sm:col-span-1">
+                        <Label>マスタ内問題番号 (任意)</Label>
+                        <Input
+                            type="number"
+                            value={formData.masterNumber || ''}
+                            onChange={(e) => setFormData((prev) => ({
+                                ...prev,
+                                masterNumber: e.target.value ? parseInt(e.target.value, 10) : undefined,
+                            }))}
+                            placeholder="例: 1001"
+                        />
+                    </div>
+                    <div className="space-y-2 sm:col-span-3">
+                        <Label>問題文</Label>
+                        <Textarea
+                            required
+                            value={formData.question}
+                            onChange={(e) => setFormData((prev) => ({ ...prev, question: e.target.value }))}
+                            placeholder="問題文を入力してください"
+                            rows={3}
+                        />
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

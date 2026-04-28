@@ -11,7 +11,6 @@ import { getPdfBrowser } from '@/lib/print-pdf/browser';
 const PDF_CACHE_TTL_MS = 5 * 60 * 1000;
 const RENDER_TIMEOUT_MS = 45_000;
 const FONT_READY_TIMEOUT_MS = 1_500;
-const IMAGE_READY_TIMEOUT_MS = 4_000;
 const MAX_CACHE_ENTRIES = 20;
 const MAX_CACHE_BYTES = 80 * 1024 * 1024;
 
@@ -44,7 +43,7 @@ const inflightRenders = new Map<string, Promise<PdfCacheEntry>>();
 let currentCacheBytes = 0;
 
 export function buildProblemIdsHash(problemSets: PrintableProblem[][]): string {
-    const flatIds = problemSets.flat().map((problem) => `${getProblemDisplayId(problem)}:${problem.publishedRevisionId ?? 'legacy'}`);
+    const flatIds = problemSets.flat().map((problem) => getProblemDisplayId(problem));
     return crypto.createHash('sha1').update(flatIds.join(',')).digest('hex');
 }
 
@@ -154,34 +153,6 @@ async function renderPdfEntry(input: PrintPdfInput): Promise<PdfCacheEntry> {
             'フォント読み込みがタイムアウトしました',
         ).catch(() => {
             // フォント待機が長引く場合でも、PDF生成は継続する。
-        });
-
-        await withTimeout(
-            page.evaluate(async () => {
-                const images = Array.from(document.images);
-                await Promise.all(
-                    images.map(async (image) => {
-                        if (image.complete) return;
-                        if (typeof image.decode === 'function') {
-                            try {
-                                await image.decode();
-                                return;
-                            } catch {
-                                // decode に失敗しても load/error の完了を待つ。
-                            }
-                        }
-
-                        await new Promise<void>((resolve) => {
-                            image.addEventListener('load', () => resolve(), { once: true });
-                            image.addEventListener('error', () => resolve(), { once: true });
-                        });
-                    }),
-                );
-            }),
-            IMAGE_READY_TIMEOUT_MS,
-            '画像読み込みがタイムアウトしました',
-        ).catch(() => {
-            // 一部画像が遅い場合でも、PDF生成は継続する。
         });
 
         const pdfBuffer = await withTimeout(

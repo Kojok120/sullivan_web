@@ -15,8 +15,7 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "type-check": "tsc --noEmit",
-    "postinstall": "prisma generate",
-    "seed:math-dev": "tsx scripts/seed-math-problems-dev.ts"
+    "postinstall": "prisma generate"
   },
   "prisma": {
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
@@ -46,9 +45,7 @@
     "clsx": "^2.1.1",
     "dotenv": "^17.2.4",
     "framer-motion": "^12.23.26",
-    "geist": "^1.7.0",
     "googleapis": "^168.0.0",
-    "katex": "^0.16.44",
     "lucide-react": "^0.554.0",
     "next": "16.0.3",
     "next-themes": "^0.4.6",

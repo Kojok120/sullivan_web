@@ -36,7 +36,7 @@ export default async function DashboardPage() {
 
     return (
         <div className="container mx-auto space-y-6 px-4 py-6 sm:space-y-8 sm:py-8">
-            <section className="rounded-lg border border-primary/25 bg-accent p-5 sm:p-6">
+            <section className="rounded-2xl border border-primary/25 bg-gradient-to-r from-primary/[0.10] to-background p-5 sm:p-6">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                     <div>
                         <h1 className="text-2xl font-bold sm:text-3xl">学習ダッシュボード</h1>

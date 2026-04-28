@@ -19,7 +19,7 @@ export function StampCard({ totalStamps, newStamps }: StampCardProps) {
     // For simplicity, let's just show the current active card.
 
     return (
-        <div className="bg-[#fcf8e3] rounded-lg p-6 border-4 border-[#e6d0a1] max-w-sm w-full mx-auto relative overflow-hidden">
+        <div className="bg-[#fcf8e3] rounded-xl p-6 shadow-xl border-4 border-[#e6d0a1] max-w-sm w-full mx-auto relative overflow-hidden">
             {/* Texture/Pattern background could go here */}
             <div className="absolute top-0 right-0 p-2 opacity-10 pointer-events-none">
                 <Star size={120} className="text-orange-500" />

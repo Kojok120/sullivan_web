@@ -65,7 +65,6 @@ CLOUD_RUN_REGION="${CLOUD_RUN_REGION:-asia-northeast1}"
 CLOUD_BUILD_REGION="${CLOUD_BUILD_REGION:-asia-northeast1}"
 GRADING_TASK_QUEUE="${GRADING_TASK_QUEUE:-sullivan-grading}"
 DRIVE_CHECK_TASK_QUEUE="${DRIVE_CHECK_TASK_QUEUE:-sullivan-drive-check}"
-GUIDANCE_SUMMARY_TASK_QUEUE="${GUIDANCE_SUMMARY_TASK_QUEUE:-sullivan-guidance-summary}"
 SERVICE_NAME="sullivan-app-dev"
 IMAGE_TAG="${IMAGE_TAG:-$(date +%Y%m%d-%H%M%S)}"
 IMAGE_URI="${IMAGE_URI:-asia.gcr.io/${GOOGLE_CLOUD_PROJECT_ID}/sullivan-app-dev:${IMAGE_TAG}}"
@@ -100,7 +99,6 @@ if [ "$SKIP_INFRA_SETUP" != "1" ]; then
   ensure_gcp_service_enabled "cloudtasks.googleapis.com"
   upsert_task_queue "$GRADING_TASK_QUEUE"
   upsert_task_queue "$DRIVE_CHECK_TASK_QUEUE"
-  upsert_task_queue "$GUIDANCE_SUMMARY_TASK_QUEUE"
 fi
 
 ensure_secret_exists "$GEMINI_API_KEY_SECRET_NAME"
@@ -133,7 +131,7 @@ gcloud run deploy "$SERVICE_NAME" \
   --memory 4Gi \
   --cpu 2 \
   --concurrency 4 \
-  --timeout 300s \
+  --timeout 120s \
   --quiet \
   --allow-unauthenticated \
   --set-env-vars "BIND_HOST=0.0.0.0,SERVICE_ROLE=web" \
@@ -153,7 +151,6 @@ gcloud run deploy "$SERVICE_NAME" \
   --set-env-vars "CLOUD_TASKS_LOCATION=$CLOUD_TASKS_LOCATION" \
   --set-env-vars "GRADING_TASK_QUEUE=$GRADING_TASK_QUEUE" \
   --set-env-vars "DRIVE_CHECK_TASK_QUEUE=$DRIVE_CHECK_TASK_QUEUE" \
-  --set-env-vars "GUIDANCE_SUMMARY_TASK_QUEUE=$GUIDANCE_SUMMARY_TASK_QUEUE" \
   --set-env-vars "CLOUD_TASKS_CALLER_SERVICE_ACCOUNT=$CLOUD_TASKS_CALLER_SERVICE_ACCOUNT" \
   --set-env-vars "RUNTIME_SA_EMAIL=$RUNTIME_SA_EMAIL" \
   --set-env-vars "NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL" \

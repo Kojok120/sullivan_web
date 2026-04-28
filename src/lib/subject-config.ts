@@ -3,7 +3,7 @@
  */
 
 export type SubjectConfig = {
-    letter: string;      // 頭文字: 'E', 'M', 'S', 'N'
+    letter: string;      // 頭文字: 'E', 'M', 'J'
     bgColor: string;     // Tailwind背景色: 'bg-orange-500'
     hoverColor: string;  // Tailwindホバー色: 'hover:bg-orange-600'
     label: string;       // 日本語ラベル: '英語'
@@ -32,19 +32,9 @@ const SUBJECT_CONFIGS: { pattern: string; config: SubjectConfig }[] = [
         },
     },
     {
-        pattern: '理科',
-        config: {
-            letter: 'S',
-            bgColor: 'bg-cyan-500',
-            hoverColor: 'hover:bg-cyan-600',
-            label: '理科',
-            fullName: 'Science',
-        },
-    },
-    {
         pattern: '国語',
         config: {
-            letter: 'N',
+            letter: 'J',
             bgColor: 'bg-green-500',
             hoverColor: 'hover:bg-green-600',
             label: '国語',
@@ -84,7 +74,7 @@ export function getSubjectConfig(subjectName: string): SubjectConfig {
 /**
  * 教科名から頭文字（プレフィックス）を取得
  * @param subjectName 教科名
- * @returns プレフィックス文字（例: 'E', 'M', 'S', 'N'）
+ * @returns プレフィックス文字（例: 'E', 'M', 'J'）
  */
 export function getSubjectPrefix(subjectName: string): string {
     return getSubjectConfig(subjectName).letter;

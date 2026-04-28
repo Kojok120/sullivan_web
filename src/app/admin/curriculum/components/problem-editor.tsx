@@ -99,7 +99,7 @@ function ProblemItem({ problem }: { problem: ProblemEditorProblem }) {
                         icon={<KeyRound className="h-3 w-3" />}
                         label="ID"
                     >
-                        <span className="font-mono">{problem.customId}</span>
+                        <span className="font-mono">{problem.customId ?? '-'}</span>
                     </MetaField>
 
                     <MetaField
@@ -200,7 +200,7 @@ export function ProblemEditor({ coreProblemId }: ProblemEditorProps) {
     return (
         <div className="flex flex-col h-full bg-slate-50/50">
             {/* Header */}
-            <div className="sticky top-0 z-10 flex flex-col items-start justify-between gap-2 border-b bg-card p-2 px-4 sm:flex-row sm:items-center">
+            <div className="sticky top-0 z-10 flex flex-col items-start justify-between gap-2 border-b bg-white p-2 px-4 shadow-sm sm:flex-row sm:items-center">
                 <h3 className="text-sm font-semibold">問題一覧 ({problems.length})</h3>
                 <div className="rounded border border-yellow-200 bg-yellow-50 px-2 py-1 text-xs text-muted-foreground text-yellow-700">
                     ※ここでの編集はできません。「問題管理」を使用してください

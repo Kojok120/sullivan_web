@@ -129,7 +129,7 @@ export function SessionListClient({ initialSessions, userId, basePath }: Session
             </div>
 
             {sessions.length === 0 && !loading && showPendingVideoReviewOnly && (
-                <div className="text-muted-foreground text-sm py-8 text-center bg-muted rounded-lg border border-dashed text-muted-foreground">
+                <div className="text-muted-foreground text-sm py-8 text-center bg-gray-50 rounded-lg border border-dashed text-gray-400">
                     <CheckCircle className="h-8 w-8 mx-auto mb-2 text-green-400/50" />
                     解説動画未視聴のセッションはありません。<br />素晴らしい！
                 </div>

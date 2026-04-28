@@ -28,9 +28,9 @@ describe('proxy', () => {
 
         const result = await proxy(request);
 
+        expect(result).toBe(supabaseResponse);
         expect(result.status).toBe(200);
         expect(result.headers.get('location')).toBeNull();
-        expect(result.headers.get('x-middleware-request-x-pathname')).toBe('/login');
     });
 
     it('未ログインの保護ページは /login に redirect する', async () => {
@@ -78,76 +78,6 @@ describe('proxy', () => {
         expect(result.headers.get('location')).toBe('http://localhost/login');
     });
 
-    it('未ログインの /materials は /login に redirect する', async () => {
-        const request = new NextRequest('http://localhost/materials/problems');
-        const supabaseResponse = NextResponse.next({ request });
-
-        updateSessionMock.mockResolvedValue({
-            supabaseResponse,
-            user: null,
-        });
-
-        const result = await proxy(request);
-
-        expect(result.status).toBe(307);
-        expect(result.headers.get('location')).toBe('http://localhost/login');
-    });
-
-    it('問題作成者は /admin に入れず /materials/problems に redirect する', async () => {
-        const request = new NextRequest('http://localhost/admin/problems');
-        const supabaseResponse = NextResponse.next({ request });
-
-        updateSessionMock.mockResolvedValue({
-            supabaseResponse,
-            user: {
-                app_metadata: { role: 'MATERIAL_AUTHOR' },
-                user_metadata: {},
-            },
-        });
-
-        const result = await proxy(request);
-
-        expect(result.status).toBe(307);
-        expect(result.headers.get('location')).toBe('http://localhost/materials/problems');
-    });
-
-    it('問題作成者はルートアクセス時に /materials/problems へ redirect する', async () => {
-        const request = new NextRequest('http://localhost/');
-        const supabaseResponse = NextResponse.next({ request });
-
-        updateSessionMock.mockResolvedValue({
-            supabaseResponse,
-            user: {
-                app_metadata: { role: 'MATERIAL_AUTHOR' },
-                user_metadata: {},
-            },
-        });
-
-        const result = await proxy(request);
-
-        expect(result.status).toBe(307);
-        expect(result.headers.get('location')).toBe('http://localhost/materials/problems');
-    });
-
-    it('問題作成者は /problem-authoring/tex-help にアクセスできる', async () => {
-        const request = new NextRequest('http://localhost/problem-authoring/tex-help');
-        const supabaseResponse = NextResponse.next({ request });
-
-        updateSessionMock.mockResolvedValue({
-            supabaseResponse,
-            user: {
-                app_metadata: { role: 'MATERIAL_AUTHOR' },
-                user_metadata: {},
-            },
-        });
-
-        const result = await proxy(request);
-
-        expect(result.status).toBe(200);
-        expect(result.headers.get('location')).toBeNull();
-        expect(result.headers.get('x-middleware-request-x-pathname')).toBe('/problem-authoring/tex-help');
-    });
-
     it('学生向け印刷ページには no-store ヘッダーを付与する', async () => {
         const request = new NextRequest('http://localhost/dashboard/print?subjectId=subject-1&sets=1');
         const supabaseResponse = NextResponse.next({ request });
@@ -162,11 +92,11 @@ describe('proxy', () => {
 
         const result = await proxy(request);
 
+        expect(result).toBe(supabaseResponse);
         expect(result.status).toBe(200);
         expect(result.headers.get('Cache-Control')).toBe('private, no-store, no-cache, max-age=0, must-revalidate');
         expect(result.headers.get('Pragma')).toBe('no-cache');
         expect(result.headers.get('Expires')).toBe('0');
-        expect(result.headers.get('x-middleware-request-x-pathname')).toBe('/dashboard/print');
     });
 
     it('学生向け印刷ページの末尾スラッシュ付き URL にも no-store ヘッダーを付与する', async () => {
@@ -183,11 +113,11 @@ describe('proxy', () => {
 
         const result = await proxy(request);
 
+        expect(result).toBe(supabaseResponse);
         expect(result.status).toBe(200);
         expect(result.headers.get('Cache-Control')).toBe('private, no-store, no-cache, max-age=0, must-revalidate');
         expect(result.headers.get('Pragma')).toBe('no-cache');
         expect(result.headers.get('Expires')).toBe('0');
-        expect(result.headers.get('x-middleware-request-x-pathname')).toBe('/dashboard/print/');
     });
 
     it('講師向け印刷ページへの redirect にも no-store ヘッダーを付与する', async () => {
@@ -222,10 +152,10 @@ describe('proxy', () => {
 
         const result = await proxy(request);
 
+        expect(result).toBe(supabaseResponse);
         expect(result.status).toBe(200);
         expect(result.headers.get('Cache-Control')).toBe('private, no-store, no-cache, max-age=0, must-revalidate');
         expect(result.headers.get('Pragma')).toBe('no-cache');
         expect(result.headers.get('Expires')).toBe('0');
-        expect(result.headers.get('x-middleware-request-x-pathname')).toBe('/teacher/students/student-1/print');
     });
 });

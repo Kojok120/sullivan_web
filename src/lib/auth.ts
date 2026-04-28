@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { cache } from 'react';
-import { isAdminRole, isProblemAuthorRole, isTeacherOrAdminRole } from '@/lib/authorization';
+import { isTeacherOrAdminRole } from '@/lib/authorization';
 
 export type SessionPayload = {
     userId: string;
@@ -44,15 +44,7 @@ export const getCurrentUser = getSession;
 
 export async function requireAdmin() {
     const session = await getSession();
-    if (!session || !isAdminRole(session.role)) {
-        throw new Error('Unauthorized');
-    }
-    return session;
-}
-
-export async function requireProblemAuthor() {
-    const session = await getSession();
-    if (!session || !isProblemAuthorRole(session.role)) {
+    if (!session || session.role !== 'ADMIN') {
         throw new Error('Unauthorized');
     }
     return session;

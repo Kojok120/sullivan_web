@@ -1,29 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { GoogleGenAI, createPartFromUri } from '@google/genai';
 import { z } from 'zod';
 
+import { saveGeneratedGuidanceRecord } from '@/app/teacher/students/[userId]/actions';
 import { getSession } from '@/lib/auth';
 import { canAccessUserWithinClassroomScope, isTeacherOrAdminRole } from '@/lib/authorization';
 import {
+    GeminiGuidanceAudioMimeType,
     prepareGuidanceAudioForGemini,
 } from '@/lib/guidance-audio-transcoder';
 import {
-    createPendingGuidanceSummaryRecord,
-    failGuidanceSummaryRecord,
-    publishGuidanceSummaryJob,
-    uploadPreparedGuidanceAudio,
-} from '@/lib/guidance-summary-job';
-import {
+    formatGuidanceSummaryAsPlainText,
+    GuidanceSummary,
     isSupportedGuidanceAudioMimeType,
     MAX_GUIDANCE_AUDIO_SIZE_LIMIT_BYTES,
     MAX_GUIDANCE_AUDIO_SIZE_LIMIT_LABEL,
     normalizeGuidanceAudioMimeType,
 } from '@/lib/guidance-recording';
-import {
-    deleteGuidanceGeminiFile,
-    GuidanceSummaryErrorCode,
-    normalizeGuidanceSummaryError,
-} from '@/lib/guidance-summary';
+import { loadInstructionPrompt } from '@/lib/instruction-prompt';
 import { prisma } from '@/lib/prisma';
+
+// Base64 展開でペイロードが膨らむため、インライン送信は小さめの閾値に分ける。
+const INLINE_AUDIO_SIZE_LIMIT_BYTES = 8 * 1024 * 1024;
 
 const payloadSchema = z.object({
     startedAtIso: z.string().datetime().optional(),
@@ -31,17 +29,186 @@ const payloadSchema = z.object({
     timeZone: z.string().optional(),
 });
 
-function isUploadedAudioFile(value: FormDataEntryValue | null): value is File {
-    return typeof value === 'object'
-        && value !== null
-        && 'arrayBuffer' in value
-        && typeof value.arrayBuffer === 'function'
-        && 'size' in value
-        && typeof value.size === 'number'
-        && 'type' in value
-        && typeof value.type === 'string'
-        && 'name' in value
-        && typeof value.name === 'string';
+function formatDateTimeForPrompt(date: Date, timeZone: string | undefined): string {
+    try {
+        return new Intl.DateTimeFormat('ja-JP', {
+            timeZone,
+            dateStyle: 'medium',
+            timeStyle: 'short',
+        }).format(date);
+    } catch {
+        return new Intl.DateTimeFormat('ja-JP', {
+            dateStyle: 'medium',
+            timeStyle: 'short',
+        }).format(date);
+    }
+}
+
+function parseStringArray(value: unknown): string[] {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    return value
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => item.trim())
+        .filter(Boolean);
+}
+
+function parseSummaryResponse(rawText: string): GuidanceSummary {
+    const normalized = rawText
+        .trim()
+        .replace(/^```(?:json)?\s*/i, '')
+        .replace(/\s*```$/, '')
+        .trim();
+
+    const parsed = JSON.parse(normalized) as {
+        summary?: unknown;
+        topics?: unknown;
+        currentStatus?: unknown;
+        concerns?: unknown;
+        agreements?: unknown;
+        nextActions?: unknown;
+        followUpPoints?: unknown;
+    };
+
+    const summary = typeof parsed.summary === 'string' ? parsed.summary.trim() : '';
+    const topics = parseStringArray(parsed.topics);
+    const currentStatus = parseStringArray(parsed.currentStatus);
+    const concerns = parseStringArray(parsed.concerns);
+    const agreements = parseStringArray(parsed.agreements);
+    const nextActions = parseStringArray(parsed.nextActions);
+    const followUpPoints = parseStringArray(parsed.followUpPoints);
+
+    if (!summary) {
+        throw new Error('summary is empty');
+    }
+
+    return {
+        summary,
+        topics,
+        currentStatus,
+        concerns,
+        agreements,
+        nextActions,
+        followUpPoints,
+    };
+}
+
+async function generateInterviewSummary(params: {
+    audioFile: File;
+    audioMimeType: GeminiGuidanceAudioMimeType;
+    prompt: string;
+}): Promise<GuidanceSummary> {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+        throw new Error('GEMINI_API_KEY is not set');
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+    const modelName = process.env.GEMINI_CHAT_MODEL || 'gemini-3.1-pro-preview';
+
+    const responseSchema = {
+        type: 'object',
+        properties: {
+            summary: { type: 'string' },
+            topics: {
+                type: 'array',
+                items: { type: 'string' },
+            },
+            currentStatus: {
+                type: 'array',
+                items: { type: 'string' },
+            },
+            concerns: {
+                type: 'array',
+                items: { type: 'string' },
+            },
+            agreements: {
+                type: 'array',
+                items: { type: 'string' },
+            },
+            nextActions: {
+                type: 'array',
+                items: { type: 'string' },
+            },
+            followUpPoints: {
+                type: 'array',
+                items: { type: 'string' },
+            },
+        },
+        required: [
+            'summary',
+            'topics',
+            'currentStatus',
+            'concerns',
+            'agreements',
+            'nextActions',
+            'followUpPoints',
+        ],
+        additionalProperties: false,
+    };
+
+    let uploadedFileName: string | null = null;
+
+    try {
+        let parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } } | ReturnType<typeof createPartFromUri>>;
+
+        if (params.audioFile.size <= INLINE_AUDIO_SIZE_LIMIT_BYTES) {
+            const audioBuffer = await params.audioFile.arrayBuffer();
+            const base64 = Buffer.from(audioBuffer).toString('base64');
+            parts = [
+                { text: params.prompt },
+                {
+                    inlineData: {
+                        mimeType: params.audioMimeType,
+                        data: base64,
+                    },
+                },
+            ];
+        } else {
+            const uploaded = await ai.files.upload({
+                file: params.audioFile,
+                config: {
+                    mimeType: params.audioMimeType,
+                    displayName: `guidance-audio-${Date.now()}`,
+                },
+            });
+
+            if (!uploaded.name || !uploaded.uri) {
+                throw new Error('failed to upload audio file');
+            }
+
+            uploadedFileName = uploaded.name;
+            parts = [
+                { text: params.prompt },
+                createPartFromUri(uploaded.uri, params.audioMimeType),
+            ];
+        }
+
+        const response = await ai.models.generateContent({
+            model: modelName,
+            contents: [{ role: 'user', parts }],
+            config: {
+                responseMimeType: 'application/json',
+                responseJsonSchema: responseSchema,
+                maxOutputTokens: 2048,
+            },
+        });
+
+        const rawText = response.text?.trim();
+        if (!rawText) {
+            throw new Error('empty response text');
+        }
+
+        return parseSummaryResponse(rawText);
+    } finally {
+        if (uploadedFileName) {
+            await ai.files.delete({ name: uploadedFileName }).catch((error) => {
+                console.warn('[guidance-summary] failed to delete uploaded file:', error);
+            });
+        }
+    }
 }
 
 export const runtime = 'nodejs';
@@ -84,7 +251,7 @@ export async function POST(
     }
 
     const audio = formData.get('audio');
-    if (!isUploadedAudioFile(audio)) {
+    if (!(audio instanceof File)) {
         return NextResponse.json({ error: '音声ファイルが必要です' }, { status: 400 });
     }
 
@@ -103,91 +270,81 @@ export async function POST(
         ? Math.max(1, Math.round((endedAt.getTime() - startedAt.getTime()) / (1000 * 60)))
         : null;
 
-    const student = await prisma.user.findUnique({
-        where: { id: userId },
-        select: {
-            id: true,
-            role: true,
-        },
-    });
+    const [student, teacher] = await Promise.all([
+        prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+                id: true,
+                role: true,
+                name: true,
+                loginId: true,
+            },
+        }),
+        prisma.user.findUnique({
+            where: { id: session.userId },
+            select: {
+                name: true,
+                loginId: true,
+            },
+        }),
+    ]);
 
     if (!student || student.role !== 'STUDENT') {
         return NextResponse.json({ error: '生徒が見つかりません' }, { status: 404 });
     }
 
-    let recordId: string | null = null;
-    let uploadedFileName: string | null = null;
-    let failureFallbackCode: GuidanceSummaryErrorCode = 'guidance_record_save_failed';
-    try {
-        const record = await createPendingGuidanceSummaryRecord({
-            studentId: userId,
-            teacherId: session.userId,
-            date: endedAt,
-        });
-        recordId = record.id;
+    const studentName = student.name || student.loginId;
+    const teacherName = teacher?.name || teacher?.loginId || '担当講師';
 
-        failureFallbackCode = 'audio_transcode_failed';
+    const prompt = loadInstructionPrompt('interview-summary-prompt.md', {
+        studentName,
+        teacherName,
+        recordedAt: formatDateTimeForPrompt(endedAt, parsedPayload.data.timeZone),
+        durationMinutes: durationMinutes ?? '不明',
+    });
+
+    try {
         const geminiAudio = await prepareGuidanceAudioForGemini({
             audioFile: audio,
             mimeType: recordedMimeType,
         });
 
-        failureFallbackCode = 'gemini_upload_failed';
-        const uploaded = await uploadPreparedGuidanceAudio({
-            recordId,
+        const summary = await generateInterviewSummary({
             audioFile: geminiAudio.audioFile,
+            audioMimeType: geminiAudio.mimeType,
+            prompt,
         });
-        uploadedFileName = uploaded.fileName;
+        const record = await saveGeneratedGuidanceRecord({
+            studentId: userId,
+            date: endedAt,
+            content: formatGuidanceSummaryAsPlainText(summary),
+        });
 
-        failureFallbackCode = 'queue_publish_failed';
-        await publishGuidanceSummaryJob({
-            recordId,
-            durationMinutes,
-            timeZone: parsedPayload.data.timeZone ?? null,
-        });
+        if (record.error || !record.recordId || !record.content) {
+            console.error('[guidance-summary] saveGeneratedGuidanceRecord failed:', {
+                studentId: userId,
+                teacherId: session.userId,
+                error: record.error,
+                hasRecordId: Boolean(record.recordId),
+                hasContent: Boolean(record.content),
+            });
+            throw new Error(record.error ?? 'failed to save guidance record');
+        }
 
         return NextResponse.json({
             success: true,
-            queued: true,
-            recordId,
-        }, { status: 202 });
+            recordId: record.recordId,
+            content: record.content,
+        });
     } catch (error) {
-        const normalized = normalizeGuidanceSummaryError(error, failureFallbackCode);
-
-        if (recordId) {
-            await failGuidanceSummaryRecord({
-                recordId,
-                code: normalized.code,
-                message: normalized.userMessage,
-                notifyTeacher: false,
-            });
-        }
-
-        if (uploadedFileName) {
-            await deleteGuidanceGeminiFile({ fileName: uploadedFileName }).catch((deleteError) => {
-                const deleteFailure = normalizeGuidanceSummaryError(deleteError, 'gemini_upload_failed');
-                console.warn('[guidance-summary] failed to delete uploaded file:', {
-                    recordId,
-                    fileName: uploadedFileName,
-                    message: deleteFailure.logMessage,
-                });
-            });
-        }
-
         console.error('[guidance-summary] failed:', {
             studentId: userId,
             teacherId: session.userId,
-            recordId,
             audioBytes: audio.size,
             audioMimeType: recordedMimeType,
-            code: normalized.code,
-            message: normalized.logMessage,
+            message: error instanceof Error ? error.message : String(error),
         });
 
-        return NextResponse.json({
-            error: normalized.userMessage,
-            code: normalized.code,
-            recordId,
-        }, { status: 500 });
+        return NextResponse.json({ error: 'AI要約に失敗しました。手動入力で保存してください。' }, { status: 500 });
     }
 }
