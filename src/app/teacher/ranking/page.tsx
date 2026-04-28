@@ -23,7 +23,7 @@ export default async function TeacherRankingPage() {
             <RankingPageClient
                 apiPath="/api/rankings"
                 heading="教室ランキング"
-                description="同じ教室の生徒ランキングです。問題数・英単語スコア・正答率の上位10人を、今月・3ヶ月・1年・自由指定で表示します。"
+                description="同じ教室の生徒ランキングです。問題数と英単語スコアの上位10人を、週・月ごとに表示します。"
                 showClassroomSelector={isAdmin}
                 classrooms={classrooms}
             />

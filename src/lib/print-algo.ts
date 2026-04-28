@@ -18,14 +18,6 @@ type ScoredProblem = {
     score: number;
 };
 
-function requirePrintableCustomId(problem: { id: string; customId: string | null }): string {
-    if (!problem.customId) {
-        throw new Error(`印刷対象の問題 ${problem.id} に customId が設定されていません`);
-    }
-
-    return problem.customId;
-}
-
 
 export async function selectProblemsForPrint(
     userId: string,
@@ -74,29 +66,6 @@ export async function selectProblemsForPrint(
             customId: true,
             question: true,
             order: true,
-            problemType: true,
-            contentFormat: true,
-            status: true,
-            publishedRevisionId: true,
-            publishedRevision: {
-                select: {
-                    structuredContent: true,
-                    answerSpec: true,
-                    printConfig: true,
-                    assets: {
-                        select: {
-                            id: true,
-                            kind: true,
-                            fileName: true,
-                            mimeType: true,
-                            storageKey: true,
-                            inlineContent: true,
-                            width: true,
-                            height: true,
-                        },
-                    },
-                },
-            },
             // UserProblemStateを一緒に取得 (1:N relation name is 'userStates')
             userStates: {
                 where: { userId },
@@ -115,7 +84,6 @@ export async function selectProblemsForPrint(
     // 4. Calculate Score
     const now = Date.now();
     const scoredProblems: ScoredProblem[] = candidateProblems.map(problem => {
-        const customId = requirePrintableCustomId(problem);
         // Integrated userState
         const state = problem.userStates[0];
         let score = 0;
@@ -137,26 +105,9 @@ export async function selectProblemsForPrint(
         return {
             problem: {
                 id: problem.id,
-                customId,
+                customId: problem.customId,
                 question: problem.question,
                 order: problem.order,
-                problemType: problem.problemType,
-                contentFormat: problem.contentFormat,
-                status: problem.status,
-                publishedRevisionId: problem.publishedRevisionId,
-                structuredContent: problem.publishedRevision?.structuredContent as never,
-                answerSpec: problem.publishedRevision?.answerSpec as never,
-                printConfig: problem.publishedRevision?.printConfig as never,
-                assets: problem.publishedRevision?.assets.map((asset) => ({
-                    id: asset.id,
-                    kind: asset.kind,
-                    fileName: asset.fileName,
-                    mimeType: asset.mimeType,
-                    storageKey: asset.storageKey,
-                    inlineContent: asset.inlineContent,
-                    width: asset.width,
-                    height: asset.height,
-                })) ?? [],
             },
             score,
         };

@@ -3,14 +3,10 @@ import { z } from 'zod';
 
 import { getSession } from '@/lib/auth';
 import { getClassroomRankingPayload, RankingServiceError } from '@/lib/classroom-ranking-service';
-import { RANKING_PERIOD_KEYS } from '@/lib/types/ranking';
 
 const querySchema = z.object({
     timeZone: z.string().optional(),
     classroomId: z.string().optional(),
-    range: z.enum(RANKING_PERIOD_KEYS).optional(),
-    startMonth: z.string().optional(),
-    endMonth: z.string().optional(),
 });
 
 const ALLOWED_ROLES = new Set(['STUDENT', 'TEACHER', 'HEAD_TEACHER', 'ADMIN']);
@@ -28,9 +24,6 @@ export async function GET(request: NextRequest) {
     const parsed = querySchema.safeParse({
         timeZone: request.nextUrl.searchParams.get('timeZone') ?? undefined,
         classroomId: request.nextUrl.searchParams.get('classroomId') ?? undefined,
-        range: request.nextUrl.searchParams.get('range') ?? undefined,
-        startMonth: request.nextUrl.searchParams.get('startMonth') ?? undefined,
-        endMonth: request.nextUrl.searchParams.get('endMonth') ?? undefined,
     });
 
     if (!parsed.success) {
@@ -43,9 +36,6 @@ export async function GET(request: NextRequest) {
             actorRole: session.role,
             requestedClassroomId: parsed.data.classroomId,
             timeZone: parsed.data.timeZone,
-            periodKey: parsed.data.range,
-            startMonth: parsed.data.startMonth,
-            endMonth: parsed.data.endMonth,
         });
 
         return NextResponse.json(payload);

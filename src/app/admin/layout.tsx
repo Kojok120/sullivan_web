@@ -1,23 +1,12 @@
-import { AdminShell } from './admin-shell';
-import { getProblemNavSubjects } from './problems/actions';
+import { AdminShell } from "./admin-shell";
 
-export const dynamic = 'force-dynamic';
-
-export default async function AdminLayout({
+export default function AdminLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
-    const subjectsResult = await getProblemNavSubjects();
-    const problemSubjects = subjectsResult.success && subjectsResult.subjects
-        ? subjectsResult.subjects.map((subject) => ({
-            id: subject.id,
-            name: subject.name,
-        }))
-        : [];
-
     return (
-        <AdminShell problemSubjects={problemSubjects}>
+        <AdminShell>
             {children}
         </AdminShell>
     );

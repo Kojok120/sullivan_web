@@ -42,7 +42,7 @@ export default async function UnitFocusPage() {
     return (
         <div className="container mx-auto px-4 py-8 max-w-5xl">
             <div className="mb-8 space-y-2">
-                <h1 className="text-3xl font-bold tracking-tight text-foreground">
+                <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
                     単元集中学習
                 </h1>
                 <p className="text-muted-foreground text-lg">

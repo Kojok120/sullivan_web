@@ -67,19 +67,8 @@ const nextConfig: NextConfig = {
       ],
     },
     {
-      // 現在 /api/admin/problems 配下はプレビュー系のみのため、
-      // 配下全体で同一オリジン iframe を許可する。
-      source: '/api/admin/problems/:path*',
-      headers: [
-        { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
-        { key: 'X-Content-Type-Options', value: 'nosniff' },
-        { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-        { key: 'X-XSS-Protection', value: '1; mode=block' },
-      ],
-    },
-    {
       // それ以外のルートは従来どおり埋め込みを拒否する。
-      source: '/((?!api/print/pdf|api/admin/problems).*)',
+      source: '/((?!api/print/pdf).*)',
       headers: [
         { key: 'X-Frame-Options', value: 'DENY' },
         { key: 'X-Content-Type-Options', value: 'nosniff' },

@@ -2,21 +2,20 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { ClassroomOption } from '@/lib/types/classroom';
 import {
-    RANKING_CUSTOM_RANGE_MAX_MONTHS,
+    RANKING_CATEGORY_KEYS,
+    RANKING_PERIOD_KEYS,
     rankingResponseSchema,
     type RankingCategoryKey,
     type RankingEntry,
     type RankingPeriodKey,
     type RankingResponse,
 } from '@/lib/types/ranking';
-import { cn } from '@/lib/utils';
 
 type RankingPageClientProps = {
     apiPath: string;
@@ -27,48 +26,19 @@ type RankingPageClientProps = {
 };
 
 const DEFAULT_TIME_ZONE = 'Asia/Tokyo';
-const MONTH_KEY_REGEX = /^\d{4}-(0[1-9]|1[0-2])$/;
-const CATEGORY_OPTIONS: Array<{ key: RankingCategoryKey; label: string }> = [
-    { key: 'problemCount', label: '問題数' },
-    { key: 'vocabularyScore', label: '英単語スコア' },
-    { key: 'accuracy', label: '正答率' },
-];
-const PERIOD_OPTIONS: Array<{ key: RankingPeriodKey; label: string }> = [
-    { key: '1m', label: '今月' },
-    { key: '3m', label: '3ヶ月' },
-    { key: '12m', label: '1年' },
-    { key: 'custom', label: '自由指定' },
-];
+const RANKING_CATEGORY_KEY_SET = new Set<string>(RANKING_CATEGORY_KEYS);
+const RANKING_PERIOD_KEY_SET = new Set<string>(RANKING_PERIOD_KEYS);
 
-const MEDAL_STYLES: Record<number, { bg: string; border: string; text: string; badge: string }> = {
-    1: {
-        bg: 'bg-amber-50 dark:bg-amber-950/30',
-        border: 'border-amber-300 dark:border-amber-700',
-        text: 'text-amber-700 dark:text-amber-400',
-        badge: 'bg-amber-500 text-white',
-    },
-    2: {
-        bg: 'bg-slate-50 dark:bg-slate-900/30',
-        border: 'border-slate-300 dark:border-slate-600',
-        text: 'text-slate-600 dark:text-slate-300',
-        badge: 'bg-slate-400 text-white',
-    },
-    3: {
-        bg: 'bg-orange-50 dark:bg-orange-950/30',
-        border: 'border-orange-300 dark:border-orange-700',
-        text: 'text-orange-700 dark:text-orange-400',
-        badge: 'bg-orange-500 text-white',
-    },
-};
-
-function getValueUnit(category: RankingCategoryKey): string {
-    if (category === 'problemCount') return '問';
-    if (category === 'vocabularyScore') return 'pt';
-    return '%';
+function getValueLabel(category: RankingCategoryKey): string {
+    return category === 'problemCount' ? '問題数' : 'スコア';
 }
 
-function formatRankingValue(category: RankingCategoryKey, value: number): string {
-    return category === 'accuracy' ? `${value}%` : String(value);
+function isRankingCategoryKey(value: string): value is RankingCategoryKey {
+    return RANKING_CATEGORY_KEY_SET.has(value);
+}
+
+function isRankingPeriodKey(value: string): value is RankingPeriodKey {
+    return RANKING_PERIOD_KEY_SET.has(value);
 }
 
 function getApiErrorMessage(payload: unknown): string | null {
@@ -84,184 +54,6 @@ function getApiErrorMessage(payload: unknown): string | null {
     return null;
 }
 
-function countInclusiveMonths(startMonth: string, endMonth: string): number {
-    const [startYear, startMonthNumber] = startMonth.split('-').map(Number);
-    const [endYear, endMonthNumber] = endMonth.split('-').map(Number);
-
-    return (endYear - startYear) * 12 + (endMonthNumber - startMonthNumber) + 1;
-}
-
-function getCustomRangeValidationMessage(startMonth: string, endMonth: string): string | null {
-    if (!startMonth || !endMonth) {
-        return '開始月と終了月を選択してください。';
-    }
-
-    if (!MONTH_KEY_REGEX.test(startMonth) || !MONTH_KEY_REGEX.test(endMonth)) {
-        return '開始月と終了月は YYYY-MM 形式で指定してください。';
-    }
-
-    if (startMonth > endMonth) {
-        return '開始月は終了月以前を指定してください。';
-    }
-
-    if (countInclusiveMonths(startMonth, endMonth) > RANKING_CUSTOM_RANGE_MAX_MONTHS) {
-        return `自由指定は最大${RANKING_CUSTOM_RANGE_MAX_MONTHS}ヶ月までです。`;
-    }
-
-    return null;
-}
-
-/** デスクトップでのポディアム配置用 CSS order: 2位(左), 1位(中央), 3位(右) */
-const PODIUM_ORDER: Record<number, string> = {
-    1: 'sm:order-2',
-    2: 'sm:order-1',
-    3: 'sm:order-3',
-};
-
-/** 上位3名のポディアムカード */
-function PodiumCard({
-    entry,
-    category,
-    maxValue,
-}: {
-    entry: RankingEntry;
-    category: RankingCategoryKey;
-    maxValue: number;
-}) {
-    const style = MEDAL_STYLES[entry.rank];
-    if (!style) return null;
-
-    const percentage = maxValue > 0 ? Math.round((entry.value / maxValue) * 100) : 0;
-
-    return (
-        <div
-            className={cn(
-                'relative flex flex-col items-center rounded-xl border-2 p-4 transition-all sm:p-5',
-                style.bg,
-                style.border,
-                entry.rank === 1 && 'sm:-mt-3 sm:scale-105',
-                PODIUM_ORDER[entry.rank],
-            )}
-        >
-            {/* 順位バッジ */}
-            <div
-                className={cn(
-                    'flex h-9 w-9 items-center justify-center rounded-full text-base font-bold shadow-sm',
-                    style.badge,
-                )}
-            >
-                {entry.rank}
-            </div>
-
-            {/* 名前 */}
-            <p className="mt-3 text-center text-sm font-semibold leading-tight">{entry.name}</p>
-
-            {/* グループ */}
-            {entry.group ? (
-                <p className="mt-1 text-center text-xs text-muted-foreground">{entry.group}</p>
-            ) : null}
-
-            {/* 値 */}
-            <p className={cn('mt-3 text-2xl font-bold tabular-nums', style.text)}>
-                {entry.value}
-                <span className="text-sm font-medium">{getValueUnit(category)}</span>
-            </p>
-
-            {/* プログレスバー */}
-            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-black/5 dark:bg-white/10">
-                <div
-                    className={cn('h-full rounded-full transition-all duration-500', style.badge)}
-                    style={{ width: `${percentage}%` }}
-                />
-            </div>
-        </div>
-    );
-}
-
-/** 4位以下のリスト行 */
-function RankingListItem({
-    entry,
-    category,
-    maxValue,
-}: {
-    entry: RankingEntry;
-    category: RankingCategoryKey;
-    maxValue: number;
-}) {
-    const percentage = maxValue > 0 ? Math.round((entry.value / maxValue) * 100) : 0;
-
-    return (
-        <div className="flex items-center gap-3 rounded-lg border bg-card px-4 py-3 transition-colors hover:bg-muted/50">
-            {/* 順位 */}
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold tabular-nums text-muted-foreground">
-                {entry.rank}
-            </span>
-
-            {/* 名前・グループ */}
-            <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{entry.name}</p>
-                <p className="truncate text-xs text-muted-foreground">
-                    {entry.group ?? entry.loginId}
-                </p>
-            </div>
-
-            {/* プログレスバー（デスクトップのみ） */}
-            <div className="hidden w-24 sm:block">
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                    <div
-                        className="h-full rounded-full bg-primary/60 transition-all duration-500"
-                        style={{ width: `${percentage}%` }}
-                    />
-                </div>
-            </div>
-
-            {/* 値 */}
-            <span className="shrink-0 text-right text-sm font-bold tabular-nums">
-                {formatRankingValue(category, entry.value)}
-            </span>
-        </div>
-    );
-}
-
-/** ローディングスケルトン */
-function RankingSkeleton() {
-    return (
-        <div className="space-y-6">
-            {/* ポディアムスケルトン */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:items-end">
-                {[2, 1, 3].map((rank) => (
-                    <div
-                        key={rank}
-                        className={cn(
-                            'flex animate-pulse flex-col items-center rounded-xl border-2 border-muted p-5',
-                            rank === 1 && 'sm:-mt-3',
-                        )}
-                    >
-                        <div className="h-9 w-9 rounded-full bg-muted" />
-                        <div className="mt-3 h-4 w-20 rounded bg-muted" />
-                        <div className="mt-3 h-7 w-16 rounded bg-muted" />
-                        <div className="mt-2 h-1.5 w-full rounded-full bg-muted" />
-                    </div>
-                ))}
-            </div>
-
-            {/* リストスケルトン */}
-            <div className="space-y-2">
-                {Array.from({ length: 4 }, (_, i) => (
-                    <div key={i} className="flex animate-pulse items-center gap-3 rounded-lg border px-4 py-3">
-                        <div className="h-8 w-8 rounded-full bg-muted" />
-                        <div className="flex-1 space-y-1.5">
-                            <div className="h-3.5 w-24 rounded bg-muted" />
-                            <div className="h-3 w-16 rounded bg-muted" />
-                        </div>
-                        <div className="h-4 w-12 rounded bg-muted" />
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-}
-
 export function RankingPageClient({
     apiPath,
     heading,
@@ -271,9 +63,7 @@ export function RankingPageClient({
 }: RankingPageClientProps) {
     const [timeZone, setTimeZone] = useState(DEFAULT_TIME_ZONE);
     const [category, setCategory] = useState<RankingCategoryKey>('problemCount');
-    const [periodKey, setPeriodKey] = useState<RankingPeriodKey>('1m');
-    const [customStartMonth, setCustomStartMonth] = useState('');
-    const [customEndMonth, setCustomEndMonth] = useState('');
+    const [period, setPeriod] = useState<RankingPeriodKey>('week');
     const [selectedClassroomId, setSelectedClassroomId] = useState('');
     const [data, setData] = useState<RankingResponse | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -286,26 +76,11 @@ export function RankingPageClient({
         }
     }, []);
 
-    const customRangeMessage = useMemo(() => {
-        if (periodKey !== 'custom') {
-            return null;
-        }
-
-        return getCustomRangeValidationMessage(customStartMonth, customEndMonth);
-    }, [customEndMonth, customStartMonth, periodKey]);
-
     useEffect(() => {
         let cancelled = false;
 
         const fetchRanking = async () => {
             if (showClassroomSelector && !selectedClassroomId) {
-                setData(null);
-                setIsLoading(false);
-                setErrorMessage(null);
-                return;
-            }
-
-            if (periodKey === 'custom' && customRangeMessage) {
                 setData(null);
                 setIsLoading(false);
                 setErrorMessage(null);
@@ -318,16 +93,10 @@ export function RankingPageClient({
             try {
                 const params = new URLSearchParams({
                     timeZone,
-                    range: periodKey,
                 });
 
                 if (showClassroomSelector && selectedClassroomId) {
                     params.set('classroomId', selectedClassroomId);
-                }
-
-                if (periodKey === 'custom') {
-                    params.set('startMonth', customStartMonth);
-                    params.set('endMonth', customEndMonth);
                 }
 
                 const response = await fetch(`${apiPath}?${params.toString()}`, {
@@ -366,39 +135,22 @@ export function RankingPageClient({
         return () => {
             cancelled = true;
         };
-    }, [
-        apiPath,
-        customEndMonth,
-        customRangeMessage,
-        customStartMonth,
-        periodKey,
-        selectedClassroomId,
-        showClassroomSelector,
-        timeZone,
-    ]);
+    }, [apiPath, selectedClassroomId, showClassroomSelector, timeZone]);
 
     const entries: RankingEntry[] = useMemo(() => {
         if (!data) return [];
-        return data[category];
-    }, [category, data]);
+        return data[category][period];
+    }, [category, data, period]);
 
-    const topThree = entries.filter((e) => e.rank <= 3);
-    const rest = entries.filter((e) => e.rank > 3);
-    const maxValue = entries.length > 0 ? entries[0].value : 0;
-
-    const periodLabel = data?.period.label;
+    const periodLabel = data?.periods[period].label;
 
     return (
         <div className="space-y-6">
-            {/* ヘッダー */}
-            <div className="space-y-1">
-                <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{heading}</h1>
-                <p className="text-sm text-muted-foreground">{description}</p>
-            </div>
-
-            {/* コントロール */}
             <Card>
-                <CardContent className="space-y-4 pt-6">
+                <CardHeader className="space-y-3">
+                    <CardTitle className="text-2xl sm:text-3xl">{heading}</CardTitle>
+                    <p className="text-sm text-muted-foreground">{description}</p>
+
                     {showClassroomSelector && (
                         <div className="w-full max-w-sm">
                             <Select value={selectedClassroomId} onValueChange={setSelectedClassroomId}>
@@ -415,137 +167,87 @@ export function RankingPageClient({
                             </Select>
                         </div>
                     )}
-
-                    {/* カテゴリ切り替え */}
-                    <div className="inline-flex h-10 w-full max-w-md items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
-                        {CATEGORY_OPTIONS.map((option) => (
-                            <button
-                                key={option.key}
-                                type="button"
-                                className={cn(
-                                    'inline-flex flex-1 items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all',
-                                    category === option.key
-                                        ? 'bg-background text-foreground shadow-sm'
-                                        : 'hover:text-foreground/80',
-                                )}
-                                onClick={() => setCategory(option.key)}
-                            >
-                                {option.label}
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* 期間切り替え */}
-                    <div className="flex flex-wrap items-center gap-2">
-                        {PERIOD_OPTIONS.map((option) => (
-                            <Button
-                                key={option.key}
-                                type="button"
-                                variant={periodKey === option.key ? 'default' : 'outline'}
-                                size="sm"
-                                onClick={() => setPeriodKey(option.key)}
-                            >
-                                {option.label}
-                            </Button>
-                        ))}
-                    </div>
-
-                    {/* カスタム期間 */}
-                    {periodKey === 'custom' ? (
-                        <div className="grid max-w-md gap-4 sm:grid-cols-2">
-                            <label className="space-y-1.5 text-sm">
-                                <span className="font-medium">開始月</span>
-                                <Input
-                                    type="month"
-                                    value={customStartMonth}
-                                    onChange={(event) => setCustomStartMonth(event.target.value)}
-                                />
-                            </label>
-                            <label className="space-y-1.5 text-sm">
-                                <span className="font-medium">終了月</span>
-                                <Input
-                                    type="month"
-                                    value={customEndMonth}
-                                    onChange={(event) => setCustomEndMonth(event.target.value)}
-                                />
-                            </label>
-                        </div>
-                    ) : null}
-
-                    {/* 期間ラベル・注釈 */}
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        {periodLabel ? (
-                            <Badge variant="secondary" className="font-normal">
-                                {periodLabel}
-                            </Badge>
-                        ) : null}
-                        {data?.classroom.name ? (
-                            <Badge variant="outline" className="font-normal">
-                                {data.classroom.name}
-                            </Badge>
-                        ) : null}
-                    </div>
-                </CardContent>
+                </CardHeader>
             </Card>
 
-            {/* ランキング本体 */}
-            {showClassroomSelector && !selectedClassroomId ? (
-                <Card>
-                    <CardContent className="py-12 text-center text-sm text-muted-foreground">
-                        教室を選択するとランキングを表示します。
-                    </CardContent>
-                </Card>
-            ) : periodKey === 'custom' && customRangeMessage ? (
-                <Card>
-                    <CardContent className="py-12 text-center text-sm text-muted-foreground">
-                        {customRangeMessage}
-                    </CardContent>
-                </Card>
-            ) : isLoading ? (
-                <RankingSkeleton />
-            ) : errorMessage ? (
-                <Card>
-                    <CardContent className="py-12 text-center">
-                        <p className="text-sm text-destructive">{errorMessage}</p>
-                    </CardContent>
-                </Card>
-            ) : entries.length === 0 ? (
-                <Card>
-                    <CardContent className="py-12 text-center text-sm text-muted-foreground">
-                        ランキングデータがありません。
-                    </CardContent>
-                </Card>
-            ) : (
-                <div className="space-y-3">
-                    {/* 上位3名ポディアム: モバイルは1,2,3順、デスクトップは2,1,3のポディアム配置 */}
-                    {topThree.length > 0 && (
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:items-end">
-                            {topThree.map((entry) => (
-                                <PodiumCard
-                                    key={entry.userId}
-                                    entry={entry}
-                                    category={category}
-                                    maxValue={maxValue}
-                                />
-                            ))}
-                        </div>
-                    )}
+            <Card>
+                <CardContent className="space-y-6 pt-6">
+                    <div className="space-y-4">
+                        <Tabs
+                            value={category}
+                            onValueChange={(value) => {
+                                if (isRankingCategoryKey(value)) {
+                                    setCategory(value);
+                                }
+                            }}
+                            className="space-y-0"
+                        >
+                            <TabsList className="grid w-full max-w-md grid-cols-2">
+                                <TabsTrigger value="problemCount">問題数</TabsTrigger>
+                                <TabsTrigger value="vocabularyScore">英単語スコア</TabsTrigger>
+                            </TabsList>
+                        </Tabs>
 
-                    {/* 4位以下リスト */}
-                    {rest.length > 0 && (
-                        <div className="space-y-2">
-                            {rest.map((entry) => (
-                                <RankingListItem
-                                    key={entry.userId}
-                                    entry={entry}
-                                    category={category}
-                                    maxValue={maxValue}
-                                />
-                            ))}
+                        <Tabs
+                            value={period}
+                            onValueChange={(value) => {
+                                if (isRankingPeriodKey(value)) {
+                                    setPeriod(value);
+                                }
+                            }}
+                            className="space-y-0"
+                        >
+                            <TabsList className="grid w-full max-w-xs grid-cols-2">
+                                <TabsTrigger value="week">週</TabsTrigger>
+                                <TabsTrigger value="month">月</TabsTrigger>
+                            </TabsList>
+                        </Tabs>
+                    </div>
+
+                    {periodLabel ? (
+                        <p className="text-sm text-muted-foreground">対象期間: {periodLabel}（{data?.timeZone}）</p>
+                    ) : null}
+
+                    {showClassroomSelector && !selectedClassroomId ? (
+                        <div className="rounded-md border p-6 text-center text-sm text-muted-foreground">
+                            教室を選択するとランキングを表示します。
+                        </div>
+                    ) : isLoading ? (
+                        <div className="rounded-md border p-6 text-center text-sm text-muted-foreground">読み込み中...</div>
+                    ) : errorMessage ? (
+                        <div className="rounded-md border border-destructive/50 bg-destructive/5 p-6 text-center text-sm text-destructive">
+                            {errorMessage}
+                        </div>
+                    ) : entries.length === 0 ? (
+                        <div className="rounded-md border p-6 text-center text-sm text-muted-foreground">ランキングデータがありません。</div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead className="w-16">順位</TableHead>
+                                        <TableHead>名前</TableHead>
+                                        <TableHead>ログインID</TableHead>
+                                        <TableHead>グループ</TableHead>
+                                        <TableHead className="text-right">{getValueLabel(category)}</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {entries.map((entry) => (
+                                        <TableRow key={`${entry.userId}-${entry.rank}`}>
+                                            <TableCell className="font-semibold">{entry.rank}</TableCell>
+                                            <TableCell>{entry.name}</TableCell>
+                                            <TableCell>{entry.loginId}</TableCell>
+                                            <TableCell>{entry.group ?? '-'}</TableCell>
+                                            <TableCell className="text-right font-semibold">{entry.value}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
                         </div>
                     )}
-                </div>
-            )}
+                </CardContent>
+            </Card>
         </div>
     );
 }

@@ -10,15 +10,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { logoutAction } from '@/app/actions';
 
-type AdminShellProps = {
-    children: React.ReactNode;
-    problemSubjects: {
-        id: string;
-        name: string;
-    }[];
-};
-
-export function AdminShell({ children, problemSubjects }: AdminShellProps) {
+export function AdminShell({ children }: { children: React.ReactNode }) {
     const [isCollapsed, setIsCollapsed] = useState(() => {
         if (typeof window === 'undefined') return false;
         return localStorage.getItem('admin-sidebar-collapsed') === 'true';
@@ -31,10 +23,10 @@ export function AdminShell({ children, problemSubjects }: AdminShellProps) {
     };
 
     return (
-        <div className="min-h-dvh bg-background">
+        <div className="min-h-dvh bg-gray-50">
             <div className="sticky top-0 z-40 border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/75 md:hidden">
                 <div className="flex h-14 items-center justify-between px-3">
-                    <AdminMobileNav problemSubjects={problemSubjects} />
+                    <AdminMobileNav />
                     <Link href="/admin" className="flex items-center">
                         <div className="relative h-8 w-28">
                             <Image
@@ -73,14 +65,10 @@ export function AdminShell({ children, problemSubjects }: AdminShellProps) {
                             isCollapsed ? 'w-16' : 'w-64'
                         )}
                     >
-                        <AdminNav
-                            isCollapsed={isCollapsed}
-                            onToggle={toggleSidebar}
-                            problemSubjects={problemSubjects}
-                        />
+                        <AdminNav isCollapsed={isCollapsed} onToggle={toggleSidebar} />
                     </div>
                 </aside>
-                <main className="min-w-0 flex-1 bg-background transition-all duration-300">
+                <main className="min-w-0 flex-1 bg-gray-50 transition-all duration-300">
                     {children}
                 </main>
             </div>

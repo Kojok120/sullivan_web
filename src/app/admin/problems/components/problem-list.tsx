@@ -1,12 +1,13 @@
 'use client';
 
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Pencil, Trash2, CheckSquare, Square } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { deleteStandaloneProblem, bulkDeleteProblems } from '../actions';
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckSquare, Pencil, Square, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
     AlertDialog,
@@ -19,37 +20,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { SortIcon } from '@/components/ui/sort-icon';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import {
-    getContentFormatLabel,
-    getProblemStatusLabel,
-    getProblemTypeLabel,
-    type ProblemEditorViewMode,
-} from '@/lib/problem-ui';
-import { renderProblemTextHtml } from '@/lib/problem-text';
-import { bulkDeleteProblems, deleteStandaloneProblem } from '../actions';
 import type { ProblemWithRelations } from '../types';
-
-function RenderedProblemText({
-    text,
-    className,
-    fallback = '-',
-}: {
-    text: string | null | undefined;
-    className?: string;
-    fallback?: string;
-}) {
-    const trimmed = (text ?? '').trim();
-    if (!trimmed) {
-        return <span className="text-xs text-muted-foreground">{fallback}</span>;
-    }
-    return (
-        <div
-            className={className}
-            dangerouslySetInnerHTML={{ __html: renderProblemTextHtml(text ?? '') }}
-        />
-    );
-}
 
 interface ProblemListProps {
     problems: ProblemWithRelations[];
@@ -57,26 +28,14 @@ interface ProblemListProps {
     sortBy: string;
     sortOrder: 'asc' | 'desc';
     onSort: (column: string) => void;
-    viewMode?: ProblemEditorViewMode;
-    showMasterNumber?: boolean;
 }
 
-export function ProblemList({
-    problems,
-    onEdit,
-    sortBy,
-    sortOrder,
-    onSort,
-    viewMode = 'admin',
-    showMasterNumber = true,
-}: ProblemListProps) {
+export function ProblemList({ problems, onEdit, sortBy, sortOrder, onSort }: ProblemListProps) {
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
     const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
     const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
     const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
-    const isAuthorView = viewMode === 'author';
-    const emptyTableColSpan = (isAuthorView ? 8 : 10) + (showMasterNumber ? 1 : 0);
 
     const handleDeleteConfirm = () => {
         if (!deleteTarget) return;
@@ -112,14 +71,14 @@ export function ProblemList({
     };
 
     const handleCheckChange = (id: string, checked: boolean) => {
-        setCheckedIds((prev) => {
-            const next = new Set(prev);
+        setCheckedIds(prev => {
+            const newSet = new Set(prev);
             if (checked) {
-                next.add(id);
+                newSet.add(id);
             } else {
-                next.delete(id);
+                newSet.delete(id);
             }
-            return next;
+            return newSet;
         });
     };
 
@@ -127,23 +86,29 @@ export function ProblemList({
         if (checkedIds.size === problems.length) {
             setCheckedIds(new Set());
         } else {
-            setCheckedIds(new Set(problems.map((problem) => problem.id)));
+            setCheckedIds(new Set(problems.map(p => p.id)));
         }
     };
 
     return (
         <>
-            {!isAuthorView && problems.length > 0 && (
-                <div className="mb-4 flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={handleSelectAll} className="min-h-11">
+            {/* Bulk Actions Header */}
+            {problems.length > 0 && (
+                <div className="flex items-center gap-2 mb-4">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSelectAll}
+                        className="min-h-11"
+                    >
                         {checkedIds.size === problems.length ? (
                             <>
-                                <CheckSquare className="mr-2 h-4 w-4" />
+                                <CheckSquare className="h-4 w-4 mr-2" />
                                 全解除
                             </>
                         ) : (
                             <>
-                                <Square className="mr-2 h-4 w-4" />
+                                <Square className="h-4 w-4 mr-2" />
                                 全選択
                             </>
                         )}
@@ -156,7 +121,7 @@ export function ProblemList({
                             disabled={isPending}
                             className="min-h-11"
                         >
-                            <Trash2 className="mr-2 h-4 w-4" />
+                            <Trash2 className="h-4 w-4 mr-2" />
                             {checkedIds.size}件削除
                         </Button>
                     )}
@@ -173,60 +138,43 @@ export function ProblemList({
                         <div key={problem.id} className="rounded-lg border bg-card p-4">
                             <div className="mb-3 flex items-start justify-between gap-3">
                                 <div className="flex items-center gap-2">
-                                    {!isAuthorView && (
-                                        <Checkbox
-                                            checked={checkedIds.has(problem.id)}
-                                            onCheckedChange={(checked) => handleCheckChange(problem.id, checked === true)}
-                                        />
-                                    )}
+                                    <Checkbox
+                                        checked={checkedIds.has(problem.id)}
+                                        onCheckedChange={(checked) => handleCheckChange(problem.id, checked === true)}
+                                    />
                                     <div>
-                                        {showMasterNumber && (
-                                            <p className="font-mono text-sm font-bold">No.{problem.masterNumber || '-'}</p>
-                                        )}
-                                        <p className="font-mono text-xs text-muted-foreground">{problem.customId}</p>
+                                        <p className="font-mono text-sm font-bold">No.{problem.masterNumber || '-'}</p>
+                                        <p className="font-mono text-xs text-muted-foreground">{problem.customId || '-'}</p>
                                     </div>
                                 </div>
                                 <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
                                     <Button variant="outline" size="sm" className="min-h-11" onClick={() => onEdit(problem)}>
                                         <Pencil className="mr-1 h-4 w-4" />
-                                        {isAuthorView ? '開く' : '編集'}
+                                        編集
                                     </Button>
-                                    {!isAuthorView && (
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="min-h-11 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-                                            disabled={isPending}
-                                            onClick={() => setDeleteTarget(problem.id)}
-                                        >
-                                            <Trash2 className="mr-1 h-4 w-4" />
-                                            削除
-                                        </Button>
-                                    )}
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="min-h-11 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                        disabled={isPending}
+                                        onClick={() => setDeleteTarget(problem.id)}
+                                    >
+                                        <Trash2 className="mr-1 h-4 w-4" />
+                                        削除
+                                    </Button>
                                 </div>
                             </div>
                             <div className="space-y-2 text-sm">
-                                <div className="flex flex-wrap gap-2">
-                                    <Badge>{getProblemTypeLabel(problem.problemType)}</Badge>
-                                    {!isAuthorView && <Badge variant="secondary">{getContentFormatLabel(problem.contentFormat)}</Badge>}
-                                    <Badge variant="outline">{getProblemStatusLabel(problem.status)}</Badge>
-                                </div>
                                 <div>
                                     <p className="text-xs text-muted-foreground">問題文</p>
-                                    <RenderedProblemText
-                                        text={problem.question}
-                                        className="whitespace-pre-wrap text-sm leading-7 [&_.katex-display]:overflow-x-auto [&_.katex-display]:py-1"
-                                    />
+                                    <p className="whitespace-pre-wrap">{problem.question}</p>
                                 </div>
                                 <div>
                                     <p className="text-xs text-muted-foreground">解答</p>
-                                    <RenderedProblemText
-                                        text={problem.answer}
-                                        className="whitespace-pre-wrap text-sm leading-7 [&_.katex-display]:overflow-x-auto [&_.katex-display]:py-1"
-                                    />
+                                    <p className="whitespace-pre-wrap">{problem.answer || '-'}</p>
                                 </div>
                                 <div>
-                                    <p className="text-xs text-muted-foreground">所属単元</p>
+                                    <p className="text-xs text-muted-foreground">所属コア問題</p>
                                     <div className="mt-1 flex flex-wrap gap-1">
                                         {problem.coreProblems.map((cp) => (
                                             <Badge key={cp.id} variant="secondary" className="text-xs">
@@ -259,71 +207,59 @@ export function ProblemList({
                 )}
             </div>
 
-            <div className="hidden rounded-md border md:block">
+            <div className="hidden border rounded-md md:block">
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            {!isAuthorView && <TableHead className="w-[50px]" />}
-                            {showMasterNumber && (
-                                <TableHead className="w-[100px] cursor-pointer hover:bg-muted/50" onClick={() => onSort('masterNumber')}>
-                                    <div className="flex items-center">
-                                        マスタNo
-                                        <SortIcon active={sortBy === 'masterNumber'} sortOrder={sortOrder} />
-                                    </div>
-                                </TableHead>
-                            )}
-                            <TableHead className="w-[120px] cursor-pointer hover:bg-muted/50" onClick={() => onSort('customId')}>
+                            <TableHead className="w-[50px]"></TableHead>
+                            <TableHead
+                                className="w-[100px] cursor-pointer hover:bg-muted/50"
+                                onClick={() => onSort('masterNumber')}
+                            >
+                                <div className="flex items-center">
+                                    マスタNo
+                                    <SortIcon active={sortBy === 'masterNumber'} sortOrder={sortOrder} />
+                                </div>
+                            </TableHead>
+                            <TableHead
+                                className="w-[120px] cursor-pointer hover:bg-muted/50" // kept ID column just in case
+                                onClick={() => onSort('customId')}
+                            >
                                 <div className="flex items-center">
                                     ID
                                     <SortIcon active={sortBy === 'customId'} sortOrder={sortOrder} />
                                 </div>
                             </TableHead>
                             <TableHead>問題文</TableHead>
-                            <TableHead className="w-[130px]">形式</TableHead>
-                            {!isAuthorView && <TableHead className="w-[130px]">本文</TableHead>}
-                            <TableHead className="w-[120px]">公開状況</TableHead>
                             <TableHead>解答</TableHead>
-                            <TableHead>所属単元</TableHead>
+                            <TableHead>所属コア問題</TableHead>
                             <TableHead className="w-[60px]">動画</TableHead>
-                            <TableHead className="w-[120px]">操作</TableHead>
+                            <TableHead className="w-[100px]">操作</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {problems.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={emptyTableColSpan} className="py-8 text-center text-muted-foreground">
+                                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                                     問題が見つかりませんでした
                                 </TableCell>
                             </TableRow>
                         ) : (
                             problems.map((problem) => (
                                 <TableRow key={problem.id}>
-                                    {!isAuthorView && (
-                                        <TableCell>
-                                            <Checkbox
-                                                checked={checkedIds.has(problem.id)}
-                                                onCheckedChange={(checked) => handleCheckChange(problem.id, checked === true)}
-                                            />
-                                        </TableCell>
-                                    )}
-                                    {showMasterNumber && (
-                                        <TableCell className="font-mono text-sm font-bold">{problem.masterNumber || '-'}</TableCell>
-                                    )}
-                                    <TableCell className="font-mono text-xs text-muted-foreground">{problem.customId}</TableCell>
-                                    <TableCell className="min-w-[200px]" title={problem.question}>
-                                        <RenderedProblemText
-                                            text={problem.question}
-                                            className="whitespace-pre-wrap text-sm leading-7 [&_.katex-display]:overflow-x-auto [&_.katex-display]:py-1"
+                                    <TableCell>
+                                        <Checkbox
+                                            checked={checkedIds.has(problem.id)}
+                                            onCheckedChange={(checked) => handleCheckChange(problem.id, checked === true)}
                                         />
                                     </TableCell>
-                                    <TableCell className="text-xs">{getProblemTypeLabel(problem.problemType)}</TableCell>
-                                    {!isAuthorView && <TableCell className="text-xs">{getContentFormatLabel(problem.contentFormat)}</TableCell>}
-                                    <TableCell className="text-xs">{getProblemStatusLabel(problem.status)}</TableCell>
-                                    <TableCell className="min-w-[150px]" title={problem.answer || ''}>
-                                        <RenderedProblemText
-                                            text={problem.answer}
-                                            className="whitespace-pre-wrap text-sm leading-7 [&_.katex-display]:overflow-x-auto [&_.katex-display]:py-1"
-                                        />
+                                    <TableCell className="font-mono text-sm font-bold">{problem.masterNumber || '-'}</TableCell>
+                                    <TableCell className="font-mono text-xs text-muted-foreground">{problem.customId || '-'}</TableCell>
+                                    <TableCell className="min-w-[200px] whitespace-pre-wrap" title={problem.question}>
+                                        {problem.question}
+                                    </TableCell>
+                                    <TableCell className="min-w-[150px] whitespace-pre-wrap" title={problem.answer || ''}>
+                                        {problem.answer}
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex flex-wrap gap-1">
@@ -333,7 +269,7 @@ export function ProblemList({
                                                 </Badge>
                                             ))}
                                             {problem.coreProblems.length === 0 && (
-                                                <span className="text-xs text-muted-foreground">-</span>
+                                                <span className="text-muted-foreground text-xs">-</span>
                                             )}
                                         </div>
                                     </TableCell>
@@ -346,31 +282,32 @@ export function ProblemList({
                                                 className="inline-flex items-center justify-center text-blue-500 hover:text-blue-700"
                                                 title={problem.videoUrl}
                                             >
-                                                <div className="flex h-5 w-5 items-center justify-center rounded-full border border-current">
-                                                    <div className="ml-0.5 h-0 w-0 border-y-[4px] border-l-[6px] border-y-transparent border-l-current" />
+                                                <div className="w-5 h-5 flex items-center justify-center border border-current rounded-full">
+                                                    <div className="w-0 h-0 border-l-[6px] border-l-current border-y-[4px] border-y-transparent ml-0.5" />
                                                 </div>
                                             </a>
                                         ) : (
-                                            <span className="text-xs text-muted-foreground">-</span>
+                                            <span className="text-muted-foreground text-xs">-</span>
                                         )}
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-2">
-                                            <Button variant="ghost" size="sm" onClick={() => onEdit(problem)}>
-                                                <Pencil className="mr-1 h-4 w-4" />
-                                                {isAuthorView ? '開く' : '編集'}
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => onEdit(problem)}
+                                            >
+                                                <Pencil className="w-4 h-4" />
                                             </Button>
-                                            {!isAuthorView && (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="text-red-500 hover:bg-red-50 hover:text-red-600"
-                                                    disabled={isPending}
-                                                    onClick={() => setDeleteTarget(problem.id)}
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                            )}
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                                                disabled={isPending}
+                                                onClick={() => setDeleteTarget(problem.id)}
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
                                         </div>
                                     </TableCell>
                                 </TableRow>
@@ -380,51 +317,49 @@ export function ProblemList({
                 </Table>
             </div>
 
-            {!isAuthorView && (
-                <>
-                    <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
-                        <AlertDialogContent>
-                            <AlertDialogHeader>
-                                <AlertDialogTitle>問題を削除しますか？</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    この操作は取り消せません。学習履歴なども削除されます。
-                                </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                                <AlertDialogCancel disabled={isPending}>キャンセル</AlertDialogCancel>
-                                <AlertDialogAction
-                                    onClick={handleDeleteConfirm}
-                                    className="bg-red-500 hover:bg-red-600"
-                                    disabled={isPending}
-                                >
-                                    削除
-                                </AlertDialogAction>
-                            </AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
+            {/* Single Delete Dialog */}
+            <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>問題を削除しますか？</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            この操作は取り消せません。学習履歴なども削除されます。
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isPending}>キャンセル</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleDeleteConfirm}
+                            className="bg-red-500 hover:bg-red-600"
+                            disabled={isPending}
+                        >
+                            削除
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
 
-                    <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
-                        <AlertDialogContent>
-                            <AlertDialogHeader>
-                                <AlertDialogTitle>{checkedIds.size}件の問題を削除しますか？</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    選択した問題と関連する学習履歴が削除されます。この操作は取り消せません。
-                                </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                                <AlertDialogCancel disabled={isPending}>キャンセル</AlertDialogCancel>
-                                <AlertDialogAction
-                                    onClick={handleBulkDeleteConfirm}
-                                    className="bg-red-500 hover:bg-red-600"
-                                    disabled={isPending}
-                                >
-                                    {checkedIds.size}件削除
-                                </AlertDialogAction>
-                            </AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
-                </>
-            )}
+            {/* Bulk Delete Dialog */}
+            <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>{checkedIds.size}件の問題を削除しますか？</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            選択した問題と関連する学習履歴が削除されます。この操作は取り消せません。
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isPending}>キャンセル</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleBulkDeleteConfirm}
+                            className="bg-red-500 hover:bg-red-600"
+                            disabled={isPending}
+                        >
+                            {checkedIds.size}件削除
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </>
     );
 }

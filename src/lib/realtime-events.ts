@@ -5,9 +5,7 @@ export type RealtimeEventType =
   | 'grading_completed'
   | 'grading_failed'
   | 'gamification_update'
-  | 'core_problem_unlocked'
-  | 'guidance_summary_completed'
-  | 'guidance_summary_failed';
+  | 'core_problem_unlocked';
 
 type RealtimeEventInput = {
   userId: string;

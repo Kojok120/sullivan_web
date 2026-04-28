@@ -52,7 +52,7 @@ export function Heatmap({ data, days = 365 }: Props) {
     }
 
     const getColor = (count: number) => {
-        if (count === 0) return 'bg-muted';
+        if (count === 0) return 'bg-gray-100';
         if (count <= 2) return 'bg-green-200';
         if (count <= 5) return 'bg-green-400';
         if (count <= 10) return 'bg-green-600';
