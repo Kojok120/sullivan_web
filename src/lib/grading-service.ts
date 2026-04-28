@@ -672,17 +672,21 @@ const SUBJECT_RUBRIC_FILES: Record<string, string> = {
 /**
  * 採点バッチに含まれる教科に応じた追加ガイドラインを連結して返す。
  * 該当教科がない場合は空文字を返し、プロンプトの該当箇所は空行になる。
+ * 並び順は問題の入力順に依存しないよう fullName でソートし、プロンプトの安定性を確保する。
  */
 export function buildSubjectSpecificGuidelines(problems: ProblemForGrading[]): string {
-    const seen = new Set<string>();
-    const sections: string[] = [];
+    const matchedFullNames = new Set<string>();
 
     for (const problem of problems) {
         const fullName = getSubjectConfig(problem.subjectName).fullName;
-        const file = SUBJECT_RUBRIC_FILES[fullName];
-        if (!file || seen.has(file)) continue;
-        seen.add(file);
+        if (SUBJECT_RUBRIC_FILES[fullName]) {
+            matchedFullNames.add(fullName);
+        }
+    }
 
+    const sections: string[] = [];
+    for (const fullName of [...matchedFullNames].sort()) {
+        const file = SUBJECT_RUBRIC_FILES[fullName];
         try {
             sections.push(loadPrompt(file).trim());
         } catch (error) {

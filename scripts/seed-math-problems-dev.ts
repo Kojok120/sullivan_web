@@ -15,6 +15,7 @@
  */
 
 import 'dotenv/config';
+import { Prisma } from '@prisma/client';
 import { config as loadDotenv } from 'dotenv';
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -278,7 +279,7 @@ async function ensureSubject(prisma: Awaited<ReturnType<typeof loadPrisma>>) {
 }
 
 async function upsertCoreProblems(
-    prisma: Awaited<ReturnType<typeof loadPrisma>>,
+    prisma: Prisma.TransactionClient,
     subjectId: string,
     coreProblems: CoreProblemDef[],
 ) {
@@ -302,7 +303,7 @@ async function upsertCoreProblems(
 }
 
 async function insertProblems(
-    prisma: Awaited<ReturnType<typeof loadPrisma>>,
+    prisma: Prisma.TransactionClient,
     subjectId: string,
     coreProblemMap: Map<number, string>,
     problems: MathProblemDef[],
@@ -363,7 +364,7 @@ async function insertProblems(
 }
 
 async function getNextProblemMasterNumber(
-    prisma: Awaited<ReturnType<typeof loadPrisma>>,
+    prisma: Prisma.TransactionClient,
     subjectId: string,
 ) {
     const aggregate = await prisma.problem.aggregate({
@@ -374,7 +375,7 @@ async function getNextProblemMasterNumber(
 }
 
 async function getNextProblemOrder(
-    prisma: Awaited<ReturnType<typeof loadPrisma>>,
+    prisma: Prisma.TransactionClient,
     subjectId: string,
 ) {
     const aggregate = await prisma.problem.aggregate({
@@ -385,7 +386,7 @@ async function getNextProblemOrder(
 }
 
 async function getNextCustomIdNumber(
-    prisma: Awaited<ReturnType<typeof loadPrisma>>,
+    prisma: Prisma.TransactionClient,
     subjectId: string,
 ) {
     const existing = await prisma.problem.findMany({
@@ -606,15 +607,28 @@ async function main() {
         const subject = await ensureSubject(prisma);
         console.log(`\n[insert] Subject「${subject.name}」(id=${subject.id}) に投入します`);
 
-        const upserted = await upsertCoreProblems(prisma, subject.id, CORE_PROBLEMS);
-        console.log(`[insert] CoreProblem upsert 完了: ${upserted.length} 件`);
-        const coreProblemMap = new Map(upserted.map((c) => [c.masterNumber, c.id]));
+        // CoreProblem upsert と Problem 投入を 1 つのトランザクションでまとめ、
+        // 途中で失敗した場合は CoreProblem の upsert もロールバックする。
+        // 100 問規模の create があるためデフォルト 5s では不足する可能性があり、timeout を伸ばす。
+        const inserted = await prisma.$transaction(
+            async (tx) => {
+                const upserted = await upsertCoreProblems(tx, subject.id, CORE_PROBLEMS);
+                console.log(`[insert] CoreProblem upsert 完了: ${upserted.length} 件`);
+                const coreProblemMap = new Map(upserted.map((c) => [c.masterNumber, c.id]));
 
-        if (MATH_PROBLEMS.length === 0) {
-            console.log('[insert] MATH_PROBLEMS が空なので Problem 投入はスキップします');
-        } else {
-            const inserted = await insertProblems(prisma, subject.id, coreProblemMap, MATH_PROBLEMS);
-            console.log(`[insert] Problem 投入完了: ${inserted.length} 件`);
+                if (MATH_PROBLEMS.length === 0) {
+                    console.log('[insert] MATH_PROBLEMS が空なので Problem 投入はスキップします');
+                    return [] as InsertedProblemLog[];
+                }
+
+                const result = await insertProblems(tx, subject.id, coreProblemMap, MATH_PROBLEMS);
+                console.log(`[insert] Problem 投入完了: ${result.length} 件`);
+                return result;
+            },
+            { timeout: 60_000, maxWait: 10_000 },
+        );
+
+        if (inserted.length > 0) {
             writeRunLog(inserted);
             console.log(`[log] ${LAST_RUN_LOG_PATH} に投入ログを書き込みました`);
 

@@ -4,9 +4,6 @@
  * 出典:
  *   中学校学習指導要領（平成29年告示）第2章 第3節 数学
  *   https://www.mext.go.jp/a_menu/shotou/new-cs/youryou/chu/su.htm
- *
- * 設計方針はリポジトリ内 plan ファイル参照:
- *   /Users/kojok/.claude/plans/stateless-tumbling-penguin.md
  */
 
 import type { DesmosSceneSpec, GeoGebraSceneSpec } from '@/lib/problem-figure-scene';
