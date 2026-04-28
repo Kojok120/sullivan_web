@@ -17,6 +17,8 @@
 - **C**: 部分的に正しいが重要な間違いがある
 - **D**: 不正解または空欄
 
+{{subjectSpecificGuidelines}}
+
 ## 問題リスト（順序厳守、{{problemCount}}問）
 
 {{problemContexts}}

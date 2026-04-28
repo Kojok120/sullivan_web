@@ -28,6 +28,7 @@ import {
     parseAnswerSpec,
     parseStructuredDocument,
 } from '@/lib/structured-problem';
+import { getSubjectConfig } from '@/lib/subject-config';
 
 // Priority adjustment logic (inlined from removed priority-algo.ts)
 type Evaluation = "A" | "B" | "C" | "D";
@@ -661,6 +662,37 @@ function getReferencedFigureAssets(problem: ProblemForGrading) {
     }
 }
 
+// 教科ごとに追加で読み込む採点ガイドラインのファイル名。
+// fullName は subject-config の SubjectConfig.fullName に対応する。
+const SUBJECT_RUBRIC_FILES: Record<string, string> = {
+    Math: 'grading-rubric-math.md',
+    Science: 'grading-rubric-science.md',
+};
+
+/**
+ * 採点バッチに含まれる教科に応じた追加ガイドラインを連結して返す。
+ * 該当教科がない場合は空文字を返し、プロンプトの該当箇所は空行になる。
+ */
+export function buildSubjectSpecificGuidelines(problems: ProblemForGrading[]): string {
+    const seen = new Set<string>();
+    const sections: string[] = [];
+
+    for (const problem of problems) {
+        const fullName = getSubjectConfig(problem.subjectName).fullName;
+        const file = SUBJECT_RUBRIC_FILES[fullName];
+        if (!file || seen.has(file)) continue;
+        seen.add(file);
+
+        try {
+            sections.push(loadPrompt(file).trim());
+        } catch (error) {
+            console.warn('[grading-service] Failed to load subject rubric', { file, error });
+        }
+    }
+
+    return sections.join('\n\n');
+}
+
 export function buildProblemContextForGemini(problem: ProblemForGrading, index: number): GeminiProblemContext {
     let problemText = problem.question?.trim() || '(問題文なし)';
     let referenceAnswer = problem.answer?.trim() || '';
@@ -1159,7 +1191,8 @@ async function gradeWithGemini(
     const gradingPrompt = loadPrompt('grading-prompt.md', {
         problemCount: problemContexts.length,
         problemContexts: JSON.stringify(problemContexts, null, 2),
-        maxIndex: problemContexts.length - 1
+        maxIndex: problemContexts.length - 1,
+        subjectSpecificGuidelines: buildSubjectSpecificGuidelines(problemsForGrading),
     });
 
     let lastErrors: string[] = [];

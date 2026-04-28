@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
     buildGeminiGradingContents,
     buildProblemContextForGemini,
+    buildSubjectSpecificGuidelines,
     validateGradingResponse,
     type ProblemForGrading,
 } from '@/lib/grading-service';
@@ -110,6 +111,35 @@ describe('grading-service helpers', () => {
             reason: '正答と一致',
             evaluation: 'A',
         });
+    });
+
+    it('数学の問題が含まれるバッチでは数学の採点指針を差し込む', () => {
+        const guidelines = buildSubjectSpecificGuidelines([
+            createProblem({ subjectName: '中学数学' }),
+            createProblem({ subjectName: '英語' }),
+        ]);
+
+        expect(guidelines).toContain('数学の採点指針');
+        expect(guidelines).not.toContain('理科の採点指針');
+    });
+
+    it('数学と理科の両方が含まれる場合は両方のガイドラインを連結する', () => {
+        const guidelines = buildSubjectSpecificGuidelines([
+            createProblem({ subjectName: '中1理科' }),
+            createProblem({ subjectName: '中3数学' }),
+        ]);
+
+        expect(guidelines).toContain('数学の採点指針');
+        expect(guidelines).toContain('理科の採点指針');
+    });
+
+    it('該当教科がない場合は空文字を返す', () => {
+        const guidelines = buildSubjectSpecificGuidelines([
+            createProblem({ subjectName: '英語' }),
+            createProblem({ subjectName: '国語' }),
+        ]);
+
+        expect(guidelines).toBe('');
     });
 
     it('confidence が欠けている結果は不正として扱う', () => {
