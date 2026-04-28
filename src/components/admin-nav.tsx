@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import SullivanLogo from "@/assets/Sullivan-Logo.jpg";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -48,9 +48,9 @@ const navItems = [
         icon: BookOpen,
     },
     {
-        title: "問題管理",
-        href: "/admin/problems",
-        icon: BookOpen, // Or another icon like FileText
+        title: "問題作成者画面",
+        href: "/materials/core-problems",
+        icon: BookOpen,
     },
 
 ];
@@ -58,14 +58,20 @@ const navItems = [
 interface AdminNavProps {
     isCollapsed?: boolean;
     onToggle?: () => void;
+    problemSubjects: {
+        id: string;
+        name: string;
+    }[];
 }
 
-export function AdminNav({ isCollapsed = false, onToggle }: AdminNavProps) {
+export function AdminNav({ isCollapsed = false, onToggle, problemSubjects }: AdminNavProps) {
     const pathname = usePathname();
+    const searchParams = useSearchParams();
+    const activeSubjectId = searchParams.get("subjectId");
 
     return (
         <div className={cn(
-            "flex h-screen flex-col border-r bg-gray-100/40 transition-all duration-300",
+            "flex h-screen flex-col border-r bg-muted/40 transition-all duration-300",
             isCollapsed ? "w-16" : "w-64"
         )}>
             <div className={cn("flex items-center p-4", isCollapsed ? "justify-center" : "justify-between")}>
@@ -96,7 +102,7 @@ export function AdminNav({ isCollapsed = false, onToggle }: AdminNavProps) {
                         className={cn(
                             "w-full min-h-11",
                             isCollapsed ? "justify-center px-2" : "justify-start",
-                            pathname === item.href && "bg-gray-200"
+                            pathname === item.href && "bg-accent"
                         )}
                         asChild
                         title={isCollapsed ? item.title : undefined}
@@ -107,6 +113,40 @@ export function AdminNav({ isCollapsed = false, onToggle }: AdminNavProps) {
                         </Link>
                     </Button>
                 ))}
+                {problemSubjects.length > 0 && !isCollapsed && (
+                    <div className="px-3 pt-3 text-xs font-medium text-muted-foreground">
+                        問題一覧
+                    </div>
+                )}
+                {problemSubjects.map((subject) => {
+                    const href = `/admin/problems?subjectId=${subject.id}`;
+                    const isActive = pathname.startsWith("/admin/problems") && activeSubjectId === subject.id;
+
+                    return (
+                        <Button
+                            key={href}
+                            variant={isActive ? "secondary" : "ghost"}
+                            className={cn(
+                                "w-full min-h-11",
+                                isCollapsed ? "justify-center px-2" : "justify-start",
+                                isActive && "bg-accent"
+                            )}
+                            asChild
+                            title={isCollapsed ? `問題一覧 - ${subject.name}` : undefined}
+                        >
+                            <Link href={href}>
+                                {isCollapsed ? (
+                                    <span className="text-xs font-semibold">{subject.name.slice(0, 1)}</span>
+                                ) : (
+                                    <>
+                                        <BookOpen className="mr-2 h-4 w-4" />
+                                        <span>{`問題一覧 - ${subject.name}`}</span>
+                                    </>
+                                )}
+                            </Link>
+                        </Button>
+                    );
+                })}
             </div>
 
             <div className="p-2 border-t space-y-2">
@@ -129,8 +169,17 @@ export function AdminNav({ isCollapsed = false, onToggle }: AdminNavProps) {
     );
 }
 
-export function AdminMobileNav() {
+export function AdminMobileNav({
+    problemSubjects,
+}: {
+    problemSubjects: {
+        id: string;
+        name: string;
+    }[];
+}) {
     const pathname = usePathname();
+    const searchParams = useSearchParams();
+    const activeSubjectId = searchParams.get("subjectId");
     const [open, setOpen] = useState(false);
 
     return (
@@ -168,13 +217,37 @@ export function AdminMobileNav() {
                             <Button
                                 key={item.href}
                                 variant={isActive ? "secondary" : "ghost"}
-                                className={cn("w-full min-h-11 justify-start", isActive && "bg-gray-200")}
+                                className={cn("w-full min-h-11 justify-start", isActive && "bg-accent")}
                                 asChild
                                 onClick={() => setOpen(false)}
                             >
                                 <Link href={item.href}>
                                     <Icon className="mr-2 h-4 w-4" />
                                     {item.title}
+                                </Link>
+                            </Button>
+                        );
+                    })}
+                    {problemSubjects.length > 0 && (
+                        <div className="px-3 pt-3 text-xs font-medium text-muted-foreground">
+                            問題一覧
+                        </div>
+                    )}
+                    {problemSubjects.map((subject) => {
+                        const href = `/admin/problems?subjectId=${subject.id}`;
+                        const isActive = pathname.startsWith("/admin/problems") && activeSubjectId === subject.id;
+
+                        return (
+                            <Button
+                                key={href}
+                                variant={isActive ? "secondary" : "ghost"}
+                                className={cn("w-full min-h-11 justify-start", isActive && "bg-accent")}
+                                asChild
+                                onClick={() => setOpen(false)}
+                            >
+                                <Link href={href}>
+                                    <BookOpen className="mr-2 h-4 w-4" />
+                                    {`問題一覧 - ${subject.name}`}
                                 </Link>
                             </Button>
                         );

@@ -59,7 +59,7 @@ describe('ProblemEditor', () => {
                     id: 'problem-2',
                     question: '未設定の問題',
                     answer: null,
-                    customId: null,
+                    customId: 'M-2',
                     grade: null,
                     masterNumber: null,
                     videoUrl: null,
@@ -123,7 +123,7 @@ describe('ProblemEditor', () => {
                 id: string;
                 question: string;
                 answer: string | null;
-                customId: string | null;
+                customId: string;
                 grade: string | null;
                 masterNumber: number | null;
                 videoUrl: string | null;
@@ -136,7 +136,7 @@ describe('ProblemEditor', () => {
                 id: string;
                 question: string;
                 answer: string | null;
-                customId: string | null;
+                customId: string;
                 grade: string | null;
                 masterNumber: number | null;
                 videoUrl: string | null;
@@ -247,7 +247,7 @@ describe('ProblemEditor', () => {
                 id: string;
                 question: string;
                 answer: string | null;
-                customId: string | null;
+                customId: string;
                 grade: string | null;
                 masterNumber: number | null;
                 videoUrl: string | null;
@@ -260,7 +260,7 @@ describe('ProblemEditor', () => {
                 id: string;
                 question: string;
                 answer: string | null;
-                customId: string | null;
+                customId: string;
                 grade: string | null;
                 masterNumber: number | null;
                 videoUrl: string | null;

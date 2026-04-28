@@ -3,7 +3,7 @@
 import { prisma } from '@/lib/prisma';
 import { getSession, isTeacherOrAdmin } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
-import { GuidanceType } from '@prisma/client';
+import { GuidanceRecordStatus, GuidanceType } from '@prisma/client';
 import { normalizeOptionalSelection } from '@/lib/form-selection';
 import { z } from 'zod';
 import { addDaysToDateKey, getTodayDateKey, isValidDateKey, listDateKeysBetween, normalizeTimeZone } from '@/lib/date-key';
@@ -334,56 +334,12 @@ export async function addGuidanceRecord(userId: string, formData: FormData) {
                 content,
                 type,
                 date: new Date(dateStr),
+                status: GuidanceRecordStatus.COMPLETED,
             },
         });
 
         revalidatePath(`/teacher/students/${userId}`);
         return { success: true };
-    } catch (e) {
-        console.error(e);
-        return { error: '記録の作成に失敗しました' };
-    }
-}
-
-export async function saveGeneratedGuidanceRecord(params: {
-    studentId: string;
-    date: Date;
-    content: string;
-    type?: GuidanceType;
-}) {
-    const session = await getSession();
-    if (!isTeacherOrAdmin(session)) {
-        return { error: '権限がありません' };
-    }
-
-    if (session.role === 'TEACHER' || session.role === 'HEAD_TEACHER') {
-        const accessError = await ensureTeacherCanAccessStudent(
-            session.userId,
-            params.studentId,
-            '担当教室外の生徒です',
-        );
-        if (accessError) {
-            return { error: accessError };
-        }
-    }
-
-    try {
-        const record = await prisma.guidanceRecord.create({
-            data: {
-                studentId: params.studentId,
-                teacherId: session.userId,
-                content: params.content,
-                type: params.type ?? GuidanceType.INTERVIEW,
-                date: params.date,
-            },
-        });
-
-        revalidatePath(`/teacher/students/${params.studentId}`);
-        return {
-            success: true,
-            recordId: record.id,
-            content: record.content,
-        };
     } catch (e) {
         console.error(e);
         return { error: '記録の作成に失敗しました' };

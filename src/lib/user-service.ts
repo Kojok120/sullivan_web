@@ -20,6 +20,8 @@ export async function createUser({
                 ? 'T'
                 : role === 'HEAD_TEACHER'
                     ? 'H'
+                    : role === 'MATERIAL_AUTHOR'
+                        ? 'M'
                     : 'A';
 
     // Find the last user with this prefix to increment ID

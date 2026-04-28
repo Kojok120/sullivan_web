@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { getSessionForMobile } from '@/lib/auth-mobile';
-import { getClassroomRankingPayload, RankingServiceError } from '@/lib/classroom-ranking-service';
+import { getLegacyClassroomRankingPayload, RankingServiceError } from '@/lib/classroom-ranking-service';
 
 const querySchema = z.object({
     timeZone: z.string().optional(),
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-        const payload = await getClassroomRankingPayload({
+        const payload = await getLegacyClassroomRankingPayload({
             actorUserId: session.userId,
             actorRole: session.role,
             timeZone: parsed.data.timeZone,

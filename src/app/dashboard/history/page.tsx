@@ -59,10 +59,10 @@ export default async function HistoryPage({
 
             <HistoryFilter subjects={subjects} />
 
-            <div className="bg-white rounded-lg shadow border overflow-hidden">
+            <div className="bg-card rounded-lg border overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
-                        <thead className="bg-gray-50 text-gray-700 uppercase">
+                        <thead className="bg-muted text-muted-foreground uppercase">
                             <tr>
                                 <th className="px-6 py-3">日時</th>
                                 <th className="px-6 py-3">科目・単元</th>
@@ -80,7 +80,7 @@ export default async function HistoryPage({
                                 </tr>
                             ) : (
                                 history.items.map((item) => (
-                                    <tr key={item.id} className="border-b hover:bg-gray-50">
+                                    <tr key={item.id} className="border-b hover:bg-muted/50">
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <DateDisplay date={item.answeredAt} showTime />
                                         </td>
@@ -88,7 +88,7 @@ export default async function HistoryPage({
                                             <div className="font-medium">
                                                 {item.problem.coreProblems[0]?.subject.name || '不明'}
                                             </div>
-                                            <div className="text-xs text-gray-500">
+                                            <div className="text-xs text-muted-foreground">
                                                 {item.problem.coreProblems.map(c => c.name).join(', ')}
                                             </div>
                                         </td>
@@ -105,7 +105,7 @@ export default async function HistoryPage({
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 max-w-md">
-                                            <div className="text-xs text-gray-600 line-clamp-3 hover:line-clamp-none cursor-pointer" title={item.feedback || ''}>
+                                            <div className="text-xs text-muted-foreground line-clamp-3 hover:line-clamp-none cursor-pointer" title={item.feedback || ''}>
                                                 {item.feedback || '(フィードバックなし)'}
                                             </div>
                                             {/* Causes display if C/D? */}
@@ -118,8 +118,8 @@ export default async function HistoryPage({
                 </div>
 
                 {/* Pagination */}
-                <div className="p-4 flex items-center justify-between border-t bg-gray-50">
-                    <div className="text-sm text-gray-500">
+                <div className="p-4 flex items-center justify-between border-t bg-muted">
+                    <div className="text-sm text-muted-foreground">
                         全 {history.total} 件中 {(page - 1) * limit + 1} - {Math.min(page * limit, history.total)} 件を表示
                     </div>
                     <div className="flex gap-2">

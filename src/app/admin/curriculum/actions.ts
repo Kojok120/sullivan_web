@@ -4,12 +4,17 @@ import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { Prisma } from '@prisma/client';
 
-import { requireAdmin, getSession } from '@/lib/auth';
+import { requireAdmin, requireProblemAuthor, getSession } from '@/lib/auth';
 import type { LectureVideo } from '@/lib/lecture-videos';
+
+function revalidateCurriculumPaths() {
+    revalidatePath('/admin/curriculum');
+    revalidatePath('/materials/core-problems');
+}
 
 // --- Subjects ---
 export async function getSubjects() {
-    await requireAdmin();
+    await requireProblemAuthor();
     try {
         const { fetchSubjects } = await import('@/lib/curriculum-service');
         // Updated fetchSubjects should handle includeCoreProblems correctly without Units
@@ -70,6 +75,45 @@ function extractUniqueConstraintMessage(error: unknown): string | null {
 
 const CORE_PROBLEM_RESEQUENCE_OFFSET = 1_000_000;
 
+async function bulkUpdateCoreProblemOrdersInTransaction(
+    tx: Prisma.TransactionClient,
+    updates: Array<{ id: string; order: number }>,
+) {
+    if (updates.length === 0) {
+        return;
+    }
+
+    // 逐次 update を避けるため、VALUES テーブルでまとめて反映する。
+    await tx.$executeRaw(Prisma.sql`
+        UPDATE "CoreProblem" AS cp
+        SET "order" = next_values."order"
+        FROM (
+            VALUES ${Prisma.join(updates.map((update) => Prisma.sql`(${update.id}, ${update.order})`))}
+        ) AS next_values(id, "order")
+        WHERE cp.id = next_values.id
+    `);
+}
+
+async function bulkResequenceCoreProblemsInTransaction(
+    tx: Prisma.TransactionClient,
+    updates: Array<{ id: string; order: number; masterNumber: number }>,
+) {
+    if (updates.length === 0) {
+        return;
+    }
+
+    await tx.$executeRaw(Prisma.sql`
+        UPDATE "CoreProblem" AS cp
+        SET
+            "order" = next_values."order",
+            "masterNumber" = next_values."masterNumber"
+        FROM (
+            VALUES ${Prisma.join(updates.map((update) => Prisma.sql`(${update.id}, ${update.order}, ${update.masterNumber})`))}
+        ) AS next_values(id, "order", "masterNumber")
+        WHERE cp.id = next_values.id
+    `);
+}
+
 async function resequenceCoreProblemsInTransaction(subjectId: string, tx: Prisma.TransactionClient) {
     const orderedCoreProblems = await tx.coreProblem.findMany({
         where: { subjectId },
@@ -98,16 +142,17 @@ async function resequenceCoreProblemsInTransaction(subjectId: string, tx: Prisma
         },
     });
 
-    for (const [index, coreProblem] of orderedCoreProblems.entries()) {
-        const resequencedNumber = index + 1;
-        await tx.coreProblem.update({
-            where: { id: coreProblem.id },
-            data: {
+    await bulkResequenceCoreProblemsInTransaction(
+        tx,
+        orderedCoreProblems.map((coreProblem, index) => {
+            const resequencedNumber = index + 1;
+            return {
+                id: coreProblem.id,
                 order: resequencedNumber,
                 masterNumber: resequencedNumber,
-            },
-        });
-    }
+            };
+        }),
+    );
 }
 
 async function resequenceCoreProblemsForSubject(subjectId: string) {
@@ -142,7 +187,7 @@ export async function createCoreProblem(data: {
     order?: number;
     lectureVideos?: LectureVideo[];
 }) {
-    await requireAdmin();
+    await requireProblemAuthor();
     try {
         const coreProblem = await prisma.$transaction(async (tx) => {
             const lastCoreProblem = await tx.coreProblem.findFirst({
@@ -165,7 +210,7 @@ export async function createCoreProblem(data: {
             return created;
         });
 
-        revalidatePath('/admin/curriculum');
+        revalidateCurriculumPaths();
         return { success: true, coreProblem };
     } catch (error) {
         console.error('Failed to create core problem:', error);
@@ -178,7 +223,7 @@ export async function createCoreProblem(data: {
 }
 
 export async function updateCoreProblem(id: string, data: { name?: string; masterNumber?: number; order?: number; lectureVideos?: LectureVideo[] }) {
-    await requireAdmin();
+    await requireProblemAuthor();
     try {
         const existing = await prisma.coreProblem.findUnique({
             where: { id },
@@ -212,7 +257,7 @@ export async function updateCoreProblem(id: string, data: { name?: string; maste
             return updated;
         });
 
-        revalidatePath('/admin/curriculum');
+        revalidateCurriculumPaths();
         return { success: true, coreProblem };
     } catch (error) {
         console.error('Failed to update core problem:', error);
@@ -229,7 +274,7 @@ export async function searchCoreProblemsForBulkUpsert(
     masterNumbers: number[],
     names: string[]
 ) {
-    await requireAdmin();
+    await requireProblemAuthor();
     try {
         if (masterNumbers.length === 0 && names.length === 0) {
             return { success: true, coreProblems: [] };
@@ -266,7 +311,7 @@ export async function searchCoreProblemsForBulkUpsert(
 }
 
 export async function deleteCoreProblem(id: string) {
-    await requireAdmin();
+    await requireProblemAuthor();
     try {
         const target = await prisma.coreProblem.findUnique({
             where: { id },
@@ -281,7 +326,7 @@ export async function deleteCoreProblem(id: string) {
             await resequenceCoreProblemsInTransaction(target.subjectId, tx);
         });
 
-        revalidatePath('/admin/curriculum');
+        revalidateCurriculumPaths();
         return { success: true };
     } catch (error) {
         console.error('Failed to delete core problem:', error);
@@ -290,7 +335,7 @@ export async function deleteCoreProblem(id: string) {
 }
 
 export async function bulkDeleteCoreProblems(ids: string[]) {
-    await requireAdmin();
+    await requireProblemAuthor();
     try {
         if (ids.length === 0) return { success: true, count: 0 };
 
@@ -308,7 +353,7 @@ export async function bulkDeleteCoreProblems(ids: string[]) {
             await resequenceCoreProblemsForSubject(subjectId);
         }
 
-        revalidatePath('/admin/curriculum');
+        revalidateCurriculumPaths();
         return { success: true, count: result.count };
     } catch (error) {
         console.error('Failed to bulk delete core problems:', error);
@@ -321,7 +366,7 @@ export async function bulkCreateCoreProblems(subjectId: string, items: {
     name: string;
     lectureVideos?: LectureVideo[];
 }[]) {
-    await requireAdmin();
+    await requireProblemAuthor();
     try {
         const warnings: string[] = [];
         let skippedCount = 0;
@@ -471,7 +516,7 @@ export async function bulkCreateCoreProblems(subjectId: string, items: {
             });
         }
 
-        revalidatePath('/admin/curriculum');
+        revalidateCurriculumPaths();
         return {
             success: true,
             createdCount,
@@ -491,7 +536,7 @@ export async function bulkCreateCoreProblems(subjectId: string, items: {
 }
 
 export async function reorderCoreProblems(items: { id: string, order: number }[]) {
-    await requireAdmin();
+    await requireProblemAuthor();
     try {
         if (items.length === 0) {
             return { success: true };
@@ -508,17 +553,11 @@ export async function reorderCoreProblems(items: { id: string, order: number }[]
         const subjectId = subjectIds[0];
 
         await prisma.$transaction(async (tx) => {
-            for (const item of items) {
-                await tx.coreProblem.update({
-                    where: { id: item.id },
-                    data: { order: item.order },
-                });
-            }
-
+            await bulkUpdateCoreProblemOrdersInTransaction(tx, items);
             await resequenceCoreProblemsInTransaction(subjectId, tx);
         });
 
-        revalidatePath('/admin/curriculum');
+        revalidateCurriculumPaths();
         return { success: true };
     } catch (error) {
         console.error('Failed to reorder core problems:', error);
