@@ -253,7 +253,7 @@ describe('印刷セレクター', () => {
         const previewButton = screen.getByRole('button', { name: '主語と動詞 の講義動画プレビューを再生' });
         fireEvent.pointerDown(previewButton);
         fireEvent.click(previewButton);
-        expect(screen.getByTestId('mock-fullscreen-player')).toBeInTheDocument();
+        expect(await screen.findByTestId('mock-fullscreen-player')).toBeInTheDocument();
 
         fireEvent.click(screen.getByText('mock-close-video'));
 
@@ -299,7 +299,7 @@ describe('印刷セレクター', () => {
         const previewButton = screen.getByRole('button', { name: '主語と動詞 の講義動画プレビューを再生' });
         fireEvent.pointerDown(previewButton);
         fireEvent.click(previewButton);
-        fireEvent.click(screen.getByText('mock-end-video-0'));
+        fireEvent.click(await screen.findByText('mock-end-video-0'));
         expect(markLectureAsWatchedMock).not.toHaveBeenCalled();
 
         fireEvent.click(screen.getByText('mock-end-video-0'));

@@ -5,6 +5,7 @@ const CLOUD_PLATFORM_SCOPE = 'https://www.googleapis.com/auth/cloud-platform';
 export const DEFAULT_CLOUD_TASKS_LOCATION = 'asia-northeast1';
 export const DEFAULT_GRADING_TASK_QUEUE = 'sullivan-grading';
 export const DEFAULT_DRIVE_CHECK_TASK_QUEUE = 'sullivan-drive-check';
+export const DEFAULT_GUIDANCE_SUMMARY_TASK_QUEUE = 'sullivan-guidance-summary';
 
 type TaskPayload = Record<string, unknown>;
 

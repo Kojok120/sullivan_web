@@ -12,13 +12,13 @@ export default function ForcePasswordChangePage() {
     const [state, action, pending] = useActionState(forceUpdatePassword, undefined);
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div className="min-h-screen bg-background flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
             <div className="w-full max-w-md space-y-8">
                 <div className="text-center">
-                    <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
+                    <h2 className="mt-6 text-3xl font-extrabold text-foreground">
                         パスワードの変更が必要です
                     </h2>
-                    <p className="mt-2 text-sm text-gray-600">
+                    <p className="mt-2 text-sm text-muted-foreground">
                         セキュリティのため、初期パスワードを変更してください。<br />
                         変更するまで他の機能は利用できません。
                     </p>
@@ -39,7 +39,7 @@ export default function ForcePasswordChangePage() {
                                 label="新しいパスワード"
                                 minLength={8}
                                 autoComplete="new-password"
-                                toggleClassName="text-gray-500 hover:text-gray-700 focus-visible:ring-blue-500"
+                                toggleClassName="text-muted-foreground hover:text-foreground focus-visible:ring-ring"
                             />
                             <PasswordInputField
                                 id="confirmPassword"
@@ -47,14 +47,14 @@ export default function ForcePasswordChangePage() {
                                 label="新しいパスワード（確認）"
                                 minLength={8}
                                 autoComplete="new-password"
-                                toggleClassName="text-gray-500 hover:text-gray-700 focus-visible:ring-blue-500"
+                                toggleClassName="text-muted-foreground hover:text-foreground focus-visible:ring-ring"
                             />
 
                             {state?.error && (
                                 <p className="text-sm text-red-500 font-medium">{state.error}</p>
                             )}
 
-                            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={pending}>
+                            <Button type="submit" className="w-full" disabled={pending}>
                                 {pending ? '変更中...' : 'パスワードを変更して利用開始'}
                             </Button>
                         </form>
@@ -63,7 +63,7 @@ export default function ForcePasswordChangePage() {
 
                 <div className="text-center">
                     <form action={logoutAction}>
-                        <Button variant="ghost" className="text-sm text-gray-500 hover:text-gray-700">
+                        <Button variant="ghost" className="text-sm text-muted-foreground hover:text-foreground">
                             <LogOut className="mr-2 h-4 w-4" />
                             今はログアウトする
                         </Button>

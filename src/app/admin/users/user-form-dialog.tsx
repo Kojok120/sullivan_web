@@ -26,6 +26,7 @@ import { NONE_SELECTION_VALUE, normalizeOptionalSelection } from '@/lib/form-sel
 import type { ClassroomOption, GroupOption } from '@/lib/types/classroom';
 import { DEFAULT_INITIAL_PASSWORD } from '@/lib/auth-constants';
 import { toast } from 'sonner';
+import { ROLE_OPTIONS } from '@/lib/role-display';
 
 type UserWithGroup = User;
 
@@ -154,11 +155,9 @@ function UserFormDialogContent({
                             <SelectValue placeholder="役割を選択" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="STUDENT">生徒 (Student)</SelectItem>
-                            <SelectItem value="TEACHER">講師 (Teacher)</SelectItem>
-                            <SelectItem value="HEAD_TEACHER">校舎長 (Head Teacher)</SelectItem>
-                            <SelectItem value="PARENT">保護者 (Parent)</SelectItem>
-                            <SelectItem value="ADMIN">管理者 (Admin)</SelectItem>
+                            {ROLE_OPTIONS.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                            ))}
                         </SelectContent>
                     </Select>
                 </div>

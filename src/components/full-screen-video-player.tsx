@@ -157,7 +157,7 @@ function FullScreenVideoPlayerContent({
             <DialogHeader className="absolute top-4 left-20 right-4 z-10 bg-black/50 p-2 rounded text-white overflow-hidden flex flex-row justify-between items-start pointer-events-none">
                 <div className="flex flex-col overflow-hidden mr-2">
                     <DialogTitle className="text-white truncate text-left">{currentVideo.title}</DialogTitle>
-                    <DialogDescription className="text-gray-300 text-left">
+                    <DialogDescription className="text-white/60 text-left">
                         {playlist.length > 1 ? `${currentIndex + 1} / ${playlist.length}` : "動画を見て理解を深めましょう。"}
                     </DialogDescription>
                 </div>

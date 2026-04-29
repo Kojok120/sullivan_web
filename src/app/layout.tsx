@@ -1,39 +1,61 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
+import { Inter, Noto_Sans_JP } from "next/font/google";
+import { GeistMono } from "geist/font/mono";
 import "./globals.css";
+import 'katex/dist/katex.min.css';
 import { Toaster } from "@/components/ui/sonner";
 import { MainNav } from "@/components/main-nav";
-import { GradingNotifier } from "@/components/grading-notifier";
-import { LevelUpModal } from "@/components/gamification/level-up-modal";
+import { StudentRealtimeEvents } from "@/components/student-realtime-events";
+import { getSession } from "@/lib/auth";
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
+const notoSansJP = Noto_Sans_JP({
+  subsets: ["latin"],
+  variable: "--font-noto-sans-jp",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Sullivan",
   description: "Sullivan Learning System",
 };
 
-import { getSession } from "@/lib/auth";
-
-// ... imports
+function shouldRenderGlobalChrome(pathname: string) {
+  return !(
+    pathname.startsWith("/admin")
+    || pathname.startsWith("/materials")
+    || pathname.startsWith("/login")
+    || pathname.startsWith("/signup")
+  );
+}
 
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const session = await getSession();
+  const requestHeaders = await headers();
+  const pathname = requestHeaders.get("x-pathname") ?? "";
+  const chromeEnabledByPath = pathname === "" ? true : shouldRenderGlobalChrome(pathname);
+  const session = chromeEnabledByPath ? await getSession() : null;
+  const shouldRenderMainNav = chromeEnabledByPath && session?.role !== "MATERIAL_AUTHOR";
 
   return (
-    <html lang="en">
+    <html lang="ja" className={`${inter.variable} ${notoSansJP.variable} ${GeistMono.variable}`}>
       <body
         className="antialiased"
         suppressHydrationWarning
       >
-        <MainNav role={session?.role} />
+        {shouldRenderMainNav ? <MainNav role={session?.role} /> : null}
         {children}
-        {session && session.role === 'STUDENT' && (
-          <>
-            <GradingNotifier />
-            <LevelUpModal />
-          </>
+        {chromeEnabledByPath && session?.role === 'STUDENT' && (
+          <StudentRealtimeEvents />
         )}
         <Toaster />
       </body>

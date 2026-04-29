@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
     problemFindManyMock,
-    requireAdminMock,
+    requireProblemAuthorMock,
     getSessionMock,
     revalidatePathMock,
 } = vi.hoisted(() => ({
     problemFindManyMock: vi.fn(),
-    requireAdminMock: vi.fn(),
+    requireProblemAuthorMock: vi.fn(),
     getSessionMock: vi.fn(),
     revalidatePathMock: vi.fn(),
 }));
@@ -21,7 +21,7 @@ vi.mock('@/lib/prisma', () => ({
 }));
 
 vi.mock('@/lib/auth', () => ({
-    requireAdmin: requireAdminMock,
+    requireProblemAuthor: requireProblemAuthorMock,
     getSession: getSessionMock,
 }));
 
@@ -34,7 +34,7 @@ import { getProblemsByCoreProblem } from './actions';
 describe('curriculum actions', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        requireAdminMock.mockResolvedValue(undefined);
+        requireProblemAuthorMock.mockResolvedValue(undefined);
     });
 
     describe('getProblemsByCoreProblem', () => {
@@ -63,7 +63,7 @@ describe('curriculum actions', () => {
 
             const result = await getProblemsByCoreProblem('cp-1');
 
-            expect(requireAdminMock).toHaveBeenCalledOnce();
+            expect(requireProblemAuthorMock).toHaveBeenCalledOnce();
             expect(problemFindManyMock).toHaveBeenCalledWith({
                 where: {
                     coreProblems: {
@@ -103,7 +103,7 @@ describe('curriculum actions', () => {
 
                 const result = await getProblemsByCoreProblem('cp-1');
 
-                expect(requireAdminMock).toHaveBeenCalledOnce();
+                expect(requireProblemAuthorMock).toHaveBeenCalledOnce();
                 expect(result).toEqual({ success: false, error: '問題の取得に失敗しました' });
             } finally {
                 consoleErrorSpy.mockRestore();

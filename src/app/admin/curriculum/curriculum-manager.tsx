@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Subject, CoreProblem } from '@prisma/client';
 import { CoreProblemList } from './components/core-problem-list';
 import { CoreProblemBulkImport } from './components/core-problem-bulk-import';
 import { ProblemEditor } from './components/problem-editor';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
+import { ResizableSplit } from '@/components/ui/resizable-split';
 
 // Type definitions including relations
 type SubjectWithRelations = Subject & {
@@ -18,32 +19,24 @@ interface CurriculumManagerProps {
 }
 
 export function CurriculumManager({ initialSubjects }: CurriculumManagerProps) {
-    const [subjects, setSubjects] = useState(initialSubjects);
-    const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(subjects[0]?.id || null);
-    const [selectedCoreProblemId, setSelectedCoreProblemId] = useState<string | null>(null);
-    const [mobilePane, setMobilePane] = useState<'core' | 'problems'>('core');
+    const [rawSelectedSubjectId, setRawSelectedSubjectId] = useState<string | null>(() => initialSubjects[0]?.id || null);
+    const [rawSelectedCoreProblemId, setRawSelectedCoreProblemId] = useState<string | null>(null);
+    const [rawMobilePane, setRawMobilePane] = useState<'core' | 'problems'>('core');
 
-    // Sync state with props when server action updates data
-    useEffect(() => {
-        setSubjects(initialSubjects);
-    }, [initialSubjects]);
+    const selectedSubjectId = rawSelectedSubjectId && initialSubjects.some((subject) => subject.id === rawSelectedSubjectId)
+        ? rawSelectedSubjectId
+        : initialSubjects[0]?.id || null;
+    const selectedSubject = initialSubjects.find((subject) => subject.id === selectedSubjectId) || null;
+    const selectedCoreProblemId = selectedSubject?.coreProblems.some((coreProblem) => coreProblem.id === rawSelectedCoreProblemId)
+        ? rawSelectedCoreProblemId
+        : null;
+    const mobilePane = selectedCoreProblemId ? rawMobilePane : 'core';
 
-    const selectedSubject = subjects.find(s => s.id === selectedSubjectId) || null;
-
-    // When subject changes, reset core problem selection or select the first one?
-    // Let's select null for now to be safe, or maybe the first one for convenience.
-    useEffect(() => {
-        const activeSubject = subjects.find((s) => s.id === selectedSubjectId) || null;
-        if (activeSubject && activeSubject.coreProblems.length > 0) {
-            // Optional: Auto-select first core problem?
-            // setSelectedCoreProblemId(selectedSubject.coreProblems[0].id);
-            setSelectedCoreProblemId(null);
-            setMobilePane('core');
-        } else {
-            setSelectedCoreProblemId(null);
-            setMobilePane('core');
-        }
-    }, [selectedSubjectId, subjects]);
+    const handleSubjectChange = (subjectId: string) => {
+        setRawSelectedSubjectId(subjectId);
+        setRawSelectedCoreProblemId(null);
+        setRawMobilePane('core');
+    };
 
     return (
         <div className="flex min-h-[calc(100dvh-8rem)] flex-col gap-4 md:h-[calc(100vh-10rem)]">
@@ -52,12 +45,12 @@ export function CurriculumManager({ initialSubjects }: CurriculumManagerProps) {
                 <h2 className="whitespace-nowrap font-semibold">科目選択:</h2>
                 <Tabs
                     value={selectedSubjectId || ''}
-                    onValueChange={(val) => setSelectedSubjectId(val)}
+                    onValueChange={handleSubjectChange}
                     className="w-full"
                 >
                     <div className="overflow-x-auto pb-1">
                         <TabsList className="w-max min-w-full md:min-w-0">
-                        {subjects.map(subject => (
+                        {initialSubjects.map(subject => (
                             <TabsTrigger key={subject.id} value={subject.id} className="px-4">
                                 {subject.name}
                             </TabsTrigger>
@@ -71,14 +64,14 @@ export function CurriculumManager({ initialSubjects }: CurriculumManagerProps) {
                 <Button
                     variant={mobilePane === 'core' ? 'default' : 'outline'}
                     className="min-h-11 flex-1"
-                    onClick={() => setMobilePane('core')}
+                    onClick={() => setRawMobilePane('core')}
                 >
                     CoreProblem一覧
                 </Button>
                 <Button
                     variant={mobilePane === 'problems' ? 'default' : 'outline'}
                     className="min-h-11 flex-1"
-                    onClick={() => setMobilePane('problems')}
+                    onClick={() => setRawMobilePane('problems')}
                     disabled={!selectedCoreProblemId}
                 >
                     問題一覧
@@ -105,8 +98,8 @@ export function CurriculumManager({ initialSubjects }: CurriculumManagerProps) {
                                     coreProblems={selectedSubject.coreProblems}
                                     selectedId={selectedCoreProblemId}
                                     onSelect={(id) => {
-                                        setSelectedCoreProblemId(id);
-                                        if (id) setMobilePane('problems');
+                                        setRawSelectedCoreProblemId(id);
+                                        if (id) setRawMobilePane('problems');
                                     }}
                                 />
                             ) : (
@@ -117,7 +110,7 @@ export function CurriculumManager({ initialSubjects }: CurriculumManagerProps) {
                         </div>
                     </div>
                 ) : (
-                    <div className="h-full overflow-hidden rounded-lg border bg-card shadow-sm">
+                    <div className="h-full overflow-hidden rounded-lg border bg-card">
                         {selectedCoreProblemId ? (
                             <ProblemEditor coreProblemId={selectedCoreProblemId} />
                         ) : (
@@ -130,44 +123,51 @@ export function CurriculumManager({ initialSubjects }: CurriculumManagerProps) {
             </div>
 
             {/* Desktop Content: 2 Columns */}
-            <div className="hidden flex-1 overflow-hidden gap-6 md:grid md:grid-cols-12">
-                {/* Left Pane: Core Problems */}
-                <div className="col-span-3 border rounded-lg bg-muted/10 flex flex-col overflow-hidden">
-                    <div className="p-3 border-b bg-muted/20 font-semibold text-sm flex justify-between items-center">
-                        <div className="flex items-center gap-2">
-                            <span>単元・コア問題</span>
-                            {selectedSubject && <CoreProblemBulkImport subjectId={selectedSubject.id} />}
-                        </div>
-                        <span className="text-xs font-normal text-muted-foreground">
-                            {selectedSubject?.coreProblems.length || 0}件
-                        </span>
-                    </div>
-                    <div className="flex-1 overflow-y-auto p-2">
-                        {selectedSubject ? (
-                            <CoreProblemList
-                                subjectId={selectedSubject.id}
-                                coreProblems={selectedSubject.coreProblems}
-                                selectedId={selectedCoreProblemId}
-                                onSelect={(id) => setSelectedCoreProblemId(id)}
-                            />
-                        ) : (
-                            <div className="p-4 text-center text-muted-foreground text-sm">
-                                科目を選択してください
+            <div className="hidden flex-1 overflow-hidden md:block">
+                <ResizableSplit
+                    storageKey="curriculum-manager-split"
+                    defaultLeftPercent={25}
+                    minLeftPercent={15}
+                    maxLeftPercent={60}
+                    left={
+                        <div className="border rounded-lg bg-muted/10 flex h-full flex-col overflow-hidden">
+                            <div className="p-3 border-b bg-muted/20 font-semibold text-sm flex justify-between items-center">
+                                <div className="flex items-center gap-2">
+                                    <span>単元・コア問題</span>
+                                    {selectedSubject && <CoreProblemBulkImport subjectId={selectedSubject.id} />}
+                                </div>
+                                <span className="text-xs font-normal text-muted-foreground">
+                                    {selectedSubject?.coreProblems.length || 0}件
+                                </span>
                             </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Right Pane: Problems */}
-                <div className="col-span-9 border rounded-lg bg-card flex flex-col overflow-hidden shadow-sm">
-                    {selectedCoreProblemId ? (
-                        <ProblemEditor coreProblemId={selectedCoreProblemId} />
-                    ) : (
-                        <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                            <p>左側のリストからCoreProblemを選択して、問題を表示・編集してください</p>
+                            <div className="flex-1 overflow-y-auto p-2">
+                                {selectedSubject ? (
+                                    <CoreProblemList
+                                        subjectId={selectedSubject.id}
+                                        coreProblems={selectedSubject.coreProblems}
+                                        selectedId={selectedCoreProblemId}
+                                        onSelect={(id) => setRawSelectedCoreProblemId(id)}
+                                    />
+                                ) : (
+                                    <div className="p-4 text-center text-muted-foreground text-sm">
+                                        科目を選択してください
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    )}
-                </div>
+                    }
+                    right={
+                        <div className="border rounded-lg bg-card flex h-full flex-col overflow-hidden">
+                            {selectedCoreProblemId ? (
+                                <ProblemEditor coreProblemId={selectedCoreProblemId} />
+                            ) : (
+                                <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                                    <p>左側のリストからCoreProblemを選択して、問題を表示・編集してください</p>
+                                </div>
+                            )}
+                        </div>
+                    }
+                />
             </div>
         </div>
     );

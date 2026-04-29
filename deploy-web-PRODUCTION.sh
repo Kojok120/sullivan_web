@@ -126,6 +126,7 @@ WARM_STOP_JOB_NAME="sullivan-app-warm-stop"
 DRIVE_RENEW_JOB_NAME="sullivan-drive-watch-renew"
 GRADING_TASK_QUEUE="${GRADING_TASK_QUEUE:-sullivan-grading}"
 DRIVE_CHECK_TASK_QUEUE="${DRIVE_CHECK_TASK_QUEUE:-sullivan-drive-check}"
+GUIDANCE_SUMMARY_TASK_QUEUE="${GUIDANCE_SUMMARY_TASK_QUEUE:-sullivan-guidance-summary}"
 GEMINI_MODEL="${GEMINI_MODEL:-gemini-3.1-pro-preview}"
 GEMINI_CHAT_MODEL="${GEMINI_CHAT_MODEL:-gemini-3.1-pro-preview}"
 GEMINI_CHAT_FALLBACK_MODEL="${GEMINI_CHAT_FALLBACK_MODEL:-$GEMINI_CHAT_MODEL}"
@@ -164,6 +165,7 @@ if [ "$SKIP_INFRA_SETUP" != "1" ]; then
   ensure_gcp_service_enabled "cloudtasks.googleapis.com"
   upsert_task_queue "$GRADING_TASK_QUEUE"
   upsert_task_queue "$DRIVE_CHECK_TASK_QUEUE"
+  upsert_task_queue "$GUIDANCE_SUMMARY_TASK_QUEUE"
 fi
 
 ensure_secret_exists "$GEMINI_API_KEY_SECRET_NAME"
@@ -198,7 +200,7 @@ gcloud run deploy "$SERVICE_NAME" \
   --cpu 2 \
   --min 0 \
   --concurrency 4 \
-  --timeout 120s \
+  --timeout 300s \
   --quiet \
   --allow-unauthenticated \
   --set-env-vars "BIND_HOST=0.0.0.0" \
@@ -219,6 +221,7 @@ gcloud run deploy "$SERVICE_NAME" \
   --set-env-vars "CLOUD_TASKS_LOCATION=$CLOUD_TASKS_LOCATION" \
   --set-env-vars "GRADING_TASK_QUEUE=$GRADING_TASK_QUEUE" \
   --set-env-vars "DRIVE_CHECK_TASK_QUEUE=$DRIVE_CHECK_TASK_QUEUE" \
+  --set-env-vars "GUIDANCE_SUMMARY_TASK_QUEUE=$GUIDANCE_SUMMARY_TASK_QUEUE" \
   --set-env-vars "CLOUD_TASKS_CALLER_SERVICE_ACCOUNT=$CLOUD_TASKS_CALLER_SERVICE_ACCOUNT" \
   --set-env-vars "RUNTIME_SA_EMAIL=$RUNTIME_SA_EMAIL" \
   --set-env-vars "NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL" \
