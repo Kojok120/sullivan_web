@@ -57,3 +57,6 @@ next-env.d.ts
 
 # 数学の問題格納
 /math_problems_originals/*
+
+# DB ダンプ（誤コミット防止）
+*.dump
