@@ -1,4 +1,4 @@
-import { isVideoStatusValue } from '@/lib/problem-ui';
+import { isProblemStatusValue, isVideoStatusValue } from '@/lib/problem-ui';
 
 import { getProblems, getProblemSubjects } from './actions';
 import { ProblemManager } from './problem-manager';
@@ -57,7 +57,7 @@ export default async function ProblemsPage({
             videoStatus: isVideoStatusValue(params.videoStatus) ? params.videoStatus : undefined,
             problemType: params.problemType,
             contentFormat: params.contentFormat,
-            status: params.status,
+            status: isProblemStatusValue(params.status) ? params.status : undefined,
         },
         normalizedSortBy,
         sortOrder

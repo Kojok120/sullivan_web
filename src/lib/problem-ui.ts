@@ -17,8 +17,13 @@ export const PROBLEM_TYPE_VALUES = PROBLEM_TYPE_OPTIONS.map((option) => option.v
 export const PROBLEM_STATUS_OPTIONS = [
     { value: 'DRAFT', label: '下書き' },
     { value: 'PUBLISHED', label: '公開中' },
+    { value: 'SENT_BACK', label: '差し戻し' },
     { value: 'ARCHIVED', label: '保管' },
 ] as const satisfies ReadonlyArray<Option<string>>;
+
+export const PROBLEM_STATUS_VALUES = PROBLEM_STATUS_OPTIONS.map((option) => option.value);
+
+export type ProblemStatusValue = (typeof PROBLEM_STATUS_OPTIONS)[number]['value'];
 
 export const CONTENT_FORMAT_OPTIONS = [
     { value: 'PLAIN_TEXT', label: '通常テキスト' },
@@ -111,6 +116,10 @@ export function getVideoStatusLabel(value: string | null | undefined) {
 
 export function isVideoStatusValue(value: unknown): value is VideoStatusValue {
     return typeof value === 'string' && (VIDEO_STATUS_VALUES as readonly string[]).includes(value);
+}
+
+export function isProblemStatusValue(value: unknown): value is ProblemStatusValue {
+    return typeof value === 'string' && (PROBLEM_STATUS_VALUES as readonly string[]).includes(value);
 }
 
 export function resolveVideoStatusFromUrl(

@@ -46,6 +46,7 @@ import {
     previewProblemPrint,
     publishProblemRevision,
     syncProblemAuthoringArtifacts,
+    updateProblemStatus,
     uploadProblemAsset,
 } from './actions';
 import {
@@ -599,18 +600,35 @@ export function ProblemEditorClient({
     };
 
     const handlePublish = () => {
+        startTransition(async () => {
+            const persisted = await persistDraftState({ showSuccessToast: false });
+            if (!persisted) {
+                return;
+            }
+
+            const result = await publishProblemRevision(persisted.problemId);
+            if (result.success) {
+                toast.success('公開しました');
+                router.refresh();
+            } else {
+                toast.error(result.error || '公開に失敗しました');
+            }
+        });
+    };
+
+    const handleSendBack = () => {
         if (!state.problemId) {
             toast.error('先に下書きを保存してください');
             return;
         }
 
         startTransition(async () => {
-            const result = await publishProblemRevision(state.problemId);
+            const result = await updateProblemStatus(state.problemId, 'SENT_BACK');
             if (result.success) {
-                toast.success('公開しました');
+                toast.success('差し戻しに変更しました');
                 router.refresh();
             } else {
-                toast.error(result.error || '公開に失敗しました');
+                toast.error(result.error || '差し戻しに失敗しました');
             }
         });
     };
@@ -682,7 +700,7 @@ export function ProblemEditorClient({
                 </div>
                 <div className="flex flex-wrap gap-2">
                     <Button variant="outline" asChild>
-                        <Link href={routeBase}>一覧へ戻る</Link>
+                        <Link href={state.subjectId ? `${routeBase}?subjectId=${state.subjectId}` : routeBase}>一覧へ戻る</Link>
                     </Button>
                     <Button variant="outline" onClick={handlePreview} disabled={isPending || !state.problemId}>
                         プレビュー
@@ -690,7 +708,10 @@ export function ProblemEditorClient({
                     <Button variant="outline" onClick={handleSave} disabled={isPending}>
                         下書き保存
                     </Button>
-                    <Button onClick={handlePublish} disabled={isPending || !state.problemId}>
+                    <Button variant="outline" onClick={handleSendBack} disabled={isPending || !state.problemId}>
+                        差し戻し
+                    </Button>
+                    <Button onClick={handlePublish} disabled={isPending}>
                         公開
                     </Button>
                 </div>

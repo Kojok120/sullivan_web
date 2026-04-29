@@ -2,7 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 import { getProblemSubjects, getProblems } from '@/app/admin/problems/actions';
 import { ProblemManager } from '@/app/admin/problems/problem-manager';
 import { buildProblemListUiPolicy, normalizeProblemSortBy } from '@/app/admin/problems/problem-list-policy';
-import { isVideoStatusValue } from '@/lib/problem-ui';
+import { isProblemStatusValue, isVideoStatusValue } from '@/lib/problem-ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,7 +66,7 @@ export default async function MaterialsProblemsPage({
             videoStatus: isVideoStatusValue(params.videoStatus) ? params.videoStatus : undefined,
             problemType: params.problemType,
             contentFormat: params.contentFormat,
-            status: params.status,
+            status: isProblemStatusValue(params.status) ? params.status : undefined,
         },
         normalizeProblemSortBy(sortBy, currentSubject.name),
         sortOrder,

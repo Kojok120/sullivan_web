@@ -22,13 +22,24 @@ vi.mock('sonner', () => ({
     },
 }));
 
+const {
+    createProblemDraftMock,
+    publishProblemRevisionMock,
+    updateProblemStatusMock,
+} = vi.hoisted(() => ({
+    createProblemDraftMock: vi.fn(),
+    publishProblemRevisionMock: vi.fn(),
+    updateProblemStatusMock: vi.fn(),
+}));
+
 vi.mock('./actions', () => ({
-    createProblemDraft: vi.fn(),
+    createProblemDraft: createProblemDraftMock,
     deleteProblemAsset: vi.fn(),
     generateProblemFigureDraft: vi.fn(),
     previewProblemPrint: vi.fn(),
-    publishProblemRevision: vi.fn(),
+    publishProblemRevision: publishProblemRevisionMock,
     syncProblemAuthoringArtifacts: vi.fn(),
+    updateProblemStatus: updateProblemStatusMock,
     uploadProblemAsset: vi.fn(),
 }));
 
@@ -205,5 +216,83 @@ describe('ProblemEditorClient', () => {
         fireEvent.change(acceptedAnswersTextarea, { target: { value: '["abc"' } });
 
         expect(screen.getByTestId('answer-spec-accepted-preview-error')).toBeInTheDocument();
+    });
+
+    it('一覧へ戻るリンクは編集中科目の subjectId をクエリで保持する', () => {
+        render(
+            <ProblemEditorClient
+                problem={mathProblem as never}
+                subjects={[{ id: 'subject-math', name: '数学' }]}
+                coreProblems={[{ id: 'core-1', name: '一次方程式', subjectId: 'subject-math', subject: { name: '数学' } }]}
+                initialSubjectId="subject-math"
+                routeBase="/admin/problems"
+            />,
+        );
+
+        expect(screen.getByRole('link', { name: '一覧へ戻る' })).toHaveAttribute(
+            'href',
+            '/admin/problems?subjectId=subject-math',
+        );
+    });
+
+    it('差し戻しボタンは updateProblemStatus(SENT_BACK) を呼ぶ', async () => {
+        updateProblemStatusMock.mockResolvedValueOnce({ success: true, status: 'SENT_BACK' });
+
+        render(
+            <ProblemEditorClient
+                problem={baseProblem as never}
+                subjects={[{ id: 'subject-1', name: '英語' }]}
+                coreProblems={[{ id: 'core-1', name: '現在完了', subjectId: 'subject-1', subject: { name: '英語' } }]}
+                initialSubjectId="subject-1"
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '差し戻し' }));
+
+        await vi.waitFor(() => {
+            expect(updateProblemStatusMock).toHaveBeenCalledWith('problem-1', 'SENT_BACK');
+        });
+    });
+
+    it('公開ボタンは createProblemDraft 後に publishProblemRevision を呼ぶ', async () => {
+        const simpleProblem = {
+            ...baseProblem,
+            problemType: 'SHORT_TEXT',
+            revisions: [{
+                ...baseProblem.revisions[0],
+                authoringTool: 'MANUAL',
+                structuredContent: {
+                    version: 1,
+                    blocks: [
+                        { id: 'p1', type: 'paragraph', text: '簡単な問題。' },
+                    ],
+                },
+            }],
+        } as const;
+
+        createProblemDraftMock.mockResolvedValueOnce({
+            success: true,
+            problemId: 'problem-1',
+            revisionId: 'revision-1',
+        });
+        publishProblemRevisionMock.mockResolvedValueOnce({ success: true });
+
+        render(
+            <ProblemEditorClient
+                problem={simpleProblem as never}
+                subjects={[{ id: 'subject-1', name: '英語' }]}
+                coreProblems={[{ id: 'core-1', name: '現在完了', subjectId: 'subject-1', subject: { name: '英語' } }]}
+                initialSubjectId="subject-1"
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '公開' }));
+
+        await vi.waitFor(() => {
+            expect(createProblemDraftMock).toHaveBeenCalled();
+            expect(publishProblemRevisionMock).toHaveBeenCalledWith('problem-1');
+        });
+        expect(createProblemDraftMock.mock.invocationCallOrder[0])
+            .toBeLessThan(publishProblemRevisionMock.mock.invocationCallOrder[0]);
     });
 });

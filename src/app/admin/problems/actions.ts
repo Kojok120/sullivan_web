@@ -9,7 +9,13 @@ import { figureGenerationTargetSchema, type FigureGenerationTarget, isAiFigureGe
 import { prisma } from '@/lib/prisma';
 import { getNextCustomId } from '@/lib/curriculum-service';
 import { deleteProblemsWithRelations, bulkUpsertProblemsCore, createProblemCore } from '@/lib/problem-service';
-import { isVideoStatusValue, resolveVideoStatusFromUrl, type VideoStatusValue } from '@/lib/problem-ui';
+import {
+    isProblemStatusValue,
+    isVideoStatusValue,
+    resolveVideoStatusFromUrl,
+    type ProblemStatusValue,
+    type VideoStatusValue,
+} from '@/lib/problem-ui';
 import {
     buildDefaultStructuredDraft,
     deriveLegacyFieldsFromStructuredData,
@@ -1071,6 +1077,28 @@ export async function deleteProblemAsset(assetId: string) {
     } catch (error) {
         console.error('Failed to delete problem asset:', error);
         return { error: 'アセットの削除に失敗しました' };
+    }
+}
+
+export async function updateProblemStatus(id: string, status: ProblemStatusValue) {
+    await requireProblemAuthor();
+
+    try {
+        if (!isProblemStatusValue(status)) {
+            return { error: '不正なステータスです' };
+        }
+
+        const problem = await prisma.problem.update({
+            where: { id },
+            data: { status },
+            select: { id: true, status: true },
+        });
+
+        revalidateProblemPaths(id);
+        return { success: true, status: problem.status as ProblemStatusValue };
+    } catch (error) {
+        console.error('Failed to update problem status:', error);
+        return { error: 'ステータスの更新に失敗しました' };
     }
 }
 

@@ -78,6 +78,7 @@ enum ProblemContentFormat {
 enum ProblemStatus {
   DRAFT
   PUBLISHED
+  SENT_BACK
   ARCHIVED
 }
 
