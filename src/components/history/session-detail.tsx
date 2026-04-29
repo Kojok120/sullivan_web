@@ -17,7 +17,7 @@ import { prisma } from "@/lib/prisma";
 import { canUseAiTutor } from "@/lib/plan-entitlements";
 import { SessionReviewTracker } from "@/components/history/session-review-tracker";
 import { getSession } from "@/lib/auth";
-import { renderProblemTextHtml } from "@/lib/problem-text";
+import { ProblemTextPreview } from "@/app/admin/problems/components/problem-text-preview";
 
 type SessionDetailProps = {
     groupId: string;
@@ -152,10 +152,9 @@ export async function SessionDetail({
                                     <div>
                                         <span className="font-semibold block mb-1">正解:</span>
                                         {item.problem.answer ? (
-                                            <div
-                                                className="bg-white p-2 rounded border text-lg min-h-[40px] text-green-700"
-                                                dangerouslySetInnerHTML={{ __html: renderProblemTextHtml(item.problem.answer) }}
-                                            />
+                                            <div className="text-green-700">
+                                                <ProblemTextPreview text={item.problem.answer} />
+                                            </div>
                                         ) : (
                                             <div className="bg-white p-2 rounded border text-lg min-h-[40px] text-green-700">
                                                 （正答なし）

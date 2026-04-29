@@ -171,4 +171,39 @@ describe('ProblemEditorClient', () => {
         expect(screen.queryByRole('tab', { name: '採点' })).not.toBeInTheDocument();
         expect(screen.queryByText('採点監査')).not.toBeInTheDocument();
     });
+
+    it('解答仕様タブに正解/別解のプレビュー欄を表示する', () => {
+        render(
+            <ProblemEditorClient
+                problem={baseProblem as never}
+                subjects={[{ id: 'subject-1', name: '英語' }]}
+                coreProblems={[{ id: 'core-1', name: '現在完了', subjectId: 'subject-1', subject: { name: '英語' } }]}
+                initialSubjectId="subject-1"
+            />,
+        );
+
+        fireEvent.mouseDown(screen.getByRole('tab', { name: '解答仕様' }), { button: 0 });
+
+        expect(screen.getByText('正解プレビュー')).toBeInTheDocument();
+        expect(screen.getByText('別解プレビュー')).toBeInTheDocument();
+    });
+
+    it('別解JSONが不正なときはエラー表示が出る', () => {
+        render(
+            <ProblemEditorClient
+                problem={baseProblem as never}
+                subjects={[{ id: 'subject-1', name: '英語' }]}
+                coreProblems={[{ id: 'core-1', name: '現在完了', subjectId: 'subject-1', subject: { name: '英語' } }]}
+                initialSubjectId="subject-1"
+            />,
+        );
+
+        fireEvent.mouseDown(screen.getByRole('tab', { name: '解答仕様' }), { button: 0 });
+
+        const acceptedAnswersTextarea = screen.getByPlaceholderText('["別解1", "別解2"]');
+
+        fireEvent.change(acceptedAnswersTextarea, { target: { value: '["abc"' } });
+
+        expect(screen.getByTestId('answer-spec-accepted-preview-error')).toBeInTheDocument();
+    });
 });
