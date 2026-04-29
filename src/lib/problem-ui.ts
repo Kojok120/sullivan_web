@@ -17,8 +17,13 @@ export const PROBLEM_TYPE_VALUES = PROBLEM_TYPE_OPTIONS.map((option) => option.v
 export const PROBLEM_STATUS_OPTIONS = [
     { value: 'DRAFT', label: '下書き' },
     { value: 'PUBLISHED', label: '公開中' },
+    { value: 'SENT_BACK', label: '差し戻し' },
     { value: 'ARCHIVED', label: '保管' },
 ] as const satisfies ReadonlyArray<Option<string>>;
+
+export const PROBLEM_STATUS_VALUES = PROBLEM_STATUS_OPTIONS.map((option) => option.value);
+
+export type ProblemStatusValue = (typeof PROBLEM_STATUS_OPTIONS)[number]['value'];
 
 export const CONTENT_FORMAT_OPTIONS = [
     { value: 'PLAIN_TEXT', label: '通常テキスト' },
@@ -61,6 +66,17 @@ export const ASSET_SOURCE_TOOL_OPTIONS = [
     { value: 'UPLOAD', label: 'ファイル取込' },
 ] as const satisfies ReadonlyArray<Option<string>>;
 
+export const VIDEO_STATUS_OPTIONS = [
+    { value: 'NONE', label: '-' },
+    { value: 'SHOT', label: '撮影完了' },
+    { value: 'UPLOADED', label: 'Drive完了' },
+    { value: 'CONFIGURED', label: '設定済み' },
+] as const satisfies ReadonlyArray<Option<string>>;
+
+export const VIDEO_STATUS_VALUES = VIDEO_STATUS_OPTIONS.map((option) => option.value);
+
+export type VideoStatusValue = (typeof VIDEO_STATUS_OPTIONS)[number]['value'];
+
 function getOptionLabel(options: ReadonlyArray<Option<string>>, value: string | null | undefined, fallback = '-'): string {
     if (!value) return fallback;
     return options.find((option) => option.value === value)?.label ?? value;
@@ -92,6 +108,29 @@ export function getAssetKindLabel(value: string | null | undefined) {
 
 export function getAssetSourceToolLabel(value: string | null | undefined) {
     return getOptionLabel(ASSET_SOURCE_TOOL_OPTIONS, value);
+}
+
+export function getVideoStatusLabel(value: string | null | undefined) {
+    return getOptionLabel(VIDEO_STATUS_OPTIONS, value);
+}
+
+export function isVideoStatusValue(value: unknown): value is VideoStatusValue {
+    return typeof value === 'string' && (VIDEO_STATUS_VALUES as readonly string[]).includes(value);
+}
+
+export function isProblemStatusValue(value: unknown): value is ProblemStatusValue {
+    return typeof value === 'string' && (PROBLEM_STATUS_VALUES as readonly string[]).includes(value);
+}
+
+export function resolveVideoStatusFromUrl(
+    desiredStatus: VideoStatusValue | undefined,
+    videoUrl: string | null | undefined,
+): VideoStatusValue {
+    const hasUrl = typeof videoUrl === 'string' && videoUrl.trim() !== '';
+    if (hasUrl) return 'CONFIGURED';
+    if (!desiredStatus) return 'NONE';
+    if (desiredStatus === 'CONFIGURED') return 'UPLOADED';
+    return desiredStatus;
 }
 
 export function getAvailableAuthoringTools(problemType: string) {

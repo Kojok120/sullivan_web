@@ -50,7 +50,7 @@ describe('selectProblemsForPrint', () => {
                 order: true,
                 userStates: {
                     where: { userId: 'user-1' },
-                    select: { lastAnsweredAt: true },
+                    select: { lastAnsweredAt: true, isCleared: true },
                     take: 1,
                 },
             },

@@ -56,6 +56,9 @@
 - [ ] **Supabase Realtime (通知)**
     - Realtime用のPostgres Replicationを有効化し、`realtime_events` テーブルを `supabase_realtime` publication に追加する。
     - `realtime_events` にRLSを有効化し、`app_metadata.prismaUserId` と `user_id` が一致する行のみSELECT可能にする。
+- [ ] **データベースバックアップ（暫定: 手動ローカル）**
+    - `scripts/backup-production-db.sh` をデプロイ前・マイグレーション前・大規模データ操作前に実行する。
+    - 詳細手順・復元手順・移行判断基準は `docs/deploy_runbook.md` の「10. 災害復旧（DR）」章を参照。
 
 ## 5. UX・品質向上
 - [ ] **エラーページ**

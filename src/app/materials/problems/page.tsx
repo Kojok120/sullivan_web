@@ -2,13 +2,14 @@ import { notFound, redirect } from 'next/navigation';
 import { getProblemSubjects, getProblems } from '@/app/admin/problems/actions';
 import { ProblemManager } from '@/app/admin/problems/problem-manager';
 import { buildProblemListUiPolicy, normalizeProblemSortBy } from '@/app/admin/problems/problem-list-policy';
+import { isProblemStatusValue, isVideoStatusValue } from '@/lib/problem-ui';
 
 export const dynamic = 'force-dynamic';
 
 export default async function MaterialsProblemsPage({
     searchParams,
 }: {
-    searchParams: Promise<{ page?: string; q?: string; grade?: string; coreProblemId?: string; subjectId?: string; sortBy?: string; sortOrder?: string; video?: string; problemType?: string; contentFormat?: string; status?: string }>;
+    searchParams: Promise<{ page?: string; q?: string; grade?: string; coreProblemId?: string; subjectId?: string; sortBy?: string; sortOrder?: string; videoStatus?: string; problemType?: string; contentFormat?: string; status?: string }>;
 }) {
     const params = await searchParams;
     const page = Number(params.page) || 1;
@@ -46,7 +47,7 @@ export default async function MaterialsProblemsPage({
         if (params.grade) nextParams.set('grade', params.grade);
         if (params.sortBy && params.sortBy !== 'masterNumber') nextParams.set('sortBy', params.sortBy);
         if (params.sortBy && params.sortBy !== 'masterNumber' && params.sortOrder) nextParams.set('sortOrder', params.sortOrder);
-        if (params.video) nextParams.set('video', params.video);
+        if (params.videoStatus) nextParams.set('videoStatus', params.videoStatus);
         if (params.problemType) nextParams.set('problemType', params.problemType);
         if (params.contentFormat) nextParams.set('contentFormat', params.contentFormat);
         if (params.status) nextParams.set('status', params.status);
@@ -62,10 +63,10 @@ export default async function MaterialsProblemsPage({
             grade: params.grade,
             coreProblemId: params.coreProblemId,
             subjectId,
-            video: params.video === 'exists' || params.video === 'none' ? params.video : undefined,
+            videoStatus: isVideoStatusValue(params.videoStatus) ? params.videoStatus : undefined,
             problemType: params.problemType,
             contentFormat: params.contentFormat,
-            status: params.status,
+            status: isProblemStatusValue(params.status) ? params.status : undefined,
         },
         normalizeProblemSortBy(sortBy, currentSubject.name),
         sortOrder,

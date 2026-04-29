@@ -5,6 +5,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { getNextCustomId, getNextCustomIds } from '@/lib/curriculum-service';
+import { resolveVideoStatusFromUrl, type VideoStatusValue } from '@/lib/problem-ui';
 import type { Prisma } from '@prisma/client';
 
 type ProblemServiceClient = Pick<
@@ -51,6 +52,7 @@ export interface CreateProblemData {
     acceptedAnswers?: string[];
     grade?: string;
     videoUrl?: string;
+    videoStatus?: VideoStatusValue;
     coreProblemIds: string[];
     order?: number;
     subjectId?: string;
@@ -160,6 +162,7 @@ export async function createProblemCore(
             grade: data.grade,
             masterNumber: data.masterNumber,
             videoUrl: data.videoUrl,
+            videoStatus: resolveVideoStatusFromUrl(data.videoStatus, data.videoUrl),
             customId,
             subjectId,
             order,
@@ -353,6 +356,7 @@ async function bulkCreateProblemsCore(
                         grade: problem.grade,
                         masterNumber: problem.masterNumber,
                         videoUrl: problem.videoUrl,
+                        videoStatus: resolveVideoStatusFromUrl(problem.videoStatus, problem.videoUrl),
                         customId,
                         subjectId: problem.subjectId,
                         order,
@@ -481,6 +485,7 @@ export async function bulkUpsertProblemsCore(
                             grade: problem.grade,
                             masterNumber: problem.masterNumber,
                             videoUrl: problem.videoUrl,
+                            videoStatus: resolveVideoStatusFromUrl(problem.videoStatus, problem.videoUrl),
                             subjectId: problem.subjectId,
                             coreProblems: {
                                 set: problem.coreProblemIds.map((id) => ({ id }))

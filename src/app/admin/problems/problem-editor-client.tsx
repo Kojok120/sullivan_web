@@ -46,6 +46,7 @@ import {
     previewProblemPrint,
     publishProblemRevision,
     syncProblemAuthoringArtifacts,
+    updateProblemStatus,
     uploadProblemAsset,
 } from './actions';
 import {
@@ -55,6 +56,7 @@ import {
     type SelectedCoreProblem,
 } from './components/core-problem-selector';
 import { ProblemBodyCardEditorShared } from './components/problem-body-card-editor-shared';
+import { ProblemTextPreview } from './components/problem-text-preview';
 import { type VendorSceneApplyPayload, type VendorSyncPayload } from './problem-authoring-embed';
 import {
     appendProblemBodyCard,
@@ -67,7 +69,12 @@ import {
     parseProblemBodySegments,
     updateProblemBodyCard,
 } from '@/lib/problem-editor-model';
-import type { ProblemEditorViewMode } from '@/lib/problem-ui';
+import {
+    VIDEO_STATUS_OPTIONS,
+    resolveVideoStatusFromUrl,
+    type ProblemEditorViewMode,
+    type VideoStatusValue,
+} from '@/lib/problem-ui';
 
 export type ProblemEditorClientProps = {
     problem: RenderableProblemWithRelations | null;
@@ -85,6 +92,7 @@ type EditorState = {
     problemType: string;
     grade: string;
     videoUrl: string;
+    videoStatus: VideoStatusValue;
     coreProblems: SelectedCoreProblem[];
     authoringTool: string;
     document: StructuredProblemDocument;
@@ -140,6 +148,7 @@ function buildInitialState(problem: RenderableProblemWithRelations | null, initi
         problemType: initialProblemType,
         grade: problem?.grade ?? '',
         videoUrl: problem?.videoUrl ?? '',
+        videoStatus: ((problem?.videoStatus as VideoStatusValue | undefined) ?? 'NONE'),
         coreProblems: (problem?.coreProblems ?? []) as SelectedCoreProblem[],
         authoringTool: normalizedAuthoringTool,
         document: structuredContent,
@@ -330,6 +339,7 @@ export function ProblemEditorClient({
                 problemType: effectiveProblemType,
                 grade: state.grade || undefined,
                 videoUrl: state.videoUrl || undefined,
+                videoStatus: resolveVideoStatusFromUrl(state.videoStatus, state.videoUrl),
                 coreProblemIds: state.coreProblems.map((coreProblem) => coreProblem.id),
                 authoringTool: effectiveAuthoringTool as never,
                 authoringState,
@@ -590,18 +600,35 @@ export function ProblemEditorClient({
     };
 
     const handlePublish = () => {
+        startTransition(async () => {
+            const persisted = await persistDraftState({ showSuccessToast: false });
+            if (!persisted) {
+                return;
+            }
+
+            const result = await publishProblemRevision(persisted.problemId);
+            if (result.success) {
+                toast.success('公開しました');
+                router.refresh();
+            } else {
+                toast.error(result.error || '公開に失敗しました');
+            }
+        });
+    };
+
+    const handleSendBack = () => {
         if (!state.problemId) {
             toast.error('先に下書きを保存してください');
             return;
         }
 
         startTransition(async () => {
-            const result = await publishProblemRevision(state.problemId);
+            const result = await updateProblemStatus(state.problemId, 'SENT_BACK');
             if (result.success) {
-                toast.success('公開しました');
+                toast.success('差し戻しに変更しました');
                 router.refresh();
             } else {
-                toast.error(result.error || '公開に失敗しました');
+                toast.error(result.error || '差し戻しに失敗しました');
             }
         });
     };
@@ -673,7 +700,7 @@ export function ProblemEditorClient({
                 </div>
                 <div className="flex flex-wrap gap-2">
                     <Button variant="outline" asChild>
-                        <Link href={routeBase}>一覧へ戻る</Link>
+                        <Link href={state.subjectId ? `${routeBase}?subjectId=${state.subjectId}` : routeBase}>一覧へ戻る</Link>
                     </Button>
                     <Button variant="outline" onClick={handlePreview} disabled={isPending || !state.problemId}>
                         プレビュー
@@ -681,7 +708,10 @@ export function ProblemEditorClient({
                     <Button variant="outline" onClick={handleSave} disabled={isPending}>
                         下書き保存
                     </Button>
-                    <Button onClick={handlePublish} disabled={isPending || !state.problemId}>
+                    <Button variant="outline" onClick={handleSendBack} disabled={isPending || !state.problemId}>
+                        差し戻し
+                    </Button>
+                    <Button onClick={handlePublish} disabled={isPending}>
                         公開
                     </Button>
                 </div>
@@ -738,9 +768,29 @@ export function ProblemEditorClient({
                                 </div>
                             </div>
 
-                            <div className="space-y-2">
-                                <Label>解説動画 URL</Label>
-                                <Input value={state.videoUrl} onChange={(event) => setState((current) => ({ ...current, videoUrl: event.target.value }))} placeholder="https://..." />
+                            <div className="grid gap-4 md:grid-cols-[1fr_220px]">
+                                <div className="space-y-2">
+                                    <Label>解説動画 URL</Label>
+                                    <Input value={state.videoUrl} onChange={(event) => setState((current) => ({ ...current, videoUrl: event.target.value }))} placeholder="https://..." />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>動画ステータス</Label>
+                                    <Select
+                                        value={resolveVideoStatusFromUrl(state.videoStatus, state.videoUrl)}
+                                        onValueChange={(value) => setState((current) => ({ ...current, videoStatus: value as VideoStatusValue }))}
+                                        disabled={!!state.videoUrl.trim()}
+                                    >
+                                        <SelectTrigger><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            {VIDEO_STATUS_OPTIONS.map((option) => (
+                                                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {!!state.videoUrl.trim() && (
+                                        <p className="text-xs text-muted-foreground">URL設定済みのため自動的に「設定済み」になります</p>
+                                    )}
+                                </div>
                             </div>
 
                             <div className="space-y-2">
@@ -1100,6 +1150,64 @@ function BlockEditor({
     return null;
 }
 
+type AcceptedAnswersJsonState =
+    | { kind: 'valid'; values: string[] }
+    | { kind: 'invalid' };
+
+function parseAcceptedAnswersJson(value: string): AcceptedAnswersJsonState {
+    const trimmed = value.trim();
+    if (trimmed === '') {
+        return { kind: 'valid', values: [] };
+    }
+
+    try {
+        const parsed = JSON.parse(trimmed);
+        if (!Array.isArray(parsed)) {
+            return { kind: 'invalid' };
+        }
+        return { kind: 'valid', values: parsed.map((item) => String(item)) };
+    } catch {
+        return { kind: 'invalid' };
+    }
+}
+
+function AcceptedAnswersPreview({ jsonText }: { jsonText: string }) {
+    const state = parseAcceptedAnswersJson(jsonText);
+
+    if (state.kind === 'invalid') {
+        return (
+            <div
+                className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive"
+                data-testid="answer-spec-accepted-preview-error"
+            >
+                JSON 形式が不正です。配列で記述してください。
+            </div>
+        );
+    }
+
+    if (state.values.length === 0) {
+        return (
+            <p className="text-sm text-muted-foreground">別解はありません。</p>
+        );
+    }
+
+    return (
+        <div className="space-y-2" data-testid="answer-spec-accepted-preview">
+            {state.values.map((item, index) => (
+                <ProblemTextPreview
+                    key={index}
+                    text={item}
+                    emptyMessage="（空の別解）"
+                />
+            ))}
+        </div>
+    );
+}
+
+function stringifyAcceptedAnswers(values: string[]): string {
+    return JSON.stringify(values, null, 2);
+}
+
 function AnswerSpecEditor({
     value,
     onChange,
@@ -1109,25 +1217,61 @@ function AnswerSpecEditor({
 }) {
     const exactValue = normalizeAnswerSpecForAuthoring(value);
     const update = (patch: Partial<typeof exactValue>) => onChange({ ...exactValue, ...patch });
+    const [acceptedAnswersJson, setAcceptedAnswersJson] = useState(() =>
+        stringifyAcceptedAnswers(exactValue.acceptedAnswers),
+    );
+
+    useEffect(() => {
+        const parsed = parseAcceptedAnswersJson(acceptedAnswersJson);
+        const parsedValues = parsed.kind === 'valid' ? parsed.values : null;
+        if (parsedValues === null || JSON.stringify(parsedValues) !== JSON.stringify(exactValue.acceptedAnswers)) {
+            setAcceptedAnswersJson(stringifyAcceptedAnswers(exactValue.acceptedAnswers));
+        }
+        // exactValue.acceptedAnswers のみを依存にし、ローカル文字列の変動では再同期しない。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [JSON.stringify(exactValue.acceptedAnswers)]);
+
+    const handleAcceptedAnswersChange = (next: string) => {
+        setAcceptedAnswersJson(next);
+        const parsed = parseAcceptedAnswersJson(next);
+        if (parsed.kind === 'valid') {
+            update({ acceptedAnswers: parsed.values });
+        }
+    };
 
     return (
-        <div className="space-y-4">
-            <div className="space-y-3">
+        <div className="space-y-6">
+            <div className="space-y-2 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
                 <div className="space-y-2">
                     <Label>正解</Label>
                     <Textarea
                         value={exactValue.correctAnswer}
                         onChange={(event) => update({ correctAnswer: event.target.value })}
                         rows={4}
+                        placeholder="数式は $...$ / $$...$$ で書けます。"
                     />
                 </div>
                 <div className="space-y-2">
+                    <Label>正解プレビュー</Label>
+                    <ProblemTextPreview
+                        text={exactValue.correctAnswer}
+                        emptyMessage="正解を入力するとプレビューが出ます。"
+                    />
+                </div>
+            </div>
+            <div className="space-y-2 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
+                <div className="space-y-2">
                     <Label>別解(JSON)</Label>
                     <Textarea
-                        value={JSON.stringify(exactValue.acceptedAnswers ?? [], null, 2)}
-                        onChange={(event) => update({ acceptedAnswers: safeJsonArray(event.target.value) })}
-                        rows={4}
+                        value={acceptedAnswersJson}
+                        onChange={(event) => handleAcceptedAnswersChange(event.target.value)}
+                        rows={6}
+                        placeholder='["別解1", "別解2"]'
                     />
+                </div>
+                <div className="space-y-2">
+                    <Label>別解プレビュー</Label>
+                    <AcceptedAnswersPreview jsonText={acceptedAnswersJson} />
                 </div>
             </div>
         </div>

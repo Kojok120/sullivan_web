@@ -74,6 +74,13 @@ if (!existsSync(ENV_FILE)) {
 }
 loadDotenv({ path: ENV_FILE, override: true });
 
+// seed は 566 件規模の Problem create を 1 transaction でまとめるため、pooler (PgBouncer) の
+// long transaction の挙動を避ける目的で DIRECT_URL があればそちらを使う。
+if (process.env.DIRECT_URL && process.env.DIRECT_URL !== process.env.DATABASE_URL) {
+    process.env.DATABASE_URL = process.env.DIRECT_URL;
+    console.log('[note] DATABASE_URL を DIRECT_URL に切り替えました (long transaction 用)');
+}
+
 // 動的 import: env 反映後に prisma シングルトンを生成させる。
 async function loadPrisma() {
     const mod = await import('../src/lib/prisma');
@@ -378,8 +385,12 @@ async function insertProblems(
                 subject: { connect: { id: subjectId } },
                 coreProblems: { connect: [{ id: coreProblemId }] },
             },
-            select: { id: true, customId: true, masterNumber: true },
         });
+        if (!created || !created.id) {
+            throw new Error(
+                `prisma.problem.create が想定外の値を返しました (customId=${customId}, returned=${JSON.stringify(created)})`,
+            );
+        }
 
         await createProblemRevision(prisma, created.id, def);
 
@@ -723,7 +734,7 @@ async function main() {
                 console.log(`[insert] Problem 投入完了: ${result.length} 件`);
                 return result;
             },
-            { timeout: 60_000, maxWait: 10_000 },
+            { timeout: 600_000, maxWait: 30_000 },
         );
 
         if (inserted.length > 0) {
