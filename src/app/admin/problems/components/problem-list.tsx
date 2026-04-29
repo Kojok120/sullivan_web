@@ -278,12 +278,12 @@ export function ProblemList({
                                     <SortIcon active={sortBy === 'customId'} sortOrder={sortOrder} />
                                 </div>
                             </TableHead>
-                            <TableHead>問題文</TableHead>
+                            <TableHead className="w-[320px]">問題文</TableHead>
                             <TableHead className="w-[130px]">形式</TableHead>
                             {!isAuthorView && <TableHead className="w-[130px]">本文</TableHead>}
                             <TableHead className="w-[120px]">公開状況</TableHead>
-                            <TableHead>解答</TableHead>
-                            <TableHead>所属単元</TableHead>
+                            <TableHead className="w-[220px]">解答</TableHead>
+                            <TableHead className="w-[180px]">所属単元</TableHead>
                             <TableHead className="w-[60px]">動画</TableHead>
                             <TableHead className="w-[120px]">操作</TableHead>
                         </TableRow>
@@ -310,22 +310,22 @@ export function ProblemList({
                                         <TableCell className="font-mono text-sm font-bold">{problem.masterNumber || '-'}</TableCell>
                                     )}
                                     <TableCell className="font-mono text-xs text-muted-foreground">{problem.customId}</TableCell>
-                                    <TableCell className="min-w-[200px]" title={problem.question}>
+                                    <TableCell className="max-w-[320px] align-top" title={problem.question}>
                                         <RenderedProblemText
                                             text={problem.question}
-                                            className="whitespace-pre-wrap text-sm leading-7 [&_.katex-display]:overflow-x-auto [&_.katex-display]:py-1"
+                                            className="whitespace-pre-wrap break-words text-sm leading-7 [&_.katex-display]:overflow-x-auto [&_.katex-display]:py-1"
                                         />
                                     </TableCell>
                                     <TableCell className="text-xs">{getProblemTypeLabel(problem.problemType)}</TableCell>
                                     {!isAuthorView && <TableCell className="text-xs">{getContentFormatLabel(problem.contentFormat)}</TableCell>}
                                     <TableCell className="text-xs">{getProblemStatusLabel(problem.status)}</TableCell>
-                                    <TableCell className="min-w-[150px]" title={problem.answer || ''}>
+                                    <TableCell className="max-w-[220px] align-top" title={problem.answer || ''}>
                                         <RenderedProblemText
                                             text={problem.answer}
-                                            className="whitespace-pre-wrap text-sm leading-7 [&_.katex-display]:overflow-x-auto [&_.katex-display]:py-1"
+                                            className="whitespace-pre-wrap break-words text-sm leading-7 [&_.katex-display]:overflow-x-auto [&_.katex-display]:py-1"
                                         />
                                     </TableCell>
-                                    <TableCell>
+                                    <TableCell className="max-w-[180px] align-top">
                                         <div className="flex flex-wrap gap-1">
                                             {problem.coreProblems.map((cp) => (
                                                 <Badge key={cp.id} variant="secondary" className="text-xs">
