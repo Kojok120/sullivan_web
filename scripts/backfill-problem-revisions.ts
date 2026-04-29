@@ -11,12 +11,14 @@
  * 実行は冪等。
  *
  * 使い方:
- *   tsx scripts/backfill-problem-revisions.ts                # 確認プロンプトあり
- *   tsx scripts/backfill-problem-revisions.ts --dry-run      # 集計のみ
- *   tsx scripts/backfill-problem-revisions.ts --yes          # 確認スキップ
- *   tsx scripts/backfill-problem-revisions.ts --subject 数学  # 特定 Subject に絞る
+ *   tsx scripts/backfill-problem-revisions.ts                          # 確認プロンプトあり (.env.DEV)
+ *   tsx scripts/backfill-problem-revisions.ts --dry-run                # 集計のみ
+ *   tsx scripts/backfill-problem-revisions.ts --yes                    # 確認スキップ
+ *   tsx scripts/backfill-problem-revisions.ts --subject 数学            # 特定 Subject に絞る
+ *   tsx scripts/backfill-problem-revisions.ts --env production         # .env.PRODUCTION から接続情報を読む
  *
- * 接続先 DB は dotenv で .env.DEV から読み込む。
+ * 接続先 DB は --env で切り替える。既定は dev (=.env.DEV)。
+ * 本番接続は必ず --env production を明示すること。
  */
 
 import 'dotenv/config';
@@ -30,9 +32,12 @@ import { stdin as input, stdout as output } from 'node:process';
 
 import { buildDefaultStructuredDraft } from '../src/lib/structured-problem';
 
-const DEV_ENV_FILE = resolve(__dirname, '..', '.env.DEV');
-if (existsSync(DEV_ENV_FILE)) {
-    loadDotenv({ path: DEV_ENV_FILE, override: true });
+type EnvName = 'dev' | 'production';
+
+function envFileFor(name: EnvName): string {
+    return name === 'production'
+        ? resolve(__dirname, '..', '.env.PRODUCTION')
+        : resolve(__dirname, '..', '.env.DEV');
 }
 
 async function loadPrisma() {
@@ -44,10 +49,11 @@ interface CliOptions {
     dryRun: boolean;
     yes: boolean;
     subjectName: string | null;
+    env: EnvName;
 }
 
 function parseArgs(argv: string[]): CliOptions {
-    const opts: CliOptions = { dryRun: false, yes: false, subjectName: null };
+    const opts: CliOptions = { dryRun: false, yes: false, subjectName: null, env: 'dev' };
     for (let i = 0; i < argv.length; i += 1) {
         const arg = argv[i];
         switch (arg) {
@@ -62,6 +68,15 @@ function parseArgs(argv: string[]): CliOptions {
                 opts.subjectName = argv[i + 1] ?? null;
                 i += 1;
                 break;
+            case '--env': {
+                const value = argv[i + 1];
+                if (value !== 'dev' && value !== 'production') {
+                    throw new Error(`--env には dev か production を指定してください (received: ${value ?? '(none)'})`);
+                }
+                opts.env = value;
+                i += 1;
+                break;
+            }
             default:
                 if (arg?.startsWith('--')) {
                     throw new Error(`未知のオプション: ${arg}`);
@@ -131,8 +146,15 @@ interface PlanRow {
 
 async function main() {
     const opts = parseArgs(process.argv.slice(2));
+    const envFile = envFileFor(opts.env);
+    if (!existsSync(envFile)) {
+        throw new Error(`env ファイルが見つかりません: ${envFile}`);
+    }
+    loadDotenv({ path: envFile, override: true });
+
     const databaseUrl = process.env.DATABASE_URL;
     console.log('--- ProblemRevision バックフィル ---');
+    console.log(`env: ${opts.env} (${envFile})`);
     console.log(`接続先 DB: ${describeDatabaseUrl(databaseUrl)}`);
     console.log(`オプション: ${JSON.stringify(opts)}`);
 

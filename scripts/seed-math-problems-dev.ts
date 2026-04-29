@@ -1,5 +1,5 @@
 /**
- * 数学100問 (中1〜中3 全範囲) を DEV DB に DRAFT で投入するスクリプト。
+ * 数学100問 (中1〜中3 全範囲) を DRAFT で投入するスクリプト。
  *
  * 使い方:
  *   npm run seed:math-dev              # 通常実行 (削除確認プロンプトあり)
@@ -10,8 +10,11 @@
  *   npm run seed:math-dev -- --rollback     # 直近投入分の Problem を削除
  *   npm run seed:math-dev -- --export-review-csv ./review.csv  # レビュー用 CSV 出力
  *   npm run seed:math-dev -- --export-figures-html ./figures.html  # 図形プレビュー HTML 出力
+ *   npm run seed:math-dev -- --env production               # .env.PRODUCTION から接続情報を読む (本番投入)
  *
- * 接続先 DB は dotenv で .env.DEV から読み込む。本番環境では絶対に実行しないこと。
+ * 接続先 DB は --env で切り替える。既定は dev (=.env.DEV)。
+ * 本番投入する場合は本スクリプトを直接呼ばず scripts/seed-math-problems-production.ts (または
+ * `npm run seed:math-prod`) を経由すること。
  */
 
 import { Prisma } from '@prisma/client';
@@ -32,21 +35,44 @@ import {
 import { buildDefaultStructuredDraft } from '../src/lib/structured-problem';
 import { randomUUID } from 'node:crypto';
 
-const DEV_ENV_FILE = resolve(__dirname, '..', '.env.DEV');
+type EnvName = 'dev' | 'production';
+
+function envFileFor(name: EnvName): string {
+    return name === 'production'
+        ? resolve(__dirname, '..', '.env.PRODUCTION')
+        : resolve(__dirname, '..', '.env.DEV');
+}
+
+function detectEnvFromArgv(argv: string[]): EnvName {
+    for (let i = 0; i < argv.length; i += 1) {
+        if (argv[i] === '--env') {
+            const value = argv[i + 1];
+            if (value !== 'dev' && value !== 'production') {
+                console.error(`--env には dev か production を指定してください (received: ${value ?? '(none)'})`);
+                process.exit(1);
+            }
+            return value;
+        }
+    }
+    return 'dev';
+}
+
+const SELECTED_ENV: EnvName = detectEnvFromArgv(process.argv.slice(2));
+const ENV_FILE = envFileFor(SELECTED_ENV);
 const SUBJECT_NAMES_TO_RESET = ['数学', '理科'] as const;
 const TARGET_SUBJECT_NAME = '数学' as const;
 const CUSTOM_ID_PREFIX = 'M' as const;
 const SCRIPT_DATA_DIR = resolve(__dirname, 'data');
 const LAST_RUN_LOG_PATH = resolve(SCRIPT_DATA_DIR, 'math-problems-dev.last-run.json');
 
-// 本スクリプトは DEV DB 専用のため、.env.DEV を必須とし、誤って .env (本番接続情報の可能性) に
-// フォールバックしないように `dotenv/config` の暗黙ロードは行わない。
-if (!existsSync(DEV_ENV_FILE)) {
-    console.error(`.env.DEV が見つかりません: ${DEV_ENV_FILE}`);
-    console.error('DEV 環境用の .env.DEV を用意してから再実行してください。');
+// 誤って .env (本番接続情報の可能性) にフォールバックしないように、選択した env ファイルを必須化し
+// `dotenv/config` の暗黙ロードは行わない。
+if (!existsSync(ENV_FILE)) {
+    console.error(`env ファイルが見つかりません: ${ENV_FILE}`);
+    console.error(`--env=${SELECTED_ENV} 用の env ファイルを用意してから再実行してください。`);
     process.exit(1);
 }
-loadDotenv({ path: DEV_ENV_FILE });
+loadDotenv({ path: ENV_FILE, override: true });
 
 // 動的 import: env 反映後に prisma シングルトンを生成させる。
 async function loadPrisma() {
@@ -100,6 +126,10 @@ function parseCliArgs(argv: string[]): CliOptions {
                 break;
             case '--export-figures-html':
                 opts.exportFiguresHtml = argv[i + 1] ?? null;
+                i += 1;
+                break;
+            case '--env':
+                // SELECTED_ENV で消費済みだが、引数自体はここで読み飛ばす
                 i += 1;
                 break;
             default:
