@@ -188,7 +188,7 @@ describe('ProblemManager', () => {
         );
     });
 
-    it('問題作成者向け画面でも動画フィルターを変更できる', () => {
+    it('問題作成者向け画面でも動画ステータスでフィルターできる', () => {
         useSearchParamsMock.mockReturnValue(createSearchParams('subjectId=subject-math'));
 
         render(
@@ -206,9 +206,9 @@ describe('ProblemManager', () => {
             />,
         );
 
-        fireEvent.click(screen.getByRole('option', { name: '動画あり' }));
+        fireEvent.click(screen.getByRole('option', { name: '撮影完了' }));
 
-        expect(pushMock).toHaveBeenCalledWith('/materials/problems?subjectId=subject-math&video=exists&page=1');
+        expect(pushMock).toHaveBeenCalledWith('/materials/problems?subjectId=subject-math&videoStatus=SHOT&page=1');
     });
 
     it('英語の管理画面では英語シート一括登録ボタンを表示する', () => {

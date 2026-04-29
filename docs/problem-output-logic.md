@@ -26,6 +26,8 @@
 ## 3. 問題選出ロジック（selectProblemsForPrint）
 実装: `src/lib/print-algo.ts` / `src/lib/progression.ts`
 
+> スコアリングの考え方や具体例は [`問題スコアリングロジック.md`](./問題スコアリングロジック.md) を参照。本セクションは実装上の正確な式と定数のリファレンスとして残す。
+
 ### 3.1 アンロック判定
 - `getUnlockedCoreProblemIds(userId, subjectId)` で、解放済みCoreProblemを取得。
 - `UserCoreProblemState.isUnlocked = true` を基準にし、**最初のCoreProblemは常にアンロック扱い**。
@@ -35,25 +37,48 @@
 - **「紐づくすべてのCoreProblemがアンロック済み」**の問題のみを有効候補とする。
 
 ### 3.3 スコアリング
-スコアは以下の合計で算出され、降順でソートされる。
+スコアは以下のルールで算出され、降順でソートされる。
 
-- **未回答ボーナス**: `UserProblemState` が存在しない場合
-  - `score += 100 * WEIGHT_UNANSWERED`
-  - `score -= problem.order * 0.1`（順序をわずかに優先）
-- **忘却度（経過日数）**: `lastAnsweredAt` からの経過日数
-  - `score += diffDays * FORGETTING_RATE * WEIGHT_TIME`
+- **未着手** (`UserProblemState` が存在しない、または `lastAnsweredAt` が null):
+  - `score = UNANSWERED_BASE * WEIGHT_UNANSWERED - problem.order * 0.1`
+  - 既定値で `1000 * 1.5 - order*0.1 = 約1500`
+- **既着手** (`lastAnsweredAt` あり):
+  - 経過日数 `diffDays` から忘却スコアを算出し、`TIME_SCORE_CAP` で頭打ち
+    - `timeScore = min(diffDays * FORGETTING_RATE * WEIGHT_TIME, TIME_SCORE_CAP)`
+    - 既定値では 80日 (= 800) で上限に達する
+  - 正解済 (`isCleared = true`): `score = timeScore - CORRECT_PENALTY`
+  - 不正解 (`isCleared = false`): `score = timeScore + WEAKNESS_BONUS * WEIGHT_WEAKNESS`
 - **同点時の扱い**: 同一点の問題群のみ seed 固定のシャッフルを行う
   - 1回のプレビュー生成中は順序固定
   - プレビューを新しく作り直した場合のみ再抽選
 
 設定値（`PRINT_CONFIG`）:
 - `WEIGHT_TIME = 2.0`
-- `WEIGHT_WEAKNESS = 1.0`（※現状の実装では未使用）
+- `WEIGHT_WEAKNESS = 1.0`
 - `WEIGHT_UNANSWERED = 1.5`
 - `FORGETTING_RATE = 5.0`
+- `UNANSWERED_BASE = 1000`（未着手のベーススコア）
+- `TIME_SCORE_CAP = 800`（既着手の時間スコア上限。長期放置の暴走を防ぐ）
+- `CORRECT_PENALTY = 150`（正解済問題のスコア減算）
+- `WEAKNESS_BONUS = 100`（不正解問題のスコア加算）
+- `NEW_QUOTA_RATIO = 0.4` / `NEW_QUOTA_MIN = 5`（後述のスロット分割で使用）
 
-### 3.4 選抜
-- スコア上位から指定数を採用（デフォルト `count = 30`）。
+スコア上限の関係:
+- 未着手 ≒ 1500
+- 既着手・不正解の最大 = `TIME_SCORE_CAP + WEAKNESS_BONUS * WEIGHT_WEAKNESS = 900`
+- 既着手・正解の最大 = `TIME_SCORE_CAP - CORRECT_PENALTY = 650`
+
+→ 未着手 > 不正解 > 正解 が常に成立し、長期放置されただけの正解問題が未着手プールを押し出さない。
+
+### 3.4 選抜（スロット分割）
+- 出題数 `count`（既定 30）を「未着手枠」と「既着手枠」に分けて確保する。
+- `newQuota = min(max(NEW_QUOTA_MIN, floor(count * NEW_QUOTA_RATIO)), count)`
+  - 既定値 `count = 30` のとき `newQuota = 12`
+- 選抜順序:
+  1. `newSlots`: 未着手プールの上位 `newQuota` 件
+  2. `reviewSlots`: 既着手プールの上位 `count - newSlots.length` 件
+  3. `overflow`: 既着手が枯渇した場合、未着手の続きで残りを埋める
+- これにより「未着手が多すぎて復習が消える / 未着手が少なすぎて既着手で埋まる」両方を防ぐ。
 - 返却は `Problem[]`（内部では `coreProblems` 付きで取得）。
 
 ## 4. 印刷レイアウト（PrintLayout）
@@ -135,7 +160,6 @@
 - アーカイブ失敗時は `[PROCESSED] (Archive Failed)` にリネーム。
 
 ## 7. 現状の注意点
-- `WEIGHT_WEAKNESS` は定義済みだが、現行ロジックでは未使用。
 - `ScoredProblem.reason` は全て `'new'` で固定されており、用途未実装。
 - 出題数（`count`）はUIから変更できず、コード上のデフォルトに依存。
 - ローカルQR解析は `/usr/bin/python3` と `scripts/qr_reader.py` に依存し、PDFは必ずGemini解析にフォールバック。

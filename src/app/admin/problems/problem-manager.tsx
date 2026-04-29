@@ -15,6 +15,7 @@ import {
     CONTENT_FORMAT_OPTIONS,
     PROBLEM_STATUS_OPTIONS,
     PROBLEM_TYPE_OPTIONS,
+    VIDEO_STATUS_OPTIONS,
     type ProblemEditorViewMode,
 } from '@/lib/problem-ui';
 import type { BulkImportVariant } from './problem-list-policy';
@@ -105,7 +106,7 @@ export function ProblemManager({
     };
 
     const rawSelectedCoreProblemId = searchParams.get('coreProblemId');
-    const selectedVideoFilter = searchParams.get('video') || 'ALL';
+    const selectedVideoStatus = searchParams.get('videoStatus') || 'ALL';
     const selectedProblemType = searchParams.get('problemType') || 'ALL';
     const selectedContentFormat = searchParams.get('contentFormat') || 'ALL';
     const selectedStatus = searchParams.get('status') || 'ALL';
@@ -142,10 +143,10 @@ export function ProblemManager({
         });
     };
 
-    const handleVideoFilter = (value: string) => {
+    const handleVideoStatusFilter = (value: string) => {
         startTransition(() => {
             updateParams({
-                video: value === 'ALL' ? undefined : value,
+                videoStatus: value === 'ALL' ? undefined : value,
                 page: '1',
             });
         });
@@ -212,14 +213,15 @@ export function ProblemManager({
                                 ))}
                             </SelectContent>
                         </Select>
-                        <Select value={selectedVideoFilter} onValueChange={handleVideoFilter}>
-                            <SelectTrigger className="w-full sm:w-[150px]">
+                        <Select value={selectedVideoStatus} onValueChange={handleVideoStatusFilter}>
+                            <SelectTrigger className="w-full sm:w-[170px]">
                                 <SelectValue placeholder="動画" />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="ALL">動画：全件</SelectItem>
-                                <SelectItem value="exists">動画あり</SelectItem>
-                                <SelectItem value="none">動画なし</SelectItem>
+                                {VIDEO_STATUS_OPTIONS.map((option) => (
+                                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                                ))}
                             </SelectContent>
                         </Select>
                         <Select value={selectedProblemType} onValueChange={handleProblemTypeFilter}>

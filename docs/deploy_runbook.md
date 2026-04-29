@@ -555,6 +555,79 @@ npx vitest run tests/discord-alert-relay.test.ts
 - Google Cloud Tasks
   https://docs.cloud.google.com/tasks/docs/creating-http-target-tasks
   https://docs.cloud.google.com/tasks/docs/creating-queues
+
+## 10. 災害復旧（DR）
+
+### 10.1 バックアップ方針（暫定: 手動ローカル）
+本番DBは Supabase Postgres を利用しているが、現段階では Supabase の自動バックアップ機能（Pro Plan 以上）は契約していない。
+代わりに、**重要操作の前に手動で `pg_dump` をローカル Mac に取得する** 運用とする。
+
+| 項目 | 値 |
+| --- | --- |
+| バックアップ手段 | `scripts/backup-production-db.sh`（手動実行） |
+| 接続情報の出所 | GCP Secret Manager の `direct-url`（session mode） |
+| 保存先 | `~/sullivan-backups/production/sullivan-production-YYYYMMDD-HHMMSS.dump` |
+| 形式 | `pg_dump --format=custom --no-owner --no-acl` |
+| 保有マシン | kojok の MacBook（**他にコピーなし**） |
+
+### 10.2 いつバックアップを取るか
+最低でも以下のタイミングで `./scripts/backup-production-db.sh` を実行する。
+
+- PRODUCTION デプロイ直前（`./deploy-web-PRODUCTION.sh` 実行前）
+- `npx prisma migrate deploy` を伴う作業前（CI から自動実行される場合も含めて意識する）
+- 一括バックフィル / 一括削除 / 大規模データ操作の前
+- 月1回の定期取得（最低水準として）
+
+### 10.3 バックアップ取得手順
+```bash
+./scripts/backup-production-db.sh
+```
+
+事前条件:
+- `gcloud auth login` 済み、`sullivan-production-483212` プロジェクトの Secret Manager Secret Accessor 権限を持っていること
+- ローカルの `pg_dump` バージョンが Supabase サーバの Postgres メジャーバージョン以上であること
+  - サーバ側のバージョン確認: Supabase Dashboard → Settings → Database → Postgres version
+  - 例: サーバが 17 系で手元が 16 系なら `brew install postgresql@17 && brew link --force postgresql@17`
+
+スクリプトの末尾で `pg_restore --list` の冒頭を出力するので、ヘッダ行が表示されれば dump は健全とみなす。
+
+### 10.4 復元手順
+復元先 Postgres を新規に用意する（既存本番への上書きはしない）。
+
+1. 復元先を準備
+   - Supabase に新プロジェクトを作成、または `createdb sullivan_dr` でローカル Postgres にDB作成
+2. 復元コマンドを実行
+   ```bash
+   pg_restore --no-owner --no-acl \
+     --dbname="$RESTORE_TARGET_URL" \
+     ~/sullivan-backups/production/sullivan-production-YYYYMMDD-HHMMSS.dump
+   ```
+3. 必要なテーブルだけ部分復元する場合
+   ```bash
+   pg_restore -l <dump> > /tmp/toc
+   # /tmp/toc を編集して不要な行をコメントアウト
+   pg_restore --no-owner --no-acl -L /tmp/toc --dbname="$RESTORE_TARGET_URL" <dump>
+   ```
+4. 本番に復元先を切り替える場合
+   - `gcloud secrets versions add database-url --data-file=- --project=sullivan-production-483212`
+   - `gcloud secrets versions add direct-url --data-file=- --project=sullivan-production-483212`
+   - `gcloud run services update sullivan-app-production --update-secrets DATABASE_URL=database-url:latest,DIRECT_URL=direct-url:latest --region=asia-northeast1 --project=sullivan-production-483212`
+   - Supabase Realtime publication（`supabase_realtime`）を新プロジェクトでも再設定
+
+### 10.5 本構成の限界
+- **kojok の Mac が壊れたら全 dump を失う**: 早晩、外部 SSD or 別ストレージへのコピー手順を追加すること
+- **取り忘れた期間のデータは戻せない**: 自動化していないので、運用規律に依存する
+- **PITR は不可**: 「直近のバックアップ時点」までしか戻せない。1日以上離れた時点への復旧はできない
+- **本番接続文字列がローカルで復号される**: スクリプトを実行できるマシンを kojok の Mac に限定する
+
+### 10.6 Supabase Pro + PITR への移行判断基準
+以下のいずれかが満たされたら、Supabase Pro Plan へ移行して自動バックアップ + PITR を有効化することを再検討する。
+
+- アクティブユーザー数が **100名** を超えた
+- バックアップ取り忘れに起因するインシデントが **1回でも** 発生した
+- DB サイズが **1GB** を超え、手動 dump の所要時間が運用負担になり始めた
+- 学校契約など、SLA を求められる商談が発生した
+
 補足:
 - `deploy-web-PRODUCTION.sh` / `deploy-web-DEV.sh` がWebサービス用です。
 - `deploy-grading-worker-PRODUCTION.sh` / `deploy-grading-worker-DEV.sh` がWorker用です。

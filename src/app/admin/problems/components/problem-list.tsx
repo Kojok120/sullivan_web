@@ -21,14 +21,146 @@ import {
 import { SortIcon } from '@/components/ui/sort-icon';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
+    PROBLEM_STATUS_OPTIONS,
+    VIDEO_STATUS_OPTIONS,
     getContentFormatLabel,
     getProblemStatusLabel,
     getProblemTypeLabel,
+    getVideoStatusLabel,
     type ProblemEditorViewMode,
+    type ProblemStatusValue,
+    type VideoStatusValue,
 } from '@/lib/problem-ui';
 import { renderProblemTextHtml } from '@/lib/problem-text';
-import { bulkDeleteProblems, deleteStandaloneProblem } from '../actions';
+import {
+    bulkDeleteProblems,
+    deleteStandaloneProblem,
+    publishProblemRevision,
+    updateProblemStatus,
+    updateProblemVideoStatus,
+} from '../actions';
 import type { ProblemWithRelations } from '../types';
+
+const VIDEO_STATUS_BADGE_CLASS: Record<VideoStatusValue, string> = {
+    NONE: 'bg-gray-100 text-gray-600 hover:bg-gray-100',
+    SHOT: 'bg-blue-100 text-blue-700 hover:bg-blue-100',
+    UPLOADED: 'bg-amber-100 text-amber-700 hover:bg-amber-100',
+    CONFIGURED: 'bg-green-100 text-green-700 hover:bg-green-100',
+};
+
+const PROBLEM_STATUS_BADGE_CLASS: Record<ProblemStatusValue, string> = {
+    DRAFT: 'bg-gray-100 text-gray-600 hover:bg-gray-100',
+    PUBLISHED: 'bg-green-100 text-green-700 hover:bg-green-100',
+    SENT_BACK: 'bg-amber-100 text-amber-700 hover:bg-amber-100',
+    ARCHIVED: 'bg-slate-200 text-slate-600 hover:bg-slate-200',
+};
+
+function ProblemStatusCell({ problem }: { problem: ProblemWithRelations }) {
+    const [isPending, startTransition] = useTransition();
+    const router = useRouter();
+    const currentStatus = problem.status as ProblemStatusValue;
+
+    const handleChange = (value: string) => {
+        if (value === currentStatus) return;
+        const nextStatus = value as ProblemStatusValue;
+        startTransition(async () => {
+            if (nextStatus === 'PUBLISHED') {
+                const result = await publishProblemRevision(problem.id);
+                if (result.success) {
+                    toast.success('公開しました');
+                    router.refresh();
+                } else {
+                    toast.error(result.error || '公開に失敗しました');
+                }
+                return;
+            }
+
+            const result = await updateProblemStatus(problem.id, nextStatus);
+            if (result.success) {
+                toast.success('ステータスを更新しました');
+                router.refresh();
+            } else {
+                toast.error(result.error || 'ステータスの更新に失敗しました');
+            }
+        });
+    };
+
+    return (
+        <Select value={currentStatus} onValueChange={handleChange} disabled={isPending}>
+            <SelectTrigger
+                size="sm"
+                className={`h-8 w-[120px] border-none px-2 text-xs font-medium ${PROBLEM_STATUS_BADGE_CLASS[currentStatus]}`}
+            >
+                <SelectValue>{getProblemStatusLabel(currentStatus)}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+                {PROBLEM_STATUS_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                ))}
+            </SelectContent>
+        </Select>
+    );
+}
+
+function VideoStatusCell({ problem }: { problem: ProblemWithRelations }) {
+    const [isPending, startTransition] = useTransition();
+    const router = useRouter();
+    const currentStatus = problem.videoStatus as VideoStatusValue;
+    const hasUrl = !!problem.videoUrl && problem.videoUrl.trim() !== '';
+    const isLocked = hasUrl;
+
+    const handleChange = (value: string) => {
+        if (value === currentStatus) return;
+        startTransition(async () => {
+            const result = await updateProblemVideoStatus(problem.id, value as VideoStatusValue);
+            if (result.success) {
+                toast.success('動画ステータスを更新しました');
+                router.refresh();
+            } else {
+                toast.error(result.error || 'ステータスの更新に失敗しました');
+            }
+        });
+    };
+
+    return (
+        <div className="flex flex-col gap-1">
+            <Select value={currentStatus} onValueChange={handleChange} disabled={isPending || isLocked}>
+                <SelectTrigger
+                    size="sm"
+                    className={`h-8 w-[120px] border-none px-2 text-xs font-medium ${VIDEO_STATUS_BADGE_CLASS[currentStatus]}`}
+                >
+                    <SelectValue>{getVideoStatusLabel(currentStatus)}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                    {VIDEO_STATUS_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+            {hasUrl && (
+                <a
+                    href={problem.videoUrl ?? undefined}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-[11px] text-blue-600 hover:underline"
+                    title={problem.videoUrl ?? ''}
+                >
+                    <span className="flex h-4 w-4 items-center justify-center rounded-full border border-current">
+                        <span className="ml-0.5 h-0 w-0 border-y-[3px] border-l-[5px] border-y-transparent border-l-current" />
+                    </span>
+                    動画を開く
+                </a>
+            )}
+        </div>
+    );
+}
 
 function RenderedProblemText({
     text,
@@ -209,7 +341,7 @@ export function ProblemList({
                                 <div className="flex flex-wrap gap-2">
                                     <Badge>{getProblemTypeLabel(problem.problemType)}</Badge>
                                     {!isAuthorView && <Badge variant="secondary">{getContentFormatLabel(problem.contentFormat)}</Badge>}
-                                    <Badge variant="outline">{getProblemStatusLabel(problem.status)}</Badge>
+                                    <ProblemStatusCell problem={problem} />
                                 </div>
                                 <div>
                                     <p className="text-xs text-muted-foreground">問題文</p>
@@ -240,18 +372,9 @@ export function ProblemList({
                                 </div>
                                 <div>
                                     <p className="text-xs text-muted-foreground">動画</p>
-                                    {problem.videoUrl ? (
-                                        <a
-                                            href={problem.videoUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-sm text-blue-600 underline underline-offset-2"
-                                        >
-                                            動画を開く
-                                        </a>
-                                    ) : (
-                                        <span className="text-xs text-muted-foreground">-</span>
-                                    )}
+                                    <div className="mt-1">
+                                        <VideoStatusCell problem={problem} />
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -284,7 +407,7 @@ export function ProblemList({
                             <TableHead className="w-[120px]">公開状況</TableHead>
                             <TableHead className="w-[220px]">解答</TableHead>
                             <TableHead className="w-[180px]">所属単元</TableHead>
-                            <TableHead className="w-[60px]">動画</TableHead>
+                            <TableHead className="w-[140px]">動画</TableHead>
                             <TableHead className="w-[120px]">操作</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -318,7 +441,7 @@ export function ProblemList({
                                     </TableCell>
                                     <TableCell className="text-xs">{getProblemTypeLabel(problem.problemType)}</TableCell>
                                     {!isAuthorView && <TableCell className="text-xs">{getContentFormatLabel(problem.contentFormat)}</TableCell>}
-                                    <TableCell className="text-xs">{getProblemStatusLabel(problem.status)}</TableCell>
+                                    <TableCell><ProblemStatusCell problem={problem} /></TableCell>
                                     <TableCell className="max-w-[220px] align-top" title={problem.answer || ''}>
                                         <RenderedProblemText
                                             text={problem.answer}
@@ -338,21 +461,7 @@ export function ProblemList({
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        {problem.videoUrl ? (
-                                            <a
-                                                href={problem.videoUrl}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="inline-flex items-center justify-center text-blue-500 hover:text-blue-700"
-                                                title={problem.videoUrl}
-                                            >
-                                                <div className="flex h-5 w-5 items-center justify-center rounded-full border border-current">
-                                                    <div className="ml-0.5 h-0 w-0 border-y-[4px] border-l-[6px] border-y-transparent border-l-current" />
-                                                </div>
-                                            </a>
-                                        ) : (
-                                            <span className="text-xs text-muted-foreground">-</span>
-                                        )}
+                                        <VideoStatusCell problem={problem} />
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-2">
