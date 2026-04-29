@@ -54,3 +54,6 @@ next-env.d.ts
 # 数学問題抽出の中間ファイル・レビュー用 CSV
 /scripts/data/_extracted/math-cp-*.json
 /tmp/
+
+# 数学の問題格納
+/math_problems_originals/*
