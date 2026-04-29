@@ -19,6 +19,7 @@ const {
     deriveLegacyFieldsFromStructuredDataMock,
     txProblemCreateMock,
     txProblemUpdateMock,
+    txProblemFindUniqueMock,
     txProblemRevisionFindFirstMock,
     txProblemRevisionUpdateMock,
     txProblemRevisionCreateMock,
@@ -41,6 +42,7 @@ const {
     deriveLegacyFieldsFromStructuredDataMock: vi.fn(),
     txProblemCreateMock: vi.fn(),
     txProblemUpdateMock: vi.fn(),
+    txProblemFindUniqueMock: vi.fn(),
     txProblemRevisionFindFirstMock: vi.fn(),
     txProblemRevisionUpdateMock: vi.fn(),
     txProblemRevisionCreateMock: vi.fn(),
@@ -143,6 +145,7 @@ describe('problem actions permissions', () => {
             problem: {
                 create: typeof txProblemCreateMock;
                 update: typeof txProblemUpdateMock;
+                findUnique: typeof txProblemFindUniqueMock;
             };
             problemRevision: {
                 findFirst: typeof txProblemRevisionFindFirstMock;
@@ -153,6 +156,7 @@ describe('problem actions permissions', () => {
             problem: {
                 create: txProblemCreateMock,
                 update: txProblemUpdateMock,
+                findUnique: txProblemFindUniqueMock,
             },
             problemRevision: {
                 findFirst: txProblemRevisionFindFirstMock,
@@ -289,6 +293,7 @@ describe('problem actions permissions', () => {
             { id: 'core-1', subjectId: 'subject-english' },
         ]);
         subjectFindUniqueMock.mockResolvedValueOnce({ name: '英語' });
+        txProblemFindUniqueMock.mockResolvedValueOnce({ videoUrl: null, videoStatus: 'NONE' });
         txProblemUpdateMock.mockResolvedValueOnce({ id: 'problem-1' });
         txProblemRevisionFindFirstMock.mockResolvedValueOnce({ id: 'draft-1' });
         txProblemRevisionUpdateMock.mockResolvedValueOnce({ id: 'draft-1' });
@@ -313,6 +318,7 @@ describe('problem actions permissions', () => {
             { id: 'core-1', subjectId: 'subject-math' },
         ]);
         subjectFindUniqueMock.mockResolvedValueOnce({ name: '数学' });
+        txProblemFindUniqueMock.mockResolvedValueOnce({ videoUrl: null, videoStatus: 'NONE' });
         txProblemUpdateMock.mockResolvedValueOnce({ id: 'problem-1' });
         txProblemRevisionFindFirstMock.mockResolvedValueOnce({ id: 'draft-1' });
         txProblemRevisionUpdateMock.mockResolvedValueOnce({ id: 'draft-1' });

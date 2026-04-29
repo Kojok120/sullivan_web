@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { Prisma, ProblemAuthoringTool } from '@prisma/client';
+import { Prisma, ProblemAuthoringTool, VideoStatus } from '@prisma/client';
 
 import { requireAdmin, requireProblemAuthor } from '@/lib/auth';
 import { generateProblemFigureScene } from '@/lib/problem-figure-generation';
@@ -9,6 +9,7 @@ import { figureGenerationTargetSchema, type FigureGenerationTarget, isAiFigureGe
 import { prisma } from '@/lib/prisma';
 import { getNextCustomId } from '@/lib/curriculum-service';
 import { deleteProblemsWithRelations, bulkUpsertProblemsCore, createProblemCore } from '@/lib/problem-service';
+import { isVideoStatusValue, resolveVideoStatusFromUrl, type VideoStatusValue } from '@/lib/problem-ui';
 import {
     buildDefaultStructuredDraft,
     deriveLegacyFieldsFromStructuredData,
@@ -25,7 +26,7 @@ type ProblemFilters = {
     grade?: string;
     subjectId?: string;
     coreProblemId?: string;
-    video?: 'exists' | 'none';
+    videoStatus?: VideoStatusValue;
     problemType?: string;
     contentFormat?: string;
     status?: string;
@@ -36,7 +37,7 @@ type FilterCondition =
     | { type: 'subjectId'; value: string }
     | { type: 'coreProblemId'; value: string }
     | { type: 'search'; value: string }
-    | { type: 'video'; value: 'exists' | 'none' }
+    | { type: 'videoStatus'; value: VideoStatusValue }
     | { type: 'problemType'; value: string }
     | { type: 'contentFormat'; value: string }
     | { type: 'status'; value: string };
@@ -59,7 +60,7 @@ function buildFilterConditions(filters: ProblemFilters, search?: string): Filter
     if (filters.grade) conditions.push({ type: 'grade', value: filters.grade });
     if (filters.subjectId) conditions.push({ type: 'subjectId', value: filters.subjectId });
     if (filters.coreProblemId) conditions.push({ type: 'coreProblemId', value: filters.coreProblemId });
-    if (filters.video) conditions.push({ type: 'video', value: filters.video });
+    if (filters.videoStatus) conditions.push({ type: 'videoStatus', value: filters.videoStatus });
     if (filters.problemType) conditions.push({ type: 'problemType', value: filters.problemType });
     if (filters.contentFormat) conditions.push({ type: 'contentFormat', value: filters.contentFormat });
     if (filters.status) conditions.push({ type: 'status', value: filters.status });
@@ -85,15 +86,8 @@ function conditionsToPrismaWhere(conditions: FilterCondition[]): Prisma.ProblemW
                     coreProblems: { some: { id: cond.value } },
                 });
                 break;
-            case 'video':
-                if (cond.value === 'exists') {
-                    andConditions.push({ videoUrl: { not: null } });
-                    andConditions.push({ videoUrl: { not: '' } });
-                } else {
-                    andConditions.push({
-                        OR: [{ videoUrl: null }, { videoUrl: '' }],
-                    });
-                }
+            case 'videoStatus':
+                where.videoStatus = cond.value as VideoStatus;
                 break;
             case 'search':
                 where.OR = [
@@ -538,16 +532,19 @@ export async function createStandaloneProblem(data: {
     acceptedAnswers?: string[];
     grade?: string;
     videoUrl?: string;
+    videoStatus?: VideoStatusValue;
     coreProblemIds: string[];
 }) {
     await requireAdmin();
     try {
+        const resolvedVideoStatus = resolveVideoStatusFromUrl(data.videoStatus, data.videoUrl);
         const problem = await createProblemCore({
             question: data.question,
             answer: data.answer,
             acceptedAnswers: data.acceptedAnswers,
             grade: data.grade,
             videoUrl: data.videoUrl,
+            videoStatus: resolvedVideoStatus,
             coreProblemIds: data.coreProblemIds,
             order: 0,
         });
@@ -566,6 +563,7 @@ export async function updateStandaloneProblem(id: string, data: {
     acceptedAnswers?: string[];
     grade?: string;
     videoUrl?: string;
+    videoStatus?: VideoStatusValue;
     coreProblemIds?: string[];
 }) {
     await requireAdmin();
@@ -577,6 +575,19 @@ export async function updateStandaloneProblem(id: string, data: {
             grade: data.grade,
             videoUrl: data.videoUrl,
         };
+
+        if (data.videoUrl !== undefined || data.videoStatus !== undefined) {
+            const existing = await prisma.problem.findUnique({
+                where: { id },
+                select: { videoUrl: true, videoStatus: true },
+            });
+            if (!existing) {
+                return { error: '問題が見つかりません' };
+            }
+            const nextVideoUrl = data.videoUrl !== undefined ? data.videoUrl : existing.videoUrl;
+            const desiredStatus = data.videoStatus ?? (existing.videoStatus as VideoStatusValue);
+            updateData.videoStatus = resolveVideoStatusFromUrl(desiredStatus, nextVideoUrl);
+        }
 
         if (data.coreProblemIds) {
             const subjectId = await resolveSubjectIdFromCoreProblemIds(data.coreProblemIds);
@@ -611,6 +622,7 @@ export async function createProblemDraft(data: {
     problemType: string;
     grade?: string;
     videoUrl?: string;
+    videoStatus?: VideoStatusValue;
     coreProblemIds: string[];
     authoringTool?: ProblemAuthoringTool;
     authoringState?: unknown;
@@ -635,6 +647,7 @@ export async function createProblemDraft(data: {
             if (!problemId) {
                 const customId = await getNextCustomId(subjectId, tx);
                 const order = await getNextProblemOrder();
+                const newVideoStatus = resolveVideoStatusFromUrl(data.videoStatus, data.videoUrl);
                 const createdProblem = await tx.problem.create({
                     data: {
                         question: legacyQuestion,
@@ -642,6 +655,7 @@ export async function createProblemDraft(data: {
                         acceptedAnswers: normalized.legacy.acceptedAnswers,
                         grade: data.grade,
                         videoUrl: data.videoUrl,
+                        videoStatus: newVideoStatus,
                         customId,
                         subjectId,
                         order,
@@ -656,12 +670,19 @@ export async function createProblemDraft(data: {
                 });
                 problemId = createdProblem.id;
             } else {
+                const existing = await tx.problem.findUnique({
+                    where: { id: problemId },
+                    select: { videoUrl: true, videoStatus: true },
+                });
+                const nextVideoUrl = data.videoUrl !== undefined ? data.videoUrl : existing?.videoUrl ?? null;
+                const desiredStatus = data.videoStatus ?? ((existing?.videoStatus as VideoStatusValue | undefined) ?? 'NONE');
                 const problemUpdateData: Prisma.ProblemUpdateInput = {
                     question: legacyQuestion,
                     answer: legacyAnswer,
                     acceptedAnswers: normalized.legacy.acceptedAnswers,
                     grade: data.grade,
                     videoUrl: data.videoUrl,
+                    videoStatus: resolveVideoStatusFromUrl(desiredStatus, nextVideoUrl),
                     subject: {
                         connect: { id: subjectId },
                     },
@@ -1053,6 +1074,39 @@ export async function deleteProblemAsset(assetId: string) {
     }
 }
 
+export async function updateProblemVideoStatus(id: string, videoStatus: VideoStatusValue) {
+    await requireProblemAuthor();
+
+    try {
+        if (!isVideoStatusValue(videoStatus)) {
+            return { error: '不正な動画ステータスです' };
+        }
+
+        const existing = await prisma.problem.findUnique({
+            where: { id },
+            select: { videoUrl: true },
+        });
+
+        if (!existing) {
+            return { error: '問題が見つかりません' };
+        }
+
+        const resolved = resolveVideoStatusFromUrl(videoStatus, existing.videoUrl);
+
+        const problem = await prisma.problem.update({
+            where: { id },
+            data: { videoStatus: resolved },
+            select: { id: true, videoStatus: true },
+        });
+
+        revalidateProblemPaths(id);
+        return { success: true, videoStatus: problem.videoStatus as VideoStatusValue };
+    } catch (error) {
+        console.error('Failed to update problem video status:', error);
+        return { error: '動画ステータスの更新に失敗しました' };
+    }
+}
+
 export async function deleteStandaloneProblem(id: string) {
     await requireAdmin();
     try {
@@ -1159,6 +1213,7 @@ export async function bulkUpsertStandaloneProblems(problems: {
     grade?: string;
     masterNumber?: number;
     videoUrl?: string;
+    videoStatus?: VideoStatusValue;
     coreProblemIds: string[];
 }[], options?: { subjectId?: string }) {
     await requireProblemAuthor();

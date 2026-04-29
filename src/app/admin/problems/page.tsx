@@ -1,3 +1,5 @@
+import { isVideoStatusValue } from '@/lib/problem-ui';
+
 import { getProblems, getProblemSubjects } from './actions';
 import { ProblemManager } from './problem-manager';
 import { buildProblemListUiPolicy, normalizeProblemSortBy } from './problem-list-policy';
@@ -8,7 +10,7 @@ export const dynamic = 'force-dynamic';
 export default async function ProblemsPage({
     searchParams,
 }: {
-    searchParams: Promise<{ page?: string; q?: string; grade?: string; coreProblemId?: string; subjectId?: string; sortBy?: string; sortOrder?: string; video?: string; problemType?: string; contentFormat?: string; status?: string }>;
+    searchParams: Promise<{ page?: string; q?: string; grade?: string; coreProblemId?: string; subjectId?: string; sortBy?: string; sortOrder?: string; videoStatus?: string; problemType?: string; contentFormat?: string; status?: string }>;
 }) {
     // Next.js 15 以降では searchParams は Promise
     const params = await searchParams;
@@ -52,7 +54,7 @@ export default async function ProblemsPage({
             grade: params.grade,
             coreProblemId: params.coreProblemId,
             subjectId,
-            video: params.video === 'exists' || params.video === 'none' ? params.video : undefined,
+            videoStatus: isVideoStatusValue(params.videoStatus) ? params.videoStatus : undefined,
             problemType: params.problemType,
             contentFormat: params.contentFormat,
             status: params.status,
