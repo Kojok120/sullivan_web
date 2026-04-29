@@ -4,18 +4,33 @@ import { getReadyCoreProblemIds } from "@/lib/progression";
 import type { PrintableProblem } from "@/lib/print-types";
 
 export const PRINT_CONFIG = {
-    // Weights for scoring
-    WEIGHT_TIME: 2.0,       // Priority for forgetting (time elapsed)
-    WEIGHT_WEAKNESS: 1.0,   // Priority for weakness (low accuracy/evaluation)
-    WEIGHT_UNANSWERED: 1.5, // Priority for new/unanswered problems
+    // 既存重み（後方互換のため値は維持）
+    WEIGHT_TIME: 2.0,
+    WEIGHT_WEAKNESS: 1.0,
+    WEIGHT_UNANSWERED: 1.5,
+    FORGETTING_RATE: 5.0,
 
-    // Forgetting curve settings
-    FORGETTING_RATE: 5.0,   // Points per day elapsed
+    // 未着手のベーススコア。十分大きく取って既着手より優先する
+    UNANSWERED_BASE: 1000,
+
+    // 既着手の時間スコア上限。長期放置の score 暴走を防ぐ
+    TIME_SCORE_CAP: 800,
+
+    // 正解済問題のスコア減算。再演優先度を大きく下げる
+    CORRECT_PENALTY: 150,
+
+    // 不正解問題の弱点ボーナス（WEIGHT_WEAKNESS を実際に使用）
+    WEAKNESS_BONUS: 100,
+
+    // 印刷スロットのうち未着手枠の割合と最低数
+    NEW_QUOTA_RATIO: 0.4,
+    NEW_QUOTA_MIN: 5,
 };
 
 type ScoredProblem = {
     problem: PrintableProblem;
     score: number;
+    isUnanswered: boolean;
 };
 
 function requirePrintableCustomId(problem: { id: string; customId: string | null }): string {
@@ -100,7 +115,7 @@ export async function selectProblemsForPrint(
             // UserProblemStateを一緒に取得 (1:N relation name is 'userStates')
             userStates: {
                 where: { userId },
-                select: { lastAnsweredAt: true },
+                select: { lastAnsweredAt: true, isCleared: true },
                 take: 1,
             },
         }
@@ -119,19 +134,28 @@ export async function selectProblemsForPrint(
         // Integrated userState
         const state = problem.userStates[0];
         let score = 0;
+        let isUnanswered = false;
 
-        if (!state) {
-            // Unanswered
-            score += 100 * PRINT_CONFIG.WEIGHT_UNANSWERED;
-            score -= problem.order * 0.1; // Slight preference for order
+        if (!state || !state.lastAnsweredAt) {
+            // 未着手: ベーススコアを大きく取って既着手より優先する
+            isUnanswered = true;
+            score += PRINT_CONFIG.UNANSWERED_BASE * PRINT_CONFIG.WEIGHT_UNANSWERED;
+            score -= problem.order * 0.1; // 順序を僅かに優先
         } else {
-            // Answered
-            const lastAnswered = state.lastAnsweredAt || new Date(0);
-            const diffMs = now - lastAnswered.getTime();
+            // 既着手: 経過日数 → 上限クリップ
+            const diffMs = now - state.lastAnsweredAt.getTime();
             const diffDays = diffMs / (1000 * 60 * 60 * 24);
 
-            const timeScore = diffDays * PRINT_CONFIG.FORGETTING_RATE * PRINT_CONFIG.WEIGHT_TIME;
-            score += timeScore;
+            const rawTimeScore = diffDays * PRINT_CONFIG.FORGETTING_RATE * PRINT_CONFIG.WEIGHT_TIME;
+            score += Math.min(rawTimeScore, PRINT_CONFIG.TIME_SCORE_CAP);
+
+            if (state.isCleared) {
+                // 正解済: 大きくスコアを下げて再演優先度を後ろに送る
+                score -= PRINT_CONFIG.CORRECT_PENALTY;
+            } else {
+                // 不正解: 弱点として加点
+                score += PRINT_CONFIG.WEAKNESS_BONUS * PRINT_CONFIG.WEIGHT_WEAKNESS;
+            }
         }
 
         return {
@@ -159,6 +183,7 @@ export async function selectProblemsForPrint(
                 })) ?? [],
             },
             score,
+            isUnanswered,
         };
     });
 
@@ -168,8 +193,25 @@ export async function selectProblemsForPrint(
     );
     const rankedProblems = shuffleTiedScores(scoredProblems, random);
 
-    // 6. 上位 `count` 件を返す
-    return rankedProblems.slice(0, count).map(sp => sp.problem);
+    // 6. 印刷スロットを「未着手枠」と「既着手枠」に分けて確保する
+    //    こうしないと未着手プールが多いとき復習が消え、少ないとき既着手で埋まってしまうので
+    //    両者の最低出題数を担保する。
+    const newQuota = Math.min(
+        Math.max(PRINT_CONFIG.NEW_QUOTA_MIN, Math.floor(count * PRINT_CONFIG.NEW_QUOTA_RATIO)),
+        count
+    );
+    const unansweredRanked = rankedProblems.filter(sp => sp.isUnanswered);
+    const answeredRanked = rankedProblems.filter(sp => !sp.isUnanswered);
+
+    const newSlots = unansweredRanked.slice(0, newQuota);
+    const reviewSlots = answeredRanked.slice(0, count - newSlots.length);
+    const overflowStart = newSlots.length;
+    const overflowCount = count - newSlots.length - reviewSlots.length;
+    const overflow = unansweredRanked.slice(overflowStart, overflowStart + overflowCount);
+
+    return [...newSlots, ...reviewSlots, ...overflow]
+        .slice(0, count)
+        .map(sp => sp.problem);
 }
 
 function shuffleTiedScores(items: ScoredProblem[], random: () => number): ScoredProblem[] {
