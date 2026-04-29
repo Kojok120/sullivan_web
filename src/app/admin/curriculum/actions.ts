@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { Prisma } from '@prisma/client';
 
-import { requireAdmin, requireProblemAuthor, getSession } from '@/lib/auth';
+import { requireProblemAuthor, getSession } from '@/lib/auth';
 import type { LectureVideo } from '@/lib/lecture-videos';
 
 function revalidateCurriculumPaths() {
@@ -567,7 +567,7 @@ export async function reorderCoreProblems(items: { id: string, order: number }[]
 
 // --- Problems ---
 export async function getProblemsByCoreProblem(coreProblemId: string) {
-    await requireAdmin();
+    await requireProblemAuthor();
     try {
         // Problem と CoreProblem は多対多のため、指定 CoreProblem に紐づく問題を取得する。
         const problems = await prisma.problem.findMany({

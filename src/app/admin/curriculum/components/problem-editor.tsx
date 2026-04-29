@@ -1,13 +1,17 @@
 'use client';
 
+import Link from 'next/link';
+
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import type { Prisma } from '@prisma/client';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { getProblemsByCoreProblem } from '../actions';
-import { LinkIcon, GraduationCap, Hash, KeyRound, BookOpen } from 'lucide-react';
+import { LinkIcon, GraduationCap, Hash, KeyRound, BookOpen, Pencil } from 'lucide-react';
 
 interface ProblemEditorProps {
     coreProblemId: string;
+    editHrefBuilder?: (problemId: string) => string;
 }
 
 type ProblemEditorProblem = Prisma.ProblemGetPayload<{
@@ -72,7 +76,7 @@ function getSafeExternalHref(rawUrl: string | null | undefined) {
     return null;
 }
 
-function ProblemItem({ problem }: { problem: ProblemEditorProblem }) {
+function ProblemItem({ problem, editHref }: { problem: ProblemEditorProblem; editHref?: string }) {
     const safeVideoUrl = getSafeExternalHref(problem.videoUrl);
 
     return (
@@ -85,6 +89,16 @@ function ProblemItem({ problem }: { problem: ProblemEditorProblem }) {
                     <div className="w-full p-2 text-sm whitespace-pre-wrap border rounded-md bg-transparent sm:w-1/3">
                         {problem.answer || '-'}
                     </div>
+                    {editHref ? (
+                        <div className="flex sm:items-start">
+                            <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
+                                <Link href={editHref}>
+                                    <Pencil className="mr-1 h-3.5 w-3.5" />
+                                    編集
+                                </Link>
+                            </Button>
+                        </div>
+                    ) : null}
                 </div>
 
                 <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
@@ -153,7 +167,7 @@ function ProblemItem({ problem }: { problem: ProblemEditorProblem }) {
     );
 }
 
-export function ProblemEditor({ coreProblemId }: ProblemEditorProps) {
+export function ProblemEditor({ coreProblemId, editHrefBuilder }: ProblemEditorProps) {
     const [problems, setProblems] = useState<ProblemEditorProblem[]>([]);
     const [loading, setLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
@@ -202,9 +216,11 @@ export function ProblemEditor({ coreProblemId }: ProblemEditorProps) {
             {/* Header */}
             <div className="sticky top-0 z-10 flex flex-col items-start justify-between gap-2 border-b bg-card p-2 px-4 sm:flex-row sm:items-center">
                 <h3 className="text-sm font-semibold">問題一覧 ({problems.length})</h3>
-                <div className="rounded border border-yellow-200 bg-yellow-50 px-2 py-1 text-xs text-muted-foreground text-yellow-700">
-                    ※ここでの編集はできません。「問題管理」を使用してください
-                </div>
+                {!editHrefBuilder ? (
+                    <div className="rounded border border-yellow-200 bg-yellow-50 px-2 py-1 text-xs text-muted-foreground text-yellow-700">
+                        ※ここでの編集はできません。「問題管理」を使用してください
+                    </div>
+                ) : null}
             </div>
 
             {/* List */}
@@ -224,6 +240,7 @@ export function ProblemEditor({ coreProblemId }: ProblemEditorProps) {
                         <ProblemItem
                             key={problem.id}
                             problem={problem}
+                            editHref={editHrefBuilder?.(problem.id)}
                         />
                     ))
                 )}

@@ -5,6 +5,9 @@ import type { CoreProblem, Subject } from '@prisma/client';
 
 import { CoreProblemBulkImport } from '@/app/admin/curriculum/components/core-problem-bulk-import';
 import { CoreProblemList } from '@/app/admin/curriculum/components/core-problem-list';
+import { ProblemEditor } from '@/app/admin/curriculum/components/problem-editor';
+import { Button } from '@/components/ui/button';
+import { ResizableSplit } from '@/components/ui/resizable-split';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 type SubjectWithCoreProblems = Subject & {
@@ -15,27 +18,35 @@ type MaterialsCoreProblemManagerProps = {
     initialSubjects: SubjectWithCoreProblems[];
 };
 
+const buildEditHref = (problemId: string) => `/materials/problems/${problemId}`;
+
 export function MaterialsCoreProblemManager({ initialSubjects }: MaterialsCoreProblemManagerProps) {
-    const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(initialSubjects[0]?.id ?? null);
-    const [selectedCoreProblemId, setSelectedCoreProblemId] = useState<string | null>(null);
-    const activeSubjectId = selectedSubjectId && initialSubjects.some((subject) => subject.id === selectedSubjectId)
-        ? selectedSubjectId
+    const [rawSelectedSubjectId, setRawSelectedSubjectId] = useState<string | null>(initialSubjects[0]?.id ?? null);
+    const [rawSelectedCoreProblemId, setRawSelectedCoreProblemId] = useState<string | null>(null);
+    const [rawMobilePane, setRawMobilePane] = useState<'core' | 'problems'>('core');
+
+    const selectedSubjectId = rawSelectedSubjectId && initialSubjects.some((subject) => subject.id === rawSelectedSubjectId)
+        ? rawSelectedSubjectId
         : initialSubjects[0]?.id ?? null;
-    const selectedSubject = initialSubjects.find((subject) => subject.id === activeSubjectId) ?? null;
-    const activeSelectedCoreProblemId = selectedSubject?.coreProblems.some((coreProblem) => coreProblem.id === selectedCoreProblemId)
-        ? selectedCoreProblemId
+    const selectedSubject = initialSubjects.find((subject) => subject.id === selectedSubjectId) ?? null;
+    const selectedCoreProblemId = selectedSubject?.coreProblems.some((coreProblem) => coreProblem.id === rawSelectedCoreProblemId)
+        ? rawSelectedCoreProblemId
         : null;
+    const mobilePane = selectedCoreProblemId ? rawMobilePane : 'core';
+
+    const handleSubjectChange = (subjectId: string) => {
+        setRawSelectedSubjectId(subjectId);
+        setRawSelectedCoreProblemId(null);
+        setRawMobilePane('core');
+    };
 
     return (
-        <div className="space-y-4">
-            <div className="flex flex-col gap-2 bg-background py-2 sm:flex-row sm:items-center sm:gap-4">
+        <div className="flex min-h-[calc(100dvh-8rem)] flex-col gap-4 md:h-[calc(100vh-10rem)]">
+            <div className="z-10 flex flex-col gap-2 bg-background py-2 sm:flex-row sm:items-center sm:gap-4">
                 <h2 className="whitespace-nowrap font-semibold">科目選択:</h2>
                 <Tabs
-                    value={activeSubjectId ?? ''}
-                    onValueChange={(value) => {
-                        setSelectedSubjectId(value);
-                        setSelectedCoreProblemId(null);
-                    }}
+                    value={selectedSubjectId ?? ''}
+                    onValueChange={handleSubjectChange}
                     className="w-full"
                 >
                     <div className="overflow-x-auto pb-1">
@@ -50,35 +61,119 @@ export function MaterialsCoreProblemManager({ initialSubjects }: MaterialsCorePr
                 </Tabs>
             </div>
 
-            <div className="overflow-hidden rounded-lg border bg-muted/10">
-                <div className="flex items-center justify-between border-b bg-muted/20 p-3 text-sm font-semibold">
-                    <div className="flex items-center gap-2">
-                        <span>CoreProblem一覧</span>
-                        {selectedSubject && <CoreProblemBulkImport subjectId={selectedSubject.id} />}
-                    </div>
-                    <span className="text-xs font-normal text-muted-foreground">
-                        {selectedSubject?.coreProblems.length ?? 0}件
-                    </span>
-                </div>
-                <div className="max-h-[calc(100dvh-18rem)] overflow-y-auto p-2">
-                    {selectedSubject ? (
-                        <CoreProblemList
-                            subjectId={selectedSubject.id}
-                            coreProblems={selectedSubject.coreProblems}
-                            selectedId={activeSelectedCoreProblemId}
-                            onSelect={setSelectedCoreProblemId}
-                        />
-                    ) : (
-                        <div className="p-4 text-center text-sm text-muted-foreground">
-                            科目を選択してください
-                        </div>
-                    )}
-                </div>
+            <div className="flex gap-2 md:hidden">
+                <Button
+                    variant={mobilePane === 'core' ? 'default' : 'outline'}
+                    className="min-h-11 flex-1"
+                    onClick={() => setRawMobilePane('core')}
+                >
+                    CoreProblem一覧
+                </Button>
+                <Button
+                    variant={mobilePane === 'problems' ? 'default' : 'outline'}
+                    className="min-h-11 flex-1"
+                    onClick={() => setRawMobilePane('problems')}
+                    disabled={!selectedCoreProblemId}
+                >
+                    問題一覧
+                </Button>
             </div>
 
-            <p className="text-sm text-muted-foreground">
-                問題の新規作成や編集は「問題一覧」から行います。
-            </p>
+            <div className="flex-1 overflow-hidden md:hidden">
+                {mobilePane === 'core' ? (
+                    <div className="flex h-full flex-col rounded-lg border bg-muted/10">
+                        <div className="flex items-center justify-between border-b bg-muted/20 p-3 text-sm font-semibold">
+                            <div className="flex items-center gap-2">
+                                <span>CoreProblem一覧</span>
+                                {selectedSubject && <CoreProblemBulkImport subjectId={selectedSubject.id} />}
+                            </div>
+                            <span className="text-xs font-normal text-muted-foreground">
+                                {selectedSubject?.coreProblems.length ?? 0}件
+                            </span>
+                        </div>
+                        <div className="min-h-0 flex-1 overflow-y-auto p-2">
+                            {selectedSubject ? (
+                                <CoreProblemList
+                                    subjectId={selectedSubject.id}
+                                    coreProblems={selectedSubject.coreProblems}
+                                    selectedId={selectedCoreProblemId}
+                                    onSelect={(id) => {
+                                        setRawSelectedCoreProblemId(id);
+                                        if (id) setRawMobilePane('problems');
+                                    }}
+                                />
+                            ) : (
+                                <div className="p-4 text-center text-sm text-muted-foreground">
+                                    科目を選択してください
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                ) : (
+                    <div className="h-full overflow-hidden rounded-lg border bg-card">
+                        {selectedCoreProblemId ? (
+                            <ProblemEditor
+                                coreProblemId={selectedCoreProblemId}
+                                editHrefBuilder={buildEditHref}
+                            />
+                        ) : (
+                            <div className="flex h-full flex-col items-center justify-center text-muted-foreground">
+                                <p>CoreProblemを選択してください</p>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            <div className="hidden flex-1 overflow-hidden md:block">
+                <ResizableSplit
+                    storageKey="materials-core-problem-split"
+                    defaultLeftPercent={25}
+                    minLeftPercent={15}
+                    maxLeftPercent={60}
+                    left={
+                        <div className="border rounded-lg bg-muted/10 flex h-full flex-col overflow-hidden">
+                            <div className="p-3 border-b bg-muted/20 font-semibold text-sm flex justify-between items-center">
+                                <div className="flex items-center gap-2">
+                                    <span>CoreProblem一覧</span>
+                                    {selectedSubject && <CoreProblemBulkImport subjectId={selectedSubject.id} />}
+                                </div>
+                                <span className="text-xs font-normal text-muted-foreground">
+                                    {selectedSubject?.coreProblems.length ?? 0}件
+                                </span>
+                            </div>
+                            <div className="flex-1 overflow-y-auto p-2">
+                                {selectedSubject ? (
+                                    <CoreProblemList
+                                        subjectId={selectedSubject.id}
+                                        coreProblems={selectedSubject.coreProblems}
+                                        selectedId={selectedCoreProblemId}
+                                        onSelect={(id) => setRawSelectedCoreProblemId(id)}
+                                    />
+                                ) : (
+                                    <div className="p-4 text-center text-muted-foreground text-sm">
+                                        科目を選択してください
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    }
+                    right={
+                        <div className="border rounded-lg bg-card flex h-full flex-col overflow-hidden">
+                            {selectedCoreProblemId ? (
+                                <ProblemEditor
+                                    coreProblemId={selectedCoreProblemId}
+                                    editHrefBuilder={buildEditHref}
+                                />
+                            ) : (
+                                <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                                    <p>左側のリストからCoreProblemを選択して、問題を表示・編集してください</p>
+                                </div>
+                            )}
+                        </div>
+                    }
+                />
+            </div>
         </div>
     );
 }
