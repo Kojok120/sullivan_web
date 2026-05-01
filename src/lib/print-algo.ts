@@ -55,6 +55,7 @@ export async function selectProblemsForPrint(
 
     const whereCondition: Prisma.ProblemWhereInput = {
         subjectId,
+        status: 'PUBLISHED',
     };
 
     if (coreProblemId) {
