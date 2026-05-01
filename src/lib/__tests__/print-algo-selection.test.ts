@@ -36,6 +36,7 @@ describe('selectProblemsForPrint', () => {
         const query = findManyMock.mock.calls[0]?.[0];
         expect(query.where).toEqual({
             subjectId: 'subject-1',
+            status: 'PUBLISHED',
             coreProblems: {
                 every: {
                     id: { in: ['cp-1', 'cp-2'] },
@@ -69,6 +70,7 @@ describe('selectProblemsForPrint', () => {
         const query = findManyMock.mock.calls[0]?.[0];
         expect(query.where).toEqual({
             subjectId: 'subject-1',
+            status: 'PUBLISHED',
             coreProblems: {
                 some: {
                     id: 'cp-9',
