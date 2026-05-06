@@ -393,49 +393,14 @@ export async function getProblems(
         const where = buildProblemWhere(filters, normalizedSearch || undefined);
         const skip = (page - 1) * limit;
 
-        if (sortBy === 'customId') {
-            // 1. WHERE に一致する Problem の id だけを取得（payload を id のみに絞る）
-            const allIdRows = await prisma.problem.findMany({
-                where,
-                select: { id: true },
-            });
-            const total = allIdRows.length;
-            if (total === 0) {
-                return { success: true, problems: [], total: 0, page, limit };
-            }
-            const allIds = allIdRows.map((row) => row.id);
-
-            // 2. PostgreSQL 側の関数ベース index を使って自然順 ORDER BY + LIMIT を 1 クエリで実行
-            const orderDir = sortOrder === 'asc' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
-            const pagedRows = await prisma.$queryRaw<Array<{ id: string }>>`
-                SELECT "id"
-                FROM "Problem"
-                WHERE "id" IN (${Prisma.join(allIds)})
-                ORDER BY public.problem_custom_id_sort_key("customId") ${orderDir} NULLS LAST,
-                         "id" ASC
-                LIMIT ${limit}
-                OFFSET ${skip}
-            `;
-            const pagedIds = pagedRows.map((row) => row.id);
-
-            // 3. ページ分の詳細だけを include で取得し、SQL 側の順序を保つ
-            const pageProblems = pagedIds.length === 0
-                ? []
-                : await prisma.problem.findMany({
-                    where: { id: { in: pagedIds } },
-                    include: problemAdminInclude,
-                });
-            const indexMap = new Map(pagedIds.map((id, index) => [id, index]));
-            pageProblems.sort((a, b) => (indexMap.get(a.id) ?? 0) - (indexMap.get(b.id) ?? 0));
-            return { success: true, problems: pageProblems, total, page, limit };
-        }
-
         const orderBy: Prisma.ProblemOrderByWithRelationInput[] =
-            sortBy === 'createdAt'
-                ? [{ createdAt: sortOrder }, { id: 'asc' }]
-                : sortBy === 'masterNumber'
-                    ? [{ masterNumber: { sort: sortOrder, nulls: 'last' } }, { id: 'asc' }]
-                    : [{ updatedAt: sortOrder }, { id: 'asc' }];
+            sortBy === 'customId'
+                ? [{ customIdSortKey: { sort: sortOrder, nulls: 'last' } }, { id: 'asc' }]
+                : sortBy === 'createdAt'
+                    ? [{ createdAt: sortOrder }, { id: 'asc' }]
+                    : sortBy === 'masterNumber'
+                        ? [{ masterNumber: { sort: sortOrder, nulls: 'last' } }, { id: 'asc' }]
+                        : [{ updatedAt: sortOrder }, { id: 'asc' }];
 
         const [problems, total] = await Promise.all([
             prisma.problem.findMany({

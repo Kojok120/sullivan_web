@@ -48,11 +48,10 @@ export function listUtcDates(from: Date, to: Date): Date[] {
 
 /**
  * 単一ユーザの指定範囲を再集計する。
- * `from` ≤ date < `to` の範囲を対象とし、既存行は上書き、学習が無い日は何もしない（孤児にしない）。
- * 既存行で from..to の範囲に含まれるが LearningHistory が空になっている日（履歴削除など）は、
- * このメソッドでは検知できない。整合性が必要なら recomputeForUserDateRange の前に範囲削除を呼ぶ。
+ * `from` ≤ date < `to` の範囲を delete してから INSERT する。
+ * これにより、履歴削除等で当該日が 0 件になった場合に古い `UserStatsDaily` 行が残らない。
  *
- * 戻り値は upsert された行数。
+ * 戻り値は INSERT された行数。
  */
 export async function recomputeForUserDateRange(
     userId: string,
@@ -63,29 +62,33 @@ export async function recomputeForUserDateRange(
     const end = startOfUtcDate(to);
     if (start.getTime() >= end.getTime()) return 0;
 
-    // INSERT ... SELECT ... GROUP BY で1往復で確定する。
+    // 1) 期間内の既存行を削除し、2) LearningHistory を GROUP BY して INSERT する。
+    // 1 ユーザ × 期間（通常 1〜365 日）の短時間 transaction なのでロック競合は限定的。
     // evaluation A/B を correct とみなす（既存実装と同一の判定基準）。
-    const result = await prisma.$executeRaw`
-        INSERT INTO "UserStatsDaily" ("userId", "date", "totalSolved", "correctCount", "xpEarned", "updatedAt")
-        SELECT
-            ${userId} AS "userId",
-            DATE_TRUNC('day', lh."answeredAt" AT TIME ZONE 'UTC')::date AS "date",
-            COUNT(*)::int AS "totalSolved",
-            SUM(CASE WHEN lh."evaluation" IN ('A', 'B') THEN 1 ELSE 0 END)::int AS "correctCount",
-            0 AS "xpEarned",
-            NOW() AS "updatedAt"
-        FROM "LearningHistory" lh
-        WHERE lh."userId" = ${userId}
-            AND lh."answeredAt" >= ${start}
-            AND lh."answeredAt" < ${end}
-        GROUP BY DATE_TRUNC('day', lh."answeredAt" AT TIME ZONE 'UTC')::date
-        ON CONFLICT ("userId", "date")
-        DO UPDATE SET
-            "totalSolved" = EXCLUDED."totalSolved",
-            "correctCount" = EXCLUDED."correctCount",
-            "updatedAt" = NOW()
-    `;
-    return Number(result);
+    const [, insertResult] = await prisma.$transaction([
+        prisma.userStatsDaily.deleteMany({
+            where: {
+                userId,
+                date: { gte: start, lt: end },
+            },
+        }),
+        prisma.$executeRaw`
+            INSERT INTO "UserStatsDaily" ("userId", "date", "totalSolved", "correctCount", "xpEarned", "updatedAt")
+            SELECT
+                ${userId} AS "userId",
+                DATE_TRUNC('day', lh."answeredAt" AT TIME ZONE 'UTC')::date AS "date",
+                COUNT(*)::int AS "totalSolved",
+                SUM(CASE WHEN lh."evaluation" IN ('A', 'B') THEN 1 ELSE 0 END)::int AS "correctCount",
+                0 AS "xpEarned",
+                NOW() AS "updatedAt"
+            FROM "LearningHistory" lh
+            WHERE lh."userId" = ${userId}
+                AND lh."answeredAt" >= ${start}
+                AND lh."answeredAt" < ${end}
+            GROUP BY DATE_TRUNC('day', lh."answeredAt" AT TIME ZONE 'UTC')::date
+        `,
+    ]);
+    return Number(insertResult);
 }
 
 /**
@@ -103,6 +106,9 @@ export async function recomputeAllForDateRange(
     const end = startOfUtcDate(to);
     if (start.getTime() >= end.getTime()) return { users: 0, rows: 0 };
     const batchSize = options.batchSize ?? 50;
+    if (!Number.isInteger(batchSize) || batchSize <= 0) {
+        throw new RangeError('batchSize は正の整数である必要があります');
+    }
 
     // 期間内に学習履歴があったユーザ ID を抽出
     const userRows = await prisma.$queryRaw<Array<{ userId: string }>>`

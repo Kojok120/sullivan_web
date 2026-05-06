@@ -296,14 +296,28 @@ async function checkAchievements(
     const pendingAchievements = allAchievements.filter((a) => !unlockedIds.has(a.id));
 
     // core-unlock 系は achievement ごとに COUNT を打たず、関連 Subject を 1 クエリで集計する
+    // 未マップ slug は CORE_UNLOCK_SUBJECT_NAMES の更新漏れを示すため、警告ログで気付けるようにする
+    const unmappedCoreUnlockSlugs: string[] = [];
     const pendingCoreUnlockSubjectNames = Array.from(
         new Set(
             pendingAchievements
                 .filter((a) => a.slug.startsWith('core-unlock-'))
-                .map((a) => CORE_UNLOCK_SUBJECT_NAMES[a.slug.replace('core-unlock-', '')])
+                .map((a) => {
+                    const suffix = a.slug.replace('core-unlock-', '');
+                    const name = CORE_UNLOCK_SUBJECT_NAMES[suffix];
+                    if (!name) {
+                        unmappedCoreUnlockSlugs.push(a.slug);
+                    }
+                    return name;
+                })
                 .filter((name): name is string => Boolean(name)),
         ),
     );
+    if (unmappedCoreUnlockSlugs.length > 0) {
+        console.warn(
+            `[gamification] core-unlock slug に対応する Subject 名が CORE_UNLOCK_SUBJECT_NAMES に存在しません: ${unmappedCoreUnlockSlugs.join(', ')}`,
+        );
+    }
     const coreUnlockStats = await fetchCoreUnlockStats(tx, userId, pendingCoreUnlockSubjectNames);
 
     // Cache some aggregates

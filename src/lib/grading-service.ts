@@ -1448,14 +1448,21 @@ async function recordGradingResults(results: GradingResult[], qrData: QRData): P
         });
         const stateMap = new Map(currentStates.map(s => [s.problemId, s]));
 
-        type UpdateRow = {
+        // unit mode かどうかで update 対象列が変わるため、判別ユニオンで型レベルに narrow する。
+        // FullUpdateRow 経路では unlock 系が必ず非 null になるため、SQL 構築時の型キャストが不要になる。
+        type BaseUpdateRow = {
             problemId: string;
             isCleared: boolean;
             lastAnsweredAt: Date;
             priority: number;
-            unlockLastAnsweredAt: Date | null;
-            unlockIsCleared: boolean | null;
         };
+        type UnitUpdateRow = BaseUpdateRow & { kind: 'unit' };
+        type FullUpdateRow = BaseUpdateRow & {
+            kind: 'full';
+            unlockLastAnsweredAt: Date;
+            unlockIsCleared: boolean;
+        };
+        type UpdateRow = UnitUpdateRow | FullUpdateRow;
 
         const newStates: Prisma.UserProblemStateCreateManyInput[] = [];
         const updateRows: UpdateRow[] = [];
@@ -1484,14 +1491,25 @@ async function recordGradingResults(results: GradingResult[], qrData: QRData): P
                 const currentPriority = currentState.priority || 0;
                 const newPriority = calculateNewPriority(currentPriority, r.evaluation);
 
-                updateRows.push({
-                    problemId: r.problemId,
-                    isCleared: r.isCorrect,
-                    lastAnsweredAt: answeredAt,
-                    priority: newPriority,
-                    unlockLastAnsweredAt: isUnitMode ? null : answeredAt,
-                    unlockIsCleared: isUnitMode ? null : r.isCorrect,
-                });
+                if (isUnitMode) {
+                    updateRows.push({
+                        kind: 'unit',
+                        problemId: r.problemId,
+                        isCleared: r.isCorrect,
+                        lastAnsweredAt: answeredAt,
+                        priority: newPriority,
+                    });
+                } else {
+                    updateRows.push({
+                        kind: 'full',
+                        problemId: r.problemId,
+                        isCleared: r.isCorrect,
+                        lastAnsweredAt: answeredAt,
+                        priority: newPriority,
+                        unlockLastAnsweredAt: answeredAt,
+                        unlockIsCleared: r.isCorrect,
+                    });
+                }
             }
         }
 
@@ -1505,8 +1523,9 @@ async function recordGradingResults(results: GradingResult[], qrData: QRData): P
         // unit mode では unlock 系を更新しないため SQL を分岐する。
         if (updateRows.length > 0) {
             if (isUnitMode) {
+                const unitRows = updateRows.filter((row): row is UnitUpdateRow => row.kind === 'unit');
                 const values = Prisma.join(
-                    updateRows.map((row) =>
+                    unitRows.map((row) =>
                         Prisma.sql`(${row.problemId}::text, ${row.isCleared}::boolean, ${row.lastAnsweredAt}::timestamp, ${row.priority}::int)`
                     )
                 );
@@ -1519,9 +1538,10 @@ async function recordGradingResults(results: GradingResult[], qrData: QRData): P
                     WHERE s."userId" = ${userId} AND s."problemId" = data.problem_id
                 `;
             } else {
+                const fullRows = updateRows.filter((row): row is FullUpdateRow => row.kind === 'full');
                 const values = Prisma.join(
-                    updateRows.map((row) =>
-                        Prisma.sql`(${row.problemId}::text, ${row.isCleared}::boolean, ${row.lastAnsweredAt}::timestamp, ${row.priority}::int, ${row.unlockLastAnsweredAt as Date}::timestamp, ${row.unlockIsCleared as boolean}::boolean)`
+                    fullRows.map((row) =>
+                        Prisma.sql`(${row.problemId}::text, ${row.isCleared}::boolean, ${row.lastAnsweredAt}::timestamp, ${row.priority}::int, ${row.unlockLastAnsweredAt}::timestamp, ${row.unlockIsCleared}::boolean)`
                     )
                 );
                 await tx.$executeRaw`

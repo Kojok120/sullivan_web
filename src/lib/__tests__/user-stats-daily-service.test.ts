@@ -13,9 +13,11 @@ vi.mock('@/lib/prisma', () => ({
     prisma: {
         userStatsDaily: {
             findMany: vi.fn(),
+            deleteMany: vi.fn(),
         },
         $executeRaw: vi.fn(),
         $queryRaw: vi.fn(),
+        $transaction: vi.fn(),
     },
 }));
 
@@ -92,17 +94,21 @@ describe('user-stats-daily-service', () => {
                 new Date('2026-05-01T00:00:00.000Z'),
             );
             expect(result).toBe(0);
-            expect(prisma.$executeRaw).not.toHaveBeenCalled();
+            expect(prisma.$transaction).not.toHaveBeenCalled();
         });
 
-        it('正しい範囲で $executeRaw を呼び upsert 件数を返す', async () => {
-            vi.mocked(prisma.$executeRaw).mockResolvedValue(3 as never);
+        it('正しい範囲で $transaction（delete + insert）を呼び insert 件数を返す', async () => {
+            // $transaction は配列形式で [deleteMany結果, $executeRaw結果] を返す
+            vi.mocked(prisma.$transaction).mockResolvedValue([{ count: 0 }, 3] as never);
             const result = await recomputeForUserDateRange(
                 'user-1',
                 new Date('2026-05-01T00:00:00.000Z'),
                 new Date('2026-05-04T00:00:00.000Z'),
             );
             expect(result).toBe(3);
+            expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+            // transaction 内では deleteMany と $executeRaw が組み立てられる
+            expect(prisma.userStatsDaily.deleteMany).toHaveBeenCalledTimes(1);
             expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
         });
 
@@ -113,7 +119,7 @@ describe('user-stats-daily-service', () => {
                 new Date('2026-05-01T00:00:00.000Z'),
             );
             expect(result).toBe(0);
-            expect(prisma.$executeRaw).not.toHaveBeenCalled();
+            expect(prisma.$transaction).not.toHaveBeenCalled();
         });
     });
 
@@ -125,7 +131,7 @@ describe('user-stats-daily-service', () => {
                 new Date('2026-05-02T00:00:00.000Z'),
             );
             expect(result).toEqual({ users: 0, rows: 0 });
-            expect(prisma.$executeRaw).not.toHaveBeenCalled();
+            expect(prisma.$transaction).not.toHaveBeenCalled();
         });
 
         it('範囲が空なら $queryRaw も呼ばない', async () => {
@@ -135,7 +141,7 @@ describe('user-stats-daily-service', () => {
             );
             expect(result).toEqual({ users: 0, rows: 0 });
             expect(prisma.$queryRaw).not.toHaveBeenCalled();
-            expect(prisma.$executeRaw).not.toHaveBeenCalled();
+            expect(prisma.$transaction).not.toHaveBeenCalled();
         });
 
         it('対象ユーザを batchSize 単位で処理し、合計を返す', async () => {
@@ -144,7 +150,7 @@ describe('user-stats-daily-service', () => {
                 { userId: 'u-2' },
                 { userId: 'u-3' },
             ] as never);
-            vi.mocked(prisma.$executeRaw).mockResolvedValue(2 as never);
+            vi.mocked(prisma.$transaction).mockResolvedValue([{ count: 0 }, 2] as never);
 
             const result = await recomputeAllForDateRange(
                 new Date('2026-05-01T00:00:00.000Z'),
@@ -153,7 +159,18 @@ describe('user-stats-daily-service', () => {
             );
 
             expect(result).toEqual({ users: 3, rows: 6 });
-            expect(prisma.$executeRaw).toHaveBeenCalledTimes(3);
+            expect(prisma.$transaction).toHaveBeenCalledTimes(3);
+        });
+
+        it('batchSize が 0 以下なら RangeError を投げる', async () => {
+            vi.mocked(prisma.$queryRaw).mockResolvedValue([{ userId: 'u-1' }] as never);
+            await expect(
+                recomputeAllForDateRange(
+                    new Date('2026-05-01T00:00:00.000Z'),
+                    new Date('2026-05-04T00:00:00.000Z'),
+                    { batchSize: 0 },
+                ),
+            ).rejects.toThrow(RangeError);
         });
     });
 

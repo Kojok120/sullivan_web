@@ -304,14 +304,15 @@ export async function getSubjectProgress(userId: string): Promise<SubjectProgres
 
 async function fetchDailyActivityLive(userId: string, startDate: Date): Promise<Map<string, number>> {
     // 旧実装：LearningHistory を 1 回 GROUP BY する。バックフィル前の fallback と「今日分の live」両方で使う。
+    // recomputeForUserDateRange と同じ UTC 基準で日付化する（DB セッションタイムゾーン非依存）。
     const stats = await prisma.$queryRaw<Array<{ date: Date | string, count: bigint }>>`
         SELECT
-            DATE("answeredAt") as "date",
+            DATE_TRUNC('day', "answeredAt" AT TIME ZONE 'UTC')::date AS "date",
             COUNT(*) as "count"
         FROM "LearningHistory"
         WHERE "userId" = ${userId}
         AND "answeredAt" >= ${startDate}
-        GROUP BY DATE("answeredAt")
+        GROUP BY DATE_TRUNC('day', "answeredAt" AT TIME ZONE 'UTC')::date
     `;
 
     const map = new Map<string, number>();
@@ -358,13 +359,16 @@ async function fetchDailyActivity(userId: string, days: number): Promise<DailyAc
         }),
     ]);
 
-    // テーブルが疎すぎる（=バックフィル前）と判断したら、履歴日分だけ live で再取得する。
+    // テーブルが疎すぎる（=バックフィル前 or 部分バックフィル）と判断したら、履歴日分だけ live で再取得する。
     // しきい値は「期待日数の半分も埋まっていない」ことにする（学習頻度に依存しすぎないよう緩め）。
+    // 学習が極端に少ないユーザでは fallback がやや過剰に走るが、live 側も軽量な GROUP BY なので許容。
     let historicMap: Map<string, number>;
-    if (statsRows.length === 0 && expectedHistoricDays > 0) {
-        // 完全に空 → live で全期間取得
+    const shouldFallbackToLive =
+        expectedHistoricDays > 0 && statsRows.length < Math.ceil(expectedHistoricDays / 2);
+
+    if (shouldFallbackToLive) {
         historicMap = await fetchDailyActivityLive(userId, startDate);
-        // 今日も live 取得済みなのでマージ用に historicMap から外す
+        // 今日分は別経路で取得済みなのでマージ用に historicMap から外す
         const todayStr = todayUtc.toISOString().split('T')[0];
         historicMap.delete(todayStr);
     } else {

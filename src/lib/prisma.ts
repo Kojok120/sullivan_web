@@ -28,7 +28,8 @@ const prismaClientSingleton = () => {
 
     const adapter = new PrismaPg({ connectionString: databaseUrl });
     const slowQueryThresholdMs = resolveSlowQueryThresholdMs();
-    const enableQueryLog = slowQueryThresholdMs > 0;
+    // 本番では query イベント購読そのものを行わない（log 出力先のオーバーヘッド回避と意図しない PII 漏洩防止）。
+    const enableQueryLog = slowQueryThresholdMs > 0 && process.env.NODE_ENV !== 'production';
 
     const client = new PrismaClient({
         adapter,
