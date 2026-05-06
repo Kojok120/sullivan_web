@@ -71,3 +71,8 @@ jobs:
           # CIではビルドが通ることのみ検証（ダミー値）
           NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
           NEXT_PUBLIC_SUPABASE_ANON_KEY: "placeholder-anon-key"
+
+      - name: バンドル予算チェック
+        # .bundle-budget.json の routes が空なら計測レポートのみ。
+        # 値を埋めると上限超過時にこのステップが落ちる。
+        run: node scripts/check-bundle-budget.mjs

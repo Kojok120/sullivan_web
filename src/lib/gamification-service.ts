@@ -1,10 +1,36 @@
 import { prisma } from '@/lib/prisma';
-import { Achievement } from '@prisma/client';
-import type { Prisma } from '@prisma/client';
+import { Achievement, Prisma } from '@prisma/client';
 
 export const XP_PER_LOGIN = 50;
 export const XP_PER_ANSWER = 10;
 export const XP_BONUS_CORRECT = 5;
+
+// Achievement マスタは seed 由来の静的データなので、採点ごとに findMany を打たず
+// プロセス常駐の TTL キャッシュで共有する。
+const ACHIEVEMENTS_CACHE_TTL_MS = 5 * 60 * 1000;
+let cachedAchievements: { promise: Promise<Achievement[]>; expiresAt: number } | null = null;
+
+function getCachedAchievements(): Promise<Achievement[]> {
+    const now = Date.now();
+    if (!cachedAchievements || cachedAchievements.expiresAt <= now) {
+        const promise = prisma.achievement.findMany();
+        // 取得失敗時はキャッシュを汚さない
+        promise.catch(() => {
+            if (cachedAchievements && cachedAchievements.promise === promise) {
+                cachedAchievements = null;
+            }
+        });
+        cachedAchievements = {
+            promise,
+            expiresAt: now + ACHIEVEMENTS_CACHE_TTL_MS,
+        };
+    }
+    return cachedAchievements.promise;
+}
+
+export function invalidateAchievementsCache() {
+    cachedAchievements = null;
+}
 
 // Level calculation constant
 const LEVEL_CONSTANT = 0.1;
@@ -204,6 +230,50 @@ export async function processVideoWatch(userId: string): Promise<GamificationUpd
     });
 }
 
+// `core-unlock-{slugSuffix}` を seed の Subject.name にマッピングする。
+// Subject 追加時はここを更新する。
+const CORE_UNLOCK_SUBJECT_NAMES: Record<string, string> = {
+    english: '英語',
+    math: '数学',
+    japanese: '国語',
+};
+
+type CoreUnlockSubjectStats = { totalCount: number; unlockedCount: number };
+
+// 該当 Subject の (CoreProblem 総数, 当該ユーザーの解放済 CoreProblem 数) を 1 クエリで取得する。
+// pendingAchievements が含む subject 分だけ集計する。
+async function fetchCoreUnlockStats(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    subjectNames: string[],
+): Promise<Map<string, CoreUnlockSubjectStats>> {
+    const stats = new Map<string, CoreUnlockSubjectStats>();
+    if (subjectNames.length === 0) return stats;
+
+    const rows = await tx.$queryRaw<Array<{ name: string; total_count: number | string | bigint; unlocked_count: number | string | bigint }>>`
+        SELECT
+            s.name AS name,
+            COUNT(DISTINCT cp.id) AS total_count,
+            COUNT(DISTINCT ucps."coreProblemId") AS unlocked_count
+        FROM "Subject" s
+        LEFT JOIN "CoreProblem" cp ON cp."subjectId" = s.id
+        LEFT JOIN "UserCoreProblemState" ucps
+            ON ucps."coreProblemId" = cp.id
+            AND ucps."userId" = ${userId}
+            AND ucps."isUnlocked" = true
+        WHERE s.name IN (${Prisma.join(subjectNames)})
+        GROUP BY s.id, s.name
+    `;
+
+    for (const row of rows) {
+        stats.set(row.name, {
+            totalCount: Number(row.total_count ?? 0),
+            unlockedCount: Number(row.unlocked_count ?? 0),
+        });
+    }
+    return stats;
+}
+
 // Helper to check achievements
 async function checkAchievements(
     tx: Prisma.TransactionClient,
@@ -221,8 +291,34 @@ async function checkAchievements(
     });
     const unlockedIds = new Set(userUnlocked.map((ua) => ua.achievementId));
 
-    const allAchievements = await tx.achievement.findMany();
+    // Achievement マスタはトランザクション外の TTL キャッシュから取得する
+    const allAchievements = await getCachedAchievements();
     const pendingAchievements = allAchievements.filter((a) => !unlockedIds.has(a.id));
+
+    // core-unlock 系は achievement ごとに COUNT を打たず、関連 Subject を 1 クエリで集計する
+    // 未マップ slug は CORE_UNLOCK_SUBJECT_NAMES の更新漏れを示すため、警告ログで気付けるようにする
+    const unmappedCoreUnlockSlugs: string[] = [];
+    const pendingCoreUnlockSubjectNames = Array.from(
+        new Set(
+            pendingAchievements
+                .filter((a) => a.slug.startsWith('core-unlock-'))
+                .map((a) => {
+                    const suffix = a.slug.replace('core-unlock-', '');
+                    const name = CORE_UNLOCK_SUBJECT_NAMES[suffix];
+                    if (!name) {
+                        unmappedCoreUnlockSlugs.push(a.slug);
+                    }
+                    return name;
+                })
+                .filter((name): name is string => Boolean(name)),
+        ),
+    );
+    if (unmappedCoreUnlockSlugs.length > 0) {
+        console.warn(
+            `[gamification] core-unlock slug に対応する Subject 名が CORE_UNLOCK_SUBJECT_NAMES に存在しません: ${unmappedCoreUnlockSlugs.join(', ')}`,
+        );
+    }
+    const coreUnlockStats = await fetchCoreUnlockStats(tx, userId, pendingCoreUnlockSubjectNames);
 
     // Cache some aggregates
     let totalSolvedCount = -1;
@@ -336,32 +432,14 @@ async function checkAchievements(
         }
 
         // Core Unlock Logic (Subject Master)
+        // 集計は事前 fetch 済み。ここではマップ参照のみ。
         if (achievement.slug.startsWith('core-unlock-')) {
             const slugSuffix = achievement.slug.replace('core-unlock-', '');
-            let subjectName = '';
-            // Map slug suffix to Japanese Subject Name (as per seed.ts)
-            if (slugSuffix === 'english') subjectName = '英語';
-            else if (slugSuffix === 'math') subjectName = '数学';
-            else if (slugSuffix === 'japanese') subjectName = '国語'; // Assuming this might exist
-
+            const subjectName = CORE_UNLOCK_SUBJECT_NAMES[slugSuffix];
             if (subjectName) {
-                // Check if user has unlocked ALL core problems for this subject
-                const subject = await tx.subject.findUnique({
-                    where: { name: subjectName },
-                    include: { coreProblems: true }
-                });
-
-                if (subject && subject.coreProblems.length > 0) {
-                    const totalCoreProblems = subject.coreProblems.length;
-                    const unlockedCount = await tx.userCoreProblemState.count({
-                        where: {
-                            userId,
-                            coreProblemId: { in: subject.coreProblems.map((cp) => cp.id) },
-                            isUnlocked: true
-                        }
-                    });
-
-                    if (unlockedCount >= totalCoreProblems) isUnlocked = true;
+                const stats = coreUnlockStats.get(subjectName);
+                if (stats && stats.totalCount > 0 && stats.unlockedCount >= stats.totalCount) {
+                    isUnlocked = true;
                 }
             }
         }

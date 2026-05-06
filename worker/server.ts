@@ -166,6 +166,80 @@ async function handleManualDriveCheck(req: IncomingMessage, res: ServerResponse)
     }
 }
 
+async function handleRecomputeStatsDaily(rawBody: string, req: IncomingMessage, res: ServerResponse) {
+    const authHeader = getSingleHeader(req.headers.authorization);
+    const secretHeader = getSingleHeader(req.headers[INTERNAL_API_SECRET_HEADER_NAME]);
+
+    if (!hasValidInternalApiSecret(secretHeader, authHeader, process.env.INTERNAL_API_SECRET)) {
+        sendJson(res, 401, { error: 'Unauthorized' });
+        return;
+    }
+
+    // payload は省略可能。省略時は「昨日 1 日分を全ユーザに対して再集計」する。
+    let payload: { fromDate?: unknown; toDate?: unknown; userId?: unknown } = {};
+    const trimmed = rawBody.trim();
+    if (trimmed.length > 0) {
+        try {
+            payload = JSON.parse(trimmed) as typeof payload;
+        } catch {
+            sendJson(res, 400, { success: false, error: 'Invalid JSON body' });
+            return;
+        }
+    }
+
+    const parseDate = (value: unknown): Date | null => {
+        if (typeof value !== 'string' || value.trim() === '') return null;
+        const d = new Date(value);
+        return Number.isNaN(d.getTime()) ? null : d;
+    };
+
+    let from = parseDate(payload.fromDate);
+    let to = parseDate(payload.toDate);
+    if (!from || !to) {
+        // デフォルト: 昨日 0:00 (UTC) ～ 今日 0:00 (UTC)
+        const todayUtc = new Date();
+        todayUtc.setUTCHours(0, 0, 0, 0);
+        const yesterdayUtc = new Date(todayUtc.getTime() - 24 * 60 * 60 * 1000);
+        from = from ?? yesterdayUtc;
+        to = to ?? todayUtc;
+    }
+    if (from.getTime() >= to.getTime()) {
+        sendJson(res, 400, { success: false, error: 'fromDate must be before toDate' });
+        return;
+    }
+
+    const userId = typeof payload.userId === 'string' && payload.userId.trim() !== ''
+        ? payload.userId.trim()
+        : null;
+
+    try {
+        const { recomputeForUserDateRange, recomputeAllForDateRange } = await import('../src/lib/user-stats-daily-service');
+        if (userId) {
+            const rows = await recomputeForUserDateRange(userId, from, to);
+            sendJson(res, 200, {
+                success: true,
+                fromDate: from.toISOString(),
+                toDate: to.toISOString(),
+                userId,
+                rows,
+            });
+            return;
+        }
+        const result = await recomputeAllForDateRange(from, to);
+        sendJson(res, 200, {
+            success: true,
+            fromDate: from.toISOString(),
+            toDate: to.toISOString(),
+            users: result.users,
+            rows: result.rows,
+        });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        console.error('[RecomputeStatsDaily] Failed:', message);
+        sendJson(res, 500, { success: false, error: message });
+    }
+}
+
 async function handleCloudRunMinInstances(rawBody: string, req: IncomingMessage, res: ServerResponse) {
     const authHeader = getSingleHeader(req.headers.authorization);
     const secretHeader = getSingleHeader(req.headers[INTERNAL_API_SECRET_HEADER_NAME]);
@@ -252,6 +326,12 @@ const server = createServer(async (req, res) => {
         if (method === 'POST' && pathname === '/api/internal/cloud-run/min-instances') {
             const rawBody = await readRawBody(req);
             await handleCloudRunMinInstances(rawBody, req, res);
+            return;
+        }
+
+        if (method === 'POST' && pathname === '/api/internal/recompute-stats-daily') {
+            const rawBody = await readRawBody(req);
+            await handleRecomputeStatsDaily(rawBody, req, res);
             return;
         }
 

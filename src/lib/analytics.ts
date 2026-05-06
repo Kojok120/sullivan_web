@@ -1,3 +1,4 @@
+import { unstable_cache } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
 import type { StudentSortKey, StudentSortOrder } from '@/lib/student-sort';
@@ -26,25 +27,6 @@ export type DailyActivity = {
 };
 
 type ComputedStudentSortKey = 'totalProblemsSolved' | 'lastActivity';
-
-const studentLoginIdCollator = new Intl.Collator('ja', {
-    numeric: true,
-    sensitivity: 'base',
-});
-
-function compareStudentLoginId(a: string, b: string) {
-    return studentLoginIdCollator.compare(a, b);
-}
-
-function compareNullableDate(a: Date | null, b: Date | null, sortOrder: StudentSortOrder) {
-    if (!a && !b) return 0;
-    if (!a) return 1;
-    if (!b) return -1;
-
-    return sortOrder === 'asc'
-        ? a.getTime() - b.getTime()
-        : b.getTime() - a.getTime();
-}
 
 function createEmptyStudentStats(user?: { xp: number; level: number; currentStreak: number }): StudentStats {
     return {
@@ -118,43 +100,6 @@ async function fetchStudentIdsForComputedSort(params: {
         LIMIT ${params.take}
         OFFSET ${params.skip}
     `);
-}
-
-function sortStudentsWithStats<T extends {
-    id: string;
-    loginId: string;
-    stats: Pick<StudentStats, 'totalProblemsSolved' | 'currentStreak' | 'lastActivity'>;
-}>(
-    students: T[],
-    sortBy: StudentSortKey,
-    sortOrder: StudentSortOrder,
-) {
-    return [...students].sort((a, b) => {
-        const direction = sortOrder === 'asc' ? 1 : -1;
-        let result: number;
-
-        switch (sortBy) {
-            case 'loginId':
-                result = compareStudentLoginId(a.loginId, b.loginId) * direction;
-                break;
-            case 'totalProblemsSolved':
-                result = (a.stats.totalProblemsSolved - b.stats.totalProblemsSolved) * direction;
-                break;
-            case 'currentStreak':
-                result = (a.stats.currentStreak - b.stats.currentStreak) * direction;
-                break;
-            case 'lastActivity':
-                result = compareNullableDate(a.stats.lastActivity, b.stats.lastActivity, sortOrder);
-                break;
-        }
-
-        if (result !== 0) return result;
-
-        const loginIdResult = compareStudentLoginId(a.loginId, b.loginId);
-        if (loginIdResult !== 0) return loginIdResult;
-
-        return a.id.localeCompare(b.id);
-    });
 }
 
 export async function getStudentStats(userId: string): Promise<StudentStats> {
@@ -297,17 +242,13 @@ export async function getStudentsWithStats(
     // Bulk fetch stats
     const statsMap = await fetchInternalStudentStats(studentIds);
 
-    const studentsWithStats = students.map(student => ({
+    // StudentSortKey は loginId/currentStreak/totalProblemsSolved/lastActivity の4値のみで、
+    // 計算系2種は requiresComputedStatsSort 経路で SQL 側 ORDER BY 済み、残り2種＋未指定はこの上の DB orderBy で済む。
+    // よってここでさらに JS で再ソートする必要は無い。
+    return students.map(student => ({
         ...student,
         stats: statsMap.get(student.id)!,
     }));
-
-    if (!sortBy || sortBy === 'loginId' || sortBy === 'currentStreak') {
-        return studentsWithStats;
-    }
-
-    const sortedStudents = sortStudentsWithStats(studentsWithStats, sortBy, sortOrder);
-    return sortedStudents.slice(skip, skip + take);
 }
 
 export async function getSubjectProgress(userId: string): Promise<SubjectProgress[]> {
@@ -361,41 +302,113 @@ export async function getSubjectProgress(userId: string): Promise<SubjectProgres
     });
 }
 
-export async function getDailyActivity(userId: string, days = 30): Promise<DailyActivity[]> {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-
-    // Group by Date in DB
+async function fetchDailyActivityLive(userId: string, startDate: Date): Promise<Map<string, number>> {
+    // 旧実装：LearningHistory を 1 回 GROUP BY する。バックフィル前の fallback と「今日分の live」両方で使う。
+    // recomputeForUserDateRange と同じ UTC 基準で日付化する（DB セッションタイムゾーン非依存）。
     const stats = await prisma.$queryRaw<Array<{ date: Date | string, count: bigint }>>`
-        SELECT 
-            DATE("answeredAt") as "date", 
+        SELECT
+            DATE_TRUNC('day', "answeredAt" AT TIME ZONE 'UTC')::date AS "date",
             COUNT(*) as "count"
         FROM "LearningHistory"
         WHERE "userId" = ${userId}
         AND "answeredAt" >= ${startDate}
-        GROUP BY DATE("answeredAt")
+        GROUP BY DATE_TRUNC('day', "answeredAt" AT TIME ZONE 'UTC')::date
     `;
 
-    const activityMap = new Map<string, number>();
-    stats.forEach(s => {
-        // s.date might be a Date object or string depending on driver
+    const map = new Map<string, number>();
+    for (const s of stats) {
         const d = new Date(s.date);
         const dateStr = d.toISOString().split('T')[0];
-        activityMap.set(dateStr, Number(s.count));
-    });
+        map.set(dateStr, Number(s.count));
+    }
+    return map;
+}
+
+async function fetchDailyActivity(userId: string, days: number): Promise<DailyActivity[]> {
+    // UTC 0:00 ベースの「今日」境界。startDate = 今日 - (days-1) 日。
+    const todayUtc = new Date();
+    todayUtc.setUTCHours(0, 0, 0, 0);
+    const startDate = new Date(todayUtc.getTime() - (days - 1) * 24 * 60 * 60 * 1000);
+
+    // 履歴日（startDate ≤ date < todayUtc）は UserStatsDaily から、今日は live で読む。
+    // UserStatsDaily が空の日は「学習なし」または「未集計」のいずれかだが、
+    // 未集計を網羅するためテーブル件数が想定より少ないときは live にフォールバックする。
+    const expectedHistoricDays = days - 1;
+    const [statsRows, liveTodayMap] = await Promise.all([
+        prisma.userStatsDaily.findMany({
+            where: {
+                userId,
+                date: { gte: startDate, lt: todayUtc },
+            },
+            select: { date: true, totalSolved: true },
+            orderBy: { date: 'asc' },
+        }),
+        // 今日分は LearningHistory から直接 COUNT する。
+        // dashboard では当日 1 ジョブ採点後すぐに反映されることが期待されるため、
+        // テーブルの再集計を待たず live に依存する。
+        prisma.learningHistory.count({
+            where: {
+                userId,
+                answeredAt: { gte: todayUtc },
+            },
+        }).then((count) => {
+            const map = new Map<string, number>();
+            const todayStr = todayUtc.toISOString().split('T')[0];
+            if (count > 0) map.set(todayStr, count);
+            return map;
+        }),
+    ]);
+
+    // テーブルが疎すぎる（=バックフィル前 or 部分バックフィル）と判断したら、履歴日分だけ live で再取得する。
+    // しきい値は「期待日数の半分も埋まっていない」ことにする（学習頻度に依存しすぎないよう緩め）。
+    // 学習が極端に少ないユーザでは fallback がやや過剰に走るが、live 側も軽量な GROUP BY なので許容。
+    let historicMap: Map<string, number>;
+    const shouldFallbackToLive =
+        expectedHistoricDays > 0 && statsRows.length < Math.ceil(expectedHistoricDays / 2);
+
+    if (shouldFallbackToLive) {
+        historicMap = await fetchDailyActivityLive(userId, startDate);
+        // 今日分は別経路で取得済みなのでマージ用に historicMap から外す
+        const todayStr = todayUtc.toISOString().split('T')[0];
+        historicMap.delete(todayStr);
+    } else {
+        historicMap = new Map();
+        for (const row of statsRows) {
+            const dateStr = row.date.toISOString().split('T')[0];
+            historicMap.set(dateStr, row.totalSolved);
+        }
+    }
 
     const result: DailyActivity[] = [];
     for (let i = 0; i < days; i++) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
+        const d = new Date(todayUtc.getTime() - i * 24 * 60 * 60 * 1000);
         const dateStr = d.toISOString().split('T')[0];
+        const fromToday = liveTodayMap.get(dateStr);
+        const fromHistoric = historicMap.get(dateStr);
         result.push({
             date: dateStr,
-            count: activityMap.get(dateStr) || 0,
+            count: fromToday ?? fromHistoric ?? 0,
         });
     }
 
     return result.reverse();
+}
+
+// 365 日分の集計はダッシュボード表示で使い回すため短期キャッシュする。
+// 採点直後の反映は最大 60 秒遅延するが、ヒートマップは日単位の濃淡で
+// 即時性を要求しないため許容する。
+const DAILY_ACTIVITY_CACHE_TTL_SECONDS = 60;
+
+const getCachedDailyActivity = unstable_cache(
+    async (userId: string, days: number): Promise<DailyActivity[]> => {
+        return fetchDailyActivity(userId, days);
+    },
+    ['analytics:daily-activity'],
+    { revalidate: DAILY_ACTIVITY_CACHE_TTL_SECONDS },
+);
+
+export async function getDailyActivity(userId: string, days = 30): Promise<DailyActivity[]> {
+    return getCachedDailyActivity(userId, days);
 }
 
 export type Weakness = {
@@ -485,14 +498,27 @@ export async function getLearningHistory(
     const [items, total] = await Promise.all([
         prisma.learningHistory.findMany({
             where: whereClause,
-            include: {
+            select: {
+                id: true,
+                evaluation: true,
+                answeredAt: true,
+                userAnswer: true,
+                feedback: true,
                 problem: {
-                    include: {
+                    select: {
+                        id: true,
+                        question: true,
                         coreProblems: {
-                            include: { subject: true }
-                        }
-                    }
-                }
+                            select: {
+                                id: true,
+                                name: true,
+                                subject: {
+                                    select: { id: true, name: true },
+                                },
+                            },
+                        },
+                    },
+                },
             },
             orderBy: {
                 answeredAt: sort
@@ -680,6 +706,7 @@ export async function getStudentDashboardData(userId: string) {
                     select: {
                         id: true,
                         question: true,
+                        // 表示で使うのは先頭の CoreProblem のみのため、転送量と JOIN コストを抑える
                         coreProblems: {
                             select: {
                                 id: true,
@@ -690,7 +717,9 @@ export async function getStudentDashboardData(userId: string) {
                                         name: true
                                     }
                                 }
-                            }
+                            },
+                            orderBy: [{ order: 'asc' }, { id: 'asc' }],
+                            take: 1,
                         }
                     }
                 }

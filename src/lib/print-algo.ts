@@ -69,14 +69,19 @@ export async function selectProblemsForPrint(
         // Unified Logic via progression.ts
         const readyCoreProblemIds = await getReadyCoreProblemIds(userId, subjectId);
 
+        // ready CoreProblem が 0 件の場合、印刷対象になり得る問題は存在しない。
+        // Prisma の every は空配列で true になり、coreProblems を持たない異常データが
+        // 紛れ込むと候補化されるため、ここで明示的に短絡する。
+        if (readyCoreProblemIds.size === 0) {
+            return [];
+        }
+
         // 通常印刷（おまかせ）の場合:
         // 紐づく「全ての」CoreProblemがReadyでなければならない
         // （アンロック済み かつ 講義動画視聴済みまたは講義動画なし）
-
-        // Prismaの every は「空配列の場合もtrue」になる仕様があるが、
-        // CoreProblemを持たない問題は存在しない前提（データ整合性）。
-
+        // some + every で「coreProblems を最低1件持ち、かつ全てが ready」を担保する。
         whereCondition.coreProblems = {
+            some: {},
             every: {
                 id: { in: Array.from(readyCoreProblemIds) }
             },

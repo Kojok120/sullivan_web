@@ -5,8 +5,7 @@ import { getSubjectProgress } from "@/lib/analytics";
 import { History } from "lucide-react";
 import { getUnseenAchievementsForUser } from '@/lib/achievement-service';
 import { PrintSelector } from "@/components/print/print-selector";
-import { StampOverlay } from "@/components/grading/stamp-overlay";
-import { AchievementOverlay } from "@/components/gamification/achievement-overlay";
+import { HomeOverlays } from "./home-overlays";
 import { getStampDataForUser } from '@/lib/stamp-service';
 import { getGoalDailyViewPayload } from '@/lib/student-goal-service';
 import { GoalReadonlyPanel } from '@/components/goals/goal-readonly-panel';
@@ -31,8 +30,10 @@ export default async function Home() {
     return (
         <div className="container mx-auto px-4 py-12 max-w-4xl">
             <header className="mb-10">
-                <StampOverlay initialData={initialStampOverlayData} />
-                <AchievementOverlay initialQueue={unseenAchievements} />
+                <HomeOverlays
+                    initialStampOverlayData={initialStampOverlayData}
+                    initialAchievementQueue={unseenAchievements}
+                />
             </header>
 
             <section className="mb-8">
