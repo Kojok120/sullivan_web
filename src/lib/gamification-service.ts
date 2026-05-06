@@ -6,6 +6,33 @@ export const XP_PER_LOGIN = 50;
 export const XP_PER_ANSWER = 10;
 export const XP_BONUS_CORRECT = 5;
 
+// Achievement マスタは seed 由来の静的データなので、採点ごとに findMany を打たず
+// プロセス常駐の TTL キャッシュで共有する。
+const ACHIEVEMENTS_CACHE_TTL_MS = 5 * 60 * 1000;
+let cachedAchievements: { promise: Promise<Achievement[]>; expiresAt: number } | null = null;
+
+function getCachedAchievements(): Promise<Achievement[]> {
+    const now = Date.now();
+    if (!cachedAchievements || cachedAchievements.expiresAt <= now) {
+        const promise = prisma.achievement.findMany();
+        // 取得失敗時はキャッシュを汚さない
+        promise.catch(() => {
+            if (cachedAchievements && cachedAchievements.promise === promise) {
+                cachedAchievements = null;
+            }
+        });
+        cachedAchievements = {
+            promise,
+            expiresAt: now + ACHIEVEMENTS_CACHE_TTL_MS,
+        };
+    }
+    return cachedAchievements.promise;
+}
+
+export function invalidateAchievementsCache() {
+    cachedAchievements = null;
+}
+
 // Level calculation constant
 const LEVEL_CONSTANT = 0.1;
 
@@ -221,7 +248,8 @@ async function checkAchievements(
     });
     const unlockedIds = new Set(userUnlocked.map((ua) => ua.achievementId));
 
-    const allAchievements = await tx.achievement.findMany();
+    // Achievement マスタはトランザクション外の TTL キャッシュから取得する
+    const allAchievements = await getCachedAchievements();
     const pendingAchievements = allAchievements.filter((a) => !unlockedIds.has(a.id));
 
     // Cache some aggregates

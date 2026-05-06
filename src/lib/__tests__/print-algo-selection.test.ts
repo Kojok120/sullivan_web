@@ -38,6 +38,7 @@ describe('selectProblemsForPrint', () => {
             subjectId: 'subject-1',
             status: 'PUBLISHED',
             coreProblems: {
+                some: {},
                 every: {
                     id: { in: ['cp-1', 'cp-2'] },
                 },
@@ -57,6 +58,15 @@ describe('selectProblemsForPrint', () => {
             },
         });
         expect(query.include).toBeUndefined();
+    });
+
+    it('ready CoreProblem が空のときは findMany を呼ばずに空配列を返す', async () => {
+        getReadyCoreProblemIdsMock.mockResolvedValue(new Set<string>());
+
+        const result = await selectProblemsForPrint('user-1', 'subject-1', undefined, 10);
+
+        expect(result).toEqual([]);
+        expect(findManyMock).not.toHaveBeenCalled();
     });
 
     it('coreProblemId 指定時は ready CoreProblem 取得をスキップする', async () => {

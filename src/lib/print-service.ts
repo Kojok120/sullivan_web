@@ -2,7 +2,20 @@ import { prisma } from '@/lib/prisma';
 import { createProblemAssetSignedUrl } from '@/lib/problem-assets';
 import { selectProblemsForPrint } from '@/lib/print-algo';
 import { encodeUnitToken } from '@/lib/qr-utils';
-import type { PrintableProblem } from '@/lib/print-types';
+import type { PrintableProblem, PrintableProblemAsset } from '@/lib/print-types';
+
+// 印刷で実際に図として埋め込み得る asset 種別だけ signed URL を生成する。
+// DESMOS_STATE / GEOGEBRA_STATE / JSON / THUMBNAIL は inlineContent や別経路で
+// 利用するため Storage への往復は不要。
+const PRINT_SIGNED_URL_KINDS = new Set(['IMAGE', 'SVG', 'PDF']);
+
+function shouldGenerateSignedUrl(asset: PrintableProblemAsset): boolean {
+    if (!asset.storageKey) return false;
+    if (PRINT_SIGNED_URL_KINDS.has(asset.kind)) return true;
+    if (asset.mimeType.startsWith('image/')) return true;
+    if (asset.mimeType === 'application/pdf') return true;
+    return false;
+}
 
 type PrintData = {
     studentName: string;
@@ -62,7 +75,9 @@ export async function getPrintData(
         assets: problem.assets
             ? await Promise.all(problem.assets.map(async (asset) => ({
                 ...asset,
-                signedUrl: asset.storageKey ? await createProblemAssetSignedUrl(asset.storageKey) : null,
+                signedUrl: shouldGenerateSignedUrl(asset)
+                    ? await createProblemAssetSignedUrl(asset.storageKey!)
+                    : null,
             })))
             : [],
     })));

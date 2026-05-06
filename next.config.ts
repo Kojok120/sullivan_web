@@ -51,6 +51,9 @@ const nextConfig: NextConfig = {
   // ⚠️ ローカルの npm run build では型エラーが検出されない
   //    ローカルで型チェックする場合: npm run type-check
   // 参照: .github/workflows/ci.yml の「TypeScript 型チェック」ステップ
+  // TODO(perf-review-2026-08): ビルド時間とメモリ使用量を再計測し、許容範囲なら
+  //   ignoreBuildErrors を false に戻す。ローカルで型エラーが見えない状態が
+  //   退行検知の網を破っているため、Phase 2 の見直しタイミングで判断する。
   typescript: {
     ignoreBuildErrors: true,
   },

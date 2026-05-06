@@ -1,3 +1,4 @@
+import { unstable_cache } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
 import type { StudentSortKey, StudentSortOrder } from '@/lib/student-sort';
@@ -361,14 +362,14 @@ export async function getSubjectProgress(userId: string): Promise<SubjectProgres
     });
 }
 
-export async function getDailyActivity(userId: string, days = 30): Promise<DailyActivity[]> {
+async function fetchDailyActivity(userId: string, days: number): Promise<DailyActivity[]> {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
     // Group by Date in DB
     const stats = await prisma.$queryRaw<Array<{ date: Date | string, count: bigint }>>`
-        SELECT 
-            DATE("answeredAt") as "date", 
+        SELECT
+            DATE("answeredAt") as "date",
             COUNT(*) as "count"
         FROM "LearningHistory"
         WHERE "userId" = ${userId}
@@ -396,6 +397,23 @@ export async function getDailyActivity(userId: string, days = 30): Promise<Daily
     }
 
     return result.reverse();
+}
+
+// 365 日分の集計はダッシュボード表示で使い回すため短期キャッシュする。
+// 採点直後の反映は最大 60 秒遅延するが、ヒートマップは日単位の濃淡で
+// 即時性を要求しないため許容する。
+const DAILY_ACTIVITY_CACHE_TTL_SECONDS = 60;
+
+const getCachedDailyActivity = unstable_cache(
+    async (userId: string, days: number): Promise<DailyActivity[]> => {
+        return fetchDailyActivity(userId, days);
+    },
+    ['analytics:daily-activity'],
+    { revalidate: DAILY_ACTIVITY_CACHE_TTL_SECONDS },
+);
+
+export async function getDailyActivity(userId: string, days = 30): Promise<DailyActivity[]> {
+    return getCachedDailyActivity(userId, days);
 }
 
 export type Weakness = {
