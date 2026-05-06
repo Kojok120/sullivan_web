@@ -302,11 +302,8 @@ export async function getSubjectProgress(userId: string): Promise<SubjectProgres
     });
 }
 
-async function fetchDailyActivity(userId: string, days: number): Promise<DailyActivity[]> {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-
-    // Group by Date in DB
+async function fetchDailyActivityLive(userId: string, startDate: Date): Promise<Map<string, number>> {
+    // 旧実装：LearningHistory を 1 回 GROUP BY する。バックフィル前の fallback と「今日分の live」両方で使う。
     const stats = await prisma.$queryRaw<Array<{ date: Date | string, count: bigint }>>`
         SELECT
             DATE("answeredAt") as "date",
@@ -317,22 +314,76 @@ async function fetchDailyActivity(userId: string, days: number): Promise<DailyAc
         GROUP BY DATE("answeredAt")
     `;
 
-    const activityMap = new Map<string, number>();
-    stats.forEach(s => {
-        // s.date might be a Date object or string depending on driver
+    const map = new Map<string, number>();
+    for (const s of stats) {
         const d = new Date(s.date);
         const dateStr = d.toISOString().split('T')[0];
-        activityMap.set(dateStr, Number(s.count));
-    });
+        map.set(dateStr, Number(s.count));
+    }
+    return map;
+}
+
+async function fetchDailyActivity(userId: string, days: number): Promise<DailyActivity[]> {
+    // UTC 0:00 ベースの「今日」境界。startDate = 今日 - (days-1) 日。
+    const todayUtc = new Date();
+    todayUtc.setUTCHours(0, 0, 0, 0);
+    const startDate = new Date(todayUtc.getTime() - (days - 1) * 24 * 60 * 60 * 1000);
+
+    // 履歴日（startDate ≤ date < todayUtc）は UserStatsDaily から、今日は live で読む。
+    // UserStatsDaily が空の日は「学習なし」または「未集計」のいずれかだが、
+    // 未集計を網羅するためテーブル件数が想定より少ないときは live にフォールバックする。
+    const expectedHistoricDays = days - 1;
+    const [statsRows, liveTodayMap] = await Promise.all([
+        prisma.userStatsDaily.findMany({
+            where: {
+                userId,
+                date: { gte: startDate, lt: todayUtc },
+            },
+            select: { date: true, totalSolved: true },
+            orderBy: { date: 'asc' },
+        }),
+        // 今日分は LearningHistory から直接 COUNT する。
+        // dashboard では当日 1 ジョブ採点後すぐに反映されることが期待されるため、
+        // テーブルの再集計を待たず live に依存する。
+        prisma.learningHistory.count({
+            where: {
+                userId,
+                answeredAt: { gte: todayUtc },
+            },
+        }).then((count) => {
+            const map = new Map<string, number>();
+            const todayStr = todayUtc.toISOString().split('T')[0];
+            if (count > 0) map.set(todayStr, count);
+            return map;
+        }),
+    ]);
+
+    // テーブルが疎すぎる（=バックフィル前）と判断したら、履歴日分だけ live で再取得する。
+    // しきい値は「期待日数の半分も埋まっていない」ことにする（学習頻度に依存しすぎないよう緩め）。
+    let historicMap: Map<string, number>;
+    if (statsRows.length === 0 && expectedHistoricDays > 0) {
+        // 完全に空 → live で全期間取得
+        historicMap = await fetchDailyActivityLive(userId, startDate);
+        // 今日も live 取得済みなのでマージ用に historicMap から外す
+        const todayStr = todayUtc.toISOString().split('T')[0];
+        historicMap.delete(todayStr);
+    } else {
+        historicMap = new Map();
+        for (const row of statsRows) {
+            const dateStr = row.date.toISOString().split('T')[0];
+            historicMap.set(dateStr, row.totalSolved);
+        }
+    }
 
     const result: DailyActivity[] = [];
     for (let i = 0; i < days; i++) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
+        const d = new Date(todayUtc.getTime() - i * 24 * 60 * 60 * 1000);
         const dateStr = d.toISOString().split('T')[0];
+        const fromToday = liveTodayMap.get(dateStr);
+        const fromHistoric = historicMap.get(dateStr);
         result.push({
             date: dateStr,
-            count: activityMap.get(dateStr) || 0,
+            count: fromToday ?? fromHistoric ?? 0,
         });
     }
 
