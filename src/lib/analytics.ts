@@ -28,25 +28,6 @@ export type DailyActivity = {
 
 type ComputedStudentSortKey = 'totalProblemsSolved' | 'lastActivity';
 
-const studentLoginIdCollator = new Intl.Collator('ja', {
-    numeric: true,
-    sensitivity: 'base',
-});
-
-function compareStudentLoginId(a: string, b: string) {
-    return studentLoginIdCollator.compare(a, b);
-}
-
-function compareNullableDate(a: Date | null, b: Date | null, sortOrder: StudentSortOrder) {
-    if (!a && !b) return 0;
-    if (!a) return 1;
-    if (!b) return -1;
-
-    return sortOrder === 'asc'
-        ? a.getTime() - b.getTime()
-        : b.getTime() - a.getTime();
-}
-
 function createEmptyStudentStats(user?: { xp: number; level: number; currentStreak: number }): StudentStats {
     return {
         totalProblemsSolved: 0,
@@ -119,43 +100,6 @@ async function fetchStudentIdsForComputedSort(params: {
         LIMIT ${params.take}
         OFFSET ${params.skip}
     `);
-}
-
-function sortStudentsWithStats<T extends {
-    id: string;
-    loginId: string;
-    stats: Pick<StudentStats, 'totalProblemsSolved' | 'currentStreak' | 'lastActivity'>;
-}>(
-    students: T[],
-    sortBy: StudentSortKey,
-    sortOrder: StudentSortOrder,
-) {
-    return [...students].sort((a, b) => {
-        const direction = sortOrder === 'asc' ? 1 : -1;
-        let result: number;
-
-        switch (sortBy) {
-            case 'loginId':
-                result = compareStudentLoginId(a.loginId, b.loginId) * direction;
-                break;
-            case 'totalProblemsSolved':
-                result = (a.stats.totalProblemsSolved - b.stats.totalProblemsSolved) * direction;
-                break;
-            case 'currentStreak':
-                result = (a.stats.currentStreak - b.stats.currentStreak) * direction;
-                break;
-            case 'lastActivity':
-                result = compareNullableDate(a.stats.lastActivity, b.stats.lastActivity, sortOrder);
-                break;
-        }
-
-        if (result !== 0) return result;
-
-        const loginIdResult = compareStudentLoginId(a.loginId, b.loginId);
-        if (loginIdResult !== 0) return loginIdResult;
-
-        return a.id.localeCompare(b.id);
-    });
 }
 
 export async function getStudentStats(userId: string): Promise<StudentStats> {
@@ -298,17 +242,13 @@ export async function getStudentsWithStats(
     // Bulk fetch stats
     const statsMap = await fetchInternalStudentStats(studentIds);
 
-    const studentsWithStats = students.map(student => ({
+    // StudentSortKey は loginId/currentStreak/totalProblemsSolved/lastActivity の4値のみで、
+    // 計算系2種は requiresComputedStatsSort 経路で SQL 側 ORDER BY 済み、残り2種＋未指定はこの上の DB orderBy で済む。
+    // よってここでさらに JS で再ソートする必要は無い。
+    return students.map(student => ({
         ...student,
         stats: statsMap.get(student.id)!,
     }));
-
-    if (!sortBy || sortBy === 'loginId' || sortBy === 'currentStreak') {
-        return studentsWithStats;
-    }
-
-    const sortedStudents = sortStudentsWithStats(studentsWithStats, sortBy, sortOrder);
-    return sortedStudents.slice(skip, skip + take);
 }
 
 export async function getSubjectProgress(userId: string): Promise<SubjectProgress[]> {
@@ -503,14 +443,27 @@ export async function getLearningHistory(
     const [items, total] = await Promise.all([
         prisma.learningHistory.findMany({
             where: whereClause,
-            include: {
+            select: {
+                id: true,
+                evaluation: true,
+                answeredAt: true,
+                userAnswer: true,
+                feedback: true,
                 problem: {
-                    include: {
+                    select: {
+                        id: true,
+                        question: true,
                         coreProblems: {
-                            include: { subject: true }
-                        }
-                    }
-                }
+                            select: {
+                                id: true,
+                                name: true,
+                                subject: {
+                                    select: { id: true, name: true },
+                                },
+                            },
+                        },
+                    },
+                },
             },
             orderBy: {
                 answeredAt: sort
@@ -698,6 +651,7 @@ export async function getStudentDashboardData(userId: string) {
                     select: {
                         id: true,
                         question: true,
+                        // 表示で使うのは先頭の CoreProblem のみのため、転送量と JOIN コストを抑える
                         coreProblems: {
                             select: {
                                 id: true,
@@ -708,7 +662,9 @@ export async function getStudentDashboardData(userId: string) {
                                         name: true
                                     }
                                 }
-                            }
+                            },
+                            orderBy: [{ order: 'asc' }, { id: 'asc' }],
+                            take: 1,
                         }
                     }
                 }

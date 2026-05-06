@@ -394,18 +394,31 @@ export async function getProblems(
         const skip = (page - 1) * limit;
 
         if (sortBy === 'customId') {
-            const idsAndCustomIds = await prisma.problem.findMany({
+            // 1. WHERE に一致する Problem の id だけを取得（payload を id のみに絞る）
+            const allIdRows = await prisma.problem.findMany({
                 where,
-                select: { id: true, customId: true },
+                select: { id: true },
             });
-            const sign = sortOrder === 'asc' ? 1 : -1;
-            const sorted = [...idsAndCustomIds].sort((a, b) => {
-                const cmp = compareCustomIdNaturally(a.customId, b.customId);
-                if (cmp !== 0) return sign * cmp;
-                return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
-            });
-            const total = sorted.length;
-            const pagedIds = sorted.slice(skip, skip + limit).map((row) => row.id);
+            const total = allIdRows.length;
+            if (total === 0) {
+                return { success: true, problems: [], total: 0, page, limit };
+            }
+            const allIds = allIdRows.map((row) => row.id);
+
+            // 2. PostgreSQL 側の関数ベース index を使って自然順 ORDER BY + LIMIT を 1 クエリで実行
+            const orderDir = sortOrder === 'asc' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
+            const pagedRows = await prisma.$queryRaw<Array<{ id: string }>>`
+                SELECT "id"
+                FROM "Problem"
+                WHERE "id" IN (${Prisma.join(allIds)})
+                ORDER BY public.problem_custom_id_sort_key("customId") ${orderDir} NULLS LAST,
+                         "id" ASC
+                LIMIT ${limit}
+                OFFSET ${skip}
+            `;
+            const pagedIds = pagedRows.map((row) => row.id);
+
+            // 3. ページ分の詳細だけを include で取得し、SQL 側の順序を保つ
             const pageProblems = pagedIds.length === 0
                 ? []
                 : await prisma.problem.findMany({
@@ -440,25 +453,6 @@ export async function getProblems(
         console.error('Failed to get problems:', error);
         return { error: '問題の取得に失敗しました' };
     }
-}
-
-function compareCustomIdNaturally(a: string, b: string): number {
-    const tokenize = (value: string) => value.match(/\d+|\D+/g) ?? [];
-    const ta = tokenize(a);
-    const tb = tokenize(b);
-    const length = Math.min(ta.length, tb.length);
-    for (let i = 0; i < length; i += 1) {
-        const partA = ta[i];
-        const partB = tb[i];
-        const numA = /^\d+$/.test(partA) ? Number(partA) : null;
-        const numB = /^\d+$/.test(partB) ? Number(partB) : null;
-        if (numA !== null && numB !== null) {
-            if (numA !== numB) return numA - numB;
-        } else if (partA !== partB) {
-            return partA < partB ? -1 : 1;
-        }
-    }
-    return ta.length - tb.length;
 }
 
 export async function getProblemSubjects() {
