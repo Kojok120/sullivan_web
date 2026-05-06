@@ -84,7 +84,8 @@ describe("VideoPlayerDialog", () => {
         expect(screen.getByRole("button", { name: "解説動画を見る" })).toBeTruthy();
 
         fireEvent.click(screen.getByRole("button", { name: "解説動画を見る" }));
-        fireEvent.click(screen.getByRole("button", { name: "mock-close" }));
+        // FullScreenVideoPlayer は dynamic import なので非同期マウントを待つ
+        fireEvent.click(await screen.findByRole("button", { name: "mock-close" }));
 
         await waitFor(() => {
             expect(refreshMock).toHaveBeenCalledTimes(1);
@@ -104,7 +105,7 @@ describe("VideoPlayerDialog", () => {
         );
 
         fireEvent.click(screen.getByRole("button", { name: "解説動画を見る" }));
-        fireEvent.click(screen.getByRole("button", { name: "mock-end-current" }));
+        fireEvent.click(await screen.findByRole("button", { name: "mock-end-current" }));
 
         await waitFor(() => {
             expect(markVideoWatchedMock).toHaveBeenCalledWith("history-1");
@@ -135,7 +136,7 @@ describe("VideoPlayerDialog", () => {
         );
 
         fireEvent.click(screen.getByRole("button", { name: "解説動画を見る" }));
-        fireEvent.click(screen.getByRole("button", { name: "mock-end-first" }));
+        fireEvent.click(await screen.findByRole("button", { name: "mock-end-first" }));
 
         await waitFor(() => {
             expect(markVideoWatchedMock).toHaveBeenCalledWith("history-1");

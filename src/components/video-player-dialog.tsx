@@ -1,12 +1,20 @@
 
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { PlayCircle } from "lucide-react";
 import { markVideoWatched } from "@/app/actions";
 import { useRouter } from "next/navigation";
-import { FullScreenVideoPlayer, VideoData } from "./full-screen-video-player";
+import type { VideoData } from "./full-screen-video-player";
+
+// 初期表示で framer-motion / react-youtube を読み込まないよう、
+// ダイアログを開いた瞬間にだけ chunk を pull する。
+const FullScreenVideoPlayer = dynamic(
+    () => import("./full-screen-video-player").then((mod) => mod.FullScreenVideoPlayer),
+    { ssr: false },
+);
 
 interface VideoItem {
     historyId: string;
@@ -88,13 +96,15 @@ export function VideoPlayerDialog({
                 {watched ? "復習する" : "解説動画を見る"}
             </Button>
 
-            <FullScreenVideoPlayer
-                isOpen={open}
-                onClose={handleClose}
-                playlist={playerPlaylist}
-                initialIndex={initialIndex !== -1 ? initialIndex : 0}
-                onVideoEnd={handleVideoEnd}
-            />
+            {open ? (
+                <FullScreenVideoPlayer
+                    isOpen={open}
+                    onClose={handleClose}
+                    playlist={playerPlaylist}
+                    initialIndex={initialIndex !== -1 ? initialIndex : 0}
+                    onVideoEnd={handleVideoEnd}
+                />
+            ) : null}
         </>
     );
 }
