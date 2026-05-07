@@ -777,6 +777,7 @@ export async function publishProblemRevision(problemId: string) {
                 data: {
                     publishedRevisionId: draftRevision.id,
                     status: 'PUBLISHED',
+                    sentBackReason: null,
                     hasStructuredContent: true,
                     contentFormat: 'STRUCTURED_V1',
                     question: normalized.legacy.question.trim() || '構造化問題',
@@ -1039,6 +1040,8 @@ export async function deleteProblemAsset(assetId: string) {
     }
 }
 
+const SENT_BACK_REASON_MAX = 500;
+
 export async function updateProblemStatus(id: string, status: ProblemStatusValue) {
     await requireProblemAuthor();
 
@@ -1047,9 +1050,16 @@ export async function updateProblemStatus(id: string, status: ProblemStatusValue
             return { error: '不正なステータスです' };
         }
 
+        if (status === 'SENT_BACK') {
+            return { error: '差し戻しは sendBackProblem を使ってください' };
+        }
+
         const problem = await prisma.problem.update({
             where: { id },
-            data: { status },
+            data: {
+                status,
+                sentBackReason: null,
+            },
             select: { id: true, status: true },
         });
 
@@ -1058,6 +1068,35 @@ export async function updateProblemStatus(id: string, status: ProblemStatusValue
     } catch (error) {
         console.error('Failed to update problem status:', error);
         return { error: 'ステータスの更新に失敗しました' };
+    }
+}
+
+export async function sendBackProblem(id: string, reason: string) {
+    await requireProblemAuthor();
+
+    const trimmed = typeof reason === 'string' ? reason.trim() : '';
+    if (trimmed.length === 0) {
+        return { error: '差し戻し理由を入力してください' };
+    }
+    if (trimmed.length > SENT_BACK_REASON_MAX) {
+        return { error: `差し戻し理由は${SENT_BACK_REASON_MAX}文字以内で入力してください` };
+    }
+
+    try {
+        const problem = await prisma.problem.update({
+            where: { id },
+            data: {
+                status: 'SENT_BACK',
+                sentBackReason: trimmed,
+            },
+            select: { id: true, status: true, sentBackReason: true },
+        });
+
+        revalidateProblemPaths(id);
+        return { success: true, status: problem.status as ProblemStatusValue, sentBackReason: problem.sentBackReason };
+    } catch (error) {
+        console.error('Failed to send back problem:', error);
+        return { error: '差し戻しに失敗しました' };
     }
 }
 
