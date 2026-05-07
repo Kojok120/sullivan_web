@@ -35,33 +35,37 @@ model CoreProblem {
 }
 
 model Problem {
-  id                   String                @id @default(cuid())
+  id                   String               @id @default(cuid())
   question             String
   answer               String?
   customId             String // Custom ID (e.g., E-1, S-10)
-  acceptedAnswers      String[]              @default([]) // 許容解答（複数）
+  /// 自然順ソートキー（PostgreSQL 側で STORED 生成カラム / public.problem_custom_id_sort_key("customId")）
+  customIdSortKey      String?              @db.Text
+
+  acceptedAnswers      String[]             @default([]) // 許容解答（複数）
   grade                String? // 学年 (e.g., "中1", "高2")
   masterNumber         Int? // マスタ内問題番号
-  problemType          ProblemType           @default(SHORT_TEXT)
-  contentFormat        ProblemContentFormat  @default(PLAIN_TEXT)
-  status               ProblemStatus         @default(PUBLISHED)
-  hasStructuredContent Boolean               @default(false)
-  publishedRevisionId  String?               @unique
+  problemType          ProblemType          @default(SHORT_TEXT)
+  contentFormat        ProblemContentFormat @default(PLAIN_TEXT)
+  status               ProblemStatus        @default(PUBLISHED)
+  hasStructuredContent Boolean              @default(false)
+  publishedRevisionId  String?              @unique
   subjectId            String
-  subject              Subject               @relation(fields: [subjectId], references: [id])
+  subject              Subject              @relation(fields: [subjectId], references: [id])
   coreProblems         CoreProblem[]
-  publishedRevision    ProblemRevision?      @relation("PublishedProblemRevision", fields: [publishedRevisionId], references: [id], onDelete: SetNull)
-  revisions            ProblemRevision[]     @relation("ProblemRevisions")
+  publishedRevision    ProblemRevision?     @relation("PublishedProblemRevision", fields: [publishedRevisionId], references: [id], onDelete: SetNull)
+  revisions            ProblemRevision[]    @relation("ProblemRevisions")
   order                Int // Chain order
   videoUrl             String? // For C/D feedback
-  videoStatus          VideoStatus           @default(NONE) // 動画制作ステータス
+  videoStatus          VideoStatus          @default(NONE) // 動画制作ステータス
   histories            LearningHistory[]
   userStates           UserProblemState[]
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
 
   @@unique([subjectId, customId])
   @@unique([subjectId, masterNumber])
+  @@index([subjectId, status])
 }
 
 enum ProblemType {
@@ -98,10 +102,10 @@ enum ProblemAuthoringTool {
 }
 
 enum VideoStatus {
-  NONE        // 未対応
-  SHOT        // 撮影完了
-  UPLOADED    // Drive 完了
-  CONFIGURED  // 設定済み（videoUrl 設定済み）
+  NONE // 未対応
+  SHOT // 撮影完了
+  UPLOADED // Drive 完了
+  CONFIGURED // 設定済み（videoUrl 設定済み）
 }
 
 enum PrintTemplate {
@@ -228,6 +232,27 @@ model User {
   createdGoals         StudentGoal[]         @relation("CreatedStudentGoals")
   updatedGoals         StudentGoal[]         @relation("UpdatedStudentGoals")
   vocabularyGameScores VocabularyGameScore[]
+  statsDaily           UserStatsDaily[]
+
+  @@index([classroomId, role])
+}
+
+/// 日次の学習集計。LearningHistory の (userId, date(answeredAt)) GROUP BY を
+/// 事前計算してキャッシュする。dashboard / heatmap の 365 日 GROUP BY を
+/// 単純な範囲読み出しに置き換えるための非正規化テーブル。
+/// 当日分は live で計算し、履歴日分はこのテーブルから読む運用。
+/// 集計はバックフィルスクリプトと worker /internal/recompute-stats-daily で再計算する。
+model UserStatsDaily {
+  userId       String
+  date         DateTime @db.Date // 日付 (UTC)
+  totalSolved  Int      @default(0)
+  correctCount Int      @default(0) // evaluation A/B
+  xpEarned     Int      @default(0)
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, date])
+  @@index([userId, date(sort: Desc)])
 }
 
 model StudentGoal {
@@ -378,6 +403,7 @@ model UserCoreProblemState {
   lectureWatchedAt DateTime? // 視聴完了日時
 
   @@unique([userId, coreProblemId])
+  @@index([userId, isUnlocked, isLectureWatched])
 }
 
 model Achievement {

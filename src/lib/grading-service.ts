@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 
 import { GoogleGenAI } from '@google/genai';
 import { prisma } from '@/lib/prisma';
-import type { Prisma, User } from '@prisma/client';
+import { Prisma, type User } from '@prisma/client';
 import fs from 'fs';
 import path from 'path';
 import { calculateCoreProblemStatus } from '@/lib/progression';
@@ -502,12 +502,37 @@ async function archiveProcessedFile(fileId: string, studentId: string, problemId
 // ジョブ発行は Cloud Tasks 経由の publishGradingJob に集約している
 
 // Helper to find or create a folder
-const folderCache = new Map<string, string>(); // Cache folder IDs key="${name}:${parentId}"
+// Drive のフォルダ ID は安定しているのでキャッシュして良いが、長時間稼働で
+// 無制限に Map が増えるとメモリリークになる。LRU で上限を切る。
+const FOLDER_CACHE_MAX_ENTRIES = 500;
+const folderCache = new Map<string, string>(); // key="${name}:${parentId}"
+
+function rememberFolderId(cacheKey: string, id: string): void {
+    if (folderCache.has(cacheKey)) {
+        folderCache.delete(cacheKey);
+    } else if (folderCache.size >= FOLDER_CACHE_MAX_ENTRIES) {
+        // Map は挿入順を保持するため、最古キーを削除すれば LRU の eviction になる。
+        const oldestKey = folderCache.keys().next().value;
+        if (oldestKey !== undefined) folderCache.delete(oldestKey);
+    }
+    folderCache.set(cacheKey, id);
+}
+
+function recallFolderId(cacheKey: string): string | undefined {
+    const id = folderCache.get(cacheKey);
+    if (id !== undefined) {
+        // ヒットしたキーを最新に押し上げる。
+        folderCache.delete(cacheKey);
+        folderCache.set(cacheKey, id);
+    }
+    return id;
+}
 
 async function ensureFolder(name: string, parentId: string): Promise<string> {
     const cacheKey = `${name}:${parentId}`;
-    if (folderCache.has(cacheKey)) {
-        return folderCache.get(cacheKey)!;
+    const cached = recallFolderId(cacheKey);
+    if (cached !== undefined) {
+        return cached;
     }
 
     try {
@@ -522,7 +547,7 @@ async function ensureFolder(name: string, parentId: string): Promise<string> {
 
         if (res.data.files && res.data.files.length > 0) {
             const id = res.data.files[0].id!;
-            folderCache.set(cacheKey, id);
+            rememberFolderId(cacheKey, id);
             return id;
         }
 
@@ -538,7 +563,7 @@ async function ensureFolder(name: string, parentId: string): Promise<string> {
         });
 
         const id = file.data.id!;
-        folderCache.set(cacheKey, id);
+        rememberFolderId(cacheKey, id);
         return id;
     } catch (error) {
         console.error(`Error ensuring folder ${name}:`, error);
@@ -1363,7 +1388,6 @@ async function recordGradingResults(results: GradingResult[], qrData: QRData): P
             where: { id: { in: problemIds } },
             include: { coreProblems: true }
         });
-        const problemMap = new Map(problems.map((problem) => [problem.id, problem]));
         const allCoreProblemIdsInBatch = Array.from(
             new Set(problems.flatMap((problem) => problem.coreProblems.map((coreProblem) => coreProblem.id)))
         );
@@ -1424,8 +1448,24 @@ async function recordGradingResults(results: GradingResult[], qrData: QRData): P
         });
         const stateMap = new Map(currentStates.map(s => [s.problemId, s]));
 
+        // unit mode かどうかで update 対象列が変わるため、判別ユニオンで型レベルに narrow する。
+        // FullUpdateRow 経路では unlock 系が必ず非 null になるため、SQL 構築時の型キャストが不要になる。
+        type BaseUpdateRow = {
+            problemId: string;
+            isCleared: boolean;
+            lastAnsweredAt: Date;
+            priority: number;
+        };
+        type UnitUpdateRow = BaseUpdateRow & { kind: 'unit' };
+        type FullUpdateRow = BaseUpdateRow & {
+            kind: 'full';
+            unlockLastAnsweredAt: Date;
+            unlockIsCleared: boolean;
+        };
+        type UpdateRow = UnitUpdateRow | FullUpdateRow;
+
         const newStates: Prisma.UserProblemStateCreateManyInput[] = [];
-        const updatePromises: Prisma.PrismaPromise<unknown>[] = [];
+        const updateRows: UpdateRow[] = [];
 
         for (const r of results) {
             const currentState = stateMap.get(r.problemId);
@@ -1450,23 +1490,26 @@ async function recordGradingResults(results: GradingResult[], qrData: QRData): P
             } else {
                 const currentPriority = currentState.priority || 0;
                 const newPriority = calculateNewPriority(currentPriority, r.evaluation);
-                const updateData: Prisma.UserProblemStateUpdateInput = {
-                    isCleared: r.isCorrect,
-                    lastAnsweredAt: answeredAt,
-                    priority: newPriority
-                };
 
-                if (!isUnitMode) {
-                    updateData.unlockLastAnsweredAt = answeredAt;
-                    updateData.unlockIsCleared = r.isCorrect;
+                if (isUnitMode) {
+                    updateRows.push({
+                        kind: 'unit',
+                        problemId: r.problemId,
+                        isCleared: r.isCorrect,
+                        lastAnsweredAt: answeredAt,
+                        priority: newPriority,
+                    });
+                } else {
+                    updateRows.push({
+                        kind: 'full',
+                        problemId: r.problemId,
+                        isCleared: r.isCorrect,
+                        lastAnsweredAt: answeredAt,
+                        priority: newPriority,
+                        unlockLastAnsweredAt: answeredAt,
+                        unlockIsCleared: r.isCorrect,
+                    });
                 }
-
-                updatePromises.push(
-                    tx.userProblemState.update({
-                        where: { userId_problemId: { userId, problemId: r.problemId } },
-                        data: updateData
-                    })
-                );
             }
         }
 
@@ -1476,18 +1519,59 @@ async function recordGradingResults(results: GradingResult[], qrData: QRData): P
             });
         }
 
-        if (updatePromises.length > 0) {
-            await Promise.all(updatePromises);
+        // N 行の UPDATE を 1 文の UPDATE FROM (VALUES ...) に集約する。
+        // unit mode では unlock 系を更新しないため SQL を分岐する。
+        if (updateRows.length > 0) {
+            if (isUnitMode) {
+                const unitRows = updateRows.filter((row): row is UnitUpdateRow => row.kind === 'unit');
+                const values = Prisma.join(
+                    unitRows.map((row) =>
+                        Prisma.sql`(${row.problemId}::text, ${row.isCleared}::boolean, ${row.lastAnsweredAt}::timestamp, ${row.priority}::int)`
+                    )
+                );
+                await tx.$executeRaw`
+                    UPDATE "UserProblemState" AS s
+                    SET "isCleared" = data.is_cleared,
+                        "lastAnsweredAt" = data.last_answered_at,
+                        "priority" = data.priority
+                    FROM (VALUES ${values}) AS data(problem_id, is_cleared, last_answered_at, priority)
+                    WHERE s."userId" = ${userId} AND s."problemId" = data.problem_id
+                `;
+            } else {
+                const fullRows = updateRows.filter((row): row is FullUpdateRow => row.kind === 'full');
+                const values = Prisma.join(
+                    fullRows.map((row) =>
+                        Prisma.sql`(${row.problemId}::text, ${row.isCleared}::boolean, ${row.lastAnsweredAt}::timestamp, ${row.priority}::int, ${row.unlockLastAnsweredAt}::timestamp, ${row.unlockIsCleared}::boolean)`
+                    )
+                );
+                await tx.$executeRaw`
+                    UPDATE "UserProblemState" AS s
+                    SET "isCleared" = data.is_cleared,
+                        "lastAnsweredAt" = data.last_answered_at,
+                        "priority" = data.priority,
+                        "unlockLastAnsweredAt" = data.unlock_last_answered_at,
+                        "unlockIsCleared" = data.unlock_is_cleared
+                    FROM (VALUES ${values}) AS data(problem_id, is_cleared, last_answered_at, priority, unlock_last_answered_at, unlock_is_cleared)
+                    WHERE s."userId" = ${userId} AND s."problemId" = data.problem_id
+                `;
+            }
         }
 
         // 4. Collect involved UserCoreProblemState IDs for unlock checks
+        // progressionScope はループ中変化しないので、scope 適用済みの coreProblems を problemId 単位で事前構築する
+        const filteredCoreProblemsByProblemId = new Map<string, typeof problems[number]['coreProblems']>();
+        const filteredCoreProblemIdSetByProblemId = new Map<string, Set<string>>();
+        for (const problem of problems) {
+            const filtered = filterCoreProblemsByScope(problem.coreProblems, progressionScope);
+            filteredCoreProblemsByProblemId.set(problem.id, filtered);
+            filteredCoreProblemIdSetByProblemId.set(problem.id, new Set(filtered.map((cp) => cp.id)));
+        }
+
         const involvedCpIdsInTransaction = new Set<string>();
 
         for (const result of results) {
-            const problem = problemMap.get(result.problemId);
-            if (!problem) continue;
-
-            const targetCoreProblems = filterCoreProblemsByScope(problem.coreProblems, progressionScope);
+            const targetCoreProblems = filteredCoreProblemsByProblemId.get(result.problemId);
+            if (!targetCoreProblems) continue;
 
             if (result.isCorrect) {
                 for (const coreProblem of targetCoreProblems) {
@@ -1501,7 +1585,8 @@ async function recordGradingResults(results: GradingResult[], qrData: QRData): P
                 continue;
             }
 
-            const coreProblemIdsOnProblem = new Set(targetCoreProblems.map((coreProblem) => coreProblem.id));
+            const coreProblemIdsOnProblem = filteredCoreProblemIdSetByProblemId.get(result.problemId);
+            if (!coreProblemIdsOnProblem) continue;
             const scopedBadCoreProblemIds = filterCoreProblemIdsByScope(result.badCoreProblemIds, progressionScope);
             for (const coreProblemId of scopedBadCoreProblemIds) {
                 if (!coreProblemIdsOnProblem.has(coreProblemId)) continue;
@@ -1543,10 +1628,14 @@ async function checkProgressAndUnlock(userId: string, cpIdsToCheck: string[]) {
     if (cpIdsToCheck.length === 0) return;
 
     // Fetch CP Details (Total Count & Next CP Candidate)
+    // 公開済み問題のみを進行判定の母集団とする。DRAFT/SENT_BACK/ARCHIVED は
+    // 「今は解けない」問題（依存 CP 未アンロックの問題）と同等扱いとし、
+    // totalProblems / hasSolvable のいずれからも除外する。
     const cpDetails = await prisma.coreProblem.findMany({
         where: { id: { in: cpIdsToCheck } },
         include: {
             problems: {
+                where: { status: 'PUBLISHED' },
                 include: { coreProblems: { select: { id: true } } } // Need dependencies
             },
             subject: {
@@ -1575,6 +1664,7 @@ async function checkProgressAndUnlock(userId: string, cpIdsToCheck: string[]) {
         select: {
             id: true,
             problems: {
+                where: { status: 'PUBLISHED' },
                 select: {
                     coreProblems: {
                         select: { id: true }

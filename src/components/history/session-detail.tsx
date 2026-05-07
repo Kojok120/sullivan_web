@@ -112,8 +112,11 @@ export async function SessionDetail({
                                             {item.problem.customId ? item.problem.customId : `問${index + 1}`}
                                         </span>
                                     </div>
-                                    <CardTitle className="text-lg leading-relaxed pt-2 whitespace-pre-wrap">
-                                        {item.problem.question}
+                                    <CardTitle className="pt-2">
+                                        <ProblemTextPreview
+                                            text={item.problem.question}
+                                            className="text-lg leading-relaxed [&_.katex-display]:overflow-x-auto [&_.katex-display]:py-2"
+                                        />
                                     </CardTitle>
                                 </div>
                                 {canUseAiTutorFeatures && (
@@ -168,9 +171,12 @@ export async function SessionDetail({
                                         <CheckCircle className="h-4 w-4 mr-2" />
                                         AIフィードバック
                                     </h4>
-                                    <p className="text-blue-900 text-sm whitespace-pre-wrap">
-                                        {item.feedback}
-                                    </p>
+                                    {item.feedback ? (
+                                        <ProblemTextPreview
+                                            text={item.feedback}
+                                            className="text-blue-900 text-sm leading-7 [&_.katex-display]:overflow-x-auto [&_.katex-display]:py-2"
+                                        />
+                                    ) : null}
                                 </div>
 
                                 {/* Video Actions - 講義動画（左）と復習動画（右）*/}

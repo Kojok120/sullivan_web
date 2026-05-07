@@ -1,0 +1,5 @@
+{
+  "$comment": "Route ごとの First Load JS（gzip 後）上限。bytes 単位。空マップだと scripts/check-bundle-budget.mjs はレポートのみで CI を落とさない。CI で測定した実値を見て埋めること。",
+  "tolerancePct": 5,
+  "routes": {}
+}

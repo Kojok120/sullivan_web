@@ -1,12 +1,19 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Printer, ArrowLeft, PlayCircle, Video as VideoIcon, Lock, CheckCircle2, AlertCircle } from "lucide-react";
 import Link from "next/link";
-import { FullScreenVideoPlayer } from "@/components/full-screen-video-player";
+
+// 講義プレーヤーは framer-motion / react-youtube を含むため、
+// ユーザーが「動画を見る」を押した時点まで chunk のロードを遅らせる。
+const FullScreenVideoPlayer = dynamic(
+    () => import("@/components/full-screen-video-player").then((mod) => mod.FullScreenVideoPlayer),
+    { ssr: false },
+);
 import { CoreProblem, Subject } from "@prisma/client";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { markLectureAsWatched } from '@/lib/api/lecture-watched-client';
@@ -223,17 +230,19 @@ export function UnitFocusDetailClient({
                                         </div>
                                     )}
 
-                                    <FullScreenVideoPlayer
-                                        isOpen={isVideoOpen}
-                                        onClose={handleVideoClose}
-                                        initialIndex={startIndex}
-                                        playlist={lectureVideos.map(v => ({
-                                            title: v.title || coreProblem.name,
-                                            url: v.url
-                                        }))}
-                                        onVideoEnd={handleVideoEnd}
-                                        autoCloseOnLastVideoEnd={false}
-                                    />
+                                    {isVideoOpen ? (
+                                        <FullScreenVideoPlayer
+                                            isOpen={isVideoOpen}
+                                            onClose={handleVideoClose}
+                                            initialIndex={startIndex}
+                                            playlist={lectureVideos.map(v => ({
+                                                title: v.title || coreProblem.name,
+                                                url: v.url
+                                            }))}
+                                            onVideoEnd={handleVideoEnd}
+                                            autoCloseOnLastVideoEnd={false}
+                                        />
+                                    ) : null}
                                 </div>
                             ) : (
                                 <div className="p-12 text-center text-muted-foreground bg-muted/10">

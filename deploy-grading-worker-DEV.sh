@@ -93,6 +93,7 @@ SCHEDULER_LOCATION="${SCHEDULER_LOCATION:-asia-northeast1}"
 SCHEDULER_TIME_ZONE="${SCHEDULER_TIME_ZONE:-Asia/Tokyo}"
 WARM_START_JOB_NAME="${WARM_START_JOB_NAME:-sullivan-grading-worker-dev-warm-start}"
 WARM_STOP_JOB_NAME="${WARM_STOP_JOB_NAME:-sullivan-grading-worker-dev-warm-stop}"
+RECOMPUTE_STATS_DAILY_JOB_NAME="${RECOMPUTE_STATS_DAILY_JOB_NAME:-sullivan-grading-worker-dev-recompute-stats-daily}"
 WORKER_MIN_INSTANCES="${WORKER_MIN_INSTANCES:-0}"
 WORKER_MAX_INSTANCES="${WORKER_MAX_INSTANCES:-10}"
 SKIP_INFRA_SETUP="${SKIP_INFRA_SETUP:-0}"
@@ -245,4 +246,13 @@ if [ "$SKIP_INFRA_SETUP" != "1" ]; then
     "0 22 * * 1-5" \
     "$WORKER_SCALING_API_URL" \
     '{"minInstances":0,"reason":"weekday-warm-stop"}'
+
+  # UserStatsDaily の日次再集計（昨日 UTC 1 日分を全ユーザに対して再集計）。
+  # JST 10:00 (= UTC 01:00) 時点で「昨日 UTC」は完全に確定済み。
+  RECOMPUTE_STATS_DAILY_API_URL="$WORKER_SERVICE_URL/api/internal/recompute-stats-daily"
+  upsert_scheduler_job \
+    "$RECOMPUTE_STATS_DAILY_JOB_NAME" \
+    "0 10 * * *" \
+    "$RECOMPUTE_STATS_DAILY_API_URL" \
+    ''
 fi

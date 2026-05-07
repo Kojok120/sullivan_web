@@ -1,6 +1,6 @@
 'use client';
 
-import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
+import dynamic from 'next/dynamic';
 
 interface ActivityChartProps {
     data: {
@@ -9,39 +9,19 @@ interface ActivityChartProps {
     }[];
 }
 
-export function ActivityChart({ data }: ActivityChartProps) {
-    return (
-        <ResponsiveContainer width="100%" height={350}>
-            <BarChart data={data}>
-                <XAxis
-                    dataKey="date"
-                    stroke="#888888"
-                    fontSize={12}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(value) => {
-                        const date = new Date(value);
-                        return `${date.getMonth() + 1}/${date.getDate()}`;
-                    }}
-                />
-                <YAxis
-                    stroke="#888888"
-                    fontSize={12}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(value) => `${value}問`}
-                />
-                <Tooltip
-                    contentStyle={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0' }}
-                    labelFormatter={(value) => new Date(value).toLocaleDateString()}
-                />
-                <Bar
-                    dataKey="count"
-                    fill="currentColor"
-                    radius={[4, 4, 0, 0]}
-                    className="fill-primary"
-                />
-            </BarChart>
-        </ResponsiveContainer>
-    );
+// recharts は重量級の依存（描画処理に SVG 計測ロジックが含まれ window を必要とする）。
+// SSR 段階ではバンドルに含めず、ブラウザでチャート描画が実際に必要になった時点で
+// 動的ロードする。
+const ActivityChartImpl = dynamic(
+    () => import('./activity-chart-impl').then((mod) => mod.ActivityChartImpl),
+    {
+        ssr: false,
+        loading: () => (
+            <div className="h-[350px] w-full animate-pulse rounded bg-muted" />
+        ),
+    },
+);
+
+export function ActivityChart(props: ActivityChartProps) {
+    return <ActivityChartImpl {...props} />;
 }

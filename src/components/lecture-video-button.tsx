@@ -1,9 +1,17 @@
 "use client";
 
+import dynamic from 'next/dynamic';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { GraduationCap } from 'lucide-react';
-import { FullScreenVideoPlayer, VideoData } from './full-screen-video-player';
+import type { VideoData } from './full-screen-video-player';
+
+// FullScreenVideoPlayer は framer-motion / react-youtube を pull-in するため、
+// ボタンが押されて isOpen=true になったタイミングで初めて chunk を読み込む。
+const FullScreenVideoPlayer = dynamic(
+    () => import('./full-screen-video-player').then((mod) => mod.FullScreenVideoPlayer),
+    { ssr: false },
+);
 
 // 講義動画の型
 interface LectureVideo {
@@ -40,12 +48,14 @@ export function LectureVideoButton({ videos, coreProblemName }: LectureVideoButt
                 講義動画{videos.length > 1 ? ` (${videos.length})` : ''}
             </Button>
 
-            <FullScreenVideoPlayer
-                isOpen={isOpen}
-                onClose={() => setIsOpen(false)}
-                playlist={playlist}
-                autoCloseOnLastVideoEnd={false}
-            />
+            {isOpen ? (
+                <FullScreenVideoPlayer
+                    isOpen={isOpen}
+                    onClose={() => setIsOpen(false)}
+                    playlist={playlist}
+                    autoCloseOnLastVideoEnd={false}
+                />
+            ) : null}
         </>
     );
 }

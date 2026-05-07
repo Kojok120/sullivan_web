@@ -1,28 +1,27 @@
-import Link from 'next/link';
+import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
-import { AlertTriangle, PlayCircle, Sparkles, Target, Trophy, Zap } from 'lucide-react';
+import { Sparkles, Target, Trophy, Zap } from 'lucide-react';
 
 import { getSession } from '@/lib/auth';
-import { getDailyActivity, getStudentStats, getSubjectProgress, getUnwatchedCount, getUnwatchedLectures } from '@/lib/analytics';
+import { getStudentStats } from '@/lib/analytics';
 import { getGoalDailyViewPayload } from '@/lib/student-goal-service';
 import { GoalReadonlyPanel } from '@/components/goals/goal-readonly-panel';
-import { Heatmap } from '@/components/gamification/heatmap';
-import { SubjectProgressList } from '@/components/subject-progress-list';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+
+import { DashboardAlerts } from './dashboard-alerts';
+import { DashboardHeatmapSection, DashboardHeatmapSectionFallback } from './dashboard-heatmap-section';
 
 export default async function DashboardPage() {
     const session = await getSession();
     if (!session) redirect('/login');
 
-    const [stats, subjectProgress, dailyActivity, unwatchedCount, unwatchedLectures, goalData] = await Promise.all([
+    // 上部 KPI と目標パネルは初回描画に必要なので同期取得する。
+    // 重い fetch（heatmap = dailyActivity 365日分 + 教科別進捗）と、
+    // 緊急度の低い fetch（未視聴アラート）は Suspense で stream する。
+    const [stats, goalData] = await Promise.all([
         getStudentStats(session.userId),
-        getSubjectProgress(session.userId),
-        getDailyActivity(session.userId, 365),
-        getUnwatchedCount(session.userId),
-        getUnwatchedLectures(session.userId),
         getGoalDailyViewPayload({ studentId: session.userId }),
     ]);
 
@@ -66,44 +65,9 @@ export default async function DashboardPage() {
                 />
             </section>
 
-            {unwatchedCount > 0 || unwatchedLectures.length > 0 ? (
-                <section className="grid gap-4 lg:grid-cols-2">
-                    {unwatchedCount > 0 ? (
-                        <Alert variant="destructive" className="border-red-200 bg-red-50 text-red-800">
-                            <AlertTriangle className="h-4 w-4" />
-                            <AlertTitle>未視聴の解説動画があります</AlertTitle>
-                            <AlertDescription className="mt-2 space-y-2">
-                                <p>
-                                    不正解問題のうち、まだ見ていない解説動画が <strong>{unwatchedCount}件</strong> あります。
-                                </p>
-                                <Link href="/" className="inline-flex items-center gap-1 text-sm font-semibold underline">
-                                    ホームで復習を開始する
-                                </Link>
-                            </AlertDescription>
-                        </Alert>
-                    ) : null}
-
-                    {unwatchedLectures.length > 0 ? (
-                        <Alert className="border-amber-200 bg-amber-50 text-amber-900">
-                            <PlayCircle className="h-4 w-4" />
-                            <AlertTitle>先に講義動画の視聴が必要です</AlertTitle>
-                            <AlertDescription className="mt-2">
-                                <ul className="space-y-1">
-                                    {unwatchedLectures.map((lecture) => (
-                                        <li key={lecture.coreProblemId}>
-                                            <Link href={`/unit-focus/${lecture.coreProblemId}`} className="inline-flex items-center gap-1 text-sm hover:underline">
-                                                <span className="font-semibold">{lecture.subjectName}</span>
-                                                <span>{lecture.coreProblemName}</span>
-                                                <span>→</span>
-                                            </Link>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </AlertDescription>
-                        </Alert>
-                    ) : null}
-                </section>
-            ) : null}
+            <Suspense fallback={null}>
+                <DashboardAlerts userId={session.userId} />
+            </Suspense>
 
             <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <Card>
@@ -151,32 +115,9 @@ export default async function DashboardPage() {
                 </Card>
             </section>
 
-            <section className="grid gap-4 lg:grid-cols-12">
-                <Card className="min-w-0 lg:col-span-8">
-                    <CardHeader className="px-4 pb-3 sm:px-6">
-                        <CardTitle>学習ヒートマップ</CardTitle>
-                    </CardHeader>
-                    <CardContent className="px-4 pb-5 sm:px-6">
-                        <div className="sm:hidden">
-                            <Heatmap data={dailyActivity} days={90} />
-                        </div>
-                        <div className="hidden sm:block">
-                            <Heatmap data={dailyActivity} />
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <div className="min-w-0 space-y-4 lg:col-span-4">
-                    <Card className="min-w-0">
-                        <CardHeader>
-                            <CardTitle>教科別進捗</CardTitle>
-                        </CardHeader>
-                        <CardContent className="px-4 pb-5 sm:px-6">
-                            <SubjectProgressList items={subjectProgress} />
-                        </CardContent>
-                    </Card>
-                </div>
-            </section>
+            <Suspense fallback={<DashboardHeatmapSectionFallback />}>
+                <DashboardHeatmapSection userId={session.userId} />
+            </Suspense>
         </div>
     );
 }
