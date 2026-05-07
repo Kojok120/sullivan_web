@@ -104,6 +104,12 @@ export const structuredProblemDocumentSchema = z.object({
 export const answerSpecSchema = z.object({
     correctAnswer: z.string().default(''),
     acceptedAnswers: z.array(z.string()).default([]),
+    /**
+     * 解答欄に印刷する視覚テンプレート。
+     * 例: 数直線問題で生徒が点を書き込む空の数直線を出すために [[numberline ...]] DSL を保存する。
+     * 未指定または空文字なら通常の罫線解答欄が使われる。
+     */
+    answerTemplate: z.string().optional(),
 }).strict();
 
 export const printConfigSchema = z.object({
@@ -175,9 +181,11 @@ export function normalizeAnswerSpecForAi(answerSpec: AnswerSpec): {
 }
 
 export function normalizeAnswerSpecForAuthoring(answerSpec: AnswerSpec): AnswerSpec {
+    const trimmedTemplate = answerSpec.answerTemplate?.trim() ?? '';
     return {
         correctAnswer: answerSpec.correctAnswer.trim(),
         acceptedAnswers: uniqueNonEmpty(answerSpec.acceptedAnswers),
+        answerTemplate: trimmedTemplate || undefined,
     };
 }
 

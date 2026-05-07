@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { SubjectProgressList } from '@/components/subject-progress-list';
 import { DateDisplay } from '@/components/ui/date-display';
+import { ProblemTextPreview } from '@/app/admin/problems/components/problem-text-preview';
 
 interface PageProps {
     params: Promise<{
@@ -97,9 +98,22 @@ export default async function StudentAnalyticsPage({ params }: PageProps) {
                                 <p className="text-sm font-medium">
                                     {history.problem.coreProblems[0]?.subject.name || '-'} / {history.problem.coreProblems[0]?.name || '-'}
                                 </p>
-                                <p className="mt-1 whitespace-pre-wrap text-sm">{history.problem.question}</p>
+                                <ProblemTextPreview
+                                    text={history.problem.question}
+                                    className="mt-1 text-sm leading-6 [&_.katex-display]:overflow-x-auto [&_.katex-display]:py-1 [&_svg.numberline]:max-w-full"
+                                />
                                 <div className="mt-2 space-y-1 text-xs">
-                                    <p className="font-medium">回答: {history.userAnswer || '-'}</p>
+                                    <div className="flex items-start gap-1">
+                                        <span className="font-medium shrink-0">回答:</span>
+                                        {history.userAnswer ? (
+                                            <ProblemTextPreview
+                                                text={history.userAnswer}
+                                                className="text-xs leading-5 [&_.katex-display]:overflow-x-auto [&_.katex-display]:py-1 [&_svg.numberline]:max-w-full"
+                                            />
+                                        ) : (
+                                            <span>-</span>
+                                        )}
+                                    </div>
                                     {history.feedback && <p className="text-muted-foreground">FB: {history.feedback}</p>}
                                 </div>
                             </div>
@@ -131,8 +145,11 @@ export default async function StudentAnalyticsPage({ params }: PageProps) {
                                                 {history.problem.coreProblems[0]?.name || '-'}
                                             </div>
                                         </TableCell>
-                                        <TableCell className="max-w-[300px] truncate" title={history.problem.question}>
-                                            {history.problem.question}
+                                        <TableCell className="max-w-[300px]">
+                                            <ProblemTextPreview
+                                                text={history.problem.question}
+                                                className="text-sm leading-6 [&_.katex-display]:overflow-x-auto [&_.katex-display]:py-1 [&_svg.numberline]:max-w-full"
+                                            />
                                         </TableCell>
                                         <TableCell>
                                             <Badge variant={['A', 'B'].includes(history.evaluation) ? 'default' : 'destructive'}>
@@ -141,7 +158,17 @@ export default async function StudentAnalyticsPage({ params }: PageProps) {
                                         </TableCell>
                                         <TableCell>
                                             <div className="flex flex-col gap-1">
-                                                <span className="text-xs font-medium">回答: {history.userAnswer || '-'}</span>
+                                                {history.userAnswer ? (
+                                                    <div className="flex items-start gap-1">
+                                                        <span className="text-xs font-medium shrink-0">回答:</span>
+                                                        <ProblemTextPreview
+                                                            text={history.userAnswer}
+                                                            className="text-xs leading-5 [&_.katex-display]:overflow-x-auto [&_.katex-display]:py-1 [&_svg.numberline]:max-w-full"
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-xs font-medium">回答: -</span>
+                                                )}
                                                 {history.feedback && (
                                                     <span className="text-xs text-muted-foreground truncate max-w-[200px]" title={history.feedback}>
                                                         FB: {history.feedback}
