@@ -280,10 +280,11 @@ server.ts                 # Web サービス起動
 
 ## デプロイ
 
-Cloud Run に Web / Worker を分離してデプロイします。
+Cloud Run に Web / Worker を分離してデプロイします。GitHub Actions による自動デプロイです。
 
-- DEV: `./deploy-web-DEV.sh`, `./deploy-grading-worker-DEV.sh`
-- PRODUCTION: `./deploy-web-PRODUCTION.sh`, `./deploy-grading-worker-PRODUCTION.sh`
+- **DEV**: `dev` ブランチへの push で [`deploy-dev.yml`](./.github/workflows/deploy-dev.yml) が起動
+- **PRODUCTION**: `main` ブランチへの push で [`deploy-production.yml`](./.github/workflows/deploy-production.yml) が起動
+- 各ワークフロー内部で `deploy-web-*.sh` / `deploy-grading-worker-*.sh` を実行する。スクリプト単体での運用は前提としていない
 
 運用時は以下も前提になります。
 

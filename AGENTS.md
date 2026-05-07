@@ -191,10 +191,14 @@ npx prisma studio     # Prisma Studio
 
 ## デプロイ
 
-- **DEV 環境**: `./deploy-web-DEV.sh`
-- **本番環境**: `./deploy-web-PRODUCTION.sh`
-- いずれも Google Cloud Run へ Docker イメージをデプロイする
+GitHub Actions による自動デプロイ運用に移行済み。ローカルから `.sh` を直接叩く運用ではない。
+
+- **DEV 環境**: `dev` ブランチへの push で `.github/workflows/deploy-dev.yml` が起動し、DB マイグレーション → Grading Worker → Web App の順で Cloud Run にデプロイされる
+- **本番環境**: `main` ブランチへの push で `.github/workflows/deploy-production.yml` が起動し、同様に DB マイグレーション → Worker → Web App がデプロイされ、最後に Discord 通知が出る
+- main へのマージは `dev` ブランチからの PR に制限されている（`restrict-main-merge-source.yml`）
+- 各ワークフロー内部で `deploy-web-DEV.sh` / `deploy-web-PRODUCTION.sh` / `deploy-grading-worker-*.sh` を実行している。スクリプト自体は CI 経由の利用が前提
 - ビルド時環境変数とランタイム環境変数は分離管理する
+- 詳細な前提（Cloud Tasks キュー、Secret Manager、Drive Watch、Supabase Realtime publication）は [`docs/deploy_runbook.md`](./docs/deploy_runbook.md) を参照
 
 ## 参考にした公式ドキュメント
 
