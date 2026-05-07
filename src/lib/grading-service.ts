@@ -1628,10 +1628,14 @@ async function checkProgressAndUnlock(userId: string, cpIdsToCheck: string[]) {
     if (cpIdsToCheck.length === 0) return;
 
     // Fetch CP Details (Total Count & Next CP Candidate)
+    // 公開済み問題のみを進行判定の母集団とする。DRAFT/SENT_BACK/ARCHIVED は
+    // 「今は解けない」問題（依存 CP 未アンロックの問題）と同等扱いとし、
+    // totalProblems / hasSolvable のいずれからも除外する。
     const cpDetails = await prisma.coreProblem.findMany({
         where: { id: { in: cpIdsToCheck } },
         include: {
             problems: {
+                where: { status: 'PUBLISHED' },
                 include: { coreProblems: { select: { id: true } } } // Need dependencies
             },
             subject: {
@@ -1660,6 +1664,7 @@ async function checkProgressAndUnlock(userId: string, cpIdsToCheck: string[]) {
         select: {
             id: true,
             problems: {
+                where: { status: 'PUBLISHED' },
                 select: {
                     coreProblems: {
                         select: { id: true }
