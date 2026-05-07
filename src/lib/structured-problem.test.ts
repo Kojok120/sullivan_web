@@ -76,6 +76,19 @@ describe('structured-problem', () => {
         })).toEqual({
             correctAnswer: '蒸散で温度調節をする。',
             acceptedAnswers: ['蒸散'],
+            answerTemplate: undefined,
+        });
+    });
+
+    it('authoring 向け answerSpec で解答欄テンプレートも trim される', () => {
+        expect(normalizeAnswerSpecForAuthoring({
+            correctAnswer: 'A:3,B:-1',
+            acceptedAnswers: [],
+            answerTemplate: '  [[numberline min=-5 max=5]]  ',
+        })).toEqual({
+            correctAnswer: 'A:3,B:-1',
+            acceptedAnswers: [],
+            answerTemplate: '[[numberline min=-5 max=5]]',
         });
     });
 

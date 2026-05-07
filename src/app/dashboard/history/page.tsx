@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { DateDisplay } from '@/components/ui/date-display';
+import { ProblemTextPreview } from '@/app/admin/problems/components/problem-text-preview';
 
 export default async function HistoryPage({
     searchParams,
@@ -92,8 +93,11 @@ export default async function HistoryPage({
                                                 {item.problem.coreProblems.map(c => c.name).join(', ')}
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 max-w-xs truncate" title={item.problem.question}>
-                                            {item.problem.question}
+                                        <td className="px-6 py-4 max-w-xs" title={item.problem.question}>
+                                            <ProblemTextPreview
+                                                text={item.problem.question}
+                                                className="text-sm leading-6 [&_.katex-display]:overflow-x-auto [&_.katex-display]:py-1 [&_svg.numberline]:max-w-full"
+                                            />
                                         </td>
                                         <td className="px-6 py-4">
                                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 

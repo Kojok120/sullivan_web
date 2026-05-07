@@ -8,6 +8,7 @@ import type { Prisma } from '@prisma/client';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { getProblemsByCoreProblem } from '../actions';
 import { LinkIcon, GraduationCap, Hash, KeyRound, BookOpen, Pencil } from 'lucide-react';
+import { ProblemTextPreview } from '@/app/admin/problems/components/problem-text-preview';
 
 interface ProblemEditorProps {
     coreProblemId: string;
@@ -83,8 +84,11 @@ function ProblemItem({ problem, editHref }: { problem: ProblemEditorProblem; edi
         <div className="group flex items-start gap-2 p-2 px-3 border-b bg-background hover:bg-muted/30 transition-colors">
             <div className="flex-1 grid gap-2">
                 <div className="flex flex-col items-stretch gap-2 sm:flex-row">
-                    <div className="flex-1 p-2 text-sm font-medium whitespace-pre-wrap border rounded-md bg-transparent">
-                        {problem.question}
+                    <div className="flex-1 border rounded-md bg-transparent">
+                        <ProblemTextPreview
+                            text={problem.question}
+                            className="p-2 text-sm font-medium leading-6 [&_.katex-display]:overflow-x-auto [&_.katex-display]:py-1 [&_svg.numberline]:max-w-full"
+                        />
                     </div>
                     <div className="w-full p-2 text-sm whitespace-pre-wrap border rounded-md bg-transparent sm:w-1/3">
                         {problem.answer || '-'}
