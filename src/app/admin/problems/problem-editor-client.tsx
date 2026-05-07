@@ -708,7 +708,7 @@ export function ProblemEditorClient({
                     <Button variant="outline" onClick={handleSave} disabled={isPending}>
                         下書き保存
                     </Button>
-                    <Button variant="outline" onClick={handleSendBack} disabled={isPending || !state.problemId}>
+                    <Button variant="destructive" onClick={handleSendBack} disabled={isPending || !state.problemId}>
                         差し戻し
                     </Button>
                     <Button onClick={handlePublish} disabled={isPending}>
