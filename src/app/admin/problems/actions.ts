@@ -26,6 +26,7 @@ import {
 } from '@/lib/structured-problem';
 import { createProblemAssetSignedUrl, removeProblemAssetFromStorage, uploadProblemAssetToStorage } from '@/lib/problem-assets';
 import { ensureRenderableSvgMarkup } from '@/lib/problem-svg';
+import { SENT_BACK_REASON_MAX } from './constants';
 import { problemAdminInclude } from './types';
 
 type ProblemFilters = {
@@ -1039,8 +1040,6 @@ export async function deleteProblemAsset(assetId: string) {
         return { error: 'アセットの削除に失敗しました' };
     }
 }
-
-const SENT_BACK_REASON_MAX = 500;
 
 export async function updateProblemStatus(id: string, status: ProblemStatusValue) {
     await requireProblemAuthor();

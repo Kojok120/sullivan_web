@@ -58,7 +58,7 @@ model Problem {
   order                Int // Chain order
   videoUrl             String? // For C/D feedback
   videoStatus          VideoStatus          @default(NONE) // 動画制作ステータス
-  sentBackReason       String? // 差し戻し理由（最後に SENT_BACK にした際のテキスト）
+  sentBackReason       String?              @db.VarChar(500) // 差し戻し理由（最後に SENT_BACK にした際のテキスト）
   histories            LearningHistory[]
   userStates           UserProblemState[]
   createdAt            DateTime             @default(now())

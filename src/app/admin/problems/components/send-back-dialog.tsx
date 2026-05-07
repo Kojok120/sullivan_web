@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm, useWatch } from 'react-hook-form';
+import { z } from 'zod';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -12,7 +14,17 @@ import {
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 
-const REASON_MAX = 500;
+import { SENT_BACK_REASON_MAX } from '../constants';
+
+const sendBackFormSchema = z.object({
+    reason: z
+        .string()
+        .trim()
+        .min(1, '差し戻し理由を入力してください')
+        .max(SENT_BACK_REASON_MAX, `差し戻し理由は${SENT_BACK_REASON_MAX}文字以内で入力してください`),
+});
+
+type SendBackFormValues = z.infer<typeof sendBackFormSchema>;
 
 interface Props {
     open: boolean;
@@ -51,31 +63,39 @@ interface BodyProps {
 }
 
 function SendBackDialogBody({ initialReason, pending, onCancel, onConfirm }: BodyProps) {
-    const [reason, setReason] = useState(initialReason);
-    const trimmed = reason.trim();
-    const remaining = REASON_MAX - reason.length;
-    const canSubmit = !pending && trimmed.length > 0 && reason.length <= REASON_MAX;
+    const form = useForm<SendBackFormValues>({
+        resolver: zodResolver(sendBackFormSchema),
+        defaultValues: { reason: initialReason },
+        mode: 'onChange',
+    });
+
+    const reasonValue = useWatch({ control: form.control, name: 'reason' }) ?? '';
+    const remaining = SENT_BACK_REASON_MAX - reasonValue.length;
+    const canSubmit = !pending && reasonValue.trim().length > 0 && reasonValue.length <= SENT_BACK_REASON_MAX;
+
+    const submit = form.handleSubmit((values) => {
+        onConfirm(values.reason.trim());
+    });
 
     return (
-        <>
+        <form onSubmit={submit}>
             <Textarea
                 autoFocus
                 rows={6}
-                maxLength={REASON_MAX}
+                maxLength={SENT_BACK_REASON_MAX}
                 placeholder="どこを直してほしいかを書いてください"
-                value={reason}
-                onChange={(event) => setReason(event.target.value)}
                 disabled={pending}
+                {...form.register('reason')}
             />
             <p className={`text-xs ${remaining < 0 ? 'text-red-600' : 'text-gray-500'}`}>残り {remaining} 文字</p>
             <DialogFooter>
-                <Button variant="outline" onClick={onCancel} disabled={pending}>
+                <Button type="button" variant="outline" onClick={onCancel} disabled={pending}>
                     キャンセル
                 </Button>
-                <Button variant="destructive" onClick={() => onConfirm(trimmed)} disabled={!canSubmit}>
+                <Button type="submit" variant="destructive" disabled={!canSubmit}>
                     差し戻す
                 </Button>
             </DialogFooter>
-        </>
+        </form>
     );
 }
