@@ -630,6 +630,8 @@ export type GeminiProblemContext = {
     referenceAnswer: string;
     alternativeAnswers: string[];
     hasReferenceFigures: boolean;
+    /** 問題文に [[numberline ...]] DSL が含まれる場合のみ true */
+    hasNumberLine: boolean;
 };
 
 type GeminiReferenceFigure = {
@@ -754,6 +756,7 @@ export function buildProblemContextForGemini(problem: ProblemForGrading, index: 
         referenceAnswer,
         alternativeAnswers,
         hasReferenceFigures: getReferencedFigureAssets(problem).length > 0,
+        hasNumberLine: problemText.includes('[[numberline'),
     };
 }
 
@@ -1217,11 +1220,27 @@ async function gradeWithGemini(
         }
     };
 
+    const numberLineInstruction = problemContexts.some((context) => context.hasNumberLine)
+        ? [
+            '## 数直線問題の追加指示',
+            '',
+            '`hasNumberLine: true` の問題に限り、生徒が紙の解答欄に書き込んだ点の位置を、問題文と同じ DSL 形式で抽出して `studentAnswer` に記載してください。',
+            '',
+            '- 形式: `[[numberline min=<下端> max=<上端> marks="A:3,B:-1,C:-5"]]`',
+            '- `min` / `max` は問題文の数直線と同じ値を使用',
+            '- `marks` は `ラベル:値` をカンマ区切りで列挙（ラベルが無い場合は連番 P1/P2/... を割り当ててよい）',
+            '- 整数で読み取れない場合は小数 1 桁まで許容（例: `A:1.5`）',
+            '- 点が空欄の場合は `studentAnswer` に "(空欄)" と記載',
+            '- `hasNumberLine: false` の問題ではこの DSL を出力しないでください（通常通り解答テキストを転記）',
+        ].join('\n')
+        : '';
+
     const gradingPrompt = loadPrompt('grading-prompt.md', {
         problemCount: problemContexts.length,
         problemContexts: JSON.stringify(problemContexts, null, 2),
         maxIndex: problemContexts.length - 1,
         subjectSpecificGuidelines: buildSubjectSpecificGuidelines(problemsForGrading),
+        numberLineInstruction,
     });
 
     let lastErrors: string[] = [];

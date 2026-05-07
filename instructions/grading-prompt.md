@@ -22,6 +22,8 @@
 
 {{subjectSpecificGuidelines}}
 
+{{numberLineInstruction}}
+
 ## 問題リスト（順序厳守、{{problemCount}}問）
 
 {{problemContexts}}

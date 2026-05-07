@@ -323,6 +323,17 @@ export const PRINT_DOCUMENT_CSS = `
     min-height: 9mm;
 }
 
+.${PRINT_DOCUMENT_ROOT_CLASS} .answer-template {
+    flex: 1;
+    min-height: 9mm;
+    padding: 1mm 0;
+}
+
+.${PRINT_DOCUMENT_ROOT_CLASS} .answer-template svg.numberline {
+    max-width: 100%;
+    height: auto;
+}
+
 .${PRINT_DOCUMENT_ROOT_CLASS} .sheet-footer {
     margin-top: 10mm;
     border-top: 1px solid #d1d5db;
@@ -410,11 +421,15 @@ export async function buildPrintDocumentMarkup(input: PrintDocumentInput): Promi
 
         const answerRows = setProblems.map((problem) => {
             const displayId = getProblemDisplayId(problem);
+            const template = problem.answerSpec?.answerTemplate?.trim();
+            const answerBody = template
+                ? `<div class="answer-template">${renderProblemTextHtml(template)}</div>`
+                : `<div class="answer-line"></div>`;
 
             return `
                 <div class="answer-row">
                     <div class="answer-id">${escapeHtml(displayId)}.</div>
-                    <div class="answer-line"></div>
+                    ${answerBody}
                 </div>
             `;
         }).join('');

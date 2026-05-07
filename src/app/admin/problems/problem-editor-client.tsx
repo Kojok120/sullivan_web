@@ -1274,6 +1274,27 @@ function AnswerSpecEditor({
                     <AcceptedAnswersPreview jsonText={acceptedAnswersJson} />
                 </div>
             </div>
+            <div className="space-y-2 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
+                <div className="space-y-2">
+                    <Label>解答欄テンプレート（任意）</Label>
+                    <Textarea
+                        value={exactValue.answerTemplate ?? ''}
+                        onChange={(event) => update({ answerTemplate: event.target.value })}
+                        rows={4}
+                        placeholder='例: [[numberline min=-5 max=5]]'
+                    />
+                    <p className="text-xs text-muted-foreground">
+                        プリント解答欄に表示する視覚テンプレート。空欄なら通常の罫線解答欄。
+                    </p>
+                </div>
+                <div className="space-y-2">
+                    <Label>解答欄テンプレートプレビュー</Label>
+                    <ProblemTextPreview
+                        text={exactValue.answerTemplate ?? ''}
+                        emptyMessage="解答欄テンプレートを入力するとプレビューが出ます。"
+                    />
+                </div>
+            </div>
         </div>
     );
 }

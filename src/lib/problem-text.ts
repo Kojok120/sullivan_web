@@ -1,4 +1,7 @@
 import katex from 'katex';
+import { parseNumberLineDirective, renderNumberLineSvg } from '@/lib/number-line-svg';
+
+const NUMBERLINE_OPENER = '[[numberline';
 
 function escapeHtml(value: string): string {
     return value
@@ -28,6 +31,19 @@ export function renderProblemTextHtml(text: string): string {
     let html = '';
 
     while (index < text.length) {
+        if (text.startsWith(NUMBERLINE_OPENER, index)) {
+            const end = text.indexOf(']]', index + NUMBERLINE_OPENER.length);
+            if (end !== -1) {
+                const body = text.slice(index + NUMBERLINE_OPENER.length, end);
+                const opts = parseNumberLineDirective(body);
+                if (opts) {
+                    html += renderNumberLineSvg(opts);
+                    index = end + 2;
+                    continue;
+                }
+            }
+        }
+
         if (text.startsWith('$$', index)) {
             const end = text.indexOf('$$', index + 2);
             if (end !== -1) {
@@ -57,19 +73,28 @@ export function renderProblemTextHtml(text: string): string {
             }
         }
 
-        let nextDollar = text.indexOf('$', index);
-        if (nextDollar === -1) {
-            nextDollar = text.length;
+        let nextSpecial = text.indexOf('$', index);
+        if (nextSpecial === -1) nextSpecial = text.length;
+        const nextDirective = text.indexOf(NUMBERLINE_OPENER, index);
+        if (nextDirective !== -1 && nextDirective < nextSpecial) {
+            nextSpecial = nextDirective;
         }
 
-        if (nextDollar === index) {
-            html += '&#36;';
-            index += 1;
+        if (nextSpecial === index) {
+            // 直前の判定で閉じなかった $ または [[numberline をリテラルとして処理
+            if (text[index] === '$') {
+                html += '&#36;';
+                index += 1;
+            } else {
+                // 閉じ ]] が無い [[numberline は 1 文字ずつ落とし込む
+                html += escapeHtml(text[index]);
+                index += 1;
+            }
             continue;
         }
 
-        html += escapeHtml(text.slice(index, nextDollar)).replace(/\n/g, '<br />');
-        index = nextDollar;
+        html += escapeHtml(text.slice(index, nextSpecial)).replace(/\n/g, '<br />');
+        index = nextSpecial;
     }
 
     return html;

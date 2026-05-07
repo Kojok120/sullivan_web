@@ -76,10 +76,23 @@ describe('structured-problem', () => {
         })).toEqual({
             correctAnswer: '蒸散で温度調節をする。',
             acceptedAnswers: ['蒸散'],
+            answerTemplate: undefined,
         });
     });
 
-    it('answerSpec は正解と別解配列だけを受け付ける', () => {
+    it('authoring 向け answerSpec で解答欄テンプレートも trim される', () => {
+        expect(normalizeAnswerSpecForAuthoring({
+            correctAnswer: 'A:3,B:-1',
+            acceptedAnswers: [],
+            answerTemplate: '  [[numberline min=-5 max=5]]  ',
+        })).toEqual({
+            correctAnswer: 'A:3,B:-1',
+            acceptedAnswers: [],
+            answerTemplate: '[[numberline min=-5 max=5]]',
+        });
+    });
+
+    it('answerSpec は正解・別解配列・解答欄テンプレートを受け付ける', () => {
         expect(parseAnswerSpec({
             correctAnswer: '20',
             acceptedAnswers: ['20cm^2'],
