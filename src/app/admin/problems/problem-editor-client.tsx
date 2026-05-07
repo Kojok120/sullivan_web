@@ -45,8 +45,8 @@ import {
     generateProblemFigureDraft,
     previewProblemPrint,
     publishProblemRevision,
+    sendBackProblem,
     syncProblemAuthoringArtifacts,
-    updateProblemStatus,
     uploadProblemAsset,
 } from './actions';
 import {
@@ -57,6 +57,7 @@ import {
 } from './components/core-problem-selector';
 import { ProblemBodyCardEditorShared } from './components/problem-body-card-editor-shared';
 import { ProblemTextPreview } from './components/problem-text-preview';
+import { SendBackDialog } from './components/send-back-dialog';
 import { type VendorSceneApplyPayload, type VendorSyncPayload } from './problem-authoring-embed';
 import {
     appendProblemBodyCard,
@@ -197,6 +198,7 @@ export function ProblemEditorClient({
     const [activeVisualCardId, setActiveVisualCardId] = useState<string | null>(null);
     const [uploadingCardId, setUploadingCardId] = useState<string | null>(null);
     const [isVendorToolReady, setIsVendorToolReady] = useState(false);
+    const [sendBackOpen, setSendBackOpen] = useState(false);
     const isAuthorView = variant === 'author';
     const title = isAuthorView
         ? (problem ? '問題を編集' : '新しい問題を作成')
@@ -616,16 +618,21 @@ export function ProblemEditorClient({
         });
     };
 
-    const handleSendBack = () => {
+    const openSendBack = () => {
         if (!state.problemId) {
             toast.error('先に下書きを保存してください');
             return;
         }
+        setSendBackOpen(true);
+    };
 
+    const submitSendBack = (reason: string) => {
+        if (!state.problemId) return;
         startTransition(async () => {
-            const result = await updateProblemStatus(state.problemId, 'SENT_BACK');
+            const result = await sendBackProblem(state.problemId, reason);
             if (result.success) {
                 toast.success('差し戻しに変更しました');
+                setSendBackOpen(false);
                 router.refresh();
             } else {
                 toast.error(result.error || '差し戻しに失敗しました');
@@ -708,7 +715,7 @@ export function ProblemEditorClient({
                     <Button variant="outline" onClick={handleSave} disabled={isPending}>
                         下書き保存
                     </Button>
-                    <Button variant="outline" onClick={handleSendBack} disabled={isPending || !state.problemId}>
+                    <Button variant="destructive" onClick={openSendBack} disabled={isPending || !state.problemId}>
                         差し戻し
                     </Button>
                     <Button onClick={handlePublish} disabled={isPending}>
@@ -1013,6 +1020,13 @@ export function ProblemEditorClient({
                     </TabsContent>
                 )}
             </Tabs>
+            <SendBackDialog
+                open={sendBackOpen}
+                onOpenChange={setSendBackOpen}
+                onConfirm={submitSendBack}
+                pending={isPending}
+                initialReason={problem?.sentBackReason ?? ''}
+            />
         </div>
     );
 }
