@@ -25,11 +25,11 @@ vi.mock('sonner', () => ({
 const {
     createProblemDraftMock,
     publishProblemRevisionMock,
-    updateProblemStatusMock,
+    sendBackProblemMock,
 } = vi.hoisted(() => ({
     createProblemDraftMock: vi.fn(),
     publishProblemRevisionMock: vi.fn(),
-    updateProblemStatusMock: vi.fn(),
+    sendBackProblemMock: vi.fn(),
 }));
 
 vi.mock('./actions', () => ({
@@ -38,8 +38,8 @@ vi.mock('./actions', () => ({
     generateProblemFigureDraft: vi.fn(),
     previewProblemPrint: vi.fn(),
     publishProblemRevision: publishProblemRevisionMock,
+    sendBackProblem: sendBackProblemMock,
     syncProblemAuthoringArtifacts: vi.fn(),
-    updateProblemStatus: updateProblemStatusMock,
     uploadProblemAsset: vi.fn(),
 }));
 
@@ -235,8 +235,8 @@ describe('ProblemEditorClient', () => {
         );
     });
 
-    it('差し戻しボタンは updateProblemStatus(SENT_BACK) を呼ぶ', async () => {
-        updateProblemStatusMock.mockResolvedValueOnce({ success: true, status: 'SENT_BACK' });
+    it('差し戻しボタンを押すとダイアログが開き、理由入力後に sendBackProblem を呼ぶ', async () => {
+        sendBackProblemMock.mockResolvedValueOnce({ success: true, status: 'SENT_BACK', sentBackReason: '答えが違います' });
 
         render(
             <ProblemEditorClient
@@ -249,8 +249,13 @@ describe('ProblemEditorClient', () => {
 
         fireEvent.click(screen.getByRole('button', { name: '差し戻し' }));
 
+        const textarea = await screen.findByPlaceholderText('どこを直してほしいかを書いてください');
+        fireEvent.change(textarea, { target: { value: '答えが違います' } });
+
+        fireEvent.click(screen.getByRole('button', { name: '差し戻す' }));
+
         await vi.waitFor(() => {
-            expect(updateProblemStatusMock).toHaveBeenCalledWith('problem-1', 'SENT_BACK');
+            expect(sendBackProblemMock).toHaveBeenCalledWith('problem-1', '答えが違います');
         });
     });
 

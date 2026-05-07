@@ -43,10 +43,13 @@ import {
     bulkDeleteProblems,
     deleteStandaloneProblem,
     publishProblemRevision,
+    sendBackProblem,
     updateProblemStatus,
     updateProblemVideoStatus,
 } from '../actions';
 import type { ProblemWithRelations } from '../types';
+import { SendBackDialog } from './send-back-dialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const VIDEO_STATUS_BADGE_CLASS: Record<VideoStatusValue, string> = {
     NONE: 'bg-gray-100 text-gray-600 hover:bg-gray-100',
@@ -64,12 +67,17 @@ const PROBLEM_STATUS_BADGE_CLASS: Record<ProblemStatusValue, string> = {
 
 function ProblemStatusCell({ problem }: { problem: ProblemWithRelations }) {
     const [isPending, startTransition] = useTransition();
+    const [sendBackOpen, setSendBackOpen] = useState(false);
     const router = useRouter();
     const currentStatus = problem.status as ProblemStatusValue;
 
     const handleChange = (value: string) => {
         if (value === currentStatus) return;
         const nextStatus = value as ProblemStatusValue;
+        if (nextStatus === 'SENT_BACK') {
+            setSendBackOpen(true);
+            return;
+        }
         startTransition(async () => {
             if (nextStatus === 'PUBLISHED') {
                 const result = await publishProblemRevision(problem.id);
@@ -92,7 +100,23 @@ function ProblemStatusCell({ problem }: { problem: ProblemWithRelations }) {
         });
     };
 
-    return (
+    const submitSendBack = (reason: string) => {
+        startTransition(async () => {
+            const result = await sendBackProblem(problem.id, reason);
+            if (result.success) {
+                toast.success('差し戻しに変更しました');
+                setSendBackOpen(false);
+                router.refresh();
+            } else {
+                toast.error(result.error || '差し戻しに失敗しました');
+            }
+        });
+    };
+
+    const reason = problem.sentBackReason;
+    const showTooltip = currentStatus === 'SENT_BACK' && reason !== null && reason !== undefined && reason.length > 0;
+
+    const select = (
         <Select value={currentStatus} onValueChange={handleChange} disabled={isPending}>
             <SelectTrigger
                 size="sm"
@@ -106,6 +130,30 @@ function ProblemStatusCell({ problem }: { problem: ProblemWithRelations }) {
                 ))}
             </SelectContent>
         </Select>
+    );
+
+    return (
+        <>
+            {showTooltip ? (
+                <TooltipProvider delayDuration={150}>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <span className="inline-block">{select}</span>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs whitespace-pre-wrap">{reason}</TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+            ) : (
+                select
+            )}
+            <SendBackDialog
+                open={sendBackOpen}
+                onOpenChange={setSendBackOpen}
+                onConfirm={submitSendBack}
+                pending={isPending}
+                initialReason={problem.sentBackReason ?? ''}
+            />
+        </>
     );
 }
 
