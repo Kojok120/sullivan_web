@@ -92,7 +92,7 @@ describe('structured-problem', () => {
         });
     });
 
-    it('answerSpec は正解と別解配列だけを受け付ける', () => {
+    it('answerSpec は正解・別解配列・解答欄テンプレートを受け付ける', () => {
         expect(parseAnswerSpec({
             correctAnswer: '20',
             acceptedAnswers: ['20cm^2'],

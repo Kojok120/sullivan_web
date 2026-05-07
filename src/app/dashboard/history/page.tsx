@@ -93,7 +93,7 @@ export default async function HistoryPage({
                                                 {item.problem.coreProblems.map(c => c.name).join(', ')}
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 max-w-xs" title={item.problem.question}>
+                                        <td className="px-6 py-4 max-w-xs">
                                             <ProblemTextPreview
                                                 text={item.problem.question}
                                                 className="text-sm leading-6 [&_.katex-display]:overflow-x-auto [&_.katex-display]:py-1 [&_svg.numberline]:max-w-full"

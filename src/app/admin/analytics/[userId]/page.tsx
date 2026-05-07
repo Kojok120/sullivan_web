@@ -145,7 +145,7 @@ export default async function StudentAnalyticsPage({ params }: PageProps) {
                                                 {history.problem.coreProblems[0]?.name || '-'}
                                             </div>
                                         </TableCell>
-                                        <TableCell className="max-w-[300px]" title={history.problem.question}>
+                                        <TableCell className="max-w-[300px]">
                                             <ProblemTextPreview
                                                 text={history.problem.question}
                                                 className="text-sm leading-6 [&_.katex-display]:overflow-x-auto [&_.katex-display]:py-1 [&_svg.numberline]:max-w-full"
