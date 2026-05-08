@@ -172,7 +172,9 @@ async function main() {
             revisionNumber: number;
             beforeAccepted: readonly string[];
             afterAccepted: string[];
-            answerSpec: AnswerSpecLike;
+            // 既知キー（correctAnswer / acceptedAnswers / answerTemplate）以外が将来追加された場合でも
+            // 黙って落とさないように、生の answerSpec をそのまま保持する。
+            rawAnswerSpec: Record<string, unknown>;
         };
 
         const problemUpdates: ProblemUpdate[] = [];
@@ -193,7 +195,15 @@ async function main() {
 
             for (const revision of problem.revisions) {
                 if (revision.answerSpec === null || revision.answerSpec === undefined) continue;
-                const spec = readAnswerSpec(revision.answerSpec);
+                const rawSpec = revision.answerSpec;
+                if (typeof rawSpec !== 'object' || Array.isArray(rawSpec)) {
+                    parseFailures += 1;
+                    console.warn(
+                        `[skip] revision ${revision.id} (problem ${problem.customId} #${revision.revisionNumber}) の answerSpec が object ではありません`,
+                    );
+                    continue;
+                }
+                const spec = readAnswerSpec(rawSpec);
                 if (!spec) {
                     parseFailures += 1;
                     console.warn(
@@ -209,7 +219,7 @@ async function main() {
                         revisionNumber: revision.revisionNumber,
                         beforeAccepted: spec.acceptedAnswers,
                         afterAccepted: dedupedSpec.values,
-                        answerSpec: spec,
+                        rawAnswerSpec: rawSpec as Record<string, unknown>,
                     });
                 }
             }
@@ -269,13 +279,12 @@ async function main() {
 
         let processedRevisions = 0;
         for (const update of revisionUpdates) {
+            // 既存の answerSpec を保持し、acceptedAnswers のみを差し替える。
+            // 既知キー以外の未知キーが含まれている場合でも落とさないため。
             const nextSpec: Record<string, unknown> = {
-                correctAnswer: update.answerSpec.correctAnswer,
+                ...update.rawAnswerSpec,
                 acceptedAnswers: update.afterAccepted,
             };
-            if (update.answerSpec.answerTemplate !== undefined) {
-                nextSpec.answerTemplate = update.answerSpec.answerTemplate;
-            }
             await prisma.problemRevision.update({
                 where: { id: update.id },
                 data: { answerSpec: nextSpec as Prisma.InputJsonValue },
