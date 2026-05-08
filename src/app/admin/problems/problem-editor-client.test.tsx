@@ -61,6 +61,7 @@ vi.mock('@/components/problem-authoring/tex-help-link', () => ({
 
 const baseProblem = {
     id: 'problem-1',
+    customId: 'E-1',
     subjectId: 'subject-1',
     grade: '中2',
     videoUrl: '',
@@ -112,6 +113,32 @@ describe('ProblemEditorClient', () => {
 
         expect(screen.queryByText('マスタNo')).not.toBeInTheDocument();
         expect(screen.getByText('学年')).toBeInTheDocument();
+    });
+
+    it('既存問題編集ではタイトル横に customId バッジを表示する', () => {
+        render(
+            <ProblemEditorClient
+                problem={baseProblem as never}
+                subjects={[{ id: 'subject-1', name: '英語' }]}
+                coreProblems={[{ id: 'core-1', name: '現在完了', subjectId: 'subject-1', subject: { name: '英語' } }]}
+                initialSubjectId="subject-1"
+            />,
+        );
+
+        expect(screen.getByText('ID: E-1')).toBeInTheDocument();
+    });
+
+    it('新規作成画面では customId バッジを表示しない', () => {
+        render(
+            <ProblemEditorClient
+                problem={null}
+                subjects={[{ id: 'subject-1', name: '英語' }]}
+                coreProblems={[{ id: 'core-1', name: '現在完了', subjectId: 'subject-1', subject: { name: '英語' } }]}
+                initialSubjectId="subject-1"
+            />,
+        );
+
+        expect(screen.queryByText(/^ID: /)).not.toBeInTheDocument();
     });
 
     it('本文タブで preview 系 UI を表示しない', () => {

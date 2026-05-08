@@ -18,7 +18,6 @@ export const PROBLEM_STATUS_OPTIONS = [
     { value: 'DRAFT', label: '下書き' },
     { value: 'PUBLISHED', label: '公開中' },
     { value: 'SENT_BACK', label: '差し戻し' },
-    { value: 'ARCHIVED', label: '保管' },
 ] as const satisfies ReadonlyArray<Option<string>>;
 
 export const PROBLEM_STATUS_VALUES = PROBLEM_STATUS_OPTIONS.map((option) => option.value);

@@ -62,7 +62,6 @@ const PROBLEM_STATUS_BADGE_CLASS: Record<ProblemStatusValue, string> = {
     DRAFT: 'bg-gray-100 text-gray-600 hover:bg-gray-100',
     PUBLISHED: 'bg-green-100 text-green-700 hover:bg-green-100',
     SENT_BACK: 'bg-amber-100 text-amber-700 hover:bg-amber-100',
-    ARCHIVED: 'bg-slate-200 text-slate-600 hover:bg-slate-200',
 };
 
 function ProblemStatusCell({ problem }: { problem: ProblemWithRelations }) {

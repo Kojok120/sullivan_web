@@ -702,7 +702,14 @@ export function ProblemEditorClient({
         <div className="space-y-6">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold">{title}</h1>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <h1 className="text-2xl font-bold">{title}</h1>
+                        {problem?.customId ? (
+                            <Badge variant="outline" className="font-mono text-xs">
+                                ID: {problem.customId}
+                            </Badge>
+                        ) : null}
+                    </div>
                     <p className="text-sm text-muted-foreground">{description}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
