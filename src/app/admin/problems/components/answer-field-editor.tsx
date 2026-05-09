@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { TableEditor } from '@/components/problem-authoring/table-editor';
 import { Input } from '@/components/ui/input';
@@ -158,12 +158,18 @@ export function AnswerFieldEditor({
     const [numberLine, setNumberLine] = useState<NumberLineState>(() => parseExistingNumberLine(answerTemplate) ?? DEFAULT_NUMBERLINE);
     const [coordPlane, setCoordPlane] = useState<CoordPlaneState>(() => parseExistingCoordPlane(answerTemplate) ?? DEFAULT_COORDPLANE);
     const [tableValue, setTableValue] = useState<AnswerTableOptions>(() => parseExistingTable(answerTemplate) ?? DEFAULT_TABLE);
+    // ローカル emit が出した DSL の echo を検出するための前回値トラッカー。
+    // useEffect でなく render 中で prevState を比較する React 公式 pattern を使う：
+    //   https://react.dev/reference/react/useState#storing-information-from-previous-renders
+    // 親が prop として返した値が lastSyncedTemplate と一致すれば「自分の出力が戻ってきただけ」
+    // とみなして再パースをスキップする。一致しない場合は外部から書き換えられたとみなして
+    // ローカル state を再構築する（部分入力中の "1." を再パースで "1" に丸め直さないため）。
+    const [lastSyncedTemplate, setLastSyncedTemplate] = useState(answerTemplate);
 
-    useEffect(() => {
+    if (answerTemplate !== lastSyncedTemplate) {
+        setLastSyncedTemplate(answerTemplate);
         const detected = detectKind(answerTemplate);
-        if (detected === kind) return;
-
-        setKind(detected);
+        if (detected !== kind) setKind(detected);
         if (detected === 'numberline') {
             const parsed = parseExistingNumberLine(answerTemplate);
             if (parsed) setNumberLine(parsed);
@@ -174,15 +180,20 @@ export function AnswerFieldEditor({
             const parsed = parseExistingCoordPlane(answerTemplate);
             if (parsed) setCoordPlane(parsed);
         }
-        // detect 結果が同じならローカル編集中なのでそのままにする
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [answerTemplate]);
+    }
+
+    // ローカル emit の前に lastSyncedTemplate を更新する。
+    // この順序により、parent が同期的に prop を返してきた次のレンダで echo として弾かれる。
+    const emit = (next: string) => {
+        setLastSyncedTemplate(next);
+        onAnswerTemplateChange(next);
+    };
 
     const handleKindChange = (next: AnswerTemplateKind) => {
         setKind(next);
         onProblemTypeChange(mapKindToProblemType(next));
         if (next === 'none') {
-            onAnswerTemplateChange('');
+            emit('');
             return;
         }
         // ローカル編集中の draft が一時的に invalid（例: min に "-" だけ入っている）でも
@@ -192,14 +203,15 @@ export function AnswerFieldEditor({
         if (next === 'numberline') {
             const dsl = buildNumberLineDsl(numberLine) || buildNumberLineDsl(DEFAULT_NUMBERLINE);
             if (!buildNumberLineDsl(numberLine)) setNumberLine(DEFAULT_NUMBERLINE);
-            onAnswerTemplateChange(dsl);
+            emit(dsl);
         } else if (next === 'table') {
-            // buildAnswerTableDirective は常に有効な DSL を返すので追加の防御は不要。
-            onAnswerTemplateChange(buildAnswerTableDirective(tableValue));
+            const dsl = buildAnswerTableDirective(tableValue) || buildAnswerTableDirective(DEFAULT_TABLE);
+            if (!buildAnswerTableDirective(tableValue)) setTableValue(DEFAULT_TABLE);
+            emit(dsl);
         } else if (next === 'coordplane') {
             const dsl = buildCoordPlaneDsl(coordPlane) || buildCoordPlaneDsl(DEFAULT_COORDPLANE);
             if (!buildCoordPlaneDsl(coordPlane)) setCoordPlane(DEFAULT_COORDPLANE);
-            onAnswerTemplateChange(dsl);
+            emit(dsl);
         }
     };
 
@@ -210,19 +222,22 @@ export function AnswerFieldEditor({
         // これがないと親の answerTemplate が空に戻り、useEffect が kind を 'none' に
         // 巻き戻して数直線エディタが画面から消えてしまう（負値入力を遮るバグ）。
         const dsl = buildNumberLineDsl(next);
-        if (dsl) onAnswerTemplateChange(dsl);
+        if (dsl) emit(dsl);
     };
 
     const handleCoordPlaneChange = (patch: Partial<CoordPlaneState>) => {
         const next = { ...coordPlane, ...patch };
         setCoordPlane(next);
         const dsl = buildCoordPlaneDsl(next);
-        if (dsl) onAnswerTemplateChange(dsl);
+        if (dsl) emit(dsl);
     };
 
     const handleTableChange = (next: AnswerTableOptions) => {
         setTableValue(next);
-        onAnswerTemplateChange(buildAnswerTableDirective(next));
+        // numberline / coordplane と同じく、過渡的に invalid な構成（行数 0、列数不一致）の間は
+        // 親への伝搬を止めて useEffect で kind が 'none' に巻き戻るのを防ぐ。
+        const dsl = buildAnswerTableDirective(next);
+        if (dsl) emit(dsl);
     };
 
     return (

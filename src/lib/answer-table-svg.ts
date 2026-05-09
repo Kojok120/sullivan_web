@@ -130,8 +130,14 @@ function parseAttributes(body: string): Map<string, string> | null {
 
 /**
  * AnswerTableOptions から DSL 文字列を再構築する（編集 UI で answerTemplate を更新するときに使う）。
+ * parseAnswerTableDirective が拒否する形（headers/cells 空、列数不一致など）が
+ * 渡された場合は空文字を返し、呼び出し側にフォールバック判断を委ねる。
  */
 export function buildAnswerTableDirective(options: AnswerTableOptions): string {
+    if (options.headers.length === 0 || options.headers.length > MAX_COLS) return '';
+    if (options.cells.length === 0 || options.cells.length > MAX_ROWS) return '';
+    if (options.cells.some((row) => row.length !== options.headers.length)) return '';
+
     const headers = options.headers.map((h) => escapeForAttr(h)).join(',');
     const allBlank = options.cells.every((row) => row.every((cell) => cell.trim() === '' || cell.trim() === '_'));
     if (allBlank) {

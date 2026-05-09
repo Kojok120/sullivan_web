@@ -68,6 +68,22 @@ describe('curve evaluator', () => {
         const opts = parseCoordPlaneDirective('xmin=-5 xmax=5 ymin=-5 ymax=5 curves="y=6/x"');
         expect(Number.isNaN(opts!.curves[0].evaluator(0))).toBe(true);
     });
+
+    it('単項マイナスは累乗より外側に適用される（-x^2 = -(x^2)）', () => {
+        const opts = parseCoordPlaneDirective('xmin=-5 xmax=5 ymin=-30 ymax=5 curves="y=-x^2"');
+        expect(opts?.curves[0].evaluator(3)).toBe(-9);
+        expect(opts?.curves[0].evaluator(-3)).toBe(-9);
+    });
+
+    it('指数側にも単項マイナスを書ける（2^-3 = 0.125）', () => {
+        const opts = parseCoordPlaneDirective('xmin=-5 xmax=5 ymin=-5 ymax=5 curves="y=2^-3"');
+        expect(opts?.curves[0].evaluator(0)).toBeCloseTo(0.125, 6);
+    });
+
+    it('累乗は右結合（2^3^2 = 2^(3^2) = 512）', () => {
+        const opts = parseCoordPlaneDirective('xmin=-5 xmax=5 ymin=0 ymax=600 curves="y=2^3^2"');
+        expect(opts?.curves[0].evaluator(0)).toBe(512);
+    });
 });
 
 describe('renderCoordPlaneSvg', () => {

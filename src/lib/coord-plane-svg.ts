@@ -386,11 +386,12 @@ function compileExpression(source: string): ((x: number) => number) | null {
     }
 
     function parseTerm(): Node | null {
-        let left = parseFactor();
+        // 単項は乗除より高い優先度なので term は unary を結合する。
+        let left = parseUnary();
         if (!left) return null;
         while (peek() && (peek()!.type === '*' || peek()!.type === '/')) {
             const op = consume()!.type as '*' | '/';
-            const right = parseFactor();
+            const right = parseUnary();
             if (!right) return null;
             left = { kind: 'binary', op, left, right };
         }
@@ -398,11 +399,15 @@ function compileExpression(source: string): ((x: number) => number) | null {
     }
 
     function parseFactor(): Node | null {
-        let base = parseUnary();
+        // factor: primary ('^' unary)?
+        // 単項を base 側に巻き込まないことで `-x^2` を `-(x^2)` と解釈する。
+        let base = parsePrimary();
         if (!base) return null;
         if (peek() && peek()!.type === '^') {
             consume();
-            const exp = parseFactor();
+            // 指数側は unary を許可することで `2^-3` を成立させる。右結合は
+            // parseUnary → parseFactor の相互再帰で表現される。
+            const exp = parseUnary();
             if (!exp) return null;
             base = { kind: 'binary', op: '^', left: base, right: exp };
         }
@@ -420,7 +425,8 @@ function compileExpression(source: string): ((x: number) => number) | null {
             consume();
             return parseUnary();
         }
-        return parsePrimary();
+        // unary は factor 全体を包む（`-x^2` の場合は `-(x^2)` になる）。
+        return parseFactor();
     }
 
     function parsePrimary(): Node | null {
