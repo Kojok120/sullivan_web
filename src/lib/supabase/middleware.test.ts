@@ -11,7 +11,7 @@ vi.mock('@supabase/ssr', () => ({
     createServerClient: createServerClientMock,
 }));
 
-import { updateSession } from '@/lib/supabase/middleware';
+import { looksLikeRecoverableAuthError, updateSession } from '@/lib/supabase/middleware';
 
 function createRequest() {
     const request = new NextRequest('http://localhost/teacher');
@@ -178,5 +178,64 @@ describe('supabase middleware', () => {
         await expect(updateSession(createRequest())).rejects.toThrow(
             'User from sub claim in JWT does not exist',
         );
+    });
+
+    describe('looksLikeRecoverableAuthError', () => {
+        it('refresh_token_not_found の AuthApiError を抑制対象と判定する', () => {
+            expect(
+                looksLikeRecoverableAuthError(
+                    Object.assign(new Error('Invalid Refresh Token: Refresh Token Not Found'), {
+                        __isAuthError: true,
+                        name: 'AuthApiError',
+                        status: 400,
+                        code: 'refresh_token_not_found',
+                    }),
+                ),
+            ).toBe(true);
+        });
+
+        it('refresh_token_already_used / session_expired も抑制対象と判定する', () => {
+            expect(
+                looksLikeRecoverableAuthError({
+                    __isAuthError: true,
+                    name: 'AuthApiError',
+                    code: 'refresh_token_already_used',
+                    message: 'Invalid Refresh Token: Already Used',
+                }),
+            ).toBe(true);
+
+            expect(
+                looksLikeRecoverableAuthError({
+                    __isAuthError: true,
+                    name: 'AuthApiError',
+                    code: 'session_expired',
+                    message: 'Session expired',
+                }),
+            ).toBe(true);
+        });
+
+        it('AuthSessionMissingError を抑制対象と判定する', () => {
+            expect(
+                looksLikeRecoverableAuthError(
+                    new AuthSessionMissingError(),
+                ),
+            ).toBe(true);
+        });
+
+        it('refresh token 以外の AuthApiError は抑制対象としない', () => {
+            expect(
+                looksLikeRecoverableAuthError(
+                    new AuthApiError('User from sub claim in JWT does not exist', 403, 'user_not_found'),
+                ),
+            ).toBe(false);
+        });
+
+        it('Supabase 由来でないオブジェクトは抑制対象としない', () => {
+            expect(looksLikeRecoverableAuthError(new Error('Refresh Token Not Found'))).toBe(false);
+            expect(looksLikeRecoverableAuthError({ message: 'Refresh Token Not Found' })).toBe(false);
+            expect(looksLikeRecoverableAuthError('Refresh Token Not Found')).toBe(false);
+            expect(looksLikeRecoverableAuthError(null)).toBe(false);
+            expect(looksLikeRecoverableAuthError(undefined)).toBe(false);
+        });
     });
 });
