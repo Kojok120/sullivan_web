@@ -83,7 +83,7 @@ export function parseAnswerTableDirective(body: string): AnswerTableOptions | nu
     const headers = headersStr
         .split(',')
         .map((h) => h.trim())
-        .filter((h, i, arr) => i < arr.length);
+        .filter((h) => h.length > 0);
     if (headers.length === 0 || headers.length > MAX_COLS) return null;
 
     const prefillStr = attrs.get('prefill');

@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { parseCoordPlaneDirective } from '@/lib/coord-plane-svg';
@@ -46,12 +48,26 @@ type NumberLineState = {
 const DEFAULT_NUMBERLINE: NumberLineState = { min: '-5', max: '5', marks: '' };
 
 function NumberLineForm({ source, onSourceChange }: FormProps) {
-    const state = parseExistingNumberLine(source) ?? DEFAULT_NUMBERLINE;
+    // 親の source は常に valid な DSL である前提で、ローカル draft（編集中の生文字列）
+    // を別途保持する。これがないと「-」だけ入力した瞬間に buildNumberLineDsl('') が
+    // 返って source が空になり、再 parse 時に DEFAULT_NUMBERLINE に戻ってしまう。
+    // 親 source が外部から差し替わった場合は draft をリセット（render 中に setState する
+    // React 公式の「prop 変化に追従」パターン: useEffect ではなく前回値と比較する）。
+    const [draft, setDraft] = useState<NumberLineState>(() => parseExistingNumberLine(source) ?? DEFAULT_NUMBERLINE);
+    const [prevSource, setPrevSource] = useState(source);
+    if (source !== prevSource) {
+        setPrevSource(source);
+        setDraft(parseExistingNumberLine(source) ?? DEFAULT_NUMBERLINE);
+    }
 
     const update = (patch: Partial<NumberLineState>) => {
-        const next = { ...state, ...patch };
-        onSourceChange(buildNumberLineDsl(next));
+        const next = { ...draft, ...patch };
+        setDraft(next);
+        const dsl = buildNumberLineDsl(next);
+        if (dsl) onSourceChange(dsl);
     };
+
+    const state = draft;
 
     return (
         <div className="space-y-3 rounded-md border p-4">
@@ -101,12 +117,21 @@ const DEFAULT_COORDPLANE: CoordPlaneState = {
 };
 
 function CoordPlaneForm({ source, onSourceChange }: FormProps) {
-    const state = parseExistingCoordPlane(source) ?? DEFAULT_COORDPLANE;
+    const [draft, setDraft] = useState<CoordPlaneState>(() => parseExistingCoordPlane(source) ?? DEFAULT_COORDPLANE);
+    const [prevSource, setPrevSource] = useState(source);
+    if (source !== prevSource) {
+        setPrevSource(source);
+        setDraft(parseExistingCoordPlane(source) ?? DEFAULT_COORDPLANE);
+    }
 
     const update = (patch: Partial<CoordPlaneState>) => {
-        const next = { ...state, ...patch };
-        onSourceChange(buildCoordPlaneDsl(next));
+        const next = { ...draft, ...patch };
+        setDraft(next);
+        const dsl = buildCoordPlaneDsl(next);
+        if (dsl) onSourceChange(dsl);
     };
+
+    const state = draft;
 
     return (
         <div className="space-y-3 rounded-md border p-4">
@@ -165,12 +190,21 @@ const DEFAULT_GEOMETRY: GeometryState = {
 };
 
 function GeometryForm({ source, onSourceChange }: FormProps) {
-    const state = parseExistingGeometry(source) ?? DEFAULT_GEOMETRY;
+    const [draft, setDraft] = useState<GeometryState>(() => parseExistingGeometry(source) ?? DEFAULT_GEOMETRY);
+    const [prevSource, setPrevSource] = useState(source);
+    if (source !== prevSource) {
+        setPrevSource(source);
+        setDraft(parseExistingGeometry(source) ?? DEFAULT_GEOMETRY);
+    }
 
     const update = (patch: Partial<GeometryState>) => {
-        const next = { ...state, ...patch };
-        onSourceChange(buildGeometryDsl(next));
+        const next = { ...draft, ...patch };
+        setDraft(next);
+        const dsl = buildGeometryDsl(next);
+        if (dsl) onSourceChange(dsl);
     };
+
+    const state = draft;
 
     return (
         <div className="space-y-3 rounded-md border p-4">

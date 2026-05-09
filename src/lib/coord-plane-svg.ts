@@ -48,6 +48,27 @@ const POINT_RADIUS = 4;
 const LABEL_OFFSET_X = 8;
 const LABEL_OFFSET_Y = -8;
 
+// 軸目盛りの最小ピクセル間隔。閾値より狭くなる場合は粗い刻みに切り替える。
+const MIN_TICK_PIXEL_SPACING = 18;
+// データ依存しないハード上限。粗刻み計算が破綻したときの保険。
+const MAX_TICKS_PER_AXIS = 60;
+
+let markerIdCounter = 0;
+function nextMarkerId(): string {
+    markerIdCounter = (markerIdCounter + 1) % Number.MAX_SAFE_INTEGER;
+    return `cp-${markerIdCounter}`;
+}
+
+function chooseTickStep(span: number, viewSpan: number): number {
+    if (!Number.isFinite(span) || span <= 0) return 1;
+    const usable = viewSpan - PADDING * 2;
+    const pixelsPerUnit = usable / span;
+    if (!Number.isFinite(pixelsPerUnit) || pixelsPerUnit <= 0) return Math.max(1, Math.ceil(span / MAX_TICKS_PER_AXIS));
+    const minStepByPixel = Math.ceil(MIN_TICK_PIXEL_SPACING / pixelsPerUnit);
+    const minStepByCount = Math.ceil(span / MAX_TICKS_PER_AXIS);
+    return Math.max(1, minStepByPixel, minStepByCount);
+}
+
 function escapeXml(value: string): string {
     return value
         .replace(/&/g, '&amp;')
@@ -85,38 +106,50 @@ export function renderCoordPlaneSvg(options: CoordPlaneOptions): string {
         return `<span class="coordplane-error">座標平面の範囲が不正です</span>`;
     }
 
-    // グリッド線（整数刻み）
+    // 描画範囲が広い場合に SVG ノード数が爆発しないよう、ピクセル間隔と件数で
+    // 動的に刻み幅を決める。数十万単位のレンジを安全に描画するためのガード。
+    const xStep = chooseTickStep(xmax - xmin, VIEW_WIDTH);
+    const yStep = chooseTickStep(ymax - ymin, VIEW_HEIGHT);
+
+    // グリッド線
     const gridLines: string[] = [];
-    for (let v = Math.ceil(xmin); v <= Math.floor(xmax); v += 1) {
+    for (let v = Math.ceil(xmin / xStep) * xStep; v <= xmax; v += xStep) {
         if (v === 0) continue;
         const x = projectX(v, xmin, xmax);
         gridLines.push(`<line x1="${x}" y1="${PADDING}" x2="${x}" y2="${VIEW_HEIGHT - PADDING}" stroke="currentColor" stroke-width="0.5" opacity="0.2" />`);
     }
-    for (let v = Math.ceil(ymin); v <= Math.floor(ymax); v += 1) {
+    for (let v = Math.ceil(ymin / yStep) * yStep; v <= ymax; v += yStep) {
         if (v === 0) continue;
         const y = projectY(v, ymin, ymax);
         gridLines.push(`<line x1="${PADDING}" y1="${y}" x2="${VIEW_WIDTH - PADDING}" y2="${y}" stroke="currentColor" stroke-width="0.5" opacity="0.2" />`);
     }
+
+    // SVG ごとに一意な marker id を割り当てる（同一ページ内で複数並んでも参照崩れしない）。
+    const markerPrefix = nextMarkerId();
+    const arrowUp = `${markerPrefix}-up`;
+    const arrowDown = `${markerPrefix}-down`;
+    const arrowLeft = `${markerPrefix}-left`;
+    const arrowRight = `${markerPrefix}-right`;
 
     // 軸（範囲内に 0 が含まれる場合のみ）
     const axisLines: string[] = [];
     const axisLabels: string[] = [];
     if (xmin <= 0 && xmax >= 0) {
         const x0 = projectX(0, xmin, xmax);
-        axisLines.push(`<line x1="${x0}" y1="${PADDING}" x2="${x0}" y2="${VIEW_HEIGHT - PADDING}" stroke="currentColor" stroke-width="1" marker-start="url(#cp-arrow-up)" marker-end="url(#cp-arrow-down)" />`);
+        axisLines.push(`<line x1="${x0}" y1="${PADDING}" x2="${x0}" y2="${VIEW_HEIGHT - PADDING}" stroke="currentColor" stroke-width="1" marker-start="url(#${arrowUp})" marker-end="url(#${arrowDown})" />`);
         axisLabels.push(`<text x="${x0 + 6}" y="${PADDING + 4}" font-size="12" fill="currentColor">y</text>`);
     }
     if (ymin <= 0 && ymax >= 0) {
         const y0 = projectY(0, ymin, ymax);
-        axisLines.push(`<line x1="${PADDING}" y1="${y0}" x2="${VIEW_WIDTH - PADDING}" y2="${y0}" stroke="currentColor" stroke-width="1" marker-start="url(#cp-arrow-left)" marker-end="url(#cp-arrow-right)" />`);
+        axisLines.push(`<line x1="${PADDING}" y1="${y0}" x2="${VIEW_WIDTH - PADDING}" y2="${y0}" stroke="currentColor" stroke-width="1" marker-start="url(#${arrowLeft})" marker-end="url(#${arrowRight})" />`);
         axisLabels.push(`<text x="${VIEW_WIDTH - PADDING - 4}" y="${y0 - 6}" font-size="12" fill="currentColor" text-anchor="end">x</text>`);
     }
 
-    // 整数目盛
+    // 目盛
     const ticks: string[] = [];
     if (ymin <= 0 && ymax >= 0) {
         const y0 = projectY(0, ymin, ymax);
-        for (let v = Math.ceil(xmin); v <= Math.floor(xmax); v += 1) {
+        for (let v = Math.ceil(xmin / xStep) * xStep; v <= xmax; v += xStep) {
             if (v === 0) continue;
             const x = projectX(v, xmin, xmax);
             ticks.push(`<line x1="${x}" y1="${y0 - 3}" x2="${x}" y2="${y0 + 3}" stroke="currentColor" stroke-width="1" />`);
@@ -125,7 +158,7 @@ export function renderCoordPlaneSvg(options: CoordPlaneOptions): string {
     }
     if (xmin <= 0 && xmax >= 0) {
         const x0 = projectX(0, xmin, xmax);
-        for (let v = Math.ceil(ymin); v <= Math.floor(ymax); v += 1) {
+        for (let v = Math.ceil(ymin / yStep) * yStep; v <= ymax; v += yStep) {
             if (v === 0) continue;
             const y = projectY(v, ymin, ymax);
             ticks.push(`<line x1="${x0 - 3}" y1="${y}" x2="${x0 + 3}" y2="${y}" stroke="currentColor" stroke-width="1" />`);
@@ -190,16 +223,16 @@ export function renderCoordPlaneSvg(options: CoordPlaneOptions): string {
     }
 
     const defs = `<defs>
-        <marker id="cp-arrow-up" viewBox="0 0 10 10" refX="5" refY="2" markerWidth="8" markerHeight="8" orient="auto">
+        <marker id="${arrowUp}" viewBox="0 0 10 10" refX="5" refY="2" markerWidth="8" markerHeight="8" orient="auto">
             <path d="M 0 10 L 5 0 L 10 10 z" fill="currentColor" />
         </marker>
-        <marker id="cp-arrow-down" viewBox="0 0 10 10" refX="5" refY="8" markerWidth="8" markerHeight="8" orient="auto">
+        <marker id="${arrowDown}" viewBox="0 0 10 10" refX="5" refY="8" markerWidth="8" markerHeight="8" orient="auto">
             <path d="M 0 0 L 5 10 L 10 0 z" fill="currentColor" />
         </marker>
-        <marker id="cp-arrow-left" viewBox="0 0 10 10" refX="2" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+        <marker id="${arrowLeft}" viewBox="0 0 10 10" refX="2" refY="5" markerWidth="8" markerHeight="8" orient="auto">
             <path d="M 10 0 L 0 5 L 10 10 z" fill="currentColor" />
         </marker>
-        <marker id="cp-arrow-right" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+        <marker id="${arrowRight}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto">
             <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor" />
         </marker>
     </defs>`;
@@ -247,6 +280,9 @@ function parseAttributes(body: string): Map<string, string> | null {
     let match: RegExpExecArray | null;
     let lastIndex = 0;
     while ((match = re.exec(body)) !== null) {
+        // 属性間に未消費のテキストがあれば typo を含む DSL なので拒否する。
+        const between = body.slice(lastIndex, match.index);
+        if (between.trim().length > 0) return null;
         const key = match[1];
         const value = match[2] ?? match[3] ?? match[4] ?? '';
         result.set(key, value);

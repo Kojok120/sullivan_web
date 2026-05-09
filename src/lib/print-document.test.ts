@@ -182,6 +182,39 @@ describe('print-document', () => {
         expect(markup).toContain('style="width:100%;aspect-ratio:1.3333;"');
     });
 
+    it('structured problem の directive ブロックを SVG 展開して印刷する', async () => {
+        const { markup } = await buildPrintDocumentMarkup({
+            studentName: '生徒H',
+            studentLoginId: 'student-h',
+            subjectName: '数学',
+            problemSets: [[{
+                id: 'structured-directive-1',
+                customId: 'M-301',
+                question: '数直線図版',
+                order: 1,
+                contentFormat: 'STRUCTURED_V1',
+                publishedRevisionId: 'rev-directive-1',
+                structuredContent: {
+                    version: 1,
+                    blocks: [
+                        { id: 'p1', type: 'paragraph', text: '数直線を見て答えなさい。' },
+                        {
+                            id: 'd1',
+                            type: 'directive',
+                            kind: 'numberline',
+                            source: '[[numberline min=-3 max=3 marks="A:-1,B:2"]]',
+                        },
+                    ],
+                } as never,
+                assets: [],
+            }]],
+        });
+
+        expect(markup).toContain('problem-directive');
+        expect(markup).toContain('<svg class="numberline"');
+        expect(markup).not.toContain('[[numberline');
+    });
+
     it('structured problem の本文で $...$ と $$...$$ を KaTeX 描画する', async () => {
         const { markup } = await buildPrintDocumentMarkup({
             studentName: '生徒F',

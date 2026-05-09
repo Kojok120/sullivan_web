@@ -90,7 +90,17 @@ const answerLinesBlockSchema = blockBaseSchema.extend({
  * 本文中の独立した添付ブロックとして保持するための型。
  * source には完全な `[[numberline ...]]` / `[[coordplane ...]]` / `[[geometry ...]]` 文字列を入れる。
  * 描画は既存の expand* と renderProblemTextHtml が担う。
+ *
+ * 描画は kind ではなく source 側のオープナーを見て分岐するので、
+ * 整合しない組み合わせ（kind: 'geometry' に対し coordplane の source 等）は
+ * document レベルの superRefine で弾く（DIRECTIVE_KIND_OPENERS を参照）。
  */
+const DIRECTIVE_KIND_OPENERS: Record<'numberline' | 'coordplane' | 'geometry', string> = {
+    numberline: '[[numberline ',
+    coordplane: '[[coordplane ',
+    geometry: '[[geometry ',
+};
+
 const directiveBlockSchema = blockBaseSchema.extend({
     type: z.literal('directive'),
     kind: z.enum(['numberline', 'coordplane', 'geometry']),
@@ -115,6 +125,18 @@ export const structuredProblemDocumentSchema = z.object({
     summary: z.string().optional(),
     instructions: z.string().optional(),
     blocks: z.array(problemBlockSchema).min(1),
+}).superRefine((value, ctx) => {
+    value.blocks.forEach((block, index) => {
+        if (block.type !== 'directive') return;
+        const opener = DIRECTIVE_KIND_OPENERS[block.kind];
+        if (!block.source.trimStart().startsWith(opener)) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['blocks', index, 'source'],
+                message: `directive.kind="${block.kind}" の source は "${opener.trim()} ..." で始まる必要があります`,
+            });
+        }
+    });
 });
 
 export const answerSpecSchema = z.object({

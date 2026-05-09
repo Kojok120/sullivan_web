@@ -155,7 +155,7 @@ table.answertable {
 
 table.answertable th,
 table.answertable td {
-  border: 1px solid #111827;
+  border: 1px solid var(--foreground);
   padding: 0.25rem 0.5rem;
   text-align: center;
   min-width: 4rem;

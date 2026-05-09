@@ -195,13 +195,18 @@ export function AnswerFieldEditor({
     const handleNumberLineChange = (patch: Partial<NumberLineState>) => {
         const next = { ...numberLine, ...patch };
         setNumberLine(next);
-        onAnswerTemplateChange(buildNumberLineDsl(next));
+        // 「-」だけ入力した瞬間など、過渡的に invalid な間は親への伝搬を止める。
+        // これがないと親の answerTemplate が空に戻り、useEffect が kind を 'none' に
+        // 巻き戻して数直線エディタが画面から消えてしまう（負値入力を遮るバグ）。
+        const dsl = buildNumberLineDsl(next);
+        if (dsl) onAnswerTemplateChange(dsl);
     };
 
     const handleCoordPlaneChange = (patch: Partial<CoordPlaneState>) => {
         const next = { ...coordPlane, ...patch };
         setCoordPlane(next);
-        onAnswerTemplateChange(buildCoordPlaneDsl(next));
+        const dsl = buildCoordPlaneDsl(next);
+        if (dsl) onAnswerTemplateChange(dsl);
     };
 
     const handleTableChange = (next: AnswerTableOptions) => {

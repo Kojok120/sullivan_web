@@ -237,6 +237,48 @@ describe('problem-editor-model', () => {
         ]);
     });
 
+    it('directive カードを round-trip で再構築できる', () => {
+        const document: StructuredProblemDocument = {
+            version: 1,
+            blocks: [
+                { id: 'p-dir', type: 'paragraph', text: '数直線を見て答えなさい。' },
+                {
+                    id: 'p-dir-asset',
+                    type: 'directive',
+                    kind: 'numberline',
+                    source: '[[numberline min=-3 max=3 marks="A:-1,B:2"]]',
+                },
+            ],
+        };
+
+        const segments = parseProblemBodySegments(document.blocks);
+        expect(segments).toHaveLength(1);
+        expect(segments[0]).toEqual({
+            kind: 'card',
+            card: {
+                id: 'p-dir',
+                text: '数直線を見て答えなさい。',
+                attachmentKind: 'numberline',
+                attachmentBlockType: 'directive',
+                assetId: '',
+                tableData: EMPTY_TABLE,
+                directiveSource: '[[numberline min=-3 max=3 marks="A:-1,B:2"]]',
+            },
+        });
+
+        // updater を no-op で通しても source が保持される
+        const next = updateProblemBodyCard(document, 'p-dir', (card) => card);
+        expect(next.blocks).toEqual([
+            { id: 'p-dir', type: 'paragraph', text: '数直線を見て答えなさい。' },
+            {
+                id: 'p-dir-asset',
+                type: 'directive',
+                kind: 'numberline',
+                source: '[[numberline min=-3 max=3 marks="A:-1,B:2"]]',
+            },
+        ]);
+    });
+
     it('deriveProblemTypeFromDocument は fallback をそのまま返す', () => {
         expect(deriveProblemTypeFromDocument({
             version: 1,
