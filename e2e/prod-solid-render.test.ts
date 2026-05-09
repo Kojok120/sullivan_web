@@ -41,6 +41,9 @@ test.describe('PROD: 立体 DSL レンダリング (admin editor)', () => {
       // /admin/problems/<id> は variant='admin' (デフォルト) で開くので h1 は「構造化問題エディタ」
       await expect(page.getByRole('heading', { name: '構造化問題エディタ' }).first()).toBeVisible({ timeout: 15_000 });
 
+      // 立体カードのプレビューは「本文」タブ配下なので、まず tab を切り替える
+      await page.getByRole('tab', { name: '本文' }).click();
+
       // svg.solid が 1 個以上、かつ .solid-error が無いこと
       const solidSvg = page.locator('svg.solid').first();
       await expect(solidSvg).toBeVisible({ timeout: 10_000 });
