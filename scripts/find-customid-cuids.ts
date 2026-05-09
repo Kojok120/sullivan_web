@@ -8,6 +8,16 @@ import { config as loadDotenv } from 'dotenv';
 import { resolve } from 'node:path';
 
 type EnvName = 'dev' | 'production';
+const ALLOWED_ENVS: readonly EnvName[] = ['dev', 'production'];
+
+function parseEnv(raw: string | undefined): EnvName {
+    if (!raw || !ALLOWED_ENVS.includes(raw as EnvName)) {
+        throw new Error(
+            `--env の値が不正です: "${raw ?? ''}" (許可: ${ALLOWED_ENVS.join(' | ')})`,
+        );
+    }
+    return raw as EnvName;
+}
 
 function envFileFor(name: EnvName): string {
     return name === 'production'
@@ -22,9 +32,9 @@ async function main() {
     for (let i = 0; i < args.length; i++) {
         const a = args[i];
         if (a === '--env') {
-            env = (args[++i] as EnvName) ?? 'dev';
+            env = parseEnv(args[++i]);
         } else if (a.startsWith('--env=')) {
-            env = (a.split('=')[1] as EnvName) ?? 'dev';
+            env = parseEnv(a.split('=')[1]);
         } else {
             customIds.push(a);
         }
