@@ -30,13 +30,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-
-      - name: 依存関係インストール
-        run: npm ci
 
       - name: Prisma マイグレーション実行
-        run: npx prisma migrate deploy
+        # `prisma migrate deploy` は CLI のみで動くため、prod 用の依存全体をインストールせず
+        # package.json の prisma バージョンをピンして npx で単体実行する
+        run: |
+          PRISMA_VERSION="$(node -p "require('./package.json').devDependencies.prisma || require('./package.json').dependencies.prisma")"
+          npx --yes "prisma@${PRISMA_VERSION}" migrate deploy
 
   deploy-grading-worker:
     name: Deploy Grading Worker (DEV)
@@ -133,7 +133,9 @@ jobs:
     name: Deploy Web App (DEV)
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: [migrate-db, deploy-grading-worker]
+    # web は worker のビルド成果物に依存しない（worker URL は gcloud describe で解決）。
+    # クリティカルパス短縮のため worker と並列に走らせる
+    needs: [migrate-db]
     environment: dev
     permissions:
       contents: read
