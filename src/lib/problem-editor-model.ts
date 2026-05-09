@@ -1,6 +1,6 @@
 import type { ProblemBlock, StructuredProblemDocument } from '@/lib/structured-problem';
 
-export type ProblemBodyDirectiveKind = 'numberline' | 'coordplane' | 'geometry';
+export type ProblemBodyDirectiveKind = 'numberline' | 'coordplane' | 'geometry' | 'solid';
 export type ProblemBodyAttachmentKind = 'none' | 'upload' | 'table' | ProblemBodyDirectiveKind;
 export type ProblemBodyAttachmentBlockType = Extract<ProblemBlock['type'], 'image' | 'svg' | 'table' | 'directive'> | null;
 
@@ -28,7 +28,7 @@ export type ProblemBodySegment =
     | { kind: 'legacy'; block: ProblemBlock };
 
 const CARD_ATTACHMENT_BLOCK_TYPES = new Set<ProblemBlock['type']>(['image', 'svg', 'table', 'directive']);
-const DIRECTIVE_KINDS = new Set<ProblemBodyDirectiveKind>(['numberline', 'coordplane', 'geometry']);
+const DIRECTIVE_KINDS = new Set<ProblemBodyDirectiveKind>(['numberline', 'coordplane', 'geometry', 'solid']);
 
 type CardAttachmentBlock = Extract<ProblemBlock, { type: 'image' | 'svg' | 'table' | 'directive' }>;
 
@@ -79,6 +79,7 @@ function getAttachmentBlockType(kind: ProblemBodyAttachmentKind, currentType: Pr
         case 'numberline':
         case 'coordplane':
         case 'geometry':
+        case 'solid':
             return 'directive';
         case 'none':
         default:
