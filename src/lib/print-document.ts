@@ -818,7 +818,7 @@ function renderKatex(latex: string, displayMode: boolean): string {
 }
 
 function isStructuredPrintableProblem(problem: PrintableProblem): boolean {
-    return problem.contentFormat === 'STRUCTURED_V1' && Boolean(problem.structuredContent);
+    return Boolean(problem.structuredContent);
 }
 
 export function getProblemDisplayId(problem: PrintableProblem): string {

@@ -19,7 +19,6 @@ function createProblem(overrides: Partial<ProblemForGrading> = {}): ProblemForGr
         contentFormat: 'PLAIN_TEXT',
         publishedRevisionId: 'revision-1',
         structuredContent: null,
-        answerSpec: null,
         revisionAssets: [],
         coreProblems: [],
         ...overrides,
@@ -27,10 +26,14 @@ function createProblem(overrides: Partial<ProblemForGrading> = {}): ProblemForGr
 }
 
 describe('grading-service helpers', () => {
-    it('structured 問題から AI 採点用コンテキストを組み立てる', () => {
+    it('structured 問題: 問題文は structuredContent から、正解は Problem.answer から組み立てる', () => {
+        // publish 時に answerSpec.correctAnswer は Problem.answer に同期されているため
+        // 採点側は Problem.answer / acceptedAnswers のみを正解の信頼源として扱う。
         const context = buildProblemContextForGemini(createProblem({
             subjectName: '理科',
             contentFormat: 'STRUCTURED_V1',
+            answer: 'B',
+            acceptedAnswers: ['18'],
             structuredContent: {
                 version: 1,
                 summary: '作図問題',
@@ -40,10 +43,6 @@ describe('grading-service helpers', () => {
                     { id: 'c1', type: 'choices', options: [{ id: 'A', label: '12' }, { id: 'B', label: '18' }] },
                     { id: 'g1', type: 'image', assetId: 'asset-graph' },
                 ],
-            },
-            answerSpec: {
-                correctAnswer: 'B',
-                acceptedAnswers: [],
             },
             revisionAssets: [{
                 id: 'asset-graph',
@@ -58,10 +57,30 @@ describe('grading-service helpers', () => {
             displayId: 'S-1',
             subjectName: '理科',
             referenceAnswer: 'B',
+            alternativeAnswers: ['18'],
             hasReferenceFigures: true,
         });
         expect(context.problemText).toContain('概要: 作図問題');
         expect(context.problemText).toContain('選択肢:');
+    });
+
+    it('structured 問題: figure 取得は contentFormat ではなく structuredContent の有無で判定する', () => {
+        // 段階A+ で contentFormat 判定を撤廃したことの回帰を防ぐ。
+        const context = buildProblemContextForGemini(createProblem({
+            contentFormat: 'PLAIN_TEXT',
+            structuredContent: {
+                version: 1,
+                blocks: [{ id: 'g1', type: 'image', assetId: 'asset-graph' }],
+            },
+            revisionAssets: [{
+                id: 'asset-graph',
+                fileName: 'graph.png',
+                mimeType: 'image/png',
+                storageKey: 'problems/x/y/graph.png',
+            }],
+        }), 0);
+
+        expect(context.hasReferenceFigures).toBe(true);
     });
 
     it('Gemini contents に答案と参考図版を含める', () => {
