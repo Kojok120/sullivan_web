@@ -24,10 +24,8 @@ vi.mock('sonner', () => ({
 
 vi.mock('@/app/admin/problems/actions', () => ({
     createProblemDraft: vi.fn(),
-    generateProblemFigureDraft: vi.fn(),
     previewProblemPrint: vi.fn(),
     publishProblemRevision: vi.fn(),
-    syncProblemAuthoringArtifacts: vi.fn(),
     uploadProblemAsset: vi.fn(),
 }));
 
@@ -37,10 +35,6 @@ vi.mock('@/app/admin/problems/components/core-problem-selector', () => ({
 
 vi.mock('@/app/admin/problems/components/problem-text-preview', () => ({
     ProblemTextPreview: () => <div>problem-text-preview</div>,
-}));
-
-vi.mock('@/app/admin/problems/problem-authoring-embed', () => ({
-    ProblemAuthoringEmbed: () => <div>problem-authoring-embed</div>,
 }));
 
 vi.mock('@/components/problem-authoring/tex-help-link', () => ({
@@ -59,15 +53,15 @@ const baseProblem = {
         id: 'revision-1',
         status: 'DRAFT',
         revisionNumber: 1,
-        authoringTool: 'GEOGEBRA',
+        authoringTool: 'MANUAL',
         authoringState: null,
         structuredContent: {
             version: 1,
             blocks: [
-                { id: 'p1', type: 'paragraph', text: 'グラフを見て答える。' },
-                { id: 'g1', type: 'graphAsset', assetId: 'asset-graph' },
-                { id: 'p2', type: 'paragraph', text: '図を見て答える。' },
+                { id: 'p1', type: 'paragraph', text: '画像を見て答える。' },
                 { id: 'i1', type: 'image', assetId: 'asset-image', src: '', alt: '' },
+                { id: 'p2', type: 'paragraph', text: '図を見て答える。' },
+                { id: 's1', type: 'svg', assetId: 'asset-svg', svg: '' },
             ],
         },
         answerSpec: { correctAnswer: '', acceptedAnswers: [] },

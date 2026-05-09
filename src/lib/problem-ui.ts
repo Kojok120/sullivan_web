@@ -31,7 +31,6 @@ export const CONTENT_FORMAT_OPTIONS = [
 
 export const PROBLEM_AUTHORING_TOOL_OPTIONS = [
     { value: 'MANUAL', label: '手入力' },
-    { value: 'GEOGEBRA', label: 'GeoGebra' },
     { value: 'SVG', label: 'SVG図版' },
     { value: 'UPLOAD', label: 'ファイル取込' },
 ] as const satisfies ReadonlyArray<Option<string>>;
@@ -45,22 +44,18 @@ export const BLOCK_TYPE_OPTIONS = [
     { value: 'table', label: '表' },
     { value: 'choices', label: '選択肢' },
     { value: 'blankGroup', label: '空欄' },
-    { value: 'graphAsset', label: 'グラフ図版' },
-    { value: 'geometryAsset', label: '図形図版' },
 ] as const satisfies ReadonlyArray<Option<string>>;
 
 export const ASSET_KIND_OPTIONS = [
     { value: 'IMAGE', label: '画像' },
     { value: 'SVG', label: 'SVG図版' },
     { value: 'PDF', label: 'PDF' },
-    { value: 'GEOGEBRA_STATE', label: 'GeoGebra状態' },
     { value: 'JSON', label: 'JSON' },
     { value: 'THUMBNAIL', label: 'サムネイル' },
 ] as const satisfies ReadonlyArray<Option<string>>;
 
 export const ASSET_SOURCE_TOOL_OPTIONS = [
     { value: 'MANUAL', label: '手入力' },
-    { value: 'GEOGEBRA', label: 'GeoGebra' },
     { value: 'SVG', label: 'SVG図版' },
     { value: 'UPLOAD', label: 'ファイル取込' },
 ] as const satisfies ReadonlyArray<Option<string>>;
@@ -132,10 +127,6 @@ export function resolveVideoStatusFromUrl(
     return desiredStatus;
 }
 
-export function getAvailableAuthoringTools(problemType: string) {
-    if (problemType === 'GRAPH_DRAW' || problemType === 'GEOMETRY') {
-        return ['GEOGEBRA', 'SVG'] as const;
-    }
-
+export function getAvailableAuthoringTools(_problemType: string) {
     return ['MANUAL', 'UPLOAD'] as const;
 }

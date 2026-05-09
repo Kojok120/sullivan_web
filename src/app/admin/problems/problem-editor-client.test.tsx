@@ -35,11 +35,9 @@ const {
 vi.mock('./actions', () => ({
     createProblemDraft: createProblemDraftMock,
     deleteProblemAsset: vi.fn(),
-    generateProblemFigureDraft: vi.fn(),
     previewProblemPrint: vi.fn(),
     publishProblemRevision: publishProblemRevisionMock,
     sendBackProblem: sendBackProblemMock,
-    syncProblemAuthoringArtifacts: vi.fn(),
     uploadProblemAsset: vi.fn(),
 }));
 
@@ -49,10 +47,6 @@ vi.mock('./components/core-problem-selector', () => ({
 
 vi.mock('./components/problem-text-preview', () => ({
     ProblemTextPreview: () => <div>problem-text-preview</div>,
-}));
-
-vi.mock('./problem-authoring-embed', () => ({
-    ProblemAuthoringEmbed: () => <div>problem-authoring-embed</div>,
 }));
 
 vi.mock('@/components/problem-authoring/tex-help-link', () => ({
@@ -72,15 +66,15 @@ const baseProblem = {
         id: 'revision-1',
         status: 'DRAFT',
         revisionNumber: 1,
-        authoringTool: 'GEOGEBRA',
+        authoringTool: 'MANUAL',
         authoringState: null,
         structuredContent: {
             version: 1,
             blocks: [
-                { id: 'p1', type: 'paragraph', text: 'グラフを見て答える。' },
-                { id: 'g1', type: 'graphAsset', assetId: 'asset-graph' },
-                { id: 'p2', type: 'paragraph', text: '図を見て答える。' },
+                { id: 'p1', type: 'paragraph', text: '画像を見て答える。' },
                 { id: 'i1', type: 'image', assetId: 'asset-image', src: '', alt: '' },
+                { id: 'p2', type: 'paragraph', text: '図を見て答える。' },
+                { id: 's1', type: 'svg', assetId: 'asset-svg', svg: '' },
             ],
         },
         answerSpec: { correctAnswer: '', acceptedAnswers: [] },
@@ -260,6 +254,43 @@ describe('ProblemEditorClient', () => {
             'href',
             '/admin/problems?subjectId=subject-math',
         );
+    });
+
+    it('解説動画URLを入力すると動画ステータスの表示が「設定済み」になる', () => {
+        render(
+            <ProblemEditorClient
+                problem={null}
+                subjects={[{ id: 'subject-1', name: '英語' }]}
+                coreProblems={[{ id: 'core-1', name: '現在完了', subjectId: 'subject-1', subject: { name: '英語' } }]}
+                initialSubjectId="subject-1"
+            />,
+        );
+
+        const videoUrlInput = screen.getByPlaceholderText('https://...');
+        const findStatusCombobox = () => screen
+            .getAllByRole('combobox')
+            .find((el) => el.textContent === '-' || el.textContent === '設定済み' || el.textContent === 'Drive完了' || el.textContent === '撮影完了');
+
+        // 初期状態は NONE (「-」) で disabled でない
+        const initialStatus = findStatusCombobox();
+        expect(initialStatus).toBeDefined();
+        expect(initialStatus).toHaveTextContent('-');
+        expect(initialStatus).not.toBeDisabled();
+        expect(screen.queryByText('URL設定済みのため自動的に「設定済み」になります')).not.toBeInTheDocument();
+
+        fireEvent.change(videoUrlInput, { target: { value: 'https://example.com/video.mp4' } });
+
+        // URL入力後はステータスが「設定済み」になり、Select は disabled になる
+        const updatedStatus = findStatusCombobox();
+        expect(updatedStatus).toHaveTextContent('設定済み');
+        expect(updatedStatus).toBeDisabled();
+        expect(screen.getByText('URL設定済みのため自動的に「設定済み」になります')).toBeInTheDocument();
+
+        // URL を消すと NONE 表示に戻る
+        fireEvent.change(videoUrlInput, { target: { value: '' } });
+        const clearedStatus = findStatusCombobox();
+        expect(clearedStatus).toHaveTextContent('-');
+        expect(clearedStatus).not.toBeDisabled();
     });
 
     it('差し戻しボタンを押すとダイアログが開き、理由入力後に sendBackProblem を呼ぶ', async () => {

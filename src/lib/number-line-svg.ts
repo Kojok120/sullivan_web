@@ -110,7 +110,7 @@ export function renderNumberLineSvg(options: NumberLineOptions): string {
 
     const axisLine = `<line x1="${lineX1}" y1="${lineY}" x2="${lineX2}" y2="${lineY}" stroke="currentColor" stroke-width="1.5" marker-start="url(#nl-arrow-left)" marker-end="url(#nl-arrow-right)" />`;
 
-    return `<svg class="numberline" viewBox="0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="数直線 ${formatNumber(min)} から ${formatNumber(max)}">${defs}${axisLine}${ticks.join('')}${numbers.join('')}${markEls.join('')}</svg>`;
+    return `<svg class="numberline" width="${VIEW_WIDTH}" height="${VIEW_HEIGHT}" viewBox="0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="数直線 ${formatNumber(min)} から ${formatNumber(max)}">${defs}${axisLine}${ticks.join('')}${numbers.join('')}${markEls.join('')}</svg>`;
 }
 
 /**
@@ -181,5 +181,22 @@ export function expandNumberLineDirectives(text: string): string {
         const opts = parseNumberLineDirective(body);
         if (!opts) return full;
         return renderNumberLineSvg(opts);
+    });
+}
+
+/**
+ * AI 採点用の人間可読サマリ。SVG ではなくテキスト要約を返す。
+ */
+export function expandNumberLineDirectivesAsText(text: string): string {
+    const re = /\[\[numberline\s+([^\]]*)\]\]/g;
+    return text.replace(re, (full, body: string) => {
+        const opts = parseNumberLineDirective(body);
+        if (!opts) return full;
+        const marks = opts.marks
+            .map((m) => (m.label ? `${m.label}=${m.value}` : String(m.value)))
+            .join(', ');
+        return marks
+            ? `[数直線] 範囲 ${opts.min}〜${opts.max}, マーク: ${marks}`
+            : `[数直線] 範囲 ${opts.min}〜${opts.max}`;
     });
 }

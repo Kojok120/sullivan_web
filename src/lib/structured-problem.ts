@@ -1,5 +1,20 @@
 import { z } from 'zod';
 
+import { expandAnswerTableDirectivesAsText } from '@/lib/answer-table-svg';
+import { expandCoordPlaneDirectivesAsText } from '@/lib/coord-plane-svg';
+import { expandGeometryDirectivesAsText } from '@/lib/geometry-svg';
+import { expandNumberLineDirectivesAsText } from '@/lib/number-line-svg';
+
+function expandAllDirectivesAsText(text: string): string {
+    return expandGeometryDirectivesAsText(
+        expandCoordPlaneDirectivesAsText(
+            expandAnswerTableDirectivesAsText(
+                expandNumberLineDirectivesAsText(text),
+            ),
+        ),
+    );
+}
+
 function createStructuredBlockId() {
     if (typeof globalThis.crypto?.randomUUID === 'function') {
         return globalThis.crypto.randomUUID();
@@ -65,19 +80,31 @@ const blankGroupBlockSchema = blockBaseSchema.extend({
     })).min(1),
 });
 
-const graphAssetBlockSchema = blockBaseSchema.extend({
-    type: z.literal('graphAsset'),
-    assetId: z.string().optional(),
-});
-
-const geometryAssetBlockSchema = blockBaseSchema.extend({
-    type: z.literal('geometryAsset'),
-    assetId: z.string().optional(),
-});
-
 const answerLinesBlockSchema = blockBaseSchema.extend({
     type: z.literal('answerLines'),
     lines: z.number().int().min(1).max(20).default(3),
+});
+
+/**
+ * 数直線 / 座標平面 / 図形 のような DSL ベース図版を、
+ * 本文中の独立した添付ブロックとして保持するための型。
+ * source には完全な `[[numberline ...]]` / `[[coordplane ...]]` / `[[geometry ...]]` 文字列を入れる。
+ * 描画は既存の expand* と renderProblemTextHtml が担う。
+ *
+ * 描画は kind ではなく source 側のオープナーを見て分岐するので、
+ * 整合しない組み合わせ（kind: 'geometry' に対し coordplane の source 等）は
+ * document レベルの superRefine で弾く（DIRECTIVE_KIND_OPENERS を参照）。
+ */
+const DIRECTIVE_KIND_OPENERS: Record<'numberline' | 'coordplane' | 'geometry', string> = {
+    numberline: '[[numberline ',
+    coordplane: '[[coordplane ',
+    geometry: '[[geometry ',
+};
+
+const directiveBlockSchema = blockBaseSchema.extend({
+    type: z.literal('directive'),
+    kind: z.enum(['numberline', 'coordplane', 'geometry']),
+    source: z.string().min(1),
 });
 
 export const problemBlockSchema = z.discriminatedUnion('type', [
@@ -89,9 +116,8 @@ export const problemBlockSchema = z.discriminatedUnion('type', [
     tableBlockSchema,
     choicesBlockSchema,
     blankGroupBlockSchema,
-    graphAssetBlockSchema,
-    geometryAssetBlockSchema,
     answerLinesBlockSchema,
+    directiveBlockSchema,
 ]);
 
 export const structuredProblemDocumentSchema = z.object({
@@ -99,6 +125,18 @@ export const structuredProblemDocumentSchema = z.object({
     summary: z.string().optional(),
     instructions: z.string().optional(),
     blocks: z.array(problemBlockSchema).min(1),
+}).superRefine((value, ctx) => {
+    value.blocks.forEach((block, index) => {
+        if (block.type !== 'directive') return;
+        const opener = DIRECTIVE_KIND_OPENERS[block.kind];
+        if (!block.source.trimStart().startsWith(opener)) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['blocks', index, 'source'],
+                message: `directive.kind="${block.kind}" の source は "${opener.trim()} ..." で始まる必要があります`,
+            });
+        }
+    });
 });
 
 export const answerSpecSchema = z.object({
@@ -142,6 +180,11 @@ function normalizeLegacyStructuredDocumentRaw(raw: unknown) {
 
         const block = { ...(candidate as Record<string, unknown>) };
         if (block.type === 'caption') {
+            return [];
+        }
+        // GeoGebra 連携を廃止したため、旧 graphAsset / geometryAsset ブロックは
+        // 描画も編集もできない死蔵データとなる。読み込み時に黙って捨てる。
+        if (block.type === 'graphAsset' || block.type === 'geometryAsset') {
             return [];
         }
 
@@ -203,7 +246,7 @@ export function buildAiProblemText(document: StructuredProblemDocument): string 
     for (const block of document.blocks) {
         switch (block.type) {
             case 'paragraph':
-                sections.push(block.text.trim());
+                sections.push(expandAllDirectivesAsText(block.text).trim());
                 break;
             case 'katexInline':
                 sections.push(`[数式] ${block.latex}`);
@@ -232,6 +275,9 @@ export function buildAiProblemText(document: StructuredProblemDocument): string 
                         .join('\n')}`,
                 );
                 break;
+            case 'directive':
+                sections.push(expandAllDirectivesAsText(block.source).trim());
+                break;
             default:
                 break;
         }
@@ -247,13 +293,7 @@ export function buildAiProblemText(document: StructuredProblemDocument): string 
 export function collectStructuredDocumentAssetIds(document: StructuredProblemDocument): string[] {
     return Array.from(new Set(
         document.blocks.flatMap((block) => {
-            if (
-                (block.type === 'image'
-                    || block.type === 'svg'
-                    || block.type === 'graphAsset'
-                    || block.type === 'geometryAsset')
-                && block.assetId
-            ) {
+            if ((block.type === 'image' || block.type === 'svg') && block.assetId) {
                 return [block.assetId];
             }
 
@@ -307,7 +347,7 @@ export function buildDefaultStructuredDraft(problemType: string) {
 
     // 互換維持のため保持するが、構造化問題の印刷レイアウト制御には利用しない。
     const printConfig: PrintConfig = {
-        template: safeType === 'GRAPH_DRAW' || safeType === 'GEOMETRY' ? 'GRAPH' : 'STANDARD',
+        template: 'STANDARD',
         estimatedHeight: 'MEDIUM',
         answerMode: safeType === 'SHORT_TEXT' ? 'SEPARATE_SHEET' : 'INLINE',
         answerLines: 3,

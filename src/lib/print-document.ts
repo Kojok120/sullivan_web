@@ -228,6 +228,30 @@ export const PRINT_DOCUMENT_CSS = `
     height: 100%;
 }
 
+.${PRINT_DOCUMENT_ROOT_CLASS} .problem-directive {
+    margin: 0;
+    display: flex;
+    justify-content: center;
+}
+
+/* 問題文 paragraph の直後に図版が来るときは、本文との隙間を詰める */
+.${PRINT_DOCUMENT_ROOT_CLASS} .problem-paragraph + .problem-directive {
+    margin-top: -1mm;
+}
+
+.${PRINT_DOCUMENT_ROOT_CLASS} .problem-directive svg.numberline {
+    max-width: 100%;
+    height: auto;
+}
+
+.${PRINT_DOCUMENT_ROOT_CLASS} .problem-directive svg.coordplane,
+.${PRINT_DOCUMENT_ROOT_CLASS} .problem-directive svg.geometry {
+    max-width: 80mm;
+    max-height: 80mm;
+    width: auto;
+    height: auto;
+}
+
 .${PRINT_DOCUMENT_ROOT_CLASS} .problem-blank-group {
     display: grid;
     gap: 2mm;
@@ -332,6 +356,40 @@ export const PRINT_DOCUMENT_CSS = `
 .${PRINT_DOCUMENT_ROOT_CLASS} .answer-template svg.numberline {
     max-width: 100%;
     height: auto;
+}
+
+.${PRINT_DOCUMENT_ROOT_CLASS} .answer-template svg.coordplane {
+    width: auto;
+    max-width: 80mm;
+    height: auto;
+    max-height: 80mm;
+}
+
+.${PRINT_DOCUMENT_ROOT_CLASS} .answer-template svg.geometry {
+    width: auto;
+    max-width: 80mm;
+    height: auto;
+    max-height: 80mm;
+}
+
+.${PRINT_DOCUMENT_ROOT_CLASS} table.answertable {
+    width: auto;
+    max-width: 100mm;
+    border-collapse: collapse;
+    font-size: 11px;
+}
+
+.${PRINT_DOCUMENT_ROOT_CLASS} table.answertable th,
+.${PRINT_DOCUMENT_ROOT_CLASS} table.answertable td {
+    border: 1px solid #111827;
+    padding: 0.5mm 1.5mm;
+    text-align: center;
+    min-width: 18mm;
+}
+
+.${PRINT_DOCUMENT_ROOT_CLASS} table.answertable td.answertable-blank {
+    height: 7mm;
+    background-color: transparent;
 }
 
 .${PRINT_DOCUMENT_ROOT_CLASS} .sheet-footer {
@@ -579,10 +637,8 @@ function renderStructuredBlock(problem: PrintableProblem, block: NonNullable<Pri
             return renderAssetFigure(problem, block.assetId, block.src, block.alt, 1);
         case 'svg':
             return renderSvgFigure(problem, block.assetId, block.svg, 1);
-        case 'graphAsset':
-            return renderFigureAsset(problem, block.assetId, 0.5);
-        case 'geometryAsset':
-            return renderFigureAsset(problem, block.assetId, 1);
+        case 'directive':
+            return `<div class="problem-directive">${renderProblemTextHtml(block.source)}</div>`;
         case 'answerLines':
             return '';
         default:
@@ -620,21 +676,6 @@ function renderAssetFigure(
             displayScale,
         },
     );
-}
-
-function renderFigureAsset(
-    problem: PrintableProblem,
-    assetId?: string,
-    displayScale = 1,
-): string {
-    const asset = findFigureAsset(problem.assets, assetId);
-    if (!asset) return '';
-
-    if (isSvgAsset(asset)) {
-        return renderSvgFigure(problem, asset.id, asset.inlineContent ?? undefined, displayScale);
-    }
-
-    return renderAssetFigure(problem, asset.id, asset.signedUrl ?? undefined, '図版', displayScale);
 }
 
 function renderSvgFigure(

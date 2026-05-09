@@ -79,17 +79,6 @@ vi.mock('next/cache', () => ({
     revalidatePath: revalidatePathMock,
 }));
 
-vi.mock('@/lib/problem-figure-generation', () => ({
-    generateProblemFigureScene: vi.fn(),
-}));
-
-vi.mock('@/lib/problem-figure-scene', () => ({
-    figureGenerationTargetSchema: {
-        safeParse: vi.fn(),
-    },
-    isAiFigureGenerationSupported: vi.fn(),
-}));
-
 vi.mock('@/lib/curriculum-service', () => ({
     getNextCustomId: getNextCustomIdMock,
 }));

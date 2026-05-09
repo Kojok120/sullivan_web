@@ -124,14 +124,18 @@ function isStructuredContentMeaningful(sc: unknown): boolean {
             blanks?: unknown[];
             assetId?: string;
             svg?: string;
+            source?: string;
         };
         if (block.type === 'paragraph' && typeof block.text === 'string' && block.text.trim().length > 0) return true;
         if ((block.type === 'katexInline' || block.type === 'katexDisplay') && typeof block.latex === 'string' && block.latex.trim().length > 0) return true;
         if (block.type === 'table' && Array.isArray(block.rows) && block.rows.length > 0) return true;
         if (block.type === 'choices' && Array.isArray(block.options) && block.options.length > 0) return true;
         if (block.type === 'blankGroup' && Array.isArray(block.blanks) && block.blanks.length > 0) return true;
-        if ((block.type === 'image' || block.type === 'svg' || block.type === 'graphAsset' || block.type === 'geometryAsset') && typeof block.assetId === 'string' && block.assetId.length > 0) return true;
+        if ((block.type === 'image' || block.type === 'svg') && typeof block.assetId === 'string' && block.assetId.length > 0) return true;
         if (block.type === 'svg' && typeof block.svg === 'string' && block.svg.length > 0) return true;
+        // 図版だけを持つ問題を空扱いにすると、本スクリプトが directive ブロックを paragraph 1 件で
+        // 上書きしてしまう（PR #150 で directive ブロックが追加された）。
+        if (block.type === 'directive' && typeof block.source === 'string' && block.source.trim().length > 0) return true;
         return false;
     });
 }
@@ -276,43 +280,49 @@ async function main() {
                 acceptedAnswers: p.acceptedAnswers ?? [],
             };
 
-            if (row.action === 'update') {
-                const existing = p.revisions[0];
-                await prisma.problemRevision.update({
-                    where: { id: existing.id },
-                    data: {
-                        structuredContent: document as unknown as Prisma.InputJsonValue,
-                        answerSpec: answerSpec as unknown as Prisma.InputJsonValue,
-                    },
-                });
-            } else {
-                const maxRev = await prisma.problemRevision.aggregate({
-                    where: { problemId: p.id },
-                    _max: { revisionNumber: true },
-                });
-                const revisionNumber = (maxRev._max.revisionNumber ?? 0) + 1;
-                await prisma.problemRevision.create({
-                    data: {
-                        problemId: p.id,
-                        revisionNumber,
-                        status: 'DRAFT',
-                        structuredContent: document as unknown as Prisma.InputJsonValue,
-                        answerSpec: answerSpec as unknown as Prisma.InputJsonValue,
-                        printConfig: draft.printConfig as unknown as Prisma.InputJsonValue,
-                        authoringTool: 'MANUAL',
-                    },
-                });
-            }
+            // 1 問題分の revision 作成/更新と problem.contentFormat 更新は 1 単位で
+            // 成功/失敗すべき。途中失敗で問題本体だけ STRUCTURED_V1 に切り替わると
+            // 編集画面が空表示になる。create 経路の aggregate→create も同一トランザクション
+            // 内で行うことで revisionNumber の競合を抑える。
+            await prisma.$transaction(async (tx) => {
+                if (row.action === 'update') {
+                    const existing = p.revisions[0];
+                    await tx.problemRevision.update({
+                        where: { id: existing.id },
+                        data: {
+                            structuredContent: document as unknown as Prisma.InputJsonValue,
+                            answerSpec: answerSpec as unknown as Prisma.InputJsonValue,
+                        },
+                    });
+                } else {
+                    const maxRev = await tx.problemRevision.aggregate({
+                        where: { problemId: p.id },
+                        _max: { revisionNumber: true },
+                    });
+                    const revisionNumber = (maxRev._max.revisionNumber ?? 0) + 1;
+                    await tx.problemRevision.create({
+                        data: {
+                            problemId: p.id,
+                            revisionNumber,
+                            status: 'DRAFT',
+                            structuredContent: document as unknown as Prisma.InputJsonValue,
+                            answerSpec: answerSpec as unknown as Prisma.InputJsonValue,
+                            printConfig: draft.printConfig as unknown as Prisma.InputJsonValue,
+                            authoringTool: 'MANUAL',
+                        },
+                    });
+                }
 
-            if (!p.hasStructuredContent || p.contentFormat !== 'STRUCTURED_V1') {
-                await prisma.problem.update({
-                    where: { id: p.id },
-                    data: {
-                        contentFormat: 'STRUCTURED_V1',
-                        hasStructuredContent: true,
-                    },
-                });
-            }
+                if (!p.hasStructuredContent || p.contentFormat !== 'STRUCTURED_V1') {
+                    await tx.problem.update({
+                        where: { id: p.id },
+                        data: {
+                            contentFormat: 'STRUCTURED_V1',
+                            hasStructuredContent: true,
+                        },
+                    });
+                }
+            });
 
             processed += 1;
             if (processed % 50 === 0) {
