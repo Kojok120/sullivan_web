@@ -11,18 +11,24 @@ vi.mock('@/components/problem-authoring/tex-help-link', () => ({
     TeXHelpLink: () => null,
 }));
 
-function renderEditor(subjectName: string) {
+type CardOverrides = Partial<{
+    attachmentKind: 'none' | 'upload' | 'table' | 'numberline' | 'coordplane' | 'geometry' | 'solid';
+    attachmentBlockType: 'image' | 'svg' | 'table' | 'directive' | null;
+    directiveSource: string;
+}>;
+
+function renderEditor(subjectName: string, overrides: CardOverrides = {}) {
     return render(
         <ProblemBodyCardEditorShared
             subjectName={subjectName}
             card={{
                 id: 'card-1',
                 text: 'テスト本文',
-                attachmentKind: 'none',
-                attachmentBlockType: null,
+                attachmentKind: overrides.attachmentKind ?? 'none',
+                attachmentBlockType: overrides.attachmentBlockType ?? null,
                 assetId: '',
                 tableData: { headers: [], rows: [] },
-                directiveSource: '',
+                directiveSource: overrides.directiveSource ?? '',
             }}
             problemId=""
             revisionId=""
@@ -73,5 +79,18 @@ describe('ProblemBodyCardEditorShared', () => {
         expect(screen.getByText('本文確認')).toBeInTheDocument();
         expect(screen.getByText('図・画像など')).toBeInTheDocument();
         expect(screen.getByTestId('problem-body-card-text-layout')).toHaveAttribute('data-preview-placement', 'below');
+    });
+
+    it('attachmentKind="solid" の card で directive 用 UI とプレビューが表示される', () => {
+        renderEditor('数学', {
+            attachmentKind: 'solid',
+            attachmentBlockType: 'directive',
+            directiveSource: '[[solid kind="cube" a=4]]',
+        });
+
+        // 立体カードでは「図版設定」と「プレビュー」が両方出ること
+        // （かつてここが numberline/coordplane/geometry のみ判定で抜けていた）
+        expect(screen.getByText('図版設定')).toBeInTheDocument();
+        expect(screen.getByText('プレビュー')).toBeInTheDocument();
     });
 });

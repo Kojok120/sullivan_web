@@ -1,12 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-
-async function loginAs(page: Page, loginId: string, password: string) {
-  await page.goto('/login');
-  await page.locator('input[name="loginId"]').fill(loginId);
-  await page.locator('input[name="password"]').fill(password);
-  await page.locator('button[type="submit"]').click();
-  await page.waitForURL((url) => url.pathname !== '/login', { timeout: 3000 }).catch(() => undefined);
-}
+import { adminCreds, loginAs } from './helpers/auth';
 
 async function expectNoGlobalHorizontalScroll(page: Page) {
   const hasOverflow = await page.evaluate(() => {
@@ -21,7 +14,8 @@ test.describe('モバイルレスポンシブ (管理者/講師)', () => {
   test('管理者: モバイルメニューとログアウト導線が表示される', async ({ page }) => {
     test.skip(!test.info().project.name.startsWith('mobile-'), 'モバイルプロジェクトのみ実行');
 
-    await loginAs(page, 'A0001', 'password123');
+    const admin = adminCreds();
+    await loginAs(page, admin.loginId, admin.password);
 
     if (page.url().includes('/login')) {
       test.skip(true, '管理者のテストログインに失敗したためスキップ');
@@ -41,7 +35,8 @@ test.describe('モバイルレスポンシブ (管理者/講師)', () => {
     await expectNoGlobalHorizontalScroll(page);
 
     await page.goto('/admin/problems');
-    await expect(page.getByRole('heading', { name: '問題管理' })).toBeVisible();
+    // 全件 / 教科別で見出しは「問題一覧」または「問題一覧 - <教科名>」となる（教科未選択時は h2 も同様の語を含むので h1 = level:1 を取る）
+    await expect(page.getByRole('heading', { level: 1, name: /問題一覧/ }).first()).toBeVisible();
     await expectNoGlobalHorizontalScroll(page);
 
     await page.getByTestId('admin-mobile-nav-trigger').click();
@@ -50,6 +45,7 @@ test.describe('モバイルレスポンシブ (管理者/講師)', () => {
 
   test('講師: モバイルメニューとログアウト導線が表示される', async ({ page }) => {
     test.skip(!test.info().project.name.startsWith('mobile-'), 'モバイルプロジェクトのみ実行');
+    test.skip(!!process.env.E2E_PROD_BASE_URL, 'PROD 実行時は講師テスト用クレデンシャル未提供のためスキップ');
 
     await loginAs(page, 'T0001', 'password123');
 

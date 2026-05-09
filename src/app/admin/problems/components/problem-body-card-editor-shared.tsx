@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils';
 import { DirectiveForm, buildDefaultDirectiveSource } from './directive-form';
 import { ProblemTextPreview } from './problem-text-preview';
 
-const DIRECTIVE_KIND_SET = new Set<ProblemBodyDirectiveKind>(['numberline', 'coordplane', 'geometry']);
+const DIRECTIVE_KIND_SET = new Set<ProblemBodyDirectiveKind>(['numberline', 'coordplane', 'geometry', 'solid']);
 
 function isDirectiveKind(kind: ProblemBodyAttachmentKind): kind is ProblemBodyDirectiveKind {
     return DIRECTIVE_KIND_SET.has(kind as ProblemBodyDirectiveKind);
@@ -42,6 +42,7 @@ function AttachmentKindSelect({
                 <SelectItem value="numberline">数直線</SelectItem>
                 <SelectItem value="coordplane">座標平面</SelectItem>
                 <SelectItem value="geometry">図形</SelectItem>
+                <SelectItem value="solid">立体</SelectItem>
             </SelectContent>
         </Select>
     );
