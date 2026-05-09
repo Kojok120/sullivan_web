@@ -5,8 +5,9 @@ import { encodeUnitToken } from '@/lib/qr-utils';
 import type { PrintableProblem, PrintableProblemAsset } from '@/lib/print-types';
 
 // 印刷で実際に図として埋め込み得る asset 種別だけ signed URL を生成する。
-// DESMOS_STATE / GEOGEBRA_STATE / JSON / THUMBNAIL は inlineContent や別経路で
-// 利用するため Storage への往復は不要。
+// JSON / THUMBNAIL は inlineContent や別経路で利用するため Storage への往復は不要。
+// （旧 DESMOS_STATE / GEOGEBRA_STATE は GeoGebra 連携廃止に伴い不要。schema 上の
+// enum 値を消すまではホワイトリスト方式で実質排除しておく。）
 const PRINT_SIGNED_URL_KINDS = new Set(['IMAGE', 'SVG', 'PDF']);
 
 function shouldGenerateSignedUrl(asset: PrintableProblemAsset): boolean {

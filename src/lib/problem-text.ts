@@ -1,7 +1,13 @@
 import katex from 'katex';
+import { parseAnswerTableDirective, renderAnswerTableHtml } from '@/lib/answer-table-svg';
+import { parseCoordPlaneDirective, renderCoordPlaneSvg } from '@/lib/coord-plane-svg';
+import { parseGeometryDirective, renderGeometrySvg } from '@/lib/geometry-svg';
 import { parseNumberLineDirective, renderNumberLineSvg } from '@/lib/number-line-svg';
 
 const NUMBERLINE_OPENER = '[[numberline';
+const COORDPLANE_OPENER = '[[coordplane';
+const ANSWERTABLE_OPENER = '[[answertable';
+const GEOMETRY_OPENER = '[[geometry';
 
 function escapeHtml(value: string): string {
     return value
@@ -44,6 +50,45 @@ export function renderProblemTextHtml(text: string): string {
             }
         }
 
+        if (text.startsWith(COORDPLANE_OPENER, index)) {
+            const end = text.indexOf(']]', index + COORDPLANE_OPENER.length);
+            if (end !== -1) {
+                const body = text.slice(index + COORDPLANE_OPENER.length, end);
+                const opts = parseCoordPlaneDirective(body);
+                if (opts) {
+                    html += renderCoordPlaneSvg(opts);
+                    index = end + 2;
+                    continue;
+                }
+            }
+        }
+
+        if (text.startsWith(ANSWERTABLE_OPENER, index)) {
+            const end = text.indexOf(']]', index + ANSWERTABLE_OPENER.length);
+            if (end !== -1) {
+                const body = text.slice(index + ANSWERTABLE_OPENER.length, end);
+                const opts = parseAnswerTableDirective(body);
+                if (opts) {
+                    html += renderAnswerTableHtml(opts);
+                    index = end + 2;
+                    continue;
+                }
+            }
+        }
+
+        if (text.startsWith(GEOMETRY_OPENER, index)) {
+            const end = text.indexOf(']]', index + GEOMETRY_OPENER.length);
+            if (end !== -1) {
+                const body = text.slice(index + GEOMETRY_OPENER.length, end);
+                const opts = parseGeometryDirective(body);
+                if (opts) {
+                    html += renderGeometrySvg(opts);
+                    index = end + 2;
+                    continue;
+                }
+            }
+        }
+
         if (text.startsWith('$$', index)) {
             const end = text.indexOf('$$', index + 2);
             if (end !== -1) {
@@ -75,18 +120,30 @@ export function renderProblemTextHtml(text: string): string {
 
         let nextSpecial = text.indexOf('$', index);
         if (nextSpecial === -1) nextSpecial = text.length;
-        const nextDirective = text.indexOf(NUMBERLINE_OPENER, index);
-        if (nextDirective !== -1 && nextDirective < nextSpecial) {
-            nextSpecial = nextDirective;
+        const nextNumberLine = text.indexOf(NUMBERLINE_OPENER, index);
+        if (nextNumberLine !== -1 && nextNumberLine < nextSpecial) {
+            nextSpecial = nextNumberLine;
+        }
+        const nextCoordPlane = text.indexOf(COORDPLANE_OPENER, index);
+        if (nextCoordPlane !== -1 && nextCoordPlane < nextSpecial) {
+            nextSpecial = nextCoordPlane;
+        }
+        const nextAnswerTable = text.indexOf(ANSWERTABLE_OPENER, index);
+        if (nextAnswerTable !== -1 && nextAnswerTable < nextSpecial) {
+            nextSpecial = nextAnswerTable;
+        }
+        const nextGeometry = text.indexOf(GEOMETRY_OPENER, index);
+        if (nextGeometry !== -1 && nextGeometry < nextSpecial) {
+            nextSpecial = nextGeometry;
         }
 
         if (nextSpecial === index) {
-            // 直前の判定で閉じなかった $ または [[numberline をリテラルとして処理
+            // 直前の判定で閉じなかった $ または [[directive をリテラルとして処理
             if (text[index] === '$') {
                 html += '&#36;';
                 index += 1;
             } else {
-                // 閉じ ]] が無い [[numberline は 1 文字ずつ落とし込む
+                // 閉じ ]] が無い [[directive は 1 文字ずつ落とし込む
                 html += escapeHtml(text[index]);
                 index += 1;
             }

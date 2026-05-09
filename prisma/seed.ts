@@ -462,7 +462,7 @@ async function seedStructuredProblemSamples() {
         masterNumber: 101,
         grade: '中2',
         problemType: 'GEOMETRY',
-        authoringTool: 'GEOGEBRA',
+        authoringTool: 'SVG',
         document: {
           version: 1,
           title: '三角形の面積',
@@ -503,7 +503,7 @@ async function seedStructuredProblemSamples() {
         masterNumber: 102,
         grade: '中3',
         problemType: 'GRAPH_DRAW',
-        authoringTool: 'GEOGEBRA',
+        authoringTool: 'SVG',
         document: {
           version: 1,
           title: '二次関数のグラフ',
@@ -512,7 +512,7 @@ async function seedStructuredProblemSamples() {
           blocks: [
             { id: 'quad-1', type: 'paragraph', text: '二次関数 y = x^2 - 4x + 3 のグラフについて、頂点の座標を答えなさい。' },
             { id: 'quad-2', type: 'katexDisplay', latex: 'y = x^2 - 4x + 3' },
-            { id: 'quad-3', type: 'graphAsset', assetId: 'math-quadratic-svg' },
+            { id: 'quad-3', type: 'svg', assetId: 'math-quadratic-svg' },
           ],
         },
         answerSpec: {
@@ -592,7 +592,7 @@ async function seedStructuredProblemSamples() {
           instructions: 'グラフを見て答えなさい。',
           blocks: [
             { id: 'exp-1', type: 'paragraph', text: '水を加熱したときの温度変化を表すグラフで、沸騰が始まったのは何分後か答えなさい。' },
-            { id: 'exp-2', type: 'graphAsset', assetId: 'science-graph-svg' },
+            { id: 'exp-2', type: 'svg', assetId: 'science-graph-svg' },
           ],
         },
         answerSpec: {

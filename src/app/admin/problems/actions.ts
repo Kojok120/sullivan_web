@@ -4,8 +4,6 @@ import { revalidatePath } from 'next/cache';
 import { Prisma, ProblemAuthoringTool, VideoStatus } from '@prisma/client';
 
 import { requireAdmin, requireProblemAuthor } from '@/lib/auth';
-import { generateProblemFigureScene } from '@/lib/problem-figure-generation';
-import { figureGenerationTargetSchema, type FigureGenerationTarget, isAiFigureGenerationSupported } from '@/lib/problem-figure-scene';
 import { prisma } from '@/lib/prisma';
 import { getNextCustomId } from '@/lib/curriculum-service';
 import { deleteProblemsWithRelations, bulkUpsertProblemsCore, createProblemCore } from '@/lib/problem-service';
@@ -17,7 +15,6 @@ import {
     type VideoStatusValue,
 } from '@/lib/problem-ui';
 import {
-    buildDefaultStructuredDraft,
     deriveLegacyFieldsFromStructuredData,
     normalizeAnswerSpecForAuthoring,
     parseAnswerSpec,
@@ -25,7 +22,6 @@ import {
     parseStructuredDocument,
 } from '@/lib/structured-problem';
 import { createProblemAssetSignedUrl, removeProblemAssetFromStorage, uploadProblemAssetToStorage } from '@/lib/problem-assets';
-import { ensureRenderableSvgMarkup } from '@/lib/problem-svg';
 import { SENT_BACK_REASON_MAX } from './constants';
 import { problemAdminInclude } from './types';
 
@@ -204,147 +200,6 @@ function normalizeStructuredDraftInput(data: {
         printConfig,
         legacy,
     };
-}
-
-async function ensureProblemDraftRevision(params: {
-    problemId: string;
-    requestedRevisionId?: string;
-    createdByUserId?: string;
-}) {
-    const problem = await prisma.problem.findUnique({
-        where: { id: params.problemId },
-        include: {
-            publishedRevision: true,
-            revisions: {
-                orderBy: { revisionNumber: 'desc' },
-            },
-        },
-    });
-
-    if (!problem) {
-        throw new Error('問題が見つかりません');
-    }
-
-    const requestedRevision = params.requestedRevisionId
-        ? problem.revisions.find((revision) => revision.id === params.requestedRevisionId)
-        : null;
-    if (requestedRevision?.status === 'DRAFT') {
-        return { problem, draftRevision: requestedRevision };
-    }
-
-    const existingDraft = problem.revisions.find((revision) => revision.status === 'DRAFT');
-    if (existingDraft) {
-        return { problem, draftRevision: existingDraft };
-    }
-
-    const defaultDraft = buildDefaultStructuredDraft(problem.problemType);
-    const sourceRevision = requestedRevision ?? problem.publishedRevision ?? problem.revisions[0] ?? null;
-    const latestRevisionNumber = problem.revisions[0]?.revisionNumber ?? 0;
-    const draftRevision = await prisma.$transaction(async (tx) => {
-        const createdRevision = await tx.problemRevision.create({
-            data: {
-                problemId: problem.id,
-                revisionNumber: latestRevisionNumber + 1,
-                status: 'DRAFT',
-                structuredContent: (sourceRevision?.structuredContent ?? defaultDraft.document) as Prisma.InputJsonValue,
-                answerSpec: (sourceRevision?.answerSpec ?? defaultDraft.answerSpec) as Prisma.InputJsonValue,
-                printConfig: (sourceRevision?.printConfig ?? defaultDraft.printConfig) as Prisma.InputJsonValue,
-                generationContext: (sourceRevision?.generationContext ?? undefined) as Prisma.InputJsonValue | undefined,
-                authoringTool: sourceRevision?.authoringTool ?? 'MANUAL',
-                authoringState: (sourceRevision?.authoringState ?? undefined) as Prisma.InputJsonValue | undefined,
-                createdByUserId: params.createdByUserId,
-            },
-        });
-
-        await tx.problem.update({
-            where: { id: problem.id },
-            data: {
-                status: 'DRAFT',
-                hasStructuredContent: true,
-                contentFormat: 'STRUCTURED_V1',
-            },
-        });
-
-        return createdRevision;
-    });
-
-    return { problem, draftRevision };
-}
-
-function resolveVendorStateAssetKind(authoringTool: ProblemAuthoringTool) {
-    switch (authoringTool) {
-        case 'DESMOS':
-            return 'DESMOS_STATE' as const;
-        case 'GEOGEBRA':
-            return 'GEOGEBRA_STATE' as const;
-        default:
-            return 'JSON' as const;
-    }
-}
-
-async function upsertInlineProblemAsset(input: {
-    revisionId: string;
-    kind: 'SVG' | 'DESMOS_STATE' | 'GEOGEBRA_STATE' | 'JSON';
-    fileName: string;
-    mimeType: string;
-    sourceTool: ProblemAuthoringTool;
-    inlineContent: string;
-    metadata?: Prisma.InputJsonValue;
-}) {
-    const existingAssets = await prisma.problemAsset.findMany({
-        where: {
-            problemRevisionId: input.revisionId,
-            kind: input.kind as never,
-            sourceTool: input.sourceTool,
-        },
-        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-    });
-
-    const primary = existingAssets[0];
-    const redundant = existingAssets.slice(1);
-
-    for (const asset of existingAssets) {
-        if (asset.storageKey) {
-            await removeProblemAssetFromStorage(asset.storageKey);
-        }
-    }
-
-    if (redundant.length > 0) {
-        await prisma.problemAsset.deleteMany({
-            where: {
-                id: {
-                    in: redundant.map((asset) => asset.id),
-                },
-            },
-        });
-    }
-
-    if (primary) {
-        return prisma.problemAsset.update({
-            where: { id: primary.id },
-            data: {
-                fileName: input.fileName,
-                mimeType: input.mimeType,
-                sourceTool: input.sourceTool,
-                storageKey: null,
-                checksum: null,
-                inlineContent: input.inlineContent,
-                metadata: input.metadata,
-            },
-        });
-    }
-
-    return prisma.problemAsset.create({
-        data: {
-            problemRevisionId: input.revisionId,
-            kind: input.kind as never,
-            fileName: input.fileName,
-            mimeType: input.mimeType,
-            sourceTool: input.sourceTool,
-            inlineContent: input.inlineContent,
-            metadata: input.metadata,
-        },
-    });
 }
 
 async function mapProblemForEditor(problemId: string) {
@@ -810,73 +665,6 @@ export async function previewProblemPrint(params: {
     };
 }
 
-export async function generateProblemFigureDraft(input: {
-    problemId: string;
-    revisionId?: string;
-    sourceProblemText: string;
-    extraPrompt?: string;
-    targetTool: FigureGenerationTarget;
-}) {
-    const session = await requireProblemAuthor();
-
-    try {
-        const sourceProblemText = input.sourceProblemText.trim();
-        const targetTool = figureGenerationTargetSchema.parse(input.targetTool);
-        if (!sourceProblemText) {
-            return { error: '問題文テキストを入力してください' };
-        }
-
-        const { problem, draftRevision } = await ensureProblemDraftRevision({
-            problemId: input.problemId,
-            requestedRevisionId: input.revisionId,
-            createdByUserId: session.userId,
-        });
-
-        if (!isAiFigureGenerationSupported(problem.problemType)) {
-            return { error: 'AI図版生成は GEOMETRY / GRAPH_DRAW のみ対応しています' };
-        }
-
-        const generated = await generateProblemFigureScene({
-            targetTool,
-            problemType: problem.problemType,
-            sourceProblemText,
-            extraPrompt: input.extraPrompt?.trim(),
-        });
-
-        const generationContext = {
-            sourceProblemText,
-            extraPrompt: input.extraPrompt?.trim() || '',
-            targetTool,
-            modelName: generated.modelName,
-            generatedAt: new Date().toISOString(),
-            sceneSpecKind: generated.sceneSpecKind,
-            sceneSpecDigest: generated.sceneSpecDigest,
-        } satisfies Prisma.InputJsonValue;
-
-        await prisma.problemRevision.update({
-            where: { id: draftRevision.id },
-            data: {
-                generationContext,
-            },
-        });
-
-        revalidateProblemPaths(problem.id);
-
-        return {
-            success: true,
-            problemId: problem.id,
-            revisionId: draftRevision.id,
-            targetTool,
-            sceneSpec: generated.sceneSpec,
-            sceneSpecKind: generated.sceneSpecKind,
-            modelName: generated.modelName,
-        };
-    } catch (error) {
-        console.error('Failed to generate problem figure draft:', error);
-        return { error: error instanceof Error ? error.message : 'AI 図版生成に失敗しました' };
-    }
-}
-
 export async function uploadProblemAsset(formData: FormData) {
     await requireProblemAuthor();
 
@@ -929,89 +717,6 @@ export async function uploadProblemAsset(formData: FormData) {
     } catch (error) {
         console.error('Failed to upload problem asset:', error);
         return { error: 'アセットの保存に失敗しました' };
-    }
-}
-
-export async function syncProblemAuthoringArtifacts(input: {
-    problemId: string;
-    revisionId: string;
-    authoringTool: ProblemAuthoringTool;
-    authoringState: unknown;
-    svgContent?: string;
-}) {
-    await requireProblemAuthor();
-
-    try {
-        const revision = await prisma.problemRevision.findFirst({
-            where: {
-                id: input.revisionId,
-                problemId: input.problemId,
-            },
-            select: {
-                id: true,
-                problemId: true,
-            },
-        });
-
-        if (!revision) {
-            return { error: 'revision が見つかりません' };
-        }
-
-        await prisma.problemRevision.update({
-            where: { id: revision.id },
-            data: {
-                authoringTool: input.authoringTool,
-                authoringState: (input.authoringState ?? undefined) as Prisma.InputJsonValue | undefined,
-            },
-        });
-
-        const shouldPersistStateAsset = input.authoringTool === 'DESMOS' || input.authoringTool === 'GEOGEBRA';
-        const stateAsset = shouldPersistStateAsset
-            ? await upsertInlineProblemAsset({
-                revisionId: revision.id,
-                kind: resolveVendorStateAssetKind(input.authoringTool),
-                fileName: `${input.authoringTool.toLowerCase()}-state.json`,
-                mimeType: 'application/json',
-                sourceTool: input.authoringTool,
-                inlineContent: JSON.stringify(input.authoringState ?? {}, null, 2),
-                metadata: {
-                    authoringTool: input.authoringTool,
-                    generatedAt: new Date().toISOString(),
-                } as Prisma.InputJsonValue,
-            })
-            : null;
-
-        const normalizedSvgContent = input.svgContent?.trim()
-            ? ensureRenderableSvgMarkup(input.svgContent.trim())
-            : '';
-
-        let svgAsset = null;
-        if (normalizedSvgContent) {
-            svgAsset = await upsertInlineProblemAsset({
-                revisionId: revision.id,
-                kind: 'SVG',
-                fileName: `${input.authoringTool.toLowerCase()}-export.svg`,
-                mimeType: 'image/svg+xml',
-                sourceTool: input.authoringTool,
-                inlineContent: normalizedSvgContent,
-                metadata: {
-                    authoringTool: input.authoringTool,
-                    generatedAt: new Date().toISOString(),
-                    exportFormat: 'svg',
-                } as Prisma.InputJsonValue,
-            });
-        }
-
-        revalidateProblemPaths(input.problemId);
-
-        return {
-            success: true,
-            stateAsset,
-            svgAsset,
-        };
-    } catch (error) {
-        console.error('Failed to sync problem authoring artifacts:', error);
-        return { error: 'vendor アセットの同期に失敗しました' };
     }
 }
 

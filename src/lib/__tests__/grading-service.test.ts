@@ -38,7 +38,7 @@ describe('grading-service helpers', () => {
                 blocks: [
                     { id: 'p1', type: 'paragraph', text: '三角形の面積を答えなさい。' },
                     { id: 'c1', type: 'choices', options: [{ id: 'A', label: '12' }, { id: 'B', label: '18' }] },
-                    { id: 'g1', type: 'graphAsset', assetId: 'asset-graph' },
+                    { id: 'g1', type: 'image', assetId: 'asset-graph' },
                 ],
             },
             answerSpec: {

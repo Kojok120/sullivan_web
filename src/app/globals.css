@@ -145,3 +145,30 @@
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 }
+
+table.answertable {
+  border-collapse: collapse;
+  width: auto;
+  max-width: 100%;
+  font-size: 0.875rem;
+}
+
+table.answertable th,
+table.answertable td {
+  border: 1px solid #111827;
+  padding: 0.25rem 0.5rem;
+  text-align: center;
+  min-width: 4rem;
+}
+
+table.answertable td.answertable-blank {
+  height: 1.75rem;
+  background-color: transparent;
+}
+
+svg.numberline,
+svg.coordplane,
+svg.geometry {
+  max-width: 100%;
+  height: auto;
+}

@@ -436,12 +436,10 @@ async function createProblemRevision(
         acceptedAnswers: def.acceptedAnswers ?? [],
     };
 
-    // figure があれば authoringTool='GEOGEBRA' とし、authoringState に spec を保存。
-    // 現状の `def.figure.kind` は 'geogebra' のみ (Desmos 対応時は分岐追加)。
-    const hasFigure = Boolean(def.figure);
-    const authoringTool = hasFigure ? 'GEOGEBRA' : 'MANUAL';
-
-    const revision = await prisma.problemRevision.create({
+    // GeoGebra 連携を廃止したため、def.figure は seed では使わない。
+    // 図版が必要な問題は admin UI で [[geometry]] / [[coordplane]] / [[numberline]] DSL に
+    // 書き換える運用に移行済み。
+    await prisma.problemRevision.create({
         data: {
             problemId,
             revisionNumber: 1,
@@ -449,27 +447,11 @@ async function createProblemRevision(
             structuredContent: document as unknown as Prisma.InputJsonValue,
             answerSpec: answerSpec as unknown as Prisma.InputJsonValue,
             printConfig: draft.printConfig as unknown as Prisma.InputJsonValue,
-            authoringTool,
-            authoringState: hasFigure
-                ? (def.figure as unknown as Prisma.InputJsonValue)
-                : Prisma.JsonNull,
+            authoringTool: 'MANUAL',
+            authoringState: Prisma.JsonNull,
         },
         select: { id: true },
     });
-
-    if (hasFigure) {
-        await prisma.problemAsset.create({
-            data: {
-                problemRevisionId: revision.id,
-                kind: 'GEOGEBRA_STATE',
-                fileName: 'geogebra-state.json',
-                mimeType: 'application/json',
-                sourceTool: 'GEOGEBRA',
-                inlineContent: JSON.stringify(def.figure, null, 2),
-                metadata: { authoringTool: 'GEOGEBRA' } as Prisma.InputJsonValue,
-            },
-        });
-    }
 }
 
 async function getNextProblemMasterNumber(
@@ -604,6 +586,8 @@ async function exportReviewCsv(
 }
 
 async function exportFiguresHtml(outPath: string) {
+    // GeoGebra 連携を廃止したため figure は seed では描画しない。
+    // レガシー spec を JSON のまま参照したい場合のみ利用する。
     const figures = MATH_PROBLEMS
         .filter((p) => p.figure)
         .map((p, idx) => ({
@@ -611,7 +595,6 @@ async function exportFiguresHtml(outPath: string) {
             problemType: p.problemType,
             unit: p.unitMasterNumber,
             title: p.title ?? p.question.slice(0, 30),
-            kind: p.figure!.kind,
             spec: p.figure!,
         }));
 
@@ -620,7 +603,7 @@ async function exportFiguresHtml(outPath: string) {
 <style>body{font-family:sans-serif;padding:16px;} .card{border:1px solid #ccc;margin:12px 0;padding:12px;}</style>
 </head><body>
 <h1>数学100問 図形プレビュー (${figures.length} 件)</h1>
-<p>各 figure spec を JSON で表示します。実際の Desmos/GeoGebra 描画は admin UI で確認してください。</p>
+<p>GeoGebra 連携は廃止済み。以下はレガシー spec の JSON ダンプ。新規問題は admin UI で [[geometry]] / [[coordplane]] / [[numberline]] DSL に書き換える運用。</p>
 ${figures.map((f) => `
 <div class="card">
   <h3>#${f.index} [${f.problemType}] 単元 ${f.unit} - ${f.title}</h3>

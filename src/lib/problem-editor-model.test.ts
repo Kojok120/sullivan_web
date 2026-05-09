@@ -2,20 +2,22 @@ import { describe, expect, it } from 'vitest';
 
 import type { StructuredProblemDocument } from './structured-problem';
 import {
+    appendProblemBodyCard,
     deriveProblemTypeFromDocument,
-    getProblemBodyCardAuthoringTool,
     hasEmptyProblemBodyCard,
     parseProblemBodySegments,
     updateProblemBodyCard,
 } from './problem-editor-model';
 
+const EMPTY_TABLE = { headers: [], rows: [] };
+
 describe('problem-editor-model', () => {
-    it('paragraph と図版を 1 つのカードに fold し、legacy caption block は無視する', () => {
+    it('paragraph と image を 1 つの upload カードに fold し、legacy caption block は無視する', () => {
         const document = {
             version: 1,
             blocks: [
-                { id: 'p1', type: 'paragraph', text: '放物線を見て答えなさい。' },
-                { id: 'g1', type: 'graphAsset', assetId: 'asset-1' },
+                { id: 'p1', type: 'paragraph', text: '画像を見て答えなさい。' },
+                { id: 'i1', type: 'image', assetId: 'asset-1', src: '', alt: '' },
                 { id: 'c1', type: 'caption', text: '旧キャプション' },
             ],
         } as unknown as StructuredProblemDocument;
@@ -25,10 +27,12 @@ describe('problem-editor-model', () => {
             kind: 'card',
             card: {
                 id: 'p1',
-                text: '放物線を見て答えなさい。',
-                attachmentKind: 'graph',
-                attachmentBlockType: 'graphAsset',
+                text: '画像を見て答えなさい。',
+                attachmentKind: 'upload',
+                attachmentBlockType: 'image',
                 assetId: 'asset-1',
+                tableData: EMPTY_TABLE,
+                directiveSource: '',
             },
         });
         expect(legacySegment).toEqual({
@@ -62,6 +66,8 @@ describe('problem-editor-model', () => {
                 attachmentKind: 'upload',
                 attachmentBlockType: 'image',
                 assetId: 'asset-image',
+                tableData: EMPTY_TABLE,
+                directiveSource: '',
             },
         });
 
@@ -73,16 +79,150 @@ describe('problem-editor-model', () => {
                 attachmentKind: 'upload',
                 attachmentBlockType: 'svg',
                 assetId: 'asset-svg',
+                tableData: EMPTY_TABLE,
+                directiveSource: '',
             },
         });
     });
 
-    it('visual カードを更新すると graphAsset を維持したまま assetId を差し替える', () => {
+    it('paragraph と table block を 1 つの table カードに fold する', () => {
         const document: StructuredProblemDocument = {
             version: 1,
             blocks: [
-                { id: 'p1', type: 'paragraph', text: 'グラフを見て答える。' },
-                { id: 'p1-asset', type: 'graphAsset', assetId: 'before' },
+                { id: 'p-table', type: 'paragraph', text: '下の表の空欄をうめなさい。' },
+                {
+                    id: 'p-table-asset',
+                    type: 'table',
+                    headers: ['x', 'y'],
+                    rows: [['1', '2'], ['3', '4']],
+                },
+            ],
+        };
+
+        const segments = parseProblemBodySegments(document.blocks);
+        expect(segments).toHaveLength(1);
+        expect(segments[0]).toEqual({
+            kind: 'card',
+            card: {
+                id: 'p-table',
+                text: '下の表の空欄をうめなさい。',
+                attachmentKind: 'table',
+                attachmentBlockType: 'table',
+                assetId: '',
+                tableData: {
+                    headers: ['x', 'y'],
+                    rows: [['1', '2'], ['3', '4']],
+                },
+                directiveSource: '',
+            },
+        });
+    });
+
+    it('table カードを更新するとヘッダー・行が反映され、structuredContent に table block として保存される', () => {
+        const document: StructuredProblemDocument = {
+            version: 1,
+            blocks: [
+                { id: 'p-table', type: 'paragraph', text: '下の表をうめなさい。' },
+                {
+                    id: 'p-table-asset',
+                    type: 'table',
+                    headers: ['x', 'y'],
+                    rows: [['1', '2']],
+                },
+            ],
+        };
+
+        const next = updateProblemBodyCard(document, 'p-table', (card) => ({
+            ...card,
+            tableData: {
+                headers: ['x', 'y', 'z'],
+                rows: [['1', '2', '3'], ['4', '5', '6']],
+            },
+        }));
+
+        expect(next.blocks).toEqual([
+            { id: 'p-table', type: 'paragraph', text: '下の表をうめなさい。' },
+            {
+                id: 'p-table-asset',
+                type: 'table',
+                headers: ['x', 'y', 'z'],
+                rows: [['1', '2', '3'], ['4', '5', '6']],
+            },
+        ]);
+    });
+
+    it('テキストが空の table カードでも table block を保持する', () => {
+        const document: StructuredProblemDocument = {
+            version: 1,
+            blocks: [
+                { id: 'p-table', type: 'paragraph', text: '' },
+                {
+                    id: 'p-table-asset',
+                    type: 'table',
+                    headers: ['a'],
+                    rows: [['1']],
+                },
+            ],
+        };
+
+        const next = updateProblemBodyCard(document, 'p-table', (card) => ({
+            ...card,
+            text: '',
+            tableData: { headers: ['a'], rows: [['9']] },
+        }));
+
+        expect(next.blocks).toEqual([
+            {
+                id: 'p-table-asset',
+                type: 'table',
+                headers: ['a'],
+                rows: [['9']],
+            },
+        ]);
+    });
+
+    it('appendProblemBodyCard で空カードが追加され、table カードに切り替えても他カードに影響しない', () => {
+        const document: StructuredProblemDocument = {
+            version: 1,
+            blocks: [
+                { id: 'p1', type: 'paragraph', text: '最初のカード' },
+            ],
+        };
+
+        const appended = appendProblemBodyCard(document);
+        expect(appended.blocks).toHaveLength(2);
+
+        const segments = parseProblemBodySegments(appended.blocks);
+        expect(segments).toHaveLength(2);
+        expect(segments[1].kind).toBe('card');
+        if (segments[1].kind !== 'card') throw new Error('unreachable');
+        const newCardId = segments[1].card.id;
+
+        const switched = updateProblemBodyCard(appended, newCardId, (card) => ({
+            ...card,
+            attachmentKind: 'table',
+            attachmentBlockType: 'table',
+            tableData: {
+                headers: ['x', 'y'],
+                rows: [['1', '2'], ['3', '4']],
+            },
+        }));
+
+        expect(switched.blocks[0]).toEqual({ id: 'p1', type: 'paragraph', text: '最初のカード' });
+        expect(switched.blocks[1]).toEqual({
+            id: `${newCardId}-asset`,
+            type: 'table',
+            headers: ['x', 'y'],
+            rows: [['1', '2'], ['3', '4']],
+        });
+    });
+
+    it('upload カードの assetId を差し替えても block 種別は維持される', () => {
+        const document: StructuredProblemDocument = {
+            version: 1,
+            blocks: [
+                { id: 'p1', type: 'paragraph', text: '画像を見て答える。' },
+                { id: 'p1-asset', type: 'image', assetId: 'before', src: '', alt: '' },
             ],
         };
 
@@ -92,36 +232,21 @@ describe('problem-editor-model', () => {
         }));
 
         expect(nextDocument.blocks).toEqual([
-            { id: 'p1', type: 'paragraph', text: 'グラフを見て答える。' },
-            { id: 'p1-asset', type: 'graphAsset', assetId: 'after' },
+            { id: 'p1', type: 'paragraph', text: '画像を見て答える。' },
+            { id: 'p1-asset', type: 'image', assetId: 'after', src: '', alt: '' },
         ]);
     });
 
-    it('図版ブロックだけで problemType を補正し、それ以外は SHORT_TEXT に寄せる', () => {
-        expect(deriveProblemTypeFromDocument({
-            version: 1,
-            blocks: [{ id: 'g1', type: 'graphAsset', assetId: 'asset-1' }],
-        }, 'SHORT_TEXT')).toBe('GRAPH_DRAW');
-
-        expect(deriveProblemTypeFromDocument({
-            version: 1,
-            blocks: [{ id: 'geom1', type: 'geometryAsset', assetId: 'asset-2' }],
-        }, 'SHORT_TEXT')).toBe('GEOMETRY');
-
-        expect(deriveProblemTypeFromDocument({
-            version: 1,
-            blocks: [{ id: 'choice-1', type: 'choices', options: [{ id: 'A', label: '1' }, { id: 'B', label: '2' }] }],
-        }, 'SHORT_TEXT')).toBe('SHORT_TEXT');
-
-        expect(deriveProblemTypeFromDocument({
-            version: 1,
-            blocks: [{ id: 'blank-1', type: 'blankGroup', blanks: [{ id: 'b1', label: '空欄1' }] }],
-        }, 'SHORT_TEXT')).toBe('SHORT_TEXT');
-
+    it('deriveProblemTypeFromDocument は fallback をそのまま返す', () => {
         expect(deriveProblemTypeFromDocument({
             version: 1,
             blocks: [{ id: 'p1', type: 'paragraph', text: '説明しなさい。' }],
-        }, 'GRAPH_DRAW')).toBe('SHORT_TEXT');
+        }, 'SHORT_TEXT')).toBe('SHORT_TEXT');
+
+        expect(deriveProblemTypeFromDocument({
+            version: 1,
+            blocks: [],
+        }, '')).toBe('SHORT_TEXT');
     });
 
     it('本文も添付もないカードを検出する', () => {
@@ -132,6 +257,8 @@ describe('problem-editor-model', () => {
                 attachmentKind: 'none',
                 attachmentBlockType: null,
                 assetId: '',
+                tableData: EMPTY_TABLE,
+                directiveSource: '',
             },
         ])).toBe(true);
 
@@ -139,36 +266,24 @@ describe('problem-editor-model', () => {
             {
                 id: 'c2',
                 text: '',
-                attachmentKind: 'graph',
-                attachmentBlockType: 'graphAsset',
-                assetId: '',
+                attachmentKind: 'upload',
+                attachmentBlockType: 'image',
+                assetId: 'asset-x',
+                tableData: EMPTY_TABLE,
+                directiveSource: '',
             },
         ])).toBe(false);
-    });
 
-    it('geometry カードでは preferredAuthoringTool に応じて GeoGebra を優先する', () => {
-        expect(getProblemBodyCardAuthoringTool({
-            id: 'c-geometry',
-            text: '図形を見て答える。',
-            attachmentKind: 'geometry',
-            attachmentBlockType: 'geometryAsset',
-            assetId: 'asset-1',
-        })).toBe('SVG');
-
-        expect(getProblemBodyCardAuthoringTool({
-            id: 'c-geometry',
-            text: '図形を見て答える。',
-            attachmentKind: 'geometry',
-            attachmentBlockType: 'geometryAsset',
-            assetId: 'asset-1',
-        }, 'GEOGEBRA')).toBe('GEOGEBRA');
-
-        expect(getProblemBodyCardAuthoringTool({
-            id: 'c-graph',
-            text: 'グラフを見て答える。',
-            attachmentKind: 'graph',
-            attachmentBlockType: 'graphAsset',
-            assetId: 'asset-2',
-        }, 'SVG')).toBe('GEOGEBRA');
+        expect(hasEmptyProblemBodyCard([
+            {
+                id: 'c3',
+                text: '',
+                attachmentKind: 'table',
+                attachmentBlockType: 'table',
+                assetId: '',
+                tableData: { headers: ['x'], rows: [['1']] },
+                directiveSource: '',
+            },
+        ])).toBe(false);
     });
 });

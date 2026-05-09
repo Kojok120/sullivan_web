@@ -125,39 +125,6 @@ describe('print-document', () => {
         expect(markup).not.toContain('workspace-line');
     });
 
-    it('graphAsset は inline SVG asset を描画し、assetId 不整合時もフォールバックする', async () => {
-        const { markup } = await buildPrintDocumentMarkup({
-            studentName: '生徒E',
-            studentLoginId: 'student-e',
-            subjectName: '数学',
-            problemSets: [[{
-                id: 'structured-graph-1',
-                customId: 'M-102',
-                question: '二次関数のグラフ',
-                order: 1,
-                contentFormat: 'STRUCTURED_V1',
-                publishedRevisionId: 'rev-graph-1',
-                structuredContent: {
-                    version: 1,
-                    blocks: [
-                        { id: 'b1', type: 'paragraph', text: 'グラフを見て答えなさい。' },
-                        { id: 'b2', type: 'graphAsset', assetId: 'mismatched-asset-id' },
-                    ],
-                },
-                assets: [{
-                    id: 'actual-svg-asset',
-                    kind: 'SVG',
-                    fileName: 'graph.svg',
-                    mimeType: 'image/svg+xml',
-                    inlineContent: '<svg width="484" height="0"><path d="M0 0 L10 10" /></svg>',
-                }],
-            }]],
-        });
-
-        expect(markup).toContain('class="problem-figure-frame"');
-        expect(markup).toContain('style="width:50%;aspect-ratio:1.3333;"');
-    });
-
     it('legacy caption / display が残っていても印刷では標準表示だけを使う', async () => {
         const { markup } = await buildPrintDocumentMarkup({
             studentName: '生徒G',
@@ -192,20 +159,6 @@ describe('print-document', () => {
                             caption: 'SVG',
                             display: { zoom: 1.8, panX: -0.5, panY: 0.2 },
                         },
-                        {
-                            id: 'graph-1',
-                            type: 'graphAsset',
-                            assetId: 'asset-graph',
-                            caption: 'グラフ',
-                            display: { zoom: 2, panX: -0.5, panY: 0.2 },
-                        },
-                        {
-                            id: 'geom-1',
-                            type: 'geometryAsset',
-                            assetId: 'asset-geom',
-                            caption: '図形',
-                            display: { zoom: 2.2, panX: 0.1, panY: -0.25 },
-                        },
                     ],
                 } as never,
                 assets: [
@@ -218,20 +171,6 @@ describe('print-document', () => {
                         width: 600,
                         height: 400,
                     },
-                    {
-                        id: 'asset-graph',
-                        kind: 'SVG',
-                        fileName: 'graph.svg',
-                        mimeType: 'image/svg+xml',
-                        inlineContent: '<svg width="400" height="300"><circle cx="10" cy="10" r="4" /></svg>',
-                    },
-                    {
-                        id: 'asset-geom',
-                        kind: 'SVG',
-                        fileName: 'geometry.svg',
-                        mimeType: 'image/svg+xml',
-                        inlineContent: '<svg width="500" height="500"><circle cx="10" cy="10" r="4" /></svg>',
-                    },
                 ],
             }]],
         });
@@ -240,8 +179,7 @@ describe('print-document', () => {
         expect(markup).not.toContain('problem-figure-pan');
         expect(markup).not.toContain('problem-figure-zoom');
         expect(markup).toContain('class="problem-figure-content"');
-        expect(markup).toContain('style="width:50%;aspect-ratio:1.3333;"');
-        expect(markup).toContain('style="width:100%;aspect-ratio:1;"');
+        expect(markup).toContain('style="width:100%;aspect-ratio:1.3333;"');
     });
 
     it('structured problem の本文で $...$ と $$...$$ を KaTeX 描画する', async () => {

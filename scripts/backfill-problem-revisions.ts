@@ -130,7 +130,7 @@ function isStructuredContentMeaningful(sc: unknown): boolean {
         if (block.type === 'table' && Array.isArray(block.rows) && block.rows.length > 0) return true;
         if (block.type === 'choices' && Array.isArray(block.options) && block.options.length > 0) return true;
         if (block.type === 'blankGroup' && Array.isArray(block.blanks) && block.blanks.length > 0) return true;
-        if ((block.type === 'image' || block.type === 'svg' || block.type === 'graphAsset' || block.type === 'geometryAsset') && typeof block.assetId === 'string' && block.assetId.length > 0) return true;
+        if ((block.type === 'image' || block.type === 'svg') && typeof block.assetId === 'string' && block.assetId.length > 0) return true;
         if (block.type === 'svg' && typeof block.svg === 'string' && block.svg.length > 0) return true;
         return false;
     });
