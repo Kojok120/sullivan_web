@@ -8,7 +8,7 @@
     "build": "next build --webpack",
     "build:server": "node scripts/build-server.mjs",
     "start": "NODE_ENV=production node dist/server.js",
-    "start:worker": "NODE_ENV=production tsx worker/server.ts",
+    "start:worker": "NODE_ENV=production node dist/worker.js",
     "lint": "eslint --no-error-on-unmatched-pattern \"src/**/*.{ts,tsx}\" \"scripts/**/*.{ts,tsx}\"",
     "test": "vitest run",
     "test:watch": "vitest",
