@@ -169,6 +169,76 @@ describe('geometry 拡張: 辺ラベル・角度マーク', () => {
     });
 });
 
+describe('geometry 拡張: angles の vertex/from-to 指定（3直線交点用）', () => {
+    it('vertex/from-to 形式で同一頂点に複数角を許可する', () => {
+        const opts = parseGeometryDirective(
+            'vertices="O:0,0;A:3,0;B:1.5,2.6;C:-3,0;D:-1.5,-2.6" segments="A-C;B-D" angles="O/A-B:60°;O/B-C:120°;O/C-D:60°"',
+        );
+        expect(opts).not.toBeNull();
+        expect(opts!.angles).toEqual([
+            { vertex: 'O', from: 'A', to: 'B', mark: 'arc', label: '60°' },
+            { vertex: 'O', from: 'B', to: 'C', mark: 'arc', label: '120°' },
+            { vertex: 'O', from: 'C', to: 'D', mark: 'arc', label: '60°' },
+        ]);
+    });
+
+    it('vertex/from-to の from/to が未定義頂点なら失敗する', () => {
+        expect(parseGeometryDirective(
+            'vertices="O:0,0;A:3,0" angles="O/A-Z:60°"',
+        )).toBeNull();
+    });
+
+    it('vertex/from-to の同一方向重複は失敗する', () => {
+        expect(parseGeometryDirective(
+            'vertices="O:0,0;A:3,0;B:1.5,2.6" angles="O/A-B:60°;O/A-B:45°"',
+        )).toBeNull();
+    });
+
+    it('from-to の self ループ（A-A）は失敗する', () => {
+        expect(parseGeometryDirective(
+            'vertices="O:0,0;A:3,0" angles="O/A-A"',
+        )).toBeNull();
+    });
+
+    it('renderGeometrySvg は from/to 指定の角弧とラベルを出力する', () => {
+        const opts = parseGeometryDirective(
+            'vertices="O:0,0;A:3,0;B:1.5,2.6;C:-3,0" angles="O/A-B:60°"',
+        )!;
+        const svg = renderGeometrySvg(opts);
+        expect(svg).toContain('<path');
+        expect(svg).toContain('>60°<');
+    });
+
+    it('round-trip で vertex/from-to 形式を再構築できる', () => {
+        const original = parseGeometryDirective(
+            'vertices="O:0,0;A:3,0;B:1.5,2.6;C:-3,0" angles="O/A-B:60°;O/B-C:45°"',
+        )!;
+        const dsl = buildGeometryDirective(original);
+        const reparsed = parseGeometryDirective(dsl.replace(/^\[\[geometry\s+/, '').replace(/\]\]$/, ''));
+        expect(reparsed).toEqual(original);
+    });
+
+    it('既存ラベル名にスラッシュが含まれていても旧構文として解釈する（後方互換）', () => {
+        // ラベル名に / を含む稀なデータが混入していても、from/to 部分が既知ラベルでなければ
+        // head 全体を頂点ラベルとして扱う。新構文の貪欲解釈で既存データを壊さないことの回帰テスト。
+        const opts = parseGeometryDirective(
+            'vertices="A/1:0,0;B:5,0;C:3,4" angles="A/1:60°"',
+        );
+        expect(opts).not.toBeNull();
+        expect(opts!.angles).toEqual([
+            { vertex: 'A/1', mark: 'arc', label: '60°' },
+        ]);
+    });
+
+    it('スラッシュを含むがどれもラベル一致しない head は頂点ラベルとして失敗する', () => {
+        // V/from-to の 3 要素のうち 1 つでも未定義なら新構文と認めず、head 全体を vertex として
+        // 解釈する。その vertex も未定義ならエラー（null）を返す。
+        expect(parseGeometryDirective(
+            'vertices="A:0,0;B:5,0" angles="X/A-B:60°"',
+        )).toBeNull();
+    });
+});
+
 describe('expandGeometryDirectives', () => {
     it('テキスト中の [[geometry]] を SVG に置換する', () => {
         const input = '次の三角形を見よ: [[geometry vertices="A:0,0;B:3,0;C:0,4" segments="A-B;B-C;C-A"]]';

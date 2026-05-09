@@ -225,11 +225,11 @@ function GeometryForm({ source, onSourceChange }: FormProps) {
                 />
             </div>
             <div className="space-y-1">
-                <Label className="text-xs">角度（任意 / 頂点[:right|:角ラベル] をセミコロン区切り）</Label>
+                <Label className="text-xs">角度（任意 / 頂点[/from-to][:right|:角ラベル] をセミコロン区切り）</Label>
                 <Input
                     value={state.angles}
                     onChange={(event) => update({ angles: event.target.value })}
-                    placeholder="例: A:right;B:60°;C:30°"
+                    placeholder="例: A:right;B:60°;O/A-B:30°"
                 />
             </div>
             <div className="space-y-1">
@@ -322,10 +322,12 @@ function parseExistingGeometry(source: string): GeometryState | null {
             .join(';'),
         angles: opts.angles
             .map((a) => {
-                if (a.mark === 'right' && a.label) return `${a.vertex}:right:${a.label}`;
-                if (a.mark === 'right') return `${a.vertex}:right`;
-                if (a.label) return `${a.vertex}:${a.label}`;
-                return a.vertex;
+                // vertex/from-to 形式の場合は新構文を再構築する。
+                const head = a.from && a.to ? `${a.vertex}/${a.from}-${a.to}` : a.vertex;
+                if (a.mark === 'right' && a.label) return `${head}:right:${a.label}`;
+                if (a.mark === 'right') return `${head}:right`;
+                if (a.label) return `${head}:${a.label}`;
+                return head;
             })
             .join(';'),
         circles: opts.circles
