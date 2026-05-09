@@ -20,6 +20,9 @@
 /.next/
 /out/
 
+# server.ts を esbuild で bundle した本番用ファイル（npm run build:server で生成）
+/dist/
+
 # production
 /build
 

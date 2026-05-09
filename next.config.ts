@@ -45,6 +45,26 @@ console.log(
 );
 
 const nextConfig: NextConfig = {
+  // Cloud Run 用 Docker image を痩せさせるため standalone 出力を使う。
+  // .next/standalone/node_modules には自動 trace で必要な依存だけが入る。
+  output: 'standalone',
+  // ローカルで親ディレクトリ群（兄弟プロジェクト含む）を monorepo と誤検知して
+  // .next/standalone/<親>/<repo>/ という階層が掘られる問題を防ぐため、
+  // trace root をリポジトリ直下に固定する。
+  outputFileTracingRoot: path.resolve(__dirname),
+  // server.ts (custom server) からしか辿れない依存は src/app からの自動 trace に
+  // 引っかからないため、明示的に standalone へ同梱する。
+  // - ws / dotenv: server.ts 起動時に直接使用
+  // - next: custom server から `import next from 'next'` で動的に読まれる
+  //   サブモジュール（dist/compiled/webpack/* 等）が `next start` 経路では trace
+  //   されず欠落するため、パッケージ丸ごと含めて取りこぼしを防ぐ
+  outputFileTracingIncludes: {
+    '/': [
+      './node_modules/ws/**/*',
+      './node_modules/dotenv/**/*',
+      './node_modules/next/**/*',
+    ],
+  },
   serverExternalPackages: ['googleapis', '@google/genai'],
   // CI では別ステップで tsc --noEmit を実行済みのため、ビルド中の重複チェックをスキップ
   // これによりビルド時のメモリ使用量と所要時間を大幅に削減できる
