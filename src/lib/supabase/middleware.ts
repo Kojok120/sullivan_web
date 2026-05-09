@@ -31,9 +31,12 @@ export function looksLikeRecoverableAuthError(value: unknown): boolean {
         return false;
     }
 
+    // code が明示されていれば code だけで判定する（message へフォールバックしない）。
+    // isRecoverableAuthSessionError と挙動を揃え、無関係な error が message regex に
+    // 偶然マッチして抑制対象になる事故を防ぐ。
     const errorCode = typeof candidate.code === 'string' ? candidate.code.toLowerCase() : '';
-    if (errorCode && RECOVERABLE_AUTH_SESSION_ERROR_CODES.has(errorCode)) {
-        return true;
+    if (errorCode) {
+        return RECOVERABLE_AUTH_SESSION_ERROR_CODES.has(errorCode);
     }
 
     const message = typeof candidate.message === 'string' ? candidate.message : '';
@@ -43,8 +46,10 @@ export function looksLikeRecoverableAuthError(value: unknown): boolean {
 // Supabase Auth SDK 内部の console.error が、updateSession 側で握り潰している
 // 失効済み refresh token を Cloud Run などに ERROR として漏らしてしまう。
 // 静的なパターンで該当エラーだけ抑制する。それ以外のログには影響しない。
+// import 時点で console.error を差し替えるとテスト環境を含む全プロセスに副作用が
+// 漏れるため、updateSession の初回実行時に lazy にパッチする。
 let consoleErrorPatched = false;
-function patchConsoleErrorOnce() {
+export function patchConsoleErrorOnce() {
     if (consoleErrorPatched) {
         return;
     }
@@ -58,8 +63,6 @@ function patchConsoleErrorOnce() {
         originalConsoleError(...args);
     };
 }
-
-patchConsoleErrorOnce();
 
 function isSupabaseAuthCookieName(name: string) {
     return name.startsWith('sb-') && name.includes('-auth-token');
@@ -107,6 +110,8 @@ function isRecoverableAuthSessionError(error: unknown) {
 }
 
 export async function updateSession(request: NextRequest) {
+    patchConsoleErrorOnce();
+
     let supabaseResponse = NextResponse.next({
         request,
     });

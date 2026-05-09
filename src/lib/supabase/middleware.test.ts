@@ -11,7 +11,7 @@ vi.mock('@supabase/ssr', () => ({
     createServerClient: createServerClientMock,
 }));
 
-import { looksLikeRecoverableAuthError, updateSession } from '@/lib/supabase/middleware';
+import { looksLikeRecoverableAuthError, patchConsoleErrorOnce, updateSession } from '@/lib/supabase/middleware';
 
 function createRequest() {
     const request = new NextRequest('http://localhost/teacher');
@@ -236,6 +236,20 @@ describe('supabase middleware', () => {
             expect(looksLikeRecoverableAuthError('Refresh Token Not Found')).toBe(false);
             expect(looksLikeRecoverableAuthError(null)).toBe(false);
             expect(looksLikeRecoverableAuthError(undefined)).toBe(false);
+        });
+    });
+
+    describe('patchConsoleErrorOnce', () => {
+        // 抑制ロジックそのものは looksLikeRecoverableAuthError 側で網羅。ここでは「2 回目以降の
+        // patchConsoleErrorOnce 呼び出しが console.error をさらにラップしない（idempotent）」
+        // ことだけを確認する。export されたことで他テストから明示的に呼べるようになり、
+        // 過去にあった import 副作用（patch がテスト環境にも漏れる問題）の回帰防止になる。
+        it('複数回呼んでもパッチは 1 回しか適用されない（idempotent）', () => {
+            patchConsoleErrorOnce();
+            const before = console.error;
+            patchConsoleErrorOnce();
+            patchConsoleErrorOnce();
+            expect(console.error).toBe(before);
         });
     });
 });

@@ -8,7 +8,6 @@
  *   tsx scripts/inspect-single-problem.ts --env production --custom-id M-1068
  */
 
-import 'dotenv/config';
 import { config as loadDotenv } from 'dotenv';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -37,13 +36,16 @@ function parseArgs(argv: string[]): CliOptions {
         const arg = argv[i];
         if (arg === '--env') {
             const v = argv[i + 1];
+            if (!v || v.startsWith('--')) throw new Error('--env の値が不正です');
             if (v !== 'dev' && v !== 'production') throw new Error(`--env: ${v}`);
             opts.env = v;
             i += 1;
             continue;
         }
         if (arg === '--custom-id') {
-            opts.customId = argv[i + 1] ?? null;
+            const v = argv[i + 1];
+            if (!v || v.startsWith('--')) throw new Error('--custom-id の値が不正です');
+            opts.customId = v;
             i += 1;
             continue;
         }
@@ -61,8 +63,11 @@ async function main() {
 
     const prisma = await loadPrisma();
     try {
-        const problem = await prisma.problem.findFirst({
+        // customId は (subjectId, customId) で複合 unique なので、複数 subject に同名が
+        // 存在しうる。重複している場合は黙って先頭1件を返さず明示的にエラーで止める。
+        const problems = await prisma.problem.findMany({
             where: { customId: opts.customId! },
+            take: 2,
             select: {
                 id: true,
                 customId: true,
@@ -74,10 +79,14 @@ async function main() {
                 problemType: true,
             },
         });
-        if (!problem) {
+        if (problems.length === 0) {
             console.log(`見つかりません: ${opts.customId}`);
             return;
         }
+        if (problems.length > 1) {
+            throw new Error(`customId が複数の Problem に一致します: ${opts.customId}（subject 等で一意化が必要）`);
+        }
+        const problem = problems[0];
 
         const revisions = await prisma.problemRevision.findMany({
             where: { problemId: problem.id },

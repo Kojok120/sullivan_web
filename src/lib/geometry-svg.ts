@@ -415,21 +415,35 @@ function parseAngles(input: string, vertices: GeometryVertex[]): GeometryAngle[]
         if (parts.length === 0 || parts.length > 3) return null;
 
         // vertex 部分は `V` か `V/from-to` の 2 形式。後者は同一頂点に複数角を許可する。
+        // 既存データに `/` を含む頂点ラベルが残っているケースを壊さないため、
+        // 「`V` 部分が既知ラベル、かつ `from-to` の両ラベルも既知ラベル」を満たすときだけ
+        // 新構文として解釈する。それ以外は head 全体を頂点ラベルとして扱う。
         const head = parts[0];
         if (!head) return null;
         let vertex = head;
         let from: string | undefined;
         let to: string | undefined;
         const slash = head.indexOf('/');
-        if (slash >= 0) {
-            vertex = head.slice(0, slash).trim();
+        if (slash > 0 && slash < head.length - 1 && head.indexOf('/', slash + 1) === -1) {
+            const candidateVertex = head.slice(0, slash).trim();
             const fromTo = head.slice(slash + 1).trim();
             const dash = fromTo.indexOf('-');
-            if (dash <= 0) return null;
-            from = fromTo.slice(0, dash).trim();
-            to = fromTo.slice(dash + 1).trim();
-            if (!from || !to || from === to) return null;
-            if (!labelSet.has(from) || !labelSet.has(to)) return null;
+            if (dash > 0 && dash < fromTo.length - 1) {
+                const candidateFrom = fromTo.slice(0, dash).trim();
+                const candidateTo = fromTo.slice(dash + 1).trim();
+                if (
+                    candidateFrom &&
+                    candidateTo &&
+                    candidateFrom !== candidateTo &&
+                    labelSet.has(candidateVertex) &&
+                    labelSet.has(candidateFrom) &&
+                    labelSet.has(candidateTo)
+                ) {
+                    vertex = candidateVertex;
+                    from = candidateFrom;
+                    to = candidateTo;
+                }
+            }
         }
         if (!vertex || !labelSet.has(vertex)) return null;
 

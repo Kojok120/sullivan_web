@@ -213,7 +213,20 @@ async function main() {
             for (const { problem, keywords } of items) {
                 const rev = problem.publishedRevisionId ? revisionById.get(problem.publishedRevisionId) : undefined;
                 const structuredText = rev ? extractStructuredText(rev.structuredContent) : '';
-                const answerSpec = rev?.answerSpec as { correctAnswer?: string; acceptedAnswers?: string[]; answerTemplate?: string } | undefined;
+                const answerSpecRaw = rev?.answerSpec as
+                    | { correctAnswer?: unknown; acceptedAnswers?: unknown; answerTemplate?: unknown }
+                    | undefined;
+                const answerSpec = answerSpecRaw
+                    ? {
+                          correctAnswer:
+                              typeof answerSpecRaw.correctAnswer === 'string' ? answerSpecRaw.correctAnswer : '',
+                          acceptedAnswers: Array.isArray(answerSpecRaw.acceptedAnswers)
+                              ? answerSpecRaw.acceptedAnswers.filter((v): v is string => typeof v === 'string')
+                              : [],
+                          answerTemplate:
+                              typeof answerSpecRaw.answerTemplate === 'string' ? answerSpecRaw.answerTemplate : '',
+                      }
+                    : undefined;
 
                 md.push(`### ${problem.customId} (problemId=${problem.id})`);
                 md.push('');
@@ -235,8 +248,8 @@ async function main() {
                 md.push(`**Problem.answer:** \`${problem.answer ?? '(null)'}\``);
                 md.push('');
                 if (answerSpec) {
-                    md.push(`**answerSpec.correctAnswer:** \`${answerSpec.correctAnswer ?? ''}\``);
-                    if (answerSpec.acceptedAnswers && answerSpec.acceptedAnswers.length > 0) {
+                    md.push(`**answerSpec.correctAnswer:** \`${answerSpec.correctAnswer}\``);
+                    if (answerSpec.acceptedAnswers.length > 0) {
                         md.push(`**answerSpec.acceptedAnswers:** ${answerSpec.acceptedAnswers.map((a) => `\`${a}\``).join(', ')}`);
                     }
                     if (answerSpec.answerTemplate) {
