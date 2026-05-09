@@ -183,12 +183,23 @@ export function AnswerFieldEditor({
         onProblemTypeChange(mapKindToProblemType(next));
         if (next === 'none') {
             onAnswerTemplateChange('');
-        } else if (next === 'numberline') {
-            onAnswerTemplateChange(buildNumberLineDsl(numberLine));
+            return;
+        }
+        // ローカル編集中の draft が一時的に invalid（例: min に "-" だけ入っている）でも
+        // build*Dsl は空文字を返してしまう。そのまま親に流すと answerTemplate が空になり、
+        // 上の useEffect が kind を 'none' に巻き戻してしまうので、
+        // 不正な場合は default state にフォールバックして必ず有効な DSL を emit する。
+        if (next === 'numberline') {
+            const dsl = buildNumberLineDsl(numberLine) || buildNumberLineDsl(DEFAULT_NUMBERLINE);
+            if (!buildNumberLineDsl(numberLine)) setNumberLine(DEFAULT_NUMBERLINE);
+            onAnswerTemplateChange(dsl);
         } else if (next === 'table') {
+            // buildAnswerTableDirective は常に有効な DSL を返すので追加の防御は不要。
             onAnswerTemplateChange(buildAnswerTableDirective(tableValue));
         } else if (next === 'coordplane') {
-            onAnswerTemplateChange(buildCoordPlaneDsl(coordPlane));
+            const dsl = buildCoordPlaneDsl(coordPlane) || buildCoordPlaneDsl(DEFAULT_COORDPLANE);
+            if (!buildCoordPlaneDsl(coordPlane)) setCoordPlane(DEFAULT_COORDPLANE);
+            onAnswerTemplateChange(dsl);
         }
     };
 

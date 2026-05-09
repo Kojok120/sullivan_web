@@ -114,6 +114,10 @@ function parseAttributes(body: string): Map<string, string> | null {
     let match: RegExpExecArray | null;
     let lastIndex = 0;
     while ((match = re.exec(body)) !== null) {
+        // マッチとマッチの間に非空白文字が残っていたら不正な属性として弾く
+        // （例: `key1=1 garbage key2=2` を黙って受け入れない）
+        const between = body.slice(lastIndex, match.index);
+        if (between.trim().length > 0) return null;
         const key = match[1];
         const value = match[2] ?? match[3] ?? match[4] ?? '';
         result.set(key, value);
@@ -143,8 +147,9 @@ export function buildAnswerTableDirective(options: AnswerTableOptions): string {
 }
 
 function escapeForAttr(value: string): string {
-    // ダブルクォートとセミコロン/カンマは DSL の区切り文字なのでサニタイズ
-    return value.replace(/[",;]/g, '');
+    // ダブルクォートとセミコロン/カンマ、閉じ角括弧は DSL の区切り文字なのでサニタイズ。
+    // `]` を残すと `expandAnswerTableDirectives` の `[^\]]*` 正規表現が早期終了して展開に失敗する。
+    return value.replace(/[",;\]]/g, '');
 }
 
 /**

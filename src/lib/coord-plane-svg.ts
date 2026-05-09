@@ -53,10 +53,25 @@ const MIN_TICK_PIXEL_SPACING = 18;
 // データ依存しないハード上限。粗刻み計算が破綻したときの保険。
 const MAX_TICKS_PER_AXIS = 60;
 
-let markerIdCounter = 0;
-function nextMarkerId(): string {
-    markerIdCounter = (markerIdCounter + 1) % Number.MAX_SAFE_INTEGER;
-    return `cp-${markerIdCounter}`;
+// SSR と CSR で同じマークアップを返す必要があるため、グローバルな mutable カウンタは使えない。
+// CoordPlaneOptions の内容から決定論的なハッシュを生成し、それを marker id の suffix に使う。
+function hashCoordPlaneOptions(options: CoordPlaneOptions): string {
+    const payload = JSON.stringify({
+        xmin: options.xmin,
+        xmax: options.xmax,
+        ymin: options.ymin,
+        ymax: options.ymax,
+        points: options.points.map((p) => ({ label: p.label, x: p.x, y: p.y })),
+        curves: options.curves.map((c) => c.expression),
+        lines: options.lines,
+    });
+    // FNV-1a 32bit。衝突しても同一ページ内で重複しなければ良いので強度は不要。
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < payload.length; i += 1) {
+        hash ^= payload.charCodeAt(i);
+        hash = Math.imul(hash, 0x01000193);
+    }
+    return (hash >>> 0).toString(36);
 }
 
 function chooseTickStep(span: number, viewSpan: number): number {
@@ -125,7 +140,8 @@ export function renderCoordPlaneSvg(options: CoordPlaneOptions): string {
     }
 
     // SVG ごとに一意な marker id を割り当てる（同一ページ内で複数並んでも参照崩れしない）。
-    const markerPrefix = nextMarkerId();
+    // SSR/CSR の hydration 不一致を避けるため options から決定論的に算出する。
+    const markerPrefix = `cp-${hashCoordPlaneOptions(options)}`;
     const arrowUp = `${markerPrefix}-up`;
     const arrowDown = `${markerPrefix}-down`;
     const arrowLeft = `${markerPrefix}-left`;
