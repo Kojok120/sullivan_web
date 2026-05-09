@@ -174,8 +174,6 @@ function buildFileContent(files: ExtractedFile[]): string {
  * 注意: このファイルは build-math-data.ts により再生成される。手動編集は再生成で上書きされる可能性がある。
  */
 
-import type { DesmosSceneSpec, GeoGebraSceneSpec } from '@/lib/problem-figure-scene';
-
 export type Grade = '中1' | '中2' | '中3';
 
 export type Difficulty = 'basic' | 'standard' | 'advanced';
@@ -200,8 +198,11 @@ export interface MathProblemDef {
     answer: string;
     acceptedAnswers?: string[];
     mextReference: string;
-    /** 構造化問題 (GEOMETRY / GRAPH_DRAW) に必須。SHORT_TEXT では未指定。 */
-    figure?: DesmosSceneSpec | GeoGebraSceneSpec;
+    /**
+     * GeoGebra 連携を廃止したため、figure フィールドはレガシーデータ保持用。
+     * 描画には使われない。新規データでは設定しないこと。
+     */
+    figure?: Record<string, unknown>;
     /** 採点や復習にあたっての設計メモ。CSV 出力に含める。 */
     designNote?: string;
 }

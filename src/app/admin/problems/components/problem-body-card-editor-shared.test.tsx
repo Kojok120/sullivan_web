@@ -7,10 +7,6 @@ vi.mock('./problem-text-preview', () => ({
     ProblemTextPreview: () => <div>problem-text-preview</div>,
 }));
 
-vi.mock('../problem-authoring-embed', () => ({
-    ProblemAuthoringEmbed: () => <div>problem-authoring-embed</div>,
-}));
-
 vi.mock('@/components/problem-authoring/tex-help-link', () => ({
     TeXHelpLink: () => null,
 }));
@@ -18,7 +14,6 @@ vi.mock('@/components/problem-authoring/tex-help-link', () => ({
 function renderEditor(subjectName: string) {
     return render(
         <ProblemBodyCardEditorShared
-            variant="author"
             subjectName={subjectName}
             card={{
                 id: 'card-1',
@@ -26,29 +21,15 @@ function renderEditor(subjectName: string) {
                 attachmentKind: 'none',
                 attachmentBlockType: null,
                 assetId: '',
+                tableData: { headers: [], rows: [] },
+                directiveSource: '',
             }}
-            isActiveVisualCard={false}
             problemId=""
             revisionId=""
             isUploadingAsset={false}
-            authoringStateText=""
-            generationExtraPrompt=""
-            generationDiagnostic={null}
             isPending={false}
-            isGenerating={false}
-            isAuthoringToolReady={false}
-            supportsAiFigureGeneration={false}
-            onActivateVisualCard={() => {}}
             onCardChange={() => {}}
             onUploadAsset={() => {}}
-            onAuthoringStateTextChange={() => {}}
-            onGenerationExtraPromptChange={() => {}}
-            onGenerateFigure={() => {}}
-            syncHandlerRef={{ current: null }}
-            sceneApplyHandlerRef={{ current: null }}
-            onAuthoringToolReadyChange={() => {}}
-            effectiveProblemType="SHORT_TEXT"
-            preferredAuthoringTool="MANUAL"
         />,
     );
 }

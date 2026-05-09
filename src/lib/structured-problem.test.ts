@@ -121,7 +121,6 @@ describe('structured-problem', () => {
                 { id: 't1', type: 'table', headers: ['物質', '性質'], rows: [['水', '液体']] },
                 { id: 'c1', type: 'choices', options: [{ id: 'A', label: '酸性' }, { id: 'B', label: '中性' }] },
                 { id: 'b1', type: 'blankGroup', blanks: [{ id: 'blank-1', label: '物質名', placeholder: '例: 水' }] },
-                { id: 'g1', type: 'graphAsset', assetId: 'asset-graph' },
                 { id: 'i1', type: 'image', assetId: 'asset-image' },
             ],
         });
@@ -130,6 +129,19 @@ describe('structured-problem', () => {
         expect(buildAiProblemText(document)).toContain('表:');
         expect(buildAiProblemText(document)).toContain('選択肢:');
         expect(buildAiProblemText(document)).toContain('空欄:');
-        expect(collectStructuredDocumentAssetIds(document)).toEqual(['asset-graph', 'asset-image']);
+        expect(collectStructuredDocumentAssetIds(document)).toEqual(['asset-image']);
+    });
+
+    it('legacy な graphAsset / geometryAsset ブロックは読み込み時に黙って捨てる', () => {
+        const document = parseStructuredDocument({
+            version: 1,
+            blocks: [
+                { id: 'p1', type: 'paragraph', text: '本文' },
+                { id: 'g1', type: 'graphAsset', assetId: 'legacy-graph' },
+                { id: 'geom1', type: 'geometryAsset', assetId: 'legacy-geom' },
+            ],
+        });
+        expect(document.blocks).toHaveLength(1);
+        expect(document.blocks[0].type).toBe('paragraph');
     });
 });

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -32,21 +32,13 @@ import {
     type ProblemBlock,
     type StructuredProblemDocument,
 } from '@/lib/structured-problem';
-import {
-    isAiFigureGenerationSupported,
-    parseProblemFigureGenerationContext,
-    renderSvgSceneSpec,
-    type ProblemFigureSceneSpec,
-} from '@/lib/problem-figure-scene';
 import type { RenderableProblemAsset, RenderableProblemWithRelations } from './types';
 import {
     createProblemDraft,
     deleteProblemAsset,
-    generateProblemFigureDraft,
     previewProblemPrint,
     publishProblemRevision,
     sendBackProblem,
-    syncProblemAuthoringArtifacts,
     uploadProblemAsset,
 } from './actions';
 import {
@@ -55,17 +47,15 @@ import {
     type ProblemEditorSubjectOption,
     type SelectedCoreProblem,
 } from './components/core-problem-selector';
+import { AnswerFieldEditor } from './components/answer-field-editor';
 import { ProblemBodyCardEditorShared } from './components/problem-body-card-editor-shared';
 import { ProblemTextPreview } from './components/problem-text-preview';
 import { SendBackDialog } from './components/send-back-dialog';
-import { type VendorSceneApplyPayload, type VendorSyncPayload } from './problem-authoring-embed';
 import {
     appendProblemBodyCard,
     deleteProblemBodySegment,
     deriveProblemTypeFromDocument,
-    getProblemBodyCardAuthoringTool,
     hasEmptyProblemBodyCard,
-    isVisualAttachmentKind,
     moveProblemBodySegment,
     parseProblemBodySegments,
     updateProblemBodyCard,
@@ -95,20 +85,13 @@ type EditorState = {
     videoUrl: string;
     videoStatus: VideoStatusValue;
     coreProblems: SelectedCoreProblem[];
-    authoringTool: string;
     document: StructuredProblemDocument;
     answerSpec: AnswerSpec;
     printConfig: PrintConfig;
-    generationExtraPrompt: string;
-    authoringStateText: string;
 };
 
-const ASSET_SOURCE_TOOLS = ['MANUAL', 'GEOGEBRA', 'SVG', 'UPLOAD'] as const;
-const ASSET_KINDS = ['IMAGE', 'SVG', 'PDF', 'GEOGEBRA_STATE', 'JSON', 'THUMBNAIL'] as const;
-
-function normalizeAuthoringTool(authoringTool?: string | null) {
-    return authoringTool ?? 'MANUAL';
-}
+const ASSET_SOURCE_TOOLS = ['MANUAL', 'SVG', 'UPLOAD'] as const;
+const ASSET_KINDS = ['IMAGE', 'SVG', 'PDF', 'JSON', 'THUMBNAIL'] as const;
 
 function getCardUploadAssetSpec(file: File): { assetKind: 'IMAGE' | 'SVG'; attachmentBlockType: 'image' | 'svg' } | null {
     const normalizedName = file.name.toLowerCase();
@@ -138,9 +121,7 @@ function buildInitialState(problem: RenderableProblemWithRelations | null, initi
         : base.document;
     const answerSpec = normalizeAnswerSpecForAuthoring((draftRevision?.answerSpec as AnswerSpec | null) ?? base.answerSpec);
     const printConfig = (draftRevision?.printConfig as PrintConfig | null) ?? base.printConfig;
-    const generationContext = parseProblemFigureGenerationContext(draftRevision?.generationContext);
     const initialProblemType = problem?.problemType ?? 'SHORT_TEXT';
-    const normalizedAuthoringTool = normalizeAuthoringTool(draftRevision?.authoringTool);
 
     return {
         problemId: problem?.id ?? '',
@@ -151,12 +132,9 @@ function buildInitialState(problem: RenderableProblemWithRelations | null, initi
         videoUrl: problem?.videoUrl ?? '',
         videoStatus: ((problem?.videoStatus as VideoStatusValue | undefined) ?? 'NONE'),
         coreProblems: (problem?.coreProblems ?? []) as SelectedCoreProblem[],
-        authoringTool: normalizedAuthoringTool,
         document: structuredContent,
         answerSpec,
         printConfig,
-        generationExtraPrompt: generationContext?.extraPrompt ?? '',
-        authoringStateText: draftRevision?.authoringState ? JSON.stringify(draftRevision.authoringState, null, 2) : '',
     };
 }
 
@@ -186,18 +164,12 @@ export function ProblemEditorClient({
 }: ProblemEditorClientProps) {
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
-    const [isGenerating, startGenerationTransition] = useTransition();
     const [state, setState] = useState(() => buildInitialState(problem, initialSubjectId));
-    const vendorSyncHandlerRef = useRef<(() => Promise<VendorSyncPayload>) | null>(null);
-    const vendorSceneApplyHandlerRef = useRef<((payload: VendorSceneApplyPayload) => Promise<void>) | null>(null);
     const [assetKind, setAssetKind] = useState<(typeof ASSET_KINDS)[number]>('SVG');
     const [assetInlineContent, setAssetInlineContent] = useState('');
     const [assetSourceTool, setAssetSourceTool] = useState<(typeof ASSET_SOURCE_TOOLS)[number]>('UPLOAD');
     const [assetFile, setAssetFile] = useState<File | null>(null);
-    const [generationDiagnostic, setGenerationDiagnostic] = useState<string | null>(null);
-    const [activeVisualCardId, setActiveVisualCardId] = useState<string | null>(null);
     const [uploadingCardId, setUploadingCardId] = useState<string | null>(null);
-    const [isVendorToolReady, setIsVendorToolReady] = useState(false);
     const [sendBackOpen, setSendBackOpen] = useState(false);
     const isAuthorView = variant === 'author';
     const title = isAuthorView
@@ -227,27 +199,10 @@ export function ProblemEditorClient({
         () => normalizeAnswerSpecForAuthoring(state.answerSpec),
         [state.answerSpec],
     );
-    const visualCards = useMemo(
-        () => bodyCards.filter((card) => isVisualAttachmentKind(card.attachmentKind)),
-        [bodyCards],
-    );
     const currentSubjectName = useMemo(
         () => subjects.find((subject) => subject.id === state.subjectId)?.name ?? state.coreProblems[0]?.subject?.name ?? null,
         [subjects, state.subjectId, state.coreProblems],
     );
-    const resolvedActiveVisualCardId = activeVisualCardId && visualCards.some((card) => card.id === activeVisualCardId)
-        ? activeVisualCardId
-        : visualCards[0]?.id ?? null;
-    const activeVisualCard = visualCards.find((card) => card.id === resolvedActiveVisualCardId) ?? null;
-    const activeVisualAuthoringTool = getProblemBodyCardAuthoringTool(activeVisualCard, state.authoringTool);
-    const effectiveAuthoringTool = activeVisualAuthoringTool ?? state.authoringTool;
-    const supportsAiFigureGeneration = isAiFigureGenerationSupported(effectiveProblemType);
-
-    useEffect(() => {
-        if (!activeVisualAuthoringTool) {
-            setIsVendorToolReady(false);
-        }
-    }, [activeVisualAuthoringTool]);
 
     const assetOptions = activeRevision?.assets ?? problem?.publishedRevision?.assets ?? [];
 
@@ -319,33 +274,17 @@ export function ProblemEditorClient({
                 return null;
             }
 
-            let authoringState = state.authoringStateText.trim()
-                ? JSON.parse(state.authoringStateText)
-                : undefined;
-            let vendorPayload: VendorSyncPayload | null = null;
             const normalizedAnswerSpec = normalizeAnswerSpecForAuthoring(state.answerSpec);
-
-            if (activeVisualCard && activeVisualAuthoringTool === 'GEOGEBRA') {
-                if (!vendorSyncHandlerRef.current) {
-                    toast.error('GeoGebra エディタの初期化が完了していません');
-                    return null;
-                }
-
-                vendorPayload = await vendorSyncHandlerRef.current();
-                authoringState = vendorPayload.authoringState;
-            }
-
-            let workingDocument = state.document;
-            let result = await createProblemDraft({
+            const result = await createProblemDraft({
                 problemId: state.problemId || undefined,
                 problemType: effectiveProblemType,
                 grade: state.grade || undefined,
                 videoUrl: state.videoUrl || undefined,
                 videoStatus: resolveVideoStatusFromUrl(state.videoStatus, state.videoUrl),
                 coreProblemIds: state.coreProblems.map((coreProblem) => coreProblem.id),
-                authoringTool: effectiveAuthoringTool as never,
-                authoringState,
-                document: workingDocument,
+                authoringTool: 'MANUAL',
+                authoringState: undefined,
+                document: state.document,
                 answerSpec: normalizedAnswerSpec,
                 printConfig: state.printConfig,
             });
@@ -355,66 +294,8 @@ export function ProblemEditorClient({
                 return null;
             }
 
-            let problemId = result.problemId || state.problemId;
-            let revisionId = result.revisionId || state.revisionId;
-
-            if (
-                vendorPayload
-                && problemId
-                && revisionId
-                && activeVisualCard
-                && activeVisualAuthoringTool === 'GEOGEBRA'
-            ) {
-                const syncResult = await syncProblemAuthoringArtifacts({
-                    problemId,
-                    revisionId,
-                    authoringTool: 'GEOGEBRA',
-                    authoringState: vendorPayload.authoringState,
-                    svgContent: vendorPayload.svgContent,
-                });
-
-                if (!syncResult.success) {
-                    toast.error(syncResult.error || 'vendor アセット同期に失敗しました');
-                    return null;
-                }
-
-                const svgAssetId = syncResult.svgAsset?.id;
-                if (svgAssetId) {
-                    const nextDocument = updateProblemBodyCard(
-                        workingDocument,
-                        activeVisualCard.id,
-                        (card) => ({
-                            ...card,
-                            attachmentKind: card.attachmentKind,
-                            assetId: svgAssetId,
-                        }),
-                    );
-
-                    if (JSON.stringify(nextDocument) !== JSON.stringify(workingDocument)) {
-                        workingDocument = nextDocument;
-                        result = await createProblemDraft({
-                            problemId,
-                            problemType: effectiveProblemType,
-                            grade: state.grade || undefined,
-                            videoUrl: state.videoUrl || undefined,
-                            coreProblemIds: state.coreProblems.map((coreProblem) => coreProblem.id),
-                            authoringTool: effectiveAuthoringTool as never,
-                            authoringState: vendorPayload.authoringState,
-                            document: workingDocument,
-                            answerSpec: normalizedAnswerSpec,
-                            printConfig: state.printConfig,
-                        });
-
-                        if (!result.success) {
-                            toast.error(result.error || 'vendor 連携後の再保存に失敗しました');
-                            return null;
-                        }
-
-                        problemId = result.problemId || problemId;
-                        revisionId = result.revisionId || revisionId;
-                    }
-                }
-            }
+            const problemId = result.problemId || state.problemId;
+            const revisionId = result.revisionId || state.revisionId;
 
             if (showSuccessToast) {
                 toast.success('下書きを保存しました');
@@ -426,9 +307,6 @@ export function ProblemEditorClient({
                 revisionId,
                 problemType: effectiveProblemType,
                 answerSpec: normalizedAnswerSpec,
-                document: workingDocument,
-                authoringStateText: authoringState ? JSON.stringify(authoringState, null, 2) : '',
-                authoringTool: effectiveAuthoringTool,
             }));
 
             if (!state.problemId && problemId) {
@@ -445,160 +323,6 @@ export function ProblemEditorClient({
             toast.error(error instanceof Error ? error.message : '保存に失敗しました');
             return null;
         }
-    };
-
-    const handleGenerateFigure = () => {
-        if (!state.problemId) {
-            toast.error('先に下書きを保存してください');
-            return;
-        }
-
-        if (!activeVisualCard || !supportsAiFigureGeneration) {
-            toast.error('AI 図版生成は GEOMETRY / GRAPH_DRAW のみ対応しています');
-            return;
-        }
-
-        const sourceProblemText = activeVisualCard.text.trim();
-        const targetTool = getProblemBodyCardAuthoringTool(activeVisualCard, state.authoringTool);
-        if (!sourceProblemText) {
-            toast.error('このカードの本文を入力してください');
-            return;
-        }
-
-        if (!targetTool) {
-            toast.error('グラフまたは図形カードを選択してください');
-            return;
-        }
-
-        if (targetTool === 'GEOGEBRA' && !isVendorToolReady) {
-            toast.error('GeoGebra エディタの準備ができるまで少し待ってください');
-            return;
-        }
-
-        startGenerationTransition(async () => {
-            try {
-                setGenerationDiagnostic(null);
-
-                const result = await generateProblemFigureDraft({
-                    problemId: state.problemId,
-                    revisionId: state.revisionId || undefined,
-                    sourceProblemText,
-                    extraPrompt: state.generationExtraPrompt,
-                    targetTool,
-                });
-
-                if (!result.success) {
-                    setGenerationDiagnostic(result.error || 'AI 図版生成に失敗しました');
-                    toast.error(result.error || 'AI 図版生成に失敗しました');
-                    return;
-                }
-
-                let nextDocument = state.document;
-                let nextAuthoringStateText = '';
-                const sceneSpec = result.sceneSpec as ProblemFigureSceneSpec;
-
-                if (result.targetTool === 'SVG') {
-                    const svgContent = renderSvgSceneSpec(sceneSpec as Extract<ProblemFigureSceneSpec, { kind: 'svg' }>);
-                    const syncResult = await syncProblemAuthoringArtifacts({
-                        problemId: result.problemId,
-                        revisionId: result.revisionId,
-                        authoringTool: 'SVG',
-                        authoringState: undefined,
-                        svgContent,
-                    });
-
-                    if (!syncResult.success) {
-                        setGenerationDiagnostic(syncResult.error || 'SVG アセットの保存に失敗しました');
-                        toast.error(syncResult.error || 'SVG アセットの保存に失敗しました');
-                        return;
-                    }
-
-                    const svgAssetId = syncResult.svgAsset?.id;
-                    if (svgAssetId) {
-                        nextDocument = updateProblemBodyCard(nextDocument, activeVisualCard.id, (card) => ({
-                            ...card,
-                            attachmentKind: card.attachmentKind,
-                            assetId: svgAssetId,
-                        }));
-                    }
-                } else {
-                    if (!vendorSceneApplyHandlerRef.current || !vendorSyncHandlerRef.current) {
-                        setGenerationDiagnostic(`${result.targetTool} エディタの準備ができていません`);
-                        toast.error(`${result.targetTool} エディタの準備ができていません`);
-                        return;
-                    }
-
-                    await vendorSceneApplyHandlerRef.current({
-                        tool: result.targetTool,
-                        sceneSpec,
-                    } as VendorSceneApplyPayload);
-
-                    const vendorPayload = await vendorSyncHandlerRef.current();
-                    nextAuthoringStateText = JSON.stringify(vendorPayload.authoringState, null, 2);
-
-                    const syncResult = await syncProblemAuthoringArtifacts({
-                        problemId: result.problemId,
-                        revisionId: result.revisionId,
-                        authoringTool: result.targetTool,
-                        authoringState: vendorPayload.authoringState,
-                        svgContent: vendorPayload.svgContent,
-                    });
-
-                    if (!syncResult.success) {
-                        setGenerationDiagnostic(syncResult.error || 'vendor アセット同期に失敗しました');
-                        toast.error(syncResult.error || 'vendor アセット同期に失敗しました');
-                        return;
-                    }
-
-                    const svgAssetId = syncResult.svgAsset?.id;
-                    if (svgAssetId) {
-                        nextDocument = updateProblemBodyCard(nextDocument, activeVisualCard.id, (card) => ({
-                            ...card,
-                            attachmentKind: card.attachmentKind,
-                            assetId: svgAssetId,
-                        }));
-                    }
-                }
-
-                const saveResult = await createProblemDraft({
-                    problemId: result.problemId,
-                    problemType: deriveProblemTypeFromDocument(nextDocument, state.problemType),
-                    grade: state.grade || undefined,
-                    videoUrl: state.videoUrl || undefined,
-                    coreProblemIds: state.coreProblems.map((coreProblem) => coreProblem.id),
-                    authoringTool: result.targetTool === 'SVG' ? 'SVG' as never : result.targetTool as never,
-                    authoringState: result.targetTool === 'SVG'
-                        ? undefined
-                        : JSON.parse(nextAuthoringStateText),
-                    document: nextDocument,
-                    answerSpec: normalizeAnswerSpecForAuthoring(state.answerSpec),
-                    printConfig: state.printConfig,
-                });
-
-                if (!saveResult.success) {
-                    setGenerationDiagnostic(saveResult.error || '生成結果の保存に失敗しました');
-                    toast.error(saveResult.error || '生成結果の保存に失敗しました');
-                    return;
-                }
-
-                setState((current) => ({
-                    ...current,
-                    problemId: saveResult.problemId || result.problemId,
-                    revisionId: saveResult.revisionId || result.revisionId,
-                    problemType: deriveProblemTypeFromDocument(nextDocument, current.problemType),
-                    answerSpec: normalizeAnswerSpecForAuthoring(current.answerSpec),
-                    document: nextDocument,
-                    authoringStateText: nextAuthoringStateText,
-                    authoringTool: result.targetTool,
-                }));
-                toast.success('AI で図版を下書きに反映しました');
-                router.refresh();
-            } catch (error) {
-                const message = error instanceof Error ? error.message : 'AI 図版生成に失敗しました';
-                setGenerationDiagnostic(message);
-                toast.error(message);
-            }
-        });
     };
 
     const handlePublish = () => {
@@ -746,6 +470,7 @@ export function ProblemEditorClient({
                     <TabsTrigger value="basic">{isAuthorView ? '基本設定' : '基本情報'}</TabsTrigger>
                     <TabsTrigger value="body">{isAuthorView ? '問題文' : '本文'}</TabsTrigger>
                     <TabsTrigger value="answer">{isAuthorView ? '答え' : '解答仕様'}</TabsTrigger>
+                    <TabsTrigger value="answer-field">解答欄</TabsTrigger>
                     {!isAuthorView && <TabsTrigger value="assets">アセット</TabsTrigger>}
                     {!isAuthorView && <TabsTrigger value="history">改訂履歴</TabsTrigger>}
                 </TabsList>
@@ -861,21 +586,12 @@ export function ProblemEditorClient({
                                         <CardContent>
                                             {segment.kind === 'card' ? (
                                                 <ProblemBodyCardEditorShared
-                                                    variant={variant}
                                                     subjectName={currentSubjectName}
                                                     card={segment.card}
-                                                    isActiveVisualCard={segment.card.id === resolvedActiveVisualCardId}
                                                     problemId={state.problemId}
                                                     revisionId={state.revisionId}
                                                     isUploadingAsset={uploadingCardId === segment.card.id}
-                                                    authoringStateText={state.authoringStateText}
-                                                    generationExtraPrompt={state.generationExtraPrompt}
-                                                    generationDiagnostic={generationDiagnostic}
                                                     isPending={isPending}
-                                                    isGenerating={isGenerating}
-                                                    isAuthoringToolReady={isVendorToolReady}
-                                                    supportsAiFigureGeneration={supportsAiFigureGeneration}
-                                                    onActivateVisualCard={() => setActiveVisualCardId(segment.card.id)}
                                                     onCardChange={(updater) => setState((current) => {
                                                         const nextDocument = updateProblemBodyCard(current.document, segment.card.id, updater);
                                                         return {
@@ -884,14 +600,6 @@ export function ProblemEditorClient({
                                                         };
                                                     })}
                                                     onUploadAsset={(file) => handleCardAssetUpload(segment.card.id, file)}
-                                                    onAuthoringStateTextChange={(next) => setState((current) => ({ ...current, authoringStateText: next }))}
-                                                    onGenerationExtraPromptChange={(next) => setState((current) => ({ ...current, generationExtraPrompt: next }))}
-                                                    onGenerateFigure={handleGenerateFigure}
-                                                    syncHandlerRef={vendorSyncHandlerRef}
-                                                    sceneApplyHandlerRef={vendorSceneApplyHandlerRef}
-                                                    onAuthoringToolReadyChange={setIsVendorToolReady}
-                                                    effectiveProblemType={effectiveProblemType}
-                                                    preferredAuthoringTool={state.authoringTool}
                                                 />
                                             ) : (
                                                 <div className="space-y-3">
@@ -934,6 +642,25 @@ export function ProblemEditorClient({
                             <AnswerSpecEditor
                                 value={syncedAnswerSpec}
                                 onChange={(next) => setState((current) => ({ ...current, answerSpec: next }))}
+                            />
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="answer-field">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>解答欄</CardTitle>
+                            <CardDescription>解答欄の形式（短い記述・数直線・表・座標平面）を設定します。</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <AnswerFieldEditor
+                                onProblemTypeChange={(next) => setState((current) => ({ ...current, problemType: next }))}
+                                answerTemplate={syncedAnswerSpec.answerTemplate ?? ''}
+                                onAnswerTemplateChange={(next) => setState((current) => ({
+                                    ...current,
+                                    answerSpec: { ...current.answerSpec, answerTemplate: next },
+                                }))}
                             />
                         </CardContent>
                     </Card>
@@ -1089,7 +816,7 @@ function BlockEditor({
         );
     }
 
-    if (type === 'image' || type === 'svg' || type === 'graphAsset' || type === 'geometryAsset') {
+    if (type === 'image' || type === 'svg') {
         return (
             <div className="space-y-3">
                 <div className="space-y-2">
@@ -1293,27 +1020,6 @@ function AnswerSpecEditor({
                 <div className="space-y-2">
                     <Label>別解プレビュー</Label>
                     <AcceptedAnswersPreview jsonText={acceptedAnswersJson} />
-                </div>
-            </div>
-            <div className="space-y-2 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
-                <div className="space-y-2">
-                    <Label>解答欄テンプレート（任意）</Label>
-                    <Textarea
-                        value={exactValue.answerTemplate ?? ''}
-                        onChange={(event) => update({ answerTemplate: event.target.value })}
-                        rows={4}
-                        placeholder='例: [[numberline min=-5 max=5]]'
-                    />
-                    <p className="text-xs text-muted-foreground">
-                        プリント解答欄に表示する視覚テンプレート。空欄なら通常の罫線解答欄。
-                    </p>
-                </div>
-                <div className="space-y-2">
-                    <Label>解答欄テンプレートプレビュー</Label>
-                    <ProblemTextPreview
-                        text={exactValue.answerTemplate ?? ''}
-                        emptyMessage="解答欄テンプレートを入力するとプレビューが出ます。"
-                    />
                 </div>
             </div>
         </div>
