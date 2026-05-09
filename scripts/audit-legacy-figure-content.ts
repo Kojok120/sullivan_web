@@ -94,7 +94,7 @@ function describeDatabaseUrl(databaseUrl: string | undefined) {
 }
 
 // 新 DSL の opener。問題文 / answerTemplate のスキャンに使う。
-const KNOWN_DIRECTIVE_OPENERS = ['[[numberline', '[[coordplane', '[[answertable', '[[geometry'] as const;
+const KNOWN_DIRECTIVE_OPENERS = ['[[numberline', '[[coordplane', '[[answertable', '[[geometry', '[[solid'] as const;
 
 // 監査でだけ使う「自然文中で図に言及してそうなキーワード」。
 // 自動変換は絶対にしないので false-positive 多めでも構わない。
@@ -284,16 +284,27 @@ async function main() {
 
             // 2) 自然文ヒント（自動変換しない、人間レビュー対象）
             //    既に DSL が含まれている問題は対象外（既に図がある＝対応済み）
+            //    publishedRevision または最新 revision の structuredContent.blocks に
+            //    directive ブロックがある場合も「対応済み」とみなす。
             if (questionSpans.length === 0) {
                 const hits = FIGURE_HINT_KEYWORDS.filter((kw) => p.question.includes(kw));
                 if (hits.length > 0) {
-                    findings.push({
-                        category: 'figure-hint-without-directive',
-                        problemId: p.id,
-                        customId: p.customId,
-                        subjectName,
-                        detail: { keywords: hits },
+                    const hasStructuredDirective = p.revisions.some((rev) => {
+                        const sc = rev.structuredContent;
+                        if (!sc || typeof sc !== 'object' || Array.isArray(sc)) return false;
+                        const blocks = (sc as { blocks?: unknown }).blocks;
+                        if (!Array.isArray(blocks)) return false;
+                        return blocks.some((b) => b && typeof b === 'object' && (b as { type?: string }).type === 'directive');
                     });
+                    if (!hasStructuredDirective) {
+                        findings.push({
+                            category: 'figure-hint-without-directive',
+                            problemId: p.id,
+                            customId: p.customId,
+                            subjectName,
+                            detail: { keywords: hits },
+                        });
+                    }
                 }
             }
 
