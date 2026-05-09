@@ -1,5 +1,5 @@
 /**
- * 段階A の安全網: 公開済 STRUCTURED_V1 問題で
+ * 段階A の安全網: 構造化された公開済問題で
  * `Problem.answer` / `Problem.acceptedAnswers` と
  * `publishedRevision.answerSpec.correctAnswer` / `acceptedAnswers` が
  * 同期された状態を保てているかを監査する read-only スクリプト。
@@ -7,6 +7,12 @@
  * 採点側は段階A 以降 Problem 側だけを正解の信頼源として参照する。
  * publish フローは answerSpec から Problem.answer / acceptedAnswers を派生する片方向同期で運用しているため、
  * 同期が崩れると AI 採点に間違った正解が渡る恐れがある。
+ *
+ * 監査対象の判定軸:
+ * - 段階A+ で「構造化問題か」を `contentFormat` ではなく `publishedRevision.structuredContent`
+ *   の有無で決めるよう本番ロジックを変更したため、本監査も同じ軸で抽出する。
+ * - `Problem.contentFormat` で絞ると、`PLAIN_TEXT` のまま公開 revision に structured data
+ *   を持つ行が漏れる。
  *
  * 使い方:
  *   tsx scripts/audit-problem-answer-sync.ts --env production
@@ -98,9 +104,11 @@ async function main() {
 
     const prisma = await loadPrisma();
     try {
+        // 公開リビジョンを持つ全問題を取得し、JS 側で structuredContent の有無で監査対象を絞る。
+        // (本番採点ロジックと同じ判定軸にすることで、`PLAIN_TEXT` のまま structuredContent を持つ
+        // 行が監査から漏れて偽陽性 (divergence=0) を返す事故を防ぐ)
         const problems = await prisma.problem.findMany({
             where: {
-                contentFormat: 'STRUCTURED_V1',
                 publishedRevisionId: { not: null },
             },
             select: {
@@ -110,14 +118,24 @@ async function main() {
                 acceptedAnswers: true,
                 subject: { select: { name: true } },
                 publishedRevision: {
-                    select: { answerSpec: true },
+                    select: { answerSpec: true, structuredContent: true },
                 },
             },
         });
 
         const divergences: Divergence[] = [];
+        let auditedCount = 0;
 
         for (const p of problems) {
+            // 構造化されていない公開済問題 (legacy English 等) は本監査の対象外。
+            // それらは Problem.answer が canonical で、検証する answerSpec が存在しない。
+            const hasStructuredContent = p.publishedRevision?.structuredContent != null;
+            if (!hasStructuredContent) {
+                continue;
+            }
+
+            auditedCount += 1;
+
             const spec = p.publishedRevision?.answerSpec as
                 | { correctAnswer?: unknown; acceptedAnswers?: unknown }
                 | null
@@ -163,7 +181,8 @@ async function main() {
         const failed = divergences.length;
 
         console.log(`[audit] env=${opts.env}`);
-        console.log(`[audit] STRUCTURED_V1 published 件数: ${total}`);
+        console.log(`[audit] 公開済 (publishedRevisionId あり) 件数: ${total}`);
+        console.log(`[audit] うち構造化問題 (監査対象) 件数: ${auditedCount}`);
         console.log(`[audit] 不整合件数: ${failed}`);
 
         if (failed > 0) {
