@@ -24,8 +24,6 @@ import { downloadProblemAssetFromStorage } from '@/lib/problem-assets';
 import {
     buildAiProblemText,
     collectStructuredDocumentAssetIds,
-    normalizeAnswerSpecForAi,
-    parseAnswerSpec,
     parseStructuredDocument,
 } from '@/lib/structured-problem';
 import { getSubjectConfig } from '@/lib/subject-config';
@@ -602,7 +600,6 @@ type ProblemRevisionAssetForGrading = {
 type ProblemRevisionForGrading = {
     id: string;
     structuredContent: Prisma.JsonValue | null;
-    answerSpec: Prisma.JsonValue | null;
     assets: ProblemRevisionAssetForGrading[];
 };
 
@@ -616,7 +613,6 @@ export type ProblemForGrading = {
     contentFormat: string;
     publishedRevisionId: string | null;
     structuredContent: Prisma.JsonValue | null;
-    answerSpec: Prisma.JsonValue | null;
     revisionAssets: ProblemRevisionAssetForGrading[];
     coreProblems: { id: string; name: string }[];
 };
@@ -650,10 +646,6 @@ type GeminiInlinePart = {
     };
 };
 
-function parseAnswerSpecJson(value: Prisma.JsonValue) {
-    return parseAnswerSpec(value as unknown);
-}
-
 function parseStructuredDocumentJson(value: Prisma.JsonValue) {
     return parseStructuredDocument(value as unknown);
 }
@@ -668,7 +660,7 @@ function isSupportedReferenceFigureMimeType(mimeType: string) {
 }
 
 function getReferencedFigureAssets(problem: ProblemForGrading) {
-    if (problem.contentFormat !== 'STRUCTURED_V1' || !problem.structuredContent) {
+    if (!problem.structuredContent) {
         return [];
     }
 
@@ -725,22 +717,18 @@ export function buildSubjectSpecificGuidelines(problems: ProblemForGrading[]): s
 }
 
 export function buildProblemContextForGemini(problem: ProblemForGrading, index: number): GeminiProblemContext {
+    // 正解は常に Problem.answer / acceptedAnswers を信頼源とする。
+    // STRUCTURED_V1 形式でも publish 時に answerSpec から Problem 側へ同期される運用。
     let problemText = problem.question?.trim() || '(問題文なし)';
-    let referenceAnswer = problem.answer?.trim() || '';
-    let alternativeAnswers = uniqueNonEmpty(problem.acceptedAnswers);
+    const referenceAnswer = problem.answer?.trim() || '';
+    const alternativeAnswers = uniqueNonEmpty(problem.acceptedAnswers);
 
-    if (problem.contentFormat === 'STRUCTURED_V1' && problem.structuredContent && problem.answerSpec) {
+    if (problem.structuredContent) {
         try {
             const document = parseStructuredDocumentJson(problem.structuredContent);
-            const normalizedAnswer = normalizeAnswerSpecForAi(parseAnswerSpecJson(problem.answerSpec));
             problemText = buildAiProblemText(document).trim() || problemText;
-            referenceAnswer = normalizedAnswer.referenceAnswer.trim() || referenceAnswer;
-            alternativeAnswers = uniqueNonEmpty([
-                ...normalizedAnswer.alternativeAnswers,
-                ...alternativeAnswers,
-            ]);
         } catch (error) {
-            console.warn('[grading-service] failed to normalize structured problem', {
+            console.warn('[grading-service] failed to parse structured problem document', {
                 problemId: problem.id,
                 error,
             });
@@ -1088,7 +1076,6 @@ async function gradeWithGemini(
                 select: {
                     id: true,
                     structuredContent: true,
-                    answerSpec: true,
                     assets: {
                         select: {
                             id: true,
@@ -1170,7 +1157,6 @@ async function gradeWithGemini(
             contentFormat: p.contentFormat,
             publishedRevisionId: matchedRevision?.id ?? p.publishedRevisionId,
             structuredContent: matchedRevision?.structuredContent ?? null,
-            answerSpec: matchedRevision?.answerSpec ?? null,
             revisionAssets: matchedRevision?.assets.map((asset) => ({
                 id: asset.id,
                 fileName: asset.fileName,

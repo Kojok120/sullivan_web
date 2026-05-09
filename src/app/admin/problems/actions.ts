@@ -493,14 +493,11 @@ export async function createProblemDraft(data: {
             } else {
                 const existing = await tx.problem.findUnique({
                     where: { id: problemId },
-                    select: { videoUrl: true, videoStatus: true },
+                    select: { videoUrl: true, videoStatus: true, publishedRevisionId: true },
                 });
                 const nextVideoUrl = data.videoUrl !== undefined ? data.videoUrl : existing?.videoUrl ?? null;
                 const desiredStatus = data.videoStatus ?? ((existing?.videoStatus as VideoStatusValue | undefined) ?? 'NONE');
                 const problemUpdateData: Prisma.ProblemUpdateInput = {
-                    question: legacyQuestion,
-                    answer: legacyAnswer,
-                    acceptedAnswers: normalized.legacy.acceptedAnswers,
                     grade: data.grade,
                     videoUrl: data.videoUrl,
                     videoStatus: resolveVideoStatusFromUrl(desiredStatus, nextVideoUrl),
@@ -515,6 +512,16 @@ export async function createProblemDraft(data: {
                         set: data.coreProblemIds.map((id) => ({ id })),
                     },
                 };
+
+                // 公開リビジョンが未存在の問題 (新規下書き編集) でのみ legacy フィールドを下書きと同期する。
+                // 既に公開済み (publishedRevisionId !== null) の問題では legacy フィールドを
+                // 公開時のスナップショットとして保持し、下書き保存で上書きしない。
+                // 上書きすると配布済みプリントの採点が未公開ドラフトの正解で行われ、誤採点になる。
+                if (!existing?.publishedRevisionId) {
+                    problemUpdateData.question = legacyQuestion;
+                    problemUpdateData.answer = legacyAnswer;
+                    problemUpdateData.acceptedAnswers = normalized.legacy.acceptedAnswers;
+                }
 
                 if (!shouldPreserveProblemMasterNumber(subjectName)) {
                     problemUpdateData.masterNumber = null;
