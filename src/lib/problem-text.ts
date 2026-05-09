@@ -56,7 +56,9 @@ export function renderProblemTextHtml(text: string): string {
                 const body = text.slice(index + COORDPLANE_OPENER.length, end);
                 const opts = parseCoordPlaneDirective(body);
                 if (opts) {
-                    html += renderCoordPlaneSvg(opts);
+                    // 同じ図を同一ページに複数置いた場合に marker id が衝突しないよう、
+                    // 出現位置（テキスト先頭からの offset）を 36 進で suffix に渡す。
+                    html += renderCoordPlaneSvg(opts, index.toString(36));
                     index = end + 2;
                     continue;
                 }

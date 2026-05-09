@@ -54,9 +54,11 @@ const MIN_TICK_PIXEL_SPACING = 18;
 const MAX_TICKS_PER_AXIS = 60;
 
 // SSR と CSR で同じマークアップを返す必要があるため、グローバルな mutable カウンタは使えない。
-// CoordPlaneOptions の内容から決定論的なハッシュを生成し、それを marker id の suffix に使う。
-function hashCoordPlaneOptions(options: CoordPlaneOptions): string {
+// CoordPlaneOptions の内容と呼び出し元の安定キー（出現位置など）を合わせてハッシュし、
+// 同じ図を同じページに 2 回置いても marker id が衝突しないようにする。
+function hashCoordPlaneMarker(options: CoordPlaneOptions, idSuffix: string): string {
     const payload = JSON.stringify({
+        suffix: idSuffix,
         xmin: options.xmin,
         xmax: options.xmax,
         ymin: options.ymin,
@@ -65,7 +67,7 @@ function hashCoordPlaneOptions(options: CoordPlaneOptions): string {
         curves: options.curves.map((c) => c.expression),
         lines: options.lines,
     });
-    // FNV-1a 32bit。衝突しても同一ページ内で重複しなければ良いので強度は不要。
+    // FNV-1a 32bit。SVG 内部の id 衝突回避が目的なので暗号強度は不要。
     let hash = 0x811c9dc5;
     for (let i = 0; i < payload.length; i += 1) {
         hash ^= payload.charCodeAt(i);
@@ -74,14 +76,28 @@ function hashCoordPlaneOptions(options: CoordPlaneOptions): string {
     return (hash >>> 0).toString(36);
 }
 
+// 与えられた下限値以上で {1, 2, 5} × 10^n 系列の最小の "nice" step を返す。
+// span が 1 未満（例: [-0.5, 0.5]）でも 0.1, 0.2, 0.5 のような fractional step を採用し、
+// 全ての tick が v=0 で潰れて何も描画されない問題を防ぐ。
+function niceStepAtLeast(minStep: number): number {
+    if (!Number.isFinite(minStep) || minStep <= 0) return 1;
+    const exp = Math.floor(Math.log10(minStep));
+    const pow = 10 ** exp;
+    const base = minStep / pow;
+    const niceBase = base <= 1 ? 1 : base <= 2 ? 2 : base <= 5 ? 5 : 10;
+    return niceBase * pow;
+}
+
 function chooseTickStep(span: number, viewSpan: number): number {
     if (!Number.isFinite(span) || span <= 0) return 1;
     const usable = viewSpan - PADDING * 2;
     const pixelsPerUnit = usable / span;
-    if (!Number.isFinite(pixelsPerUnit) || pixelsPerUnit <= 0) return Math.max(1, Math.ceil(span / MAX_TICKS_PER_AXIS));
-    const minStepByPixel = Math.ceil(MIN_TICK_PIXEL_SPACING / pixelsPerUnit);
-    const minStepByCount = Math.ceil(span / MAX_TICKS_PER_AXIS);
-    return Math.max(1, minStepByPixel, minStepByCount);
+    if (!Number.isFinite(pixelsPerUnit) || pixelsPerUnit <= 0) {
+        return niceStepAtLeast(span / MAX_TICKS_PER_AXIS);
+    }
+    const minStepByPixel = MIN_TICK_PIXEL_SPACING / pixelsPerUnit;
+    const minStepByCount = span / MAX_TICKS_PER_AXIS;
+    return niceStepAtLeast(Math.max(minStepByPixel, minStepByCount));
 }
 
 function escapeXml(value: string): string {
@@ -110,8 +126,12 @@ function formatNumber(value: number): string {
 
 /**
  * 座標平面 SVG マークアップを生成する。失敗時は説明的なエラー span を返す。
+ *
+ * @param idSuffix 同じ options を 1 ページ内に複数並べる場合の衝突回避用 suffix。
+ *   省略時は空文字を入れて options 内容のみで marker id を導出する。
+ *   呼び出し側（expandCoordPlaneDirectives 等）から match.index を 36 進で渡すのが想定。
  */
-export function renderCoordPlaneSvg(options: CoordPlaneOptions): string {
+export function renderCoordPlaneSvg(options: CoordPlaneOptions, idSuffix = ''): string {
     const { xmin, xmax, ymin, ymax, points, curves, lines } = options;
 
     if (
@@ -140,8 +160,8 @@ export function renderCoordPlaneSvg(options: CoordPlaneOptions): string {
     }
 
     // SVG ごとに一意な marker id を割り当てる（同一ページ内で複数並んでも参照崩れしない）。
-    // SSR/CSR の hydration 不一致を避けるため options から決定論的に算出する。
-    const markerPrefix = `cp-${hashCoordPlaneOptions(options)}`;
+    // SSR/CSR の hydration 不一致を避けるため options + idSuffix から決定論的に算出する。
+    const markerPrefix = `cp-${hashCoordPlaneMarker(options, idSuffix)}`;
     const arrowUp = `${markerPrefix}-up`;
     const arrowDown = `${markerPrefix}-down`;
     const arrowLeft = `${markerPrefix}-left`;
@@ -551,10 +571,12 @@ function evaluate(node: Node, x: number): number {
  */
 export function expandCoordPlaneDirectives(text: string): string {
     const re = /\[\[coordplane\s+([^\]]*)\]\]/g;
-    return text.replace(re, (full, body: string) => {
+    return text.replace(re, (full, body: string, offset: number) => {
         const opts = parseCoordPlaneDirective(body);
         if (!opts) return full;
-        return renderCoordPlaneSvg(opts);
+        // 同じ DSL を同一ページに複数置いた場合に marker id が衝突しないよう、
+        // 出現位置を 36 進で suffix に渡す。
+        return renderCoordPlaneSvg(opts, offset.toString(36));
     });
 }
 

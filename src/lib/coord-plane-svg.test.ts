@@ -104,6 +104,31 @@ describe('renderCoordPlaneSvg', () => {
         expect(svg).toContain('coordplane-error');
     });
 
+    it('小さい span（[-0.5, 0.5]）でも fractional な目盛が描画される', () => {
+        const svg = renderCoordPlaneSvg({
+            xmin: -0.5, xmax: 0.5, ymin: -0.5, ymax: 0.5,
+            points: [], curves: [], lines: [],
+        });
+        // step=0.1 を選択するので 0.1, 0.2, ... 0.5 が目盛りラベルとして含まれる
+        expect(svg).toContain('>0.1<');
+        expect(svg).toContain('>0.5<');
+    });
+
+    it('同一内容を 2 回描画しても idSuffix で marker id が衝突しない', () => {
+        const opts = {
+            xmin: -5, xmax: 5, ymin: -5, ymax: 5,
+            points: [], curves: [], lines: [],
+        };
+        const a = renderCoordPlaneSvg(opts, 'a');
+        const b = renderCoordPlaneSvg(opts, 'b');
+        // それぞれの marker id を取り出して一致しないことを確認
+        const idA = a.match(/cp-([a-z0-9]+)-up/)?.[1];
+        const idB = b.match(/cp-([a-z0-9]+)-up/)?.[1];
+        expect(idA).toBeTruthy();
+        expect(idB).toBeTruthy();
+        expect(idA).not.toBe(idB);
+    });
+
     it('points のラベルは XML エスケープされる', () => {
         const svg = renderCoordPlaneSvg({
             xmin: -5, xmax: 5, ymin: -5, ymax: 5,

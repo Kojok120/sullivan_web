@@ -120,13 +120,19 @@ function parseExistingCoordPlane(answerTemplate: string): CoordPlaneState | null
     };
 }
 
+// 共有 sanitizer。`"` と `]` は DSL の区切り文字なので埋め込み属性値からは除去する。
+// `]` を残すと展開側の `[^\]]*` 正規表現が早期終了し、保存できても表示で展開されないバグになる。
+function sanitizeDslAttr(value: string): string {
+    return value.replace(/["\]]/g, '').trim();
+}
+
 function buildNumberLineDsl(state: NumberLineState): string {
     const min = Number(state.min);
     const max = Number(state.max);
     if (!Number.isFinite(min) || !Number.isFinite(max) || min >= max) return '';
-    const marks = state.marks.trim();
+    const marks = sanitizeDslAttr(state.marks);
     if (marks) {
-        return `[[numberline min=${min} max=${max} marks="${marks.replace(/"/g, '')}"]]`;
+        return `[[numberline min=${min} max=${max} marks="${marks}"]]`;
     }
     return `[[numberline min=${min} max=${max}]]`;
 }
@@ -142,10 +148,9 @@ function buildCoordPlaneDsl(state: CoordPlaneState): string {
     ) return '';
 
     const parts = [`xmin=${xmin}`, `xmax=${xmax}`, `ymin=${ymin}`, `ymax=${ymax}`];
-    const sanitize = (value: string) => value.replace(/"/g, '').trim();
-    if (state.points.trim()) parts.push(`points="${sanitize(state.points)}"`);
-    if (state.curves.trim()) parts.push(`curves="${sanitize(state.curves)}"`);
-    if (state.lines.trim()) parts.push(`lines="${sanitize(state.lines)}"`);
+    if (sanitizeDslAttr(state.points)) parts.push(`points="${sanitizeDslAttr(state.points)}"`);
+    if (sanitizeDslAttr(state.curves)) parts.push(`curves="${sanitizeDslAttr(state.curves)}"`);
+    if (sanitizeDslAttr(state.lines)) parts.push(`lines="${sanitizeDslAttr(state.lines)}"`);
     return `[[coordplane ${parts.join(' ')}]]`;
 }
 
