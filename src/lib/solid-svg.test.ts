@@ -96,6 +96,17 @@ describe('parseSolidDirective', () => {
         expect(parseSolidDirective('kind="cube" size=0')).toBeNull();
     });
 
+    it('cone で h を省略し slant <= r だと退化形なのでパース失敗', () => {
+        // slant == r → 高さ 0 の退化形
+        expect(parseSolidDirective('kind="cone" r=4 slant=4')).toBeNull();
+        // slant < r → √(slant²-r²) が虚数で実高無し
+        expect(parseSolidDirective('kind="cone" r=4 slant=3')).toBeNull();
+        // h を明示すれば slant 不要で OK
+        expect(parseSolidDirective('kind="cone" r=4 h=3')).not.toBeNull();
+        // slant > r なら h 省略でも OK
+        expect(parseSolidDirective('kind="cone" r=3 slant=5')).not.toBeNull();
+    });
+
     it('rect-prism で必須属性が欠落するとパース失敗', () => {
         expect(parseSolidDirective('kind="rect-prism" w=3 h=4')).toBeNull();
     });

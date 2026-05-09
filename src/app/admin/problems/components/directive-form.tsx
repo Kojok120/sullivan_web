@@ -8,7 +8,7 @@ import { parseCoordPlaneDirective } from '@/lib/coord-plane-svg';
 import { parseGeometryDirective } from '@/lib/geometry-svg';
 import { parseNumberLineDirective, type NumberLineMark } from '@/lib/number-line-svg';
 import type { ProblemBodyDirectiveKind } from '@/lib/problem-editor-model';
-import { buildSolidDirective, parseSolidDirective } from '@/lib/solid-svg';
+import { parseSolidDirective } from '@/lib/solid-svg';
 
 /**
  * 数直線 / 座標平面 / 図形 の DSL を form ベースで編集するための共通コンポーネント。
@@ -59,7 +59,9 @@ function SolidForm({ source, onSourceChange }: FormProps) {
         if (!trimmed.startsWith('[[solid ') || !trimmed.endsWith(']]')) return;
         const body = trimmed.slice('[[solid '.length, -2);
         const opts = parseSolidDirective(body);
-        if (opts) onSourceChange(buildSolidDirective(opts));
+        // 正規化版で書き換えると属性順序が変わったタイミングで draft が上書きされ caret が飛ぶ。
+        // ここではパース可能性のみ検証し、保存値はユーザー入力をそのまま流す。
+        if (opts) onSourceChange(trimmed);
     };
 
     return (

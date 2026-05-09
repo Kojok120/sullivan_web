@@ -226,8 +226,9 @@ function validateSolidOptions(opts: SolidOptions): boolean {
             return isPositiveDimension(opts.r) && isPositiveDimension(opts.h);
         case 'cone': {
             if (!isPositiveDimension(opts.r)) return false;
-            // h または slant のいずれかが正値
-            return isPositiveDimension(opts.h) || isPositiveDimension(opts.slant);
+            // h があれば h を採用、なければ slant > r を要求（slant² - r² > 0 で実高が確保される）
+            if (isPositiveDimension(opts.h)) return true;
+            return isPositiveDimension(opts.slant) && opts.slant > opts.r;
         }
         case 'sphere':
             return isPositiveDimension(opts.r);
