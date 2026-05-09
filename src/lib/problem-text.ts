@@ -3,11 +3,13 @@ import { parseAnswerTableDirective, renderAnswerTableHtml } from '@/lib/answer-t
 import { parseCoordPlaneDirective, renderCoordPlaneSvg } from '@/lib/coord-plane-svg';
 import { parseGeometryDirective, renderGeometrySvg } from '@/lib/geometry-svg';
 import { parseNumberLineDirective, renderNumberLineSvg } from '@/lib/number-line-svg';
+import { parseSolidDirective, renderSolidSvg } from '@/lib/solid-svg';
 
 const NUMBERLINE_OPENER = '[[numberline';
 const COORDPLANE_OPENER = '[[coordplane';
 const ANSWERTABLE_OPENER = '[[answertable';
 const GEOMETRY_OPENER = '[[geometry';
+const SOLID_OPENER = '[[solid';
 
 function escapeHtml(value: string): string {
     return value
@@ -91,6 +93,19 @@ export function renderProblemTextHtml(text: string): string {
             }
         }
 
+        if (text.startsWith(SOLID_OPENER, index)) {
+            const end = text.indexOf(']]', index + SOLID_OPENER.length);
+            if (end !== -1) {
+                const body = text.slice(index + SOLID_OPENER.length, end);
+                const opts = parseSolidDirective(body);
+                if (opts) {
+                    html += renderSolidSvg(opts);
+                    index = end + 2;
+                    continue;
+                }
+            }
+        }
+
         if (text.startsWith('$$', index)) {
             const end = text.indexOf('$$', index + 2);
             if (end !== -1) {
@@ -137,6 +152,10 @@ export function renderProblemTextHtml(text: string): string {
         const nextGeometry = text.indexOf(GEOMETRY_OPENER, index);
         if (nextGeometry !== -1 && nextGeometry < nextSpecial) {
             nextSpecial = nextGeometry;
+        }
+        const nextSolid = text.indexOf(SOLID_OPENER, index);
+        if (nextSolid !== -1 && nextSolid < nextSpecial) {
+            nextSpecial = nextSolid;
         }
 
         if (nextSpecial === index) {

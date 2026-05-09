@@ -4,12 +4,15 @@ import { expandAnswerTableDirectivesAsText } from '@/lib/answer-table-svg';
 import { expandCoordPlaneDirectivesAsText } from '@/lib/coord-plane-svg';
 import { expandGeometryDirectivesAsText } from '@/lib/geometry-svg';
 import { expandNumberLineDirectivesAsText } from '@/lib/number-line-svg';
+import { expandSolidDirectivesAsText } from '@/lib/solid-svg';
 
 function expandAllDirectivesAsText(text: string): string {
-    return expandGeometryDirectivesAsText(
-        expandCoordPlaneDirectivesAsText(
-            expandAnswerTableDirectivesAsText(
-                expandNumberLineDirectivesAsText(text),
+    return expandSolidDirectivesAsText(
+        expandGeometryDirectivesAsText(
+            expandCoordPlaneDirectivesAsText(
+                expandAnswerTableDirectivesAsText(
+                    expandNumberLineDirectivesAsText(text),
+                ),
             ),
         ),
     );
@@ -95,15 +98,16 @@ const answerLinesBlockSchema = blockBaseSchema.extend({
  * 整合しない組み合わせ（kind: 'geometry' に対し coordplane の source 等）は
  * document レベルの superRefine で弾く（DIRECTIVE_KIND_OPENERS を参照）。
  */
-const DIRECTIVE_KIND_OPENERS: Record<'numberline' | 'coordplane' | 'geometry', string> = {
+const DIRECTIVE_KIND_OPENERS: Record<'numberline' | 'coordplane' | 'geometry' | 'solid', string> = {
     numberline: '[[numberline ',
     coordplane: '[[coordplane ',
     geometry: '[[geometry ',
+    solid: '[[solid ',
 };
 
 const directiveBlockSchema = blockBaseSchema.extend({
     type: z.literal('directive'),
-    kind: z.enum(['numberline', 'coordplane', 'geometry']),
+    kind: z.enum(['numberline', 'coordplane', 'geometry', 'solid']),
     source: z.string().min(1),
 });
 
