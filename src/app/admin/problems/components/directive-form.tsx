@@ -8,6 +8,7 @@ import { parseCoordPlaneDirective } from '@/lib/coord-plane-svg';
 import { parseGeometryDirective } from '@/lib/geometry-svg';
 import { parseNumberLineDirective, type NumberLineMark } from '@/lib/number-line-svg';
 import type { ProblemBodyDirectiveKind } from '@/lib/problem-editor-model';
+import { buildSolidDirective, parseSolidDirective } from '@/lib/solid-svg';
 
 /**
  * 数直線 / 座標平面 / 図形 の DSL を form ベースで編集するための共通コンポーネント。
@@ -31,7 +32,49 @@ export function DirectiveForm({ kind, source, onSourceChange }: DirectiveFormPro
         return <CoordPlaneForm source={source} onSourceChange={onSourceChange} />;
     }
 
+    if (kind === 'solid') {
+        return <SolidForm source={source} onSourceChange={onSourceChange} />;
+    }
+
     return <GeometryForm source={source} onSourceChange={onSourceChange} />;
+}
+
+const DEFAULT_SOLID_SOURCE = '[[solid kind="cube" size=4]]';
+
+/**
+ * solid DSL は kind ごとに必須属性が異なるため、まずは raw テキスト編集で対応する。
+ * 入力中の値が valid な solid DSL であれば onSourceChange に流す。
+ */
+function SolidForm({ source, onSourceChange }: FormProps) {
+    const [draft, setDraft] = useState(() => source || DEFAULT_SOLID_SOURCE);
+    const [prevSource, setPrevSource] = useState(source);
+    if (source !== prevSource) {
+        setPrevSource(source);
+        setDraft(source || DEFAULT_SOLID_SOURCE);
+    }
+
+    const update = (next: string) => {
+        setDraft(next);
+        const trimmed = next.trim();
+        if (!trimmed.startsWith('[[solid ') || !trimmed.endsWith(']]')) return;
+        const body = trimmed.slice('[[solid '.length, -2);
+        const opts = parseSolidDirective(body);
+        if (opts) onSourceChange(buildSolidDirective(opts));
+    };
+
+    return (
+        <div className="space-y-2 rounded-md border p-4">
+            <Label className="text-xs">立体 DSL（[[solid kind=&quot;...&quot; ...]]）</Label>
+            <Input
+                value={draft}
+                onChange={(event) => update(event.target.value)}
+                placeholder='例: [[solid kind="cube" size=4 diagonal=true]]'
+            />
+            <p className="text-xs text-muted-foreground">
+                kind: rect-prism / cube / cylinder / cone / sphere / hemisphere / square-pyramid / tri-prism / rotation
+            </p>
+        </div>
+    );
 }
 
 type FormProps = {
@@ -363,5 +406,7 @@ export function buildDefaultDirectiveSource(kind: ProblemBodyDirectiveKind): str
             return buildCoordPlaneDsl(DEFAULT_COORDPLANE);
         case 'geometry':
             return buildGeometryDsl(DEFAULT_GEOMETRY);
+        case 'solid':
+            return DEFAULT_SOLID_SOURCE;
     }
 }
