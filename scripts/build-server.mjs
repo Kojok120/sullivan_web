@@ -13,16 +13,30 @@ const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
 
 const target = "node20";
 
-const entries = [
-  {
+const TARGETS = {
+  web: {
     in: path.join(projectRoot, "server.ts"),
     out: path.join(projectRoot, "dist/server.js"),
   },
-  {
+  worker: {
     in: path.join(projectRoot, "worker/server.ts"),
     out: path.join(projectRoot, "dist/worker.js"),
   },
-];
+};
+
+// 引数なし → 全部ビルド、引数あり → 指定されたものだけビルド。
+// Dockerfile (web) は `web` だけ、Dockerfile.worker は `worker` だけ指定することで
+// 互いの bundle が runner image に紛れ込むのを防ぐ。
+const requested = process.argv.slice(2);
+const selected = requested.length === 0 ? Object.keys(TARGETS) : requested;
+const unknown = selected.filter((key) => !(key in TARGETS));
+if (unknown.length > 0) {
+  console.error(
+    `Unknown build target(s): ${unknown.join(", ")}. Valid: ${Object.keys(TARGETS).join(", ")}.`
+  );
+  process.exit(1);
+}
+const entries = selected.map((key) => TARGETS[key]);
 
 await Promise.all(
   entries.map((entry) =>

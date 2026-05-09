@@ -25,7 +25,8 @@ ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
 ENV NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS=$NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS
 
 # Next.js standalone 出力 (.next/standalone) と custom server bundle (dist/server.js) を生成
-RUN npm run build && npm run build:server
+# build-server.mjs に `web` を渡し、worker bundle が image に紛れ込まないようにする
+RUN npm run build && node scripts/build-server.mjs web
 
 FROM base AS runner
 WORKDIR /app

@@ -18,10 +18,9 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json package-lock.json tsconfig.json ./
 COPY scripts/build-server.mjs ./scripts/build-server.mjs
-COPY server.ts ./server.ts
 COPY worker ./worker
 COPY src ./src
-RUN node scripts/build-server.mjs
+RUN node scripts/build-server.mjs worker
 
 # devDependencies を削ぎ落とした production node_modules を作る。
 # `npm prune --omit=dev` は postinstall を再実行しないため、
