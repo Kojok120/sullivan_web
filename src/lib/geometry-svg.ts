@@ -37,6 +37,13 @@ export type GeometryAngleMark = 'arc' | 'right';
 export type GeometryAngle = {
     /** 対象頂点ラベル（vertices に存在すること）。 */
     vertex: string;
+    /**
+     * 角を構成する 2 方向の頂点ラベル。指定時は vertex の neighbor として segments を見ず、
+     * `from`/`to` 方向で角を描く。3 直線交点など、同一頂点に複数の角を独立して描きたい場合に使う。
+     * 旧形式（vertex のみ）では segments から最初に見つかった 2 つの neighbor が使われる。
+     */
+    from?: string;
+    to?: string;
     /** 角を示すマークの種類。 */
     mark: GeometryAngleMark;
     /** 角の中に表示するラベル（角度など）。未指定ならマークだけを描く。 */
@@ -272,19 +279,29 @@ function renderAngleMark(
     const vertex = vertexByLabel.get(angle.vertex);
     if (!vertex) return '';
 
-    const neighbors: GeometryVertex[] = [];
-    for (const seg of segments) {
-        let neighbor: GeometryVertex | undefined;
-        if (seg.from === angle.vertex) neighbor = vertexByLabel.get(seg.to);
-        else if (seg.to === angle.vertex) neighbor = vertexByLabel.get(seg.from);
-        if (neighbor) neighbors.push(neighbor);
-        if (neighbors.length >= 2) break;
+    // from/to 指定時は segments を無視してその 2 頂点で角を描く（3直線交点など）。
+    // 未指定時は従来どおり segments から最初の 2 つの neighbor を使う。
+    let firstNeighbor: GeometryVertex | undefined;
+    let secondNeighbor: GeometryVertex | undefined;
+    if (angle.from && angle.to) {
+        firstNeighbor = vertexByLabel.get(angle.from);
+        secondNeighbor = vertexByLabel.get(angle.to);
+    } else {
+        for (const seg of segments) {
+            let neighbor: GeometryVertex | undefined;
+            if (seg.from === angle.vertex) neighbor = vertexByLabel.get(seg.to);
+            else if (seg.to === angle.vertex) neighbor = vertexByLabel.get(seg.from);
+            if (neighbor) {
+                if (!firstNeighbor) firstNeighbor = neighbor;
+                else if (!secondNeighbor) { secondNeighbor = neighbor; break; }
+            }
+        }
     }
-    if (neighbors.length < 2) return '';
+    if (!firstNeighbor || !secondNeighbor) return '';
 
     const vp = project(vertex.x, vertex.y, transform);
-    const n1 = project(neighbors[0].x, neighbors[0].y, transform);
-    const n2 = project(neighbors[1].x, neighbors[1].y, transform);
+    const n1 = project(firstNeighbor.x, firstNeighbor.y, transform);
+    const n2 = project(secondNeighbor.x, secondNeighbor.y, transform);
 
     const v1x = n1.sx - vp.sx;
     const v1y = n1.sy - vp.sy;
@@ -396,9 +413,45 @@ function parseAngles(input: string, vertices: GeometryVertex[]): GeometryAngle[]
     for (const item of items) {
         const parts = item.split(':').map((s) => s.trim());
         if (parts.length === 0 || parts.length > 3) return null;
-        const vertex = parts[0];
-        if (!vertex || !labelSet.has(vertex) || seen.has(vertex)) return null;
-        seen.add(vertex);
+
+        // vertex 部分は `V` か `V/from-to` の 2 形式。後者は同一頂点に複数角を許可する。
+        // 既存データに `/` を含む頂点ラベルが残っているケースを壊さないため、
+        // 「`V` 部分が既知ラベル、かつ `from-to` の両ラベルも既知ラベル」を満たすときだけ
+        // 新構文として解釈する。それ以外は head 全体を頂点ラベルとして扱う。
+        const head = parts[0];
+        if (!head) return null;
+        let vertex = head;
+        let from: string | undefined;
+        let to: string | undefined;
+        const slash = head.indexOf('/');
+        if (slash > 0 && slash < head.length - 1 && head.indexOf('/', slash + 1) === -1) {
+            const candidateVertex = head.slice(0, slash).trim();
+            const fromTo = head.slice(slash + 1).trim();
+            const dash = fromTo.indexOf('-');
+            if (dash > 0 && dash < fromTo.length - 1) {
+                const candidateFrom = fromTo.slice(0, dash).trim();
+                const candidateTo = fromTo.slice(dash + 1).trim();
+                if (
+                    candidateFrom &&
+                    candidateTo &&
+                    candidateFrom !== candidateTo &&
+                    labelSet.has(candidateVertex) &&
+                    labelSet.has(candidateFrom) &&
+                    labelSet.has(candidateTo)
+                ) {
+                    vertex = candidateVertex;
+                    from = candidateFrom;
+                    to = candidateTo;
+                }
+            }
+        }
+        if (!vertex || !labelSet.has(vertex)) return null;
+
+        // seen キーは vertex 単体（旧形式）または `V|from-to`（新形式）。
+        // 新形式は方向ごとに 1 個までで、旧形式と新形式は別キー扱い。
+        const seenKey = from && to ? `${vertex}|${from}-${to}` : vertex;
+        if (seen.has(seenKey)) return null;
+        seen.add(seenKey);
 
         let mark: GeometryAngleMark = 'arc';
         let label: string | undefined;
@@ -417,6 +470,10 @@ function parseAngles(input: string, vertices: GeometryVertex[]): GeometryAngle[]
         }
 
         const entry: GeometryAngle = { vertex, mark };
+        if (from && to) {
+            entry.from = from;
+            entry.to = to;
+        }
         if (label) entry.label = label;
         angles.push(entry);
     }
@@ -528,7 +585,8 @@ function summarizeGeometry(opts: GeometryOptions): string {
     if (opts.angles && opts.angles.length > 0) {
         lines.push(`角: ${opts.angles.map((a) => {
             const mark = a.mark === 'right' ? '直角' : '弧';
-            return a.label ? `${a.vertex}(${mark}, ${a.label})` : `${a.vertex}(${mark})`;
+            const head = a.from && a.to ? `${a.vertex}(${a.from}-${a.to})` : a.vertex;
+            return a.label ? `${head}(${mark}, ${a.label})` : `${head}(${mark})`;
         }).join(', ')}`);
     }
     if (opts.circles.length > 0) {
@@ -562,7 +620,9 @@ export function buildGeometryDirective(opts: GeometryOptions): string {
     if (opts.angles && opts.angles.length > 0) {
         const angleStr = opts.angles
             .map((a) => {
-                const v = escapeForAttr(a.vertex);
+                const v = a.from && a.to
+                    ? `${escapeForAttr(a.vertex)}/${escapeForAttr(a.from)}-${escapeForAttr(a.to)}`
+                    : escapeForAttr(a.vertex);
                 if (a.mark === 'right' && a.label) return `${v}:right:${escapeForAttr(a.label)}`;
                 if (a.mark === 'right') return `${v}:right`;
                 if (a.label) return `${v}:${escapeForAttr(a.label)}`;
