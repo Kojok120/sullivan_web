@@ -24,7 +24,9 @@ ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
 ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
 ENV NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS=$NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS
 
-RUN npm run build
+# Next.js standalone 出力 (.next/standalone) と custom server bundle (dist/server.js) を生成
+# build-server.mjs に `web` を渡し、worker bundle が image に紛れ込まないようにする
+RUN npm run build && node scripts/build-server.mjs web
 
 FROM base AS runner
 WORKDIR /app
@@ -43,20 +45,21 @@ RUN adduser --system --uid 1001 nextjs
 RUN mkdir -p /home/nextjs /tmp/.chromium-config /tmp/.chromium-cache /tmp/.chromium-data /tmp/.chromium-user-data /tmp/.chromium-crashpad \
     && chown -R nextjs:nodejs /home/nextjs /tmp/.chromium-config /tmp/.chromium-cache /tmp/.chromium-data /tmp/.chromium-user-data /tmp/.chromium-crashpad
 
-COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
-COPY --from=builder --chown=nextjs:nodejs /app/tsconfig.json ./tsconfig.json
-COPY --from=builder --chown=nextjs:nodejs /app/next.config.ts ./next.config.ts
-COPY --from=builder --chown=nextjs:nodejs /app/server.ts ./server.ts
+# standalone 本体（trace 済みの最小 node_modules + .next/server 等）を /app 直下に展開
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+# .next/static は standalone に含まれないので個別に同梱
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/src ./src
-COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
+# bundle した custom server
+COPY --from=builder --chown=nextjs:nodejs /app/dist ./dist
+# instructions/ は runtime に process.cwd()/instructions で読まれる
 COPY --from=builder --chown=nextjs:nodejs /app/instructions ./instructions
-COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
+# scripts/qr_reader.py は grading-service が実行する
+COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
 
 USER nextjs
 
 EXPOSE 8080
 ENV BIND_HOST="0.0.0.0"
 
-CMD ["npm", "run", "start"]
+CMD ["node", "dist/server.js"]

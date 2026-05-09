@@ -2,11 +2,32 @@ ARG WORKER_BASE_IMAGE
 
 FROM ${WORKER_BASE_IMAGE} AS base
 
+# 全 dependencies をインストールして Prisma client を生成する。
+# postinstall: `prisma generate` は devDependencies の prisma CLI を必要とするため、
+# ここでは --omit=dev せず full install で行う。後段で prune して prod 依存だけに絞る。
 FROM base AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY prisma ./prisma
 RUN npm ci
+
+# esbuild で worker/server.ts を dist/worker.js に bundle する。
+# 依存は packages=external のままなので、runner の node_modules で解決する。
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json package-lock.json tsconfig.json ./
+COPY scripts/build-server.mjs ./scripts/build-server.mjs
+COPY worker ./worker
+COPY src ./src
+RUN node scripts/build-server.mjs worker
+
+# devDependencies を削ぎ落とした production node_modules を作る。
+# `npm prune --omit=dev` は postinstall を再実行しないため、
+# deps stage で生成済みの Prisma client (node_modules/.prisma, @prisma/client) は維持される。
+FROM deps AS prod-deps
+WORKDIR /app
+RUN npm prune --omit=dev
 
 FROM base AS runner
 WORKDIR /app
@@ -17,13 +38,16 @@ ENV NODE_OPTIONS="--max-old-space-size=2048"
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 worker
 
-COPY --from=deps --chown=worker:nodejs /app/node_modules ./node_modules
-COPY --chown=worker:nodejs package.json ./package.json
-COPY --chown=worker:nodejs tsconfig.json ./tsconfig.json
-COPY --chown=worker:nodejs worker ./worker
-COPY --chown=worker:nodejs src ./src
+# production 依存のみの node_modules（Prisma 生成物含む）
+COPY --from=prod-deps --chown=worker:nodejs /app/node_modules ./node_modules
+# bundle した worker
+COPY --from=builder --chown=worker:nodejs /app/dist ./dist
+# qr_reader.py など runtime に process.cwd()/scripts から起動するもの
 COPY --chown=worker:nodejs scripts ./scripts
+# instruction-prompt.ts が process.cwd()/instructions から読む
 COPY --chown=worker:nodejs instructions ./instructions
+# Node の module resolution と運用上の参照用に最小限同梱
+COPY --chown=worker:nodejs package.json ./package.json
 
 USER worker
 
@@ -32,4 +56,4 @@ ENV BIND_HOST="0.0.0.0"
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD node -e "const req=require('http').get('http://127.0.0.1:8080/healthz',r=>process.exit(r.statusCode===200?0:1));req.on('error',()=>process.exit(1));req.setTimeout(4000,()=>{req.destroy();process.exit(1);});"
 
-CMD ["npm", "run", "start:worker"]
+CMD ["node", "dist/worker.js"]

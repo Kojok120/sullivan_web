@@ -30,13 +30,20 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-
-      - name: 依存関係インストール
-        run: npm ci
 
       - name: Prisma マイグレーション実行
-        run: npx prisma migrate deploy
+        # `prisma migrate deploy` は CLI のみで動くため、prod 用の依存全体をインストールせず
+        # package.json の prisma / dotenv バージョンをピンして必要最小限のみ追加インストールする。
+        # SemVer 接頭辞 (^, ~ 等) を剥がして範囲解決にならないよう exact pin する。
+        # npx の -p ではなく `npm install --no-save` で project の node_modules に置くのは、
+        # prisma.config.ts の `import "dotenv/config"` を Node の resolution が cwd から辿れるようにするため。
+        # postinstall (prisma generate) は migrate には不要なので --ignore-scripts でスキップする
+        run: |
+          PRISMA_VERSION="$(node -p "((require('./package.json').devDependencies.prisma) || (require('./package.json').dependencies.prisma)).replace(/^[\^~>=<]+/, '')")"
+          DOTENV_VERSION="$(node -p "((require('./package.json').dependencies.dotenv) || (require('./package.json').devDependencies.dotenv)).replace(/^[\^~>=<]+/, '')")"
+          npm install --no-save --no-audit --no-fund --ignore-scripts \
+            "prisma@${PRISMA_VERSION}" "dotenv@${DOTENV_VERSION}"
+          ./node_modules/.bin/prisma migrate deploy
 
   deploy-grading-worker:
     name: Deploy Grading Worker (DEV)
@@ -133,7 +140,9 @@ jobs:
     name: Deploy Web App (DEV)
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: [migrate-db, deploy-grading-worker]
+    # web は worker のビルド成果物に依存しない（worker URL は gcloud describe で解決）。
+    # クリティカルパス短縮のため worker と並列に走らせる
+    needs: [migrate-db]
     environment: dev
     permissions:
       contents: read
