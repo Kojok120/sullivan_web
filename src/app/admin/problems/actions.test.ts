@@ -327,6 +327,80 @@ describe('problem actions permissions', () => {
         expect(result).toEqual({ success: true, problemId: 'problem-1', revisionId: 'draft-1' });
     });
 
+    it('createProblemDraft は公開リビジョンが無い問題では legacy フィールド (question/answer/acceptedAnswers) を下書きと同期する', async () => {
+        coreProblemFindManyMock.mockResolvedValueOnce([
+            { id: 'core-1', subjectId: 'subject-math' },
+        ]);
+        subjectFindUniqueMock.mockResolvedValueOnce({ name: '数学' });
+        // publishedRevisionId が null = 未公開の下書き専用問題
+        txProblemFindUniqueMock.mockResolvedValueOnce({
+            videoUrl: null,
+            videoStatus: 'NONE',
+            publishedRevisionId: null,
+        });
+        txProblemUpdateMock.mockResolvedValueOnce({ id: 'problem-1' });
+        txProblemRevisionFindFirstMock.mockResolvedValueOnce({ id: 'draft-1' });
+        txProblemRevisionUpdateMock.mockResolvedValueOnce({ id: 'draft-1' });
+        deriveLegacyFieldsFromStructuredDataMock.mockReturnValueOnce({
+            question: '下書きの問題文',
+            answer: '下書きの正解',
+            acceptedAnswers: ['許容1'],
+        });
+
+        await createProblemDraft({
+            problemId: 'problem-1',
+            problemType: 'SHORT_TEXT',
+            grade: '中1',
+            coreProblemIds: ['core-1'],
+            document: { blocks: [] },
+            answerSpec: { correctAnswer: '下書きの正解', acceptedAnswers: ['許容1'] },
+            printConfig: {},
+        });
+
+        const data = txProblemUpdateMock.mock.calls[0][0].data;
+        expect(data).toMatchObject({
+            question: '下書きの問題文',
+            answer: '下書きの正解',
+            acceptedAnswers: ['許容1'],
+        });
+    });
+
+    it('createProblemDraft は公開済み問題の下書き保存で legacy フィールドを上書きしない (配布済みプリント採点保護)', async () => {
+        coreProblemFindManyMock.mockResolvedValueOnce([
+            { id: 'core-1', subjectId: 'subject-math' },
+        ]);
+        subjectFindUniqueMock.mockResolvedValueOnce({ name: '数学' });
+        // publishedRevisionId がある = 既に公開済み。下書き保存しても legacy フィールドは公開時のまま保持
+        txProblemFindUniqueMock.mockResolvedValueOnce({
+            videoUrl: null,
+            videoStatus: 'NONE',
+            publishedRevisionId: 'pubrev-1',
+        });
+        txProblemUpdateMock.mockResolvedValueOnce({ id: 'problem-1' });
+        txProblemRevisionFindFirstMock.mockResolvedValueOnce({ id: 'draft-1' });
+        txProblemRevisionUpdateMock.mockResolvedValueOnce({ id: 'draft-1' });
+        deriveLegacyFieldsFromStructuredDataMock.mockReturnValueOnce({
+            question: '更新中の下書き',
+            answer: '更新中の正解',
+            acceptedAnswers: ['更新中の許容'],
+        });
+
+        await createProblemDraft({
+            problemId: 'problem-1',
+            problemType: 'SHORT_TEXT',
+            grade: '中1',
+            coreProblemIds: ['core-1'],
+            document: { blocks: [] },
+            answerSpec: { correctAnswer: '更新中の正解', acceptedAnswers: ['更新中の許容'] },
+            printConfig: {},
+        });
+
+        const data = txProblemUpdateMock.mock.calls[0][0].data;
+        expect(data).not.toHaveProperty('question');
+        expect(data).not.toHaveProperty('answer');
+        expect(data).not.toHaveProperty('acceptedAnswers');
+    });
+
     it('deleteStandaloneProblem は引き続き admin 権限が必要', async () => {
         deleteProblemsWithRelationsMock.mockResolvedValueOnce(1);
 
