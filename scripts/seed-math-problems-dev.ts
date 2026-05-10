@@ -431,10 +431,9 @@ async function createProblemRevision(
         ],
     };
 
-    const answerSpec = {
-        correctAnswer: def.answer ?? '',
-        acceptedAnswers: def.acceptedAnswers ?? [],
-    };
+    // Stage B' 以降、正解情報は ProblemRevision 専用カラムに保存し、
+    // answerSpec JSON は answerTemplate などの DSL 専用に縮小する。
+    const answerSpec: Record<string, never> = {};
 
     // GeoGebra 連携を廃止したため、def.figure は seed では使わない。
     // 図版が必要な問題は admin UI で [[geometry]] / [[coordplane]] / [[numberline]] DSL に
@@ -446,6 +445,8 @@ async function createProblemRevision(
             status: 'DRAFT',
             structuredContent: document as unknown as Prisma.InputJsonValue,
             answerSpec: answerSpec as unknown as Prisma.InputJsonValue,
+            correctAnswer: def.answer ?? null,
+            acceptedAnswers: def.acceptedAnswers ?? [],
             printConfig: draft.printConfig as unknown as Prisma.InputJsonValue,
             authoringTool: 'MANUAL',
             authoringState: Prisma.JsonNull,

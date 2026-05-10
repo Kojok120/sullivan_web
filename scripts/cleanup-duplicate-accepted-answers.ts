@@ -1,6 +1,6 @@
 /**
- * Problem.acceptedAnswers および ProblemRevision.answerSpec.acceptedAnswers から、
- * 正解（Problem.answer / answerSpec.correctAnswer）と一致する別解、
+ * Problem.acceptedAnswers および ProblemRevision.acceptedAnswers (Stage B' で追加した専用カラム) から、
+ * 正解（Problem.answer / ProblemRevision.correctAnswer）と一致する別解、
  * および同一配列内の重複を取り除くワンショットスクリプト。
  *
  * 背景: 過去データに「別解」として正解と全く同じ値が登録されているレコードが残っており、
@@ -8,8 +8,7 @@
  *
  * - 値が変わるレコードのみ更新する
  * - 冪等（再実行しても結果が同じ）
- * - Problem.answer / Problem.acceptedAnswers と ProblemRevision.answerSpec の双方を見る
- * - answerSpec パースに失敗したリビジョンはスキップしてログのみ残す
+ * - Problem.answer / Problem.acceptedAnswers と ProblemRevision.correctAnswer / acceptedAnswers の双方を見る
  *
  * 使い方:
  *   tsx scripts/cleanup-duplicate-accepted-answers.ts                # 確認プロンプトあり
@@ -21,7 +20,6 @@
  */
 
 import 'dotenv/config';
-import { Prisma } from '@prisma/client';
 import { config as loadDotenv } from 'dotenv';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -105,30 +103,6 @@ function dedupeAcceptedAnswers(
     return { values, changed };
 }
 
-interface AnswerSpecLike {
-    correctAnswer: string;
-    acceptedAnswers: string[];
-    answerTemplate?: string;
-}
-
-/**
- * answerSpec を緩く読む（zodパースは使わない）。失敗時は null。
- */
-function readAnswerSpec(raw: unknown): AnswerSpecLike | null {
-    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-    const obj = raw as Record<string, unknown>;
-    const correctAnswer = typeof obj.correctAnswer === 'string' ? obj.correctAnswer : '';
-    const acceptedAnswersRaw = obj.acceptedAnswers;
-    if (!Array.isArray(acceptedAnswersRaw)) return null;
-    const acceptedAnswers: string[] = [];
-    for (const item of acceptedAnswersRaw) {
-        if (typeof item !== 'string') return null;
-        acceptedAnswers.push(item);
-    }
-    const answerTemplate = typeof obj.answerTemplate === 'string' ? obj.answerTemplate : undefined;
-    return { correctAnswer, acceptedAnswers, answerTemplate };
-}
-
 function previewArray(values: readonly string[], limit = 5): string {
     const head = values.slice(0, limit).map((value) => JSON.stringify(value)).join(', ');
     const suffix = values.length > limit ? `, …(+${values.length - limit})` : '';
@@ -153,7 +127,8 @@ async function main() {
                     select: {
                         id: true,
                         revisionNumber: true,
-                        answerSpec: true,
+                        correctAnswer: true,
+                        acceptedAnswers: true,
                     },
                 },
             },
@@ -172,14 +147,10 @@ async function main() {
             revisionNumber: number;
             beforeAccepted: readonly string[];
             afterAccepted: string[];
-            // 既知キー（correctAnswer / acceptedAnswers / answerTemplate）以外が将来追加された場合でも
-            // 黙って落とさないように、生の answerSpec をそのまま保持する。
-            rawAnswerSpec: Record<string, unknown>;
         };
 
         const problemUpdates: ProblemUpdate[] = [];
         const revisionUpdates: RevisionUpdate[] = [];
-        let parseFailures = 0;
 
         for (const problem of problems) {
             const correctAnswer = problem.answer ?? '';
@@ -194,32 +165,15 @@ async function main() {
             }
 
             for (const revision of problem.revisions) {
-                if (revision.answerSpec === null || revision.answerSpec === undefined) continue;
-                const rawSpec = revision.answerSpec;
-                if (typeof rawSpec !== 'object' || Array.isArray(rawSpec)) {
-                    parseFailures += 1;
-                    console.warn(
-                        `[skip] revision ${revision.id} (problem ${problem.customId} #${revision.revisionNumber}) の answerSpec が object ではありません`,
-                    );
-                    continue;
-                }
-                const spec = readAnswerSpec(rawSpec);
-                if (!spec) {
-                    parseFailures += 1;
-                    console.warn(
-                        `[skip] revision ${revision.id} (problem ${problem.customId} #${revision.revisionNumber}) の answerSpec をパースできません`,
-                    );
-                    continue;
-                }
-                const dedupedSpec = dedupeAcceptedAnswers(spec.acceptedAnswers, spec.correctAnswer);
+                const revCorrect = revision.correctAnswer ?? '';
+                const dedupedSpec = dedupeAcceptedAnswers(revision.acceptedAnswers, revCorrect);
                 if (dedupedSpec.changed) {
                     revisionUpdates.push({
                         id: revision.id,
                         problemCustomId: problem.customId,
                         revisionNumber: revision.revisionNumber,
-                        beforeAccepted: spec.acceptedAnswers,
+                        beforeAccepted: revision.acceptedAnswers,
                         afterAccepted: dedupedSpec.values,
-                        rawAnswerSpec: rawSpec as Record<string, unknown>,
                     });
                 }
             }
@@ -227,10 +181,7 @@ async function main() {
 
         console.log(`\n総 problem: ${problems.length} 件`);
         console.log(`Problem.acceptedAnswers 修正対象: ${problemUpdates.length} 件`);
-        console.log(`ProblemRevision.answerSpec 修正対象: ${revisionUpdates.length} 件`);
-        if (parseFailures > 0) {
-            console.log(`answerSpec パース失敗（スキップ）: ${parseFailures} 件`);
-        }
+        console.log(`ProblemRevision.acceptedAnswers 修正対象: ${revisionUpdates.length} 件`);
 
         const sampleSize = 5;
         if (problemUpdates.length > 0) {
@@ -279,15 +230,9 @@ async function main() {
 
         let processedRevisions = 0;
         for (const update of revisionUpdates) {
-            // 既存の answerSpec を保持し、acceptedAnswers のみを差し替える。
-            // 既知キー以外の未知キーが含まれている場合でも落とさないため。
-            const nextSpec: Record<string, unknown> = {
-                ...update.rawAnswerSpec,
-                acceptedAnswers: update.afterAccepted,
-            };
             await prisma.problemRevision.update({
                 where: { id: update.id },
-                data: { answerSpec: nextSpec as Prisma.InputJsonValue },
+                data: { acceptedAnswers: { set: update.afterAccepted } },
             });
             processedRevisions += 1;
             if (processedRevisions % 200 === 0) {

@@ -16,6 +16,7 @@ const {
     parseAnswerSpecMock,
     parsePrintConfigMock,
     normalizeAnswerSpecForAuthoringMock,
+    normalizeAnswerForAuthoringMock,
     deriveLegacyFieldsFromStructuredDataMock,
     txProblemCreateMock,
     txProblemUpdateMock,
@@ -39,6 +40,7 @@ const {
     parseAnswerSpecMock: vi.fn(),
     parsePrintConfigMock: vi.fn(),
     normalizeAnswerSpecForAuthoringMock: vi.fn(),
+    normalizeAnswerForAuthoringMock: vi.fn(),
     deriveLegacyFieldsFromStructuredDataMock: vi.fn(),
     txProblemCreateMock: vi.fn(),
     txProblemUpdateMock: vi.fn(),
@@ -87,6 +89,7 @@ vi.mock('@/lib/structured-problem', () => ({
     buildDefaultStructuredDraft: vi.fn(),
     deriveLegacyFieldsFromStructuredData: deriveLegacyFieldsFromStructuredDataMock,
     normalizeAnswerSpecForAuthoring: normalizeAnswerSpecForAuthoringMock,
+    normalizeAnswerForAuthoring: normalizeAnswerForAuthoringMock,
     parseAnswerSpec: parseAnswerSpecMock,
     parsePrintConfig: parsePrintConfigMock,
     parseStructuredDocument: parseStructuredDocumentMock,
@@ -125,6 +128,12 @@ describe('problem actions permissions', () => {
         parseAnswerSpecMock.mockImplementation((value) => value);
         parsePrintConfigMock.mockImplementation((value) => value);
         normalizeAnswerSpecForAuthoringMock.mockImplementation((value) => value);
+        normalizeAnswerForAuthoringMock.mockImplementation(({ correctAnswer, acceptedAnswers }) => ({
+            correctAnswer: typeof correctAnswer === 'string' ? correctAnswer.trim() : '',
+            acceptedAnswers: Array.isArray(acceptedAnswers)
+                ? acceptedAnswers.filter((v: unknown): v is string => typeof v === 'string')
+                : [],
+        }));
         deriveLegacyFieldsFromStructuredDataMock.mockReturnValue({
             question: '構造化問題',
             answer: '答え',
@@ -268,8 +277,10 @@ describe('problem actions permissions', () => {
             videoUrl: 'https://example.com/video',
             coreProblemIds: ['core-1'],
             document: { blocks: [] },
-            answerSpec: { correctAnswer: '', acceptedAnswers: [] },
+            answerSpec: {},
             printConfig: {},
+            correctAnswer: '',
+            acceptedAnswers: [],
         });
 
         expect(txProblemCreateMock).toHaveBeenCalledOnce();
@@ -293,8 +304,10 @@ describe('problem actions permissions', () => {
             grade: '中1',
             coreProblemIds: ['core-1'],
             document: { blocks: [] },
-            answerSpec: { correctAnswer: '', acceptedAnswers: [] },
+            answerSpec: {},
             printConfig: {},
+            correctAnswer: '',
+            acceptedAnswers: [],
         });
 
         expect(txProblemUpdateMock).toHaveBeenCalledOnce();
@@ -318,8 +331,10 @@ describe('problem actions permissions', () => {
             grade: '中1',
             coreProblemIds: ['core-1'],
             document: { blocks: [] },
-            answerSpec: { correctAnswer: '', acceptedAnswers: [] },
+            answerSpec: {},
             printConfig: {},
+            correctAnswer: '',
+            acceptedAnswers: [],
         });
 
         expect(txProblemUpdateMock).toHaveBeenCalledOnce();
@@ -353,14 +368,23 @@ describe('problem actions permissions', () => {
             grade: '中1',
             coreProblemIds: ['core-1'],
             document: { blocks: [] },
-            answerSpec: { correctAnswer: '下書きの正解', acceptedAnswers: ['許容1'] },
+            answerSpec: {},
             printConfig: {},
+            correctAnswer: '下書きの正解',
+            acceptedAnswers: ['許容1'],
         });
 
         const data = txProblemUpdateMock.mock.calls[0][0].data;
         expect(data).toMatchObject({
             question: '下書きの問題文',
             answer: '下書きの正解',
+            acceptedAnswers: ['許容1'],
+        });
+
+        // ProblemRevision の専用カラムにも書き込まれること (Stage B')
+        const revisionData = txProblemRevisionUpdateMock.mock.calls[0][0].data;
+        expect(revisionData).toMatchObject({
+            correctAnswer: '下書きの正解',
             acceptedAnswers: ['許容1'],
         });
     });
@@ -391,14 +415,23 @@ describe('problem actions permissions', () => {
             grade: '中1',
             coreProblemIds: ['core-1'],
             document: { blocks: [] },
-            answerSpec: { correctAnswer: '更新中の正解', acceptedAnswers: ['更新中の許容'] },
+            answerSpec: {},
             printConfig: {},
+            correctAnswer: '更新中の正解',
+            acceptedAnswers: ['更新中の許容'],
         });
 
         const data = txProblemUpdateMock.mock.calls[0][0].data;
         expect(data).not.toHaveProperty('question');
         expect(data).not.toHaveProperty('answer');
         expect(data).not.toHaveProperty('acceptedAnswers');
+
+        // ただし ProblemRevision (下書き側) には新しい正解情報が書かれること (Stage B')
+        const revisionData = txProblemRevisionUpdateMock.mock.calls[0][0].data;
+        expect(revisionData).toMatchObject({
+            correctAnswer: '更新中の正解',
+            acceptedAnswers: ['更新中の許容'],
+        });
     });
 
     it('deleteStandaloneProblem は引き続き admin 権限が必要', async () => {

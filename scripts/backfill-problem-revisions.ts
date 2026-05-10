@@ -275,10 +275,9 @@ async function main() {
                     },
                 ],
             };
-            const answerSpec = {
-                correctAnswer: p.answer ?? '',
-                acceptedAnswers: p.acceptedAnswers ?? [],
-            };
+            // Stage B' 以降、正解情報は revision 専用カラムに保存し、
+            // answerSpec JSON は answerTemplate のみを保持する形に縮小済み。
+            const answerSpec: Record<string, never> = {};
 
             // 1 問題分の revision 作成/更新と problem.contentFormat 更新は 1 単位で
             // 成功/失敗すべき。途中失敗で問題本体だけ STRUCTURED_V1 に切り替わると
@@ -292,6 +291,8 @@ async function main() {
                         data: {
                             structuredContent: document as unknown as Prisma.InputJsonValue,
                             answerSpec: answerSpec as unknown as Prisma.InputJsonValue,
+                            correctAnswer: p.answer ?? null,
+                            acceptedAnswers: { set: p.acceptedAnswers ?? [] },
                         },
                     });
                 } else {
@@ -307,6 +308,8 @@ async function main() {
                             status: 'DRAFT',
                             structuredContent: document as unknown as Prisma.InputJsonValue,
                             answerSpec: answerSpec as unknown as Prisma.InputJsonValue,
+                            correctAnswer: p.answer ?? null,
+                            acceptedAnswers: p.acceptedAnswers ?? [],
                             printConfig: draft.printConfig as unknown as Prisma.InputJsonValue,
                             authoringTool: 'MANUAL',
                         },

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
     buildAiProblemText,
     collectStructuredDocumentAssetIds,
-    normalizeAnswerSpecForAi,
+    normalizeAnswerForAuthoring,
     normalizeAnswerSpecForAuthoring,
     parseAnswerSpec,
     parseStructuredDocument,
@@ -51,63 +51,55 @@ describe('structured-problem', () => {
         ]);
     });
 
-    it('answerSpec を AI 採点向けの正解/別解へ正規化する', () => {
-        expect(normalizeAnswerSpecForAi({
-            correctAnswer: 'B',
-            acceptedAnswers: [],
-        })).toEqual({
-            referenceAnswer: 'B',
-            alternativeAnswers: [],
-        });
-
-        expect(normalizeAnswerSpecForAi({
-            correctAnswer: '水',
-            acceptedAnswers: ['みず', ' 水 '],
-        })).toEqual({
-            referenceAnswer: '水',
-            alternativeAnswers: ['みず', '水'],
-        });
-    });
-
-    it('authoring 向け answerSpec を trim 済みの最小形へ寄せる', () => {
-        expect(normalizeAnswerSpecForAuthoring({
+    it('Stage B\': 正解情報は normalizeAnswerForAuthoring で trim & 重複排除される', () => {
+        expect(normalizeAnswerForAuthoring({
             correctAnswer: '  蒸散で温度調節をする。 ',
             acceptedAnswers: [' 蒸散 ', '', '蒸散'],
         })).toEqual({
             correctAnswer: '蒸散で温度調節をする。',
             acceptedAnswers: ['蒸散'],
-            answerTemplate: undefined,
         });
     });
 
-    it('authoring 向け answerSpec で解答欄テンプレートも trim される', () => {
-        expect(normalizeAnswerSpecForAuthoring({
-            correctAnswer: 'A:3,B:-1',
+    it('Stage B\': normalizeAnswerForAuthoring は null/undefined を空値として扱う', () => {
+        expect(normalizeAnswerForAuthoring({
+            correctAnswer: null,
+            acceptedAnswers: undefined,
+        })).toEqual({
+            correctAnswer: '',
             acceptedAnswers: [],
+        });
+    });
+
+    it('authoring 向け answerSpec は answerTemplate のみ保持する (Stage B\' で正解情報は分離)', () => {
+        expect(normalizeAnswerSpecForAuthoring({
             answerTemplate: '  [[numberline min=-5 max=5]]  ',
         })).toEqual({
-            correctAnswer: 'A:3,B:-1',
-            acceptedAnswers: [],
             answerTemplate: '[[numberline min=-5 max=5]]',
         });
     });
 
-    it('answerSpec は正解・別解配列・解答欄テンプレートを受け付ける', () => {
-        expect(parseAnswerSpec({
-            correctAnswer: '20',
-            acceptedAnswers: ['20cm^2'],
+    it('authoring 向け answerSpec で空テンプレートは undefined に寄せる', () => {
+        expect(normalizeAnswerSpecForAuthoring({
+            answerTemplate: '   ',
         })).toEqual({
-            correctAnswer: '20',
-            acceptedAnswers: ['20cm^2'],
+            answerTemplate: undefined,
         });
     });
 
-    it('legacy な余計なキーを含む answerSpec は受け付けない', () => {
-        expect(() => parseAnswerSpec({
-            kind: 'choice',
+    it('legacy DB の answerSpec (correctAnswer / acceptedAnswers キー含む) を passthrough で読める', () => {
+        // Stage B' 移行直後は既存 DB 行に旧キーが残るため、parse はエラーにしない方針。
+        // ただし normalizeAnswerSpecForAuthoring を通すと旧キーは破棄される。
+        const parsed = parseAnswerSpec({
             correctAnswer: '20',
             acceptedAnswers: ['20cm^2'],
-        })).toThrow();
+            answerTemplate: '[[numberline]]',
+        });
+        // passthrough なので未知キーは型としては素通り
+        expect(parsed.answerTemplate).toBe('[[numberline]]');
+        expect(normalizeAnswerSpecForAuthoring(parsed)).toEqual({
+            answerTemplate: '[[numberline]]',
+        });
     });
 
     it('AI 向け problemText に表や選択肢や空欄情報を含め、参照 asset を集める', () => {
