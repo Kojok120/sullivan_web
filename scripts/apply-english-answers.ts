@@ -1,21 +1,24 @@
 /**
- * batch-XXX.reviewed.json から approved アイテムを集約し、DB の
- * ProblemRevision.correctAnswer と Problem.answer に **同一トランザクションで**
- * 書き込む。flagged 系は CSV に出力し人間判断対象として残す。
+ * batch-XXX.reviewed.json から approved アイテムを集約し、DB に書き込む。
+ * flagged 系は CSV に出力し人間判断対象として残す。
  *
- * なぜ両カラムを同時に書くか:
- *   publish フロー (src/app/admin/problems/actions.ts:664-673) は
- *   ProblemRevision.correctAnswer から Problem.answer を派生する片方向同期で
- *   ある。Problem.answer のみ update しても、次回 publish で必ず上書きされる。
- *   さらに片方が空のまま update すると audit-problem-answer-sync.ts で
- *   divergence として検出される。
+ * 書き込み経路（item.revisionId の有無で分岐）:
+ *   - revisionId === null  → Problem.answer のみ update
+ *     * publishedRevision を持たない問題（PROD/DEV 英語の 99.9%）が該当。
+ *       publish フローを通っていない＝Problem.answer が単独 canonical のため、
+ *       Problem.answer の更新で完結する。
+ *   - revisionId !== null  → ProblemRevision.correctAnswer と Problem.answer を
+ *     同一トランザクションで両方 update
+ *     * publish フロー (src/app/admin/problems/actions.ts:664-673) は
+ *       correctAnswer から answer を派生する片方向同期。Problem.answer 単独 update
+ *       では次回 publish で上書きされる。両カラム同時 update が必要。
  *
  * 安全装置:
  *   - --dry-run がデフォルト（明示的に --yes を指定しない限り書き込まない）
  *   - 1 件ごとに独立トランザクション（CLAUDE.md の Prisma 原則: 短く保つ）
- *   - race-condition guard: 書き込み直前に両カラムが空であることを再確認
- *   - publishedRevisionId が変わっていないかも確認（reseed 等で revision が
- *     差し替わっている問題は触らない）
+ *   - race-condition guard: 書き込み直前に該当カラムが空であることを再確認
+ *   - publishedRevisionId が変わっていないか確認（抽出時 null だったものに
+ *     revision が付与された / その逆 などは触らない）
  *
  * 使い方:
  *   tsx scripts/apply-english-answers.ts --env dev --dry-run     # default
@@ -46,7 +49,7 @@ interface CliOptions {
 
 interface ReviewedItem {
     problemId: string;
-    revisionId: string;
+    revisionId: string | null;
     customId: string;
     approvedAnswer: string;
     verdict: Verdict;
@@ -268,10 +271,24 @@ async function main() {
                     }
                     if (current.publishedRevisionId !== item.revisionId) {
                         throw new Error(
-                            `publishedRevisionId が変わっています: expected=${item.revisionId} actual=${current.publishedRevisionId ?? 'null'}`,
+                            `publishedRevisionId が変わっています: expected=${item.revisionId ?? 'null'} actual=${current.publishedRevisionId ?? 'null'}`,
                         );
                     }
                     const probEmpty = (current.answer ?? '').trim() === '';
+
+                    if (item.revisionId === null) {
+                        // 経路 A: Problem.answer のみ update
+                        if (!probEmpty) {
+                            throw new Error('SKIP_RACE');
+                        }
+                        await tx.problem.update({
+                            where: { id: item.problemId },
+                            data: { answer: trimmed },
+                        });
+                        return;
+                    }
+
+                    // 経路 B: ProblemRevision.correctAnswer と Problem.answer を同時 update
                     const revEmpty = (current.publishedRevision?.correctAnswer ?? '').trim() === '';
                     if (!probEmpty || !revEmpty) {
                         throw new Error('SKIP_RACE');

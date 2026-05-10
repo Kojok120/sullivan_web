@@ -10,12 +10,18 @@
  * 抽出条件:
  *   - subject.name = '英語'
  *   - status = 'PUBLISHED'
- *   - publishedRevisionId が NOT NULL
- *   - Problem.answer が NULL/空 かつ publishedRevision.correctAnswer も NULL/空
- *     （両方が同期して空 = 「未設定で同期済み」状態のみ対象）
+ *   - Problem.answer が NULL/空
  *
- * publish フローは ProblemRevision.correctAnswer から Problem.answer に片方向同期される
- * ため、書き込み時には両カラムを同一トランザクションで update する必要がある（apply 側）。
+ * 実態として PROD/DEV の英語問題は 99.9% が publishedRevisionId = NULL で、
+ * Problem.answer が単独 canonical の状態。残りの僅かな問題（PR #169 以降に
+ * 編集 UI を通った分）は publishedRevisionId を持ち、ProblemRevision.correctAnswer
+ * と同期する必要がある。各アイテムに revisionId を持たせ、apply 側で経路分岐する:
+ *   - revisionId === null → Problem.answer のみ update
+ *   - revisionId !== null → ProblemRevision.correctAnswer と Problem.answer を
+ *     同一トランザクションで両方 update（publish フローの片方向同期に整合）。
+ *
+ * publishedRevisionId が存在し answer と correctAnswer が片方だけ空という divergence
+ * は別タスクとして divergence.json に分離する。
  *
  * 使い方:
  *   tsx scripts/extract-english-unanswered.ts --env dev
@@ -113,7 +119,7 @@ async function loadPrisma() {
 
 interface ExtractedItem {
     problemId: string;
-    revisionId: string;
+    revisionId: string | null;
     customId: string;
     subjectName: string;
     grade: string | null;
@@ -169,14 +175,18 @@ async function main() {
 
     const prisma = await loadPrisma();
     try {
-        // 公開済みの英語問題で publishedRevision を持つものを全件取得し、
-        // 「両方空」「片方のみ空 (= divergence)」「両方埋まっている (= skip)」を JS 側で振り分ける。
-        // Prisma の関連テーブルへの OR 条件は型が複雑になるため、ここでは findMany 後に分類する。
+        // 公開済みの英語問題を全件取得し、JS 側で振り分ける。
+        // PROD/DEV では 99.9% が publishedRevisionId = NULL で Problem.answer が単独 canonical。
+        // 残り僅かは publishedRevisionId を持つので、両カラムの状態で次に分類する:
+        //   - revision なし & answer 空                          → 抽出対象 (revisionId=null)
+        //   - revision なし & answer 埋                          → skip
+        //   - revision あり & 両方空                             → 抽出対象 (revisionId=...)
+        //   - revision あり & 片方のみ空 (divergence)             → 別タスク
+        //   - revision あり & 両方埋                             → skip
         const problems = await prisma.problem.findMany({
             where: {
                 subject: { name: '英語' },
                 status: 'PUBLISHED',
-                publishedRevisionId: { not: null },
             },
             select: {
                 id: true,
@@ -201,13 +211,33 @@ async function main() {
         const targets: ExtractedItem[] = [];
         const divergence: DivergenceItem[] = [];
         let bothFilled = 0;
+        let answeredNoRev = 0;
 
         for (const p of problems) {
             const probAnswer = (p.answer ?? '').trim();
-            const revCorrect = (p.publishedRevision?.correctAnswer ?? '').trim();
-            const revisionId = p.publishedRevision?.id;
-            if (!revisionId) continue;
+            const revisionId = p.publishedRevision?.id ?? null;
 
+            if (revisionId === null) {
+                // revision なしパス: Problem.answer のみで判断
+                if (probAnswer === '') {
+                    targets.push({
+                        problemId: p.id,
+                        revisionId: null,
+                        customId: p.customId,
+                        subjectName: p.subject.name,
+                        grade: p.grade,
+                        masterNumber: p.masterNumber,
+                        question: p.question,
+                        structuredContent: null,
+                    });
+                } else {
+                    answeredNoRev += 1;
+                }
+                continue;
+            }
+
+            // revision ありパス: 両カラムを照合
+            const revCorrect = (p.publishedRevision?.correctAnswer ?? '').trim();
             if (probAnswer === '' && revCorrect === '') {
                 targets.push({
                     problemId: p.id,
@@ -270,11 +300,16 @@ async function main() {
             `${JSON.stringify(manifest, null, 2)}\n`,
         );
 
+        const targetsNoRev = targets.filter((t) => t.revisionId === null).length;
+        const targetsWithRev = targets.length - targetsNoRev;
         console.log('');
         console.log(`[extract] 公開済み英語問題: ${problems.length} 件`);
-        console.log(`[extract]   ├─ 両方空 (対象): ${targets.length}${opts.limit ? ` (--limit ${opts.limit} 適用後 ${limited.length})` : ''}`);
+        console.log(`[extract]   ├─ 抽出対象 (answer 空): ${targets.length}${opts.limit ? ` (--limit ${opts.limit} 適用後 ${limited.length})` : ''}`);
+        console.log(`[extract]   │   ├─ revision なし (Problem.answer 単独 update): ${targetsNoRev}`);
+        console.log(`[extract]   │   └─ revision あり (両カラム同期 update): ${targetsWithRev}`);
         console.log(`[extract]   ├─ divergence (要別タスク): ${divergence.length}`);
-        console.log(`[extract]   └─ 両方埋まっている (skip): ${bothFilled}`);
+        console.log(`[extract]   ├─ revision なし & answer 埋 (skip): ${answeredNoRev}`);
+        console.log(`[extract]   └─ revision あり & 両方埋 (skip): ${bothFilled}`);
         console.log(`[extract] バッチ数: ${batches.length} (size=${opts.batchSize})`);
         console.log(`[extract] 出力先: ${opts.outDir}`);
     } finally {
