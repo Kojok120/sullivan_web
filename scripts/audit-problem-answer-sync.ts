@@ -91,7 +91,7 @@ interface Divergence {
     problemId: string;
     customId: string;
     subject: string;
-    kind: 'correctAnswer' | 'acceptedAnswers' | 'missingCorrectAnswer';
+    kind: 'correctAnswer' | 'acceptedAnswers';
     detail: string;
 }
 
@@ -139,19 +139,10 @@ async function main() {
 
             auditedCount += 1;
 
-            const revisionCorrect = p.publishedRevision?.correctAnswer;
-            if (typeof revisionCorrect !== 'string') {
-                divergences.push({
-                    problemId: p.id,
-                    customId: p.customId,
-                    subject: p.subject.name,
-                    kind: 'missingCorrectAnswer',
-                    detail: 'publishedRevision.correctAnswer が無い',
-                });
-                continue;
-            }
-
-            const specCorrect = revisionCorrect.trim();
+            // null と空文字は「未設定」として等価扱い。両者が一致していれば divergence ではない。
+            // 段階B' の backfill で answerSpec.correctAnswer = '' は revision.correctAnswer = NULL に
+            // マップされるため、Problem.answer が null/空 のときは正常に同期している。
+            const specCorrect = (p.publishedRevision?.correctAnswer ?? '').trim();
             const problemAnswer = (p.answer ?? '').trim();
             if (specCorrect !== problemAnswer) {
                 divergences.push({
