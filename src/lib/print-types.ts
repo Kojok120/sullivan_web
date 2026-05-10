@@ -22,7 +22,6 @@ export type PrintableProblem = {
     question: string;
     order: number;
     problemType?: string;
-    contentFormat?: string;
     status?: string;
     publishedRevisionId?: string | null;
     structuredContent?: StructuredProblemDocument | null;

@@ -379,7 +379,6 @@ async function insertProblems(
                 masterNumber,
                 order,
                 problemType: def.problemType,
-                contentFormat: 'STRUCTURED_V1',
                 hasStructuredContent: true,
                 status: 'DRAFT',
                 subject: { connect: { id: subjectId } },

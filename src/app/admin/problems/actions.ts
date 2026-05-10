@@ -32,7 +32,6 @@ type ProblemFilters = {
     coreProblemId?: string;
     videoStatus?: VideoStatusValue;
     problemType?: string;
-    contentFormat?: string;
     status?: string;
 };
 
@@ -43,7 +42,6 @@ type FilterCondition =
     | { type: 'search'; value: string }
     | { type: 'videoStatus'; value: VideoStatusValue }
     | { type: 'problemType'; value: string }
-    | { type: 'contentFormat'; value: string }
     | { type: 'status'; value: string };
 
 const SEARCH_SCALAR_FIELDS = ['question', 'answer', 'customId'] as const;
@@ -66,7 +64,6 @@ function buildFilterConditions(filters: ProblemFilters, search?: string): Filter
     if (filters.coreProblemId) conditions.push({ type: 'coreProblemId', value: filters.coreProblemId });
     if (filters.videoStatus) conditions.push({ type: 'videoStatus', value: filters.videoStatus });
     if (filters.problemType) conditions.push({ type: 'problemType', value: filters.problemType });
-    if (filters.contentFormat) conditions.push({ type: 'contentFormat', value: filters.contentFormat });
     if (filters.status) conditions.push({ type: 'status', value: filters.status });
     if (search) conditions.push({ type: 'search', value: search });
 
@@ -115,9 +112,6 @@ function conditionsToPrismaWhere(conditions: FilterCondition[]): Prisma.ProblemW
                 break;
             case 'problemType':
                 where.problemType = cond.value as never;
-                break;
-            case 'contentFormat':
-                where.contentFormat = cond.value as never;
                 break;
             case 'status':
                 where.status = cond.value as never;
@@ -482,7 +476,6 @@ export async function createProblemDraft(data: {
         });
         const subjectId = await resolveSubjectIdFromCoreProblemIds(data.coreProblemIds);
         const subjectName = await getSubjectNameById(subjectId);
-        const contentFormat = 'STRUCTURED_V1';
         const legacyQuestion = normalized.legacy.question.trim() || '構造化問題';
         const legacyAnswer = normalized.legacy.answer.trim() || null;
 
@@ -506,7 +499,6 @@ export async function createProblemDraft(data: {
                         subjectId,
                         order,
                         problemType: data.problemType as never,
-                        contentFormat: contentFormat as never,
                         status: 'DRAFT',
                         hasStructuredContent: true,
                         coreProblems: {
@@ -530,7 +522,6 @@ export async function createProblemDraft(data: {
                         connect: { id: subjectId },
                     },
                     problemType: data.problemType as never,
-                    contentFormat: contentFormat as never,
                     status: 'DRAFT',
                     hasStructuredContent: true,
                     coreProblems: {
@@ -677,7 +668,6 @@ export async function publishProblemRevision(problemId: string) {
                     status: 'PUBLISHED',
                     sentBackReason: null,
                     hasStructuredContent: true,
-                    contentFormat: 'STRUCTURED_V1',
                     question: normalized.legacy.question.trim() || '構造化問題',
                     answer: normalized.legacy.answer || null,
                     acceptedAnswers: normalized.legacy.acceptedAnswers,
