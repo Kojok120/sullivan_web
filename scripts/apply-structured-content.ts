@@ -27,7 +27,6 @@ import { stdin as input, stdout as output } from 'node:process';
 
 import {
     deriveLegacyFieldsFromStructuredData,
-    parseAnswerSpec,
     parseStructuredDocument,
 } from '../src/lib/structured-problem';
 
@@ -169,7 +168,8 @@ async function main() {
                 where: { id: problem.publishedRevisionId! },
                 select: {
                     id: true, revisionNumber: true, status: true,
-                    structuredContent: true, answerSpec: true, printConfig: true,
+                    structuredContent: true, answerSpec: true,
+                    correctAnswer: true, acceptedAnswers: true, printConfig: true,
                 },
             });
         } else {
@@ -178,7 +178,8 @@ async function main() {
                 orderBy: { revisionNumber: 'desc' },
                 select: {
                     id: true, revisionNumber: true, status: true,
-                    structuredContent: true, answerSpec: true, printConfig: true,
+                    structuredContent: true, answerSpec: true,
+                    correctAnswer: true, acceptedAnswers: true, printConfig: true,
                 },
             });
         }
@@ -187,9 +188,13 @@ async function main() {
         }
         console.log(`\n対象: ${problem.subject.name}/${problem.customId} rev=${targetRevision.revisionNumber} (${targetRevision.status})`);
 
-        // 既存 answerSpec と新 document から legacy フィールドを再導出
-        const answerSpec = parseAnswerSpec(targetRevision.answerSpec ?? { correctAnswer: '', acceptedAnswers: [] });
-        const derived = deriveLegacyFieldsFromStructuredData({ document: newDocument, answerSpec });
+        // Stage B' 以降、正解情報は ProblemRevision の専用カラムから読み、
+        // legacy Problem.* は document + 正解専用カラムから再導出する。
+        const derived = deriveLegacyFieldsFromStructuredData({
+            document: newDocument,
+            correctAnswer: targetRevision.correctAnswer ?? '',
+            acceptedAnswers: targetRevision.acceptedAnswers ?? [],
+        });
 
         console.log('\n--- diff ---');
         console.log('[Problem.question]');

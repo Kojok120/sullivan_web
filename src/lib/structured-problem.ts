@@ -143,16 +143,23 @@ export const structuredProblemDocumentSchema = z.object({
     });
 });
 
+/**
+ * answerSpec は解答欄に印刷する「視覚テンプレート」専用 (Stage B' 以降)。
+ * 正解の真値は ProblemRevision.correctAnswer / ProblemRevision.acceptedAnswers (専用カラム)
+ * および Problem.answer / Problem.acceptedAnswers に保持する。
+ *
+ * 既存 DB の answerSpec JSON には Stage A+A+ 以前に書かれた correctAnswer / acceptedAnswers
+ * キーが残るが、本スキーマは passthrough() でそれらを許容しつつ、コード側からは
+ * answerTemplate 以外を読まない方針。Stage C で JSON から完全に削除する。
+ */
 export const answerSpecSchema = z.object({
-    correctAnswer: z.string().default(''),
-    acceptedAnswers: z.array(z.string()).default([]),
     /**
      * 解答欄に印刷する視覚テンプレート。
      * 例: 数直線問題で生徒が点を書き込む空の数直線を出すために [[numberline ...]] DSL を保存する。
      * 未指定または空文字なら通常の罫線解答欄が使われる。
      */
     answerTemplate: z.string().optional(),
-}).strict();
+}).passthrough();
 
 export const printConfigSchema = z.object({
     template: z.enum(['COMPACT', 'STANDARD', 'WORKSPACE', 'GRAPH', 'TABLE', 'EXPLANATION']).default('STANDARD'),
@@ -217,22 +224,35 @@ function uniqueNonEmpty(values: string[]) {
     return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 }
 
-export function normalizeAnswerSpecForAi(answerSpec: AnswerSpec): {
-    referenceAnswer: string;
-    alternativeAnswers: string[];
-} {
-    return {
-        referenceAnswer: answerSpec.correctAnswer.trim(),
-        alternativeAnswers: uniqueNonEmpty(answerSpec.acceptedAnswers),
-    };
-}
-
+/**
+ * answerSpec を保存形に正規化する。Stage B' 以降は answerTemplate のみ扱う。
+ * 既存 DB に残っている correctAnswer / acceptedAnswers キーは passthrough で素通りするが、
+ * 戻り値からは除外して JSON を縮小する (新規保存時は新シェイプで上書きされる)。
+ */
 export function normalizeAnswerSpecForAuthoring(answerSpec: AnswerSpec): AnswerSpec {
     const trimmedTemplate = answerSpec.answerTemplate?.trim() ?? '';
     return {
-        correctAnswer: answerSpec.correctAnswer.trim(),
-        acceptedAnswers: uniqueNonEmpty(answerSpec.acceptedAnswers),
         answerTemplate: trimmedTemplate || undefined,
+    };
+}
+
+/**
+ * 正解情報 (string answer + accepted answers) を保存形に正規化する。
+ * Stage B' で answerSpec から分離し、ProblemRevision.correctAnswer / acceptedAnswers と
+ * Problem.answer / acceptedAnswers の双方に書き込む値を生成する。
+ */
+export function normalizeAnswerForAuthoring(input: {
+    correctAnswer: string | null | undefined;
+    acceptedAnswers: readonly string[] | null | undefined;
+}): {
+    correctAnswer: string;
+    acceptedAnswers: string[];
+} {
+    const trimmedCorrect = (input.correctAnswer ?? '').trim();
+    const accepted = uniqueNonEmpty(Array.from(input.acceptedAnswers ?? []));
+    return {
+        correctAnswer: trimmedCorrect,
+        acceptedAnswers: accepted,
     };
 }
 
@@ -306,16 +326,21 @@ export function collectStructuredDocumentAssetIds(document: StructuredProblemDoc
     ));
 }
 
+/**
+ * 構造化ドキュメントから legacy `Problem.question` / `answer` / `acceptedAnswers` 用の値を組み立てる。
+ * Stage B' 以降は answer 系を answerSpec から導出せず、呼び出し側から直接渡してもらう。
+ * question は document の summary と paragraph ブロックから合成する。
+ */
 export function deriveLegacyFieldsFromStructuredData(input: {
     document: StructuredProblemDocument;
-    answerSpec: AnswerSpec;
+    correctAnswer: string;
+    acceptedAnswers: readonly string[];
 }): {
     question: string;
     answer: string;
     acceptedAnswers: string[];
 } {
-    const { document, answerSpec } = input;
-    const normalizedAnswer = normalizeAnswerSpecForAi(answerSpec);
+    const { document, correctAnswer, acceptedAnswers } = input;
     const question = [
         document.summary,
         ...document.blocks
@@ -328,8 +353,8 @@ export function deriveLegacyFieldsFromStructuredData(input: {
 
     return {
         question,
-        answer: normalizedAnswer.referenceAnswer,
-        acceptedAnswers: normalizedAnswer.alternativeAnswers,
+        answer: correctAnswer.trim(),
+        acceptedAnswers: uniqueNonEmpty(Array.from(acceptedAnswers)),
     };
 }
 
@@ -358,7 +383,7 @@ export function buildDefaultStructuredDraft(problemType: string) {
         showQrOnFirstPage: true,
     };
 
-    const answerSpec: AnswerSpec = { correctAnswer: '', acceptedAnswers: [] };
+    const answerSpec: AnswerSpec = {};
 
     return { document, answerSpec, printConfig };
 }

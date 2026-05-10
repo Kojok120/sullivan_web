@@ -1,16 +1,15 @@
 /**
- * 段階A の安全網: 構造化された公開済問題で
+ * 段階B' の安全網: 構造化された公開済問題で
  * `Problem.answer` / `Problem.acceptedAnswers` と
- * `publishedRevision.answerSpec.correctAnswer` / `acceptedAnswers` が
+ * `publishedRevision.correctAnswer` / `acceptedAnswers` (専用カラム) が
  * 同期された状態を保てているかを監査する read-only スクリプト。
  *
  * 採点側は段階A 以降 Problem 側だけを正解の信頼源として参照する。
- * publish フローは answerSpec から Problem.answer / acceptedAnswers を派生する片方向同期で運用しているため、
- * 同期が崩れると AI 採点に間違った正解が渡る恐れがある。
+ * publish フローは ProblemRevision の正解専用カラムから Problem.answer / acceptedAnswers を
+ * 派生する片方向同期で運用しているため、同期が崩れると AI 採点に間違った正解が渡る恐れがある。
  *
  * 監査対象の判定軸:
- * - 段階A+ で「構造化問題か」を `contentFormat` ではなく `publishedRevision.structuredContent`
- *   の有無で決めるよう本番ロジックを変更したため、本監査も同じ軸で抽出する。
+ * - 「構造化問題か」を `contentFormat` ではなく `publishedRevision.structuredContent` の有無で決める。
  * - `Problem.contentFormat` で絞ると、`PLAIN_TEXT` のまま公開 revision に structured data
  *   を持つ行が漏れる。
  *
@@ -92,7 +91,7 @@ interface Divergence {
     problemId: string;
     customId: string;
     subject: string;
-    kind: 'correctAnswer' | 'acceptedAnswers' | 'missingAnswerSpec';
+    kind: 'correctAnswer' | 'acceptedAnswers' | 'missingCorrectAnswer';
     detail: string;
 }
 
@@ -118,7 +117,11 @@ async function main() {
                 acceptedAnswers: true,
                 subject: { select: { name: true } },
                 publishedRevision: {
-                    select: { answerSpec: true, structuredContent: true },
+                    select: {
+                        correctAnswer: true,
+                        acceptedAnswers: true,
+                        structuredContent: true,
+                    },
                 },
             },
         });
@@ -128,7 +131,7 @@ async function main() {
 
         for (const p of problems) {
             // 構造化されていない公開済問題 (legacy English 等) は本監査の対象外。
-            // それらは Problem.answer が canonical で、検証する answerSpec が存在しない。
+            // それらは Problem.answer が canonical で、検証する revision の正解カラムが存在しない。
             const hasStructuredContent = p.publishedRevision?.structuredContent != null;
             if (!hasStructuredContent) {
                 continue;
@@ -136,23 +139,19 @@ async function main() {
 
             auditedCount += 1;
 
-            const spec = p.publishedRevision?.answerSpec as
-                | { correctAnswer?: unknown; acceptedAnswers?: unknown }
-                | null
-                | undefined;
-
-            if (!spec || typeof spec.correctAnswer !== 'string') {
+            const revisionCorrect = p.publishedRevision?.correctAnswer;
+            if (typeof revisionCorrect !== 'string') {
                 divergences.push({
                     problemId: p.id,
                     customId: p.customId,
                     subject: p.subject.name,
-                    kind: 'missingAnswerSpec',
-                    detail: 'publishedRevision.answerSpec.correctAnswer が無い',
+                    kind: 'missingCorrectAnswer',
+                    detail: 'publishedRevision.correctAnswer が無い',
                 });
                 continue;
             }
 
-            const specCorrect = spec.correctAnswer.trim();
+            const specCorrect = revisionCorrect.trim();
             const problemAnswer = (p.answer ?? '').trim();
             if (specCorrect !== problemAnswer) {
                 divergences.push({
@@ -160,19 +159,21 @@ async function main() {
                     customId: p.customId,
                     subject: p.subject.name,
                     kind: 'correctAnswer',
-                    detail: `Problem.answer="${problemAnswer}" vs answerSpec.correctAnswer="${specCorrect}"`,
+                    detail: `Problem.answer="${problemAnswer}" vs revision.correctAnswer="${specCorrect}"`,
                 });
             }
 
-            const specAccepted = normalizeAcceptedAnswers(spec.acceptedAnswers);
+            const revisionAccepted = normalizeAcceptedAnswers(
+                p.publishedRevision?.acceptedAnswers,
+            );
             const problemAccepted = normalizeAcceptedAnswers(p.acceptedAnswers);
-            if (!setEquals(specAccepted, problemAccepted)) {
+            if (!setEquals(revisionAccepted, problemAccepted)) {
                 divergences.push({
                     problemId: p.id,
                     customId: p.customId,
                     subject: p.subject.name,
                     kind: 'acceptedAnswers',
-                    detail: `Problem=${JSON.stringify(problemAccepted)} vs spec=${JSON.stringify(specAccepted)}`,
+                    detail: `Problem=${JSON.stringify(problemAccepted)} vs revision=${JSON.stringify(revisionAccepted)}`,
                 });
             }
         }
@@ -196,7 +197,7 @@ async function main() {
             return;
         }
 
-        console.log('[audit] OK: Problem.answer / acceptedAnswers は answerSpec と完全に同期している');
+        console.log('[audit] OK: Problem.answer / acceptedAnswers は publishedRevision の正解カラムと完全に同期している');
     } finally {
         await prisma.$disconnect();
     }

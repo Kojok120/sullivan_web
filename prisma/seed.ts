@@ -254,7 +254,13 @@ type StructuredProblemSeed = {
     problemType: ProblemType;
     authoringTool: ProblemAuthoringTool;
     document: StructuredProblemDocument & Prisma.InputJsonObject;
+    /**
+     * Stage B' 以降は answerSpec に正解情報を含めず、correctAnswer / acceptedAnswers
+     * を seed の top-level に分離する。answerSpec は answerTemplate (描画用 DSL) のみを保持する。
+     */
     answerSpec: AnswerSpec & Prisma.InputJsonObject;
+    correctAnswer: string;
+    acceptedAnswers: string[];
     printConfig: PrintConfig & Prisma.InputJsonObject;
     assets: StructuredSeedAsset[];
   };
@@ -474,10 +480,9 @@ async function seedStructuredProblemSamples() {
             { id: 'geo-3', type: 'answerLines', lines: 3 },
           ],
         },
-        answerSpec: {
-          correctAnswer: '20cm^2',
-          acceptedAnswers: ['20', '20 cm^2', '20cm2'],
-        },
+        answerSpec: {},
+        correctAnswer: '20cm^2',
+        acceptedAnswers: ['20', '20 cm^2', '20cm2'],
         printConfig: {
           template: 'WORKSPACE',
           estimatedHeight: 'MEDIUM',
@@ -515,10 +520,9 @@ async function seedStructuredProblemSamples() {
             { id: 'quad-3', type: 'svg', assetId: 'math-quadratic-svg' },
           ],
         },
-        answerSpec: {
-          correctAnswer: '(2, -1)',
-          acceptedAnswers: ['(2,-1)', 'x=2,y=-1'],
-        },
+        answerSpec: {},
+        correctAnswer: '(2, -1)',
+        acceptedAnswers: ['(2,-1)', 'x=2,y=-1'],
         printConfig: {
           template: 'GRAPH',
           estimatedHeight: 'LARGE',
@@ -555,10 +559,9 @@ async function seedStructuredProblemSamples() {
             { id: 'circuit-2', type: 'svg', assetId: 'science-circuit-svg' },
           ],
         },
-        answerSpec: {
-          correctAnswer: '並列',
-          acceptedAnswers: [],
-        },
+        answerSpec: {},
+        correctAnswer: '並列',
+        acceptedAnswers: [],
         printConfig: {
           template: 'STANDARD',
           estimatedHeight: 'MEDIUM',
@@ -595,10 +598,9 @@ async function seedStructuredProblemSamples() {
             { id: 'exp-2', type: 'svg', assetId: 'science-graph-svg' },
           ],
         },
-        answerSpec: {
-          correctAnswer: '6',
-          acceptedAnswers: ['6分'],
-        },
+        answerSpec: {},
+        correctAnswer: '6',
+        acceptedAnswers: ['6分'],
         printConfig: {
           template: 'GRAPH',
           estimatedHeight: 'LARGE',
@@ -635,10 +637,9 @@ async function seedStructuredProblemSamples() {
             { id: 'essay-2', type: 'answerLines', lines: 6 },
           ],
         },
-        answerSpec: {
-          correctAnswer: '蒸散によって葉から水が失われると、根から水を吸い上げる力がはたらき、体内で水や無機養分が運ばれやすくなる。',
-          acceptedAnswers: [],
-        },
+        answerSpec: {},
+        correctAnswer: '蒸散によって葉から水が失われると、根から水を吸い上げる力がはたらき、体内で水や無機養分が運ばれやすくなる。',
+        acceptedAnswers: [],
         printConfig: {
           template: 'EXPLANATION',
           estimatedHeight: 'LARGE',
@@ -665,7 +666,8 @@ async function seedStructuredProblemSamples() {
 
     const legacy = deriveLegacyFieldsFromStructuredData({
       document: sample.problem.document,
-      answerSpec: sample.problem.answerSpec,
+      correctAnswer: sample.problem.correctAnswer,
+      acceptedAnswers: sample.problem.acceptedAnswers,
     });
 
     const problem = await prisma.problem.upsert({
@@ -716,6 +718,8 @@ async function seedStructuredProblemSamples() {
         status: ProblemRevisionStatus.PUBLISHED,
         structuredContent: sample.problem.document,
         answerSpec: sample.problem.answerSpec,
+        correctAnswer: sample.problem.correctAnswer || null,
+        acceptedAnswers: sample.problem.acceptedAnswers,
         printConfig: sample.problem.printConfig,
         authoringTool: sample.problem.authoringTool,
         publishedAt,
@@ -736,6 +740,8 @@ async function seedStructuredProblemSamples() {
         status: ProblemRevisionStatus.PUBLISHED,
         structuredContent: sample.problem.document,
         answerSpec: sample.problem.answerSpec,
+        correctAnswer: sample.problem.correctAnswer || null,
+        acceptedAnswers: sample.problem.acceptedAnswers,
         printConfig: sample.problem.printConfig,
         authoringTool: sample.problem.authoringTool,
         publishedAt,
