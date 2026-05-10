@@ -9,9 +9,8 @@
  * 派生する片方向同期で運用しているため、同期が崩れると AI 採点に間違った正解が渡る恐れがある。
  *
  * 監査対象の判定軸:
- * - 「構造化問題か」を `contentFormat` ではなく `publishedRevision.structuredContent` の有無で決める。
- * - `Problem.contentFormat` で絞ると、`PLAIN_TEXT` のまま公開 revision に structured data
- *   を持つ行が漏れる。
+ * - 「構造化問題か」は `publishedRevision.structuredContent` の有無で決める。
+ *   段階C で `Problem.contentFormat` カラムは撤去済み。
  *
  * 使い方:
  *   tsx scripts/audit-problem-answer-sync.ts --env production

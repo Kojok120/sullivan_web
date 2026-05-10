@@ -96,7 +96,6 @@ export async function selectProblemsForPrint(
             question: true,
             order: true,
             problemType: true,
-            contentFormat: true,
             status: true,
             publishedRevisionId: true,
             publishedRevision: {
@@ -171,7 +170,6 @@ export async function selectProblemsForPrint(
                 question: problem.question,
                 order: problem.order,
                 problemType: problem.problemType,
-                contentFormat: problem.contentFormat,
                 status: problem.status,
                 publishedRevisionId: problem.publishedRevisionId,
                 structuredContent: problem.publishedRevision?.structuredContent as never,

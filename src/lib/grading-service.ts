@@ -610,7 +610,6 @@ export type ProblemForGrading = {
     question: string;
     answer: string | null;
     acceptedAnswers: string[];
-    contentFormat: string;
     publishedRevisionId: string | null;
     structuredContent: Prisma.JsonValue | null;
     revisionAssets: ProblemRevisionAssetForGrading[];
@@ -621,7 +620,6 @@ export type GeminiProblemContext = {
     index: number;
     displayId: string;
     subjectName: string;
-    contentFormat: string;
     problemText: string;
     referenceAnswer: string;
     alternativeAnswers: string[];
@@ -739,7 +737,6 @@ export function buildProblemContextForGemini(problem: ProblemForGrading, index: 
         index,
         displayId: problem.customId,
         subjectName: problem.subjectName,
-        contentFormat: problem.contentFormat,
         problemText,
         referenceAnswer,
         alternativeAnswers,
@@ -1154,7 +1151,6 @@ async function gradeWithGemini(
             question: p.question,
             answer: p.answer,
             acceptedAnswers: p.acceptedAnswers,
-            contentFormat: p.contentFormat,
             publishedRevisionId: matchedRevision?.id ?? p.publishedRevisionId,
             structuredContent: matchedRevision?.structuredContent ?? null,
             revisionAssets: matchedRevision?.assets.map((asset) => ({

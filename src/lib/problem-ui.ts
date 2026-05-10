@@ -24,11 +24,6 @@ export const PROBLEM_STATUS_VALUES = PROBLEM_STATUS_OPTIONS.map((option) => opti
 
 export type ProblemStatusValue = (typeof PROBLEM_STATUS_OPTIONS)[number]['value'];
 
-export const CONTENT_FORMAT_OPTIONS = [
-    { value: 'PLAIN_TEXT', label: '通常テキスト' },
-    { value: 'STRUCTURED_V1', label: '教材レイアウト' },
-] as const satisfies ReadonlyArray<Option<string>>;
-
 export const PROBLEM_AUTHORING_TOOL_OPTIONS = [
     { value: 'MANUAL', label: '手入力' },
     { value: 'SVG', label: 'SVG図版' },
@@ -82,10 +77,6 @@ export function getProblemTypeLabel(value: string | null | undefined) {
 
 export function getProblemStatusLabel(value: string | null | undefined) {
     return getOptionLabel(PROBLEM_STATUS_OPTIONS, value);
-}
-
-export function getContentFormatLabel(value: string | null | undefined) {
-    return getOptionLabel(CONTENT_FORMAT_OPTIONS, value);
 }
 
 export function getAuthoringToolLabel(value: string | null | undefined) {

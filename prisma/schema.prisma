@@ -46,7 +46,6 @@ model Problem {
   grade                String? // 学年 (e.g., "中1", "高2")
   masterNumber         Int? // マスタ内問題番号
   problemType          ProblemType          @default(SHORT_TEXT)
-  contentFormat        ProblemContentFormat @default(PLAIN_TEXT)
   status               ProblemStatus        @default(PUBLISHED)
   hasStructuredContent Boolean              @default(false)
   publishedRevisionId  String?              @unique
@@ -73,11 +72,6 @@ enum ProblemType {
   SHORT_TEXT
   GEOMETRY
   GRAPH_DRAW
-}
-
-enum ProblemContentFormat {
-  PLAIN_TEXT
-  STRUCTURED_V1
 }
 
 enum ProblemStatus {

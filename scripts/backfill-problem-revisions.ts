@@ -174,7 +174,6 @@ async function main() {
                 answer: true,
                 acceptedAnswers: true,
                 problemType: true,
-                contentFormat: true,
                 hasStructuredContent: true,
                 subject: { select: { name: true } },
                 revisions: {
@@ -279,8 +278,8 @@ async function main() {
             // answerSpec JSON は answerTemplate のみを保持する形に縮小済み。
             const answerSpec: Record<string, never> = {};
 
-            // 1 問題分の revision 作成/更新と problem.contentFormat 更新は 1 単位で
-            // 成功/失敗すべき。途中失敗で問題本体だけ STRUCTURED_V1 に切り替わると
+            // 1 問題分の revision 作成/更新と problem.hasStructuredContent 更新は 1 単位で
+            // 成功/失敗すべき。途中失敗で hasStructuredContent だけ true に切り替わると
             // 編集画面が空表示になる。create 経路の aggregate→create も同一トランザクション
             // 内で行うことで revisionNumber の競合を抑える。
             await prisma.$transaction(async (tx) => {
@@ -316,11 +315,10 @@ async function main() {
                     });
                 }
 
-                if (!p.hasStructuredContent || p.contentFormat !== 'STRUCTURED_V1') {
+                if (!p.hasStructuredContent) {
                     await tx.problem.update({
                         where: { id: p.id },
                         data: {
-                            contentFormat: 'STRUCTURED_V1',
                             hasStructuredContent: true,
                         },
                     });
