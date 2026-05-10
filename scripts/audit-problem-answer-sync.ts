@@ -129,8 +129,10 @@ async function main() {
         let auditedCount = 0;
 
         for (const p of problems) {
-            // 構造化されていない公開済問題 (legacy English 等) は本監査の対象外。
-            // それらは Problem.answer が canonical で、検証する revision の正解カラムが存在しない。
+            // PROD は 41377d2 時点で全問題が STRUCTURED_V1 に統一済みのため、
+            // structuredContent が null のレコードは事実上存在しない。それでも万一
+            // そのような行が混入しても監査が落ちないよう安全網としてスキップする。
+            // (その場合は Problem.answer 側だけが正解を持つフォールバック扱い)
             const hasStructuredContent = p.publishedRevision?.structuredContent != null;
             if (!hasStructuredContent) {
                 continue;
