@@ -1,6 +1,6 @@
 /**
  * 単一の Problem を customId 指定で読み取り、
- * 本文・解答・publishedRevision / 全 revision の structuredContent と answerSpec を JSON で表示する read-only スクリプト。
+ * 本文・解答・publishedRevision / 全 revision の structuredContent と answerSpec / 正解専用カラムを JSON で表示する read-only スクリプト。
  *
  * triage 編集の前後で「現状はどうなっているか」を確認するために使う。
  *
@@ -98,6 +98,8 @@ async function main() {
                 authoringTool: true,
                 structuredContent: true,
                 answerSpec: true,
+                correctAnswer: true,
+                acceptedAnswers: true,
                 printConfig: true,
             },
         });

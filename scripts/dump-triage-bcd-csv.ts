@@ -250,7 +250,7 @@ async function main() {
 
             const rev = problem.publishedRevisionId ? revisionById.get(problem.publishedRevisionId) : undefined;
             const structuredText = rev ? extractStructuredText(rev.structuredContent) : '';
-            const answerSpec = rev?.answerSpec as { correctAnswer?: string; acceptedAnswers?: string[]; answerTemplate?: string } | undefined;
+            const answerSpec = rev?.answerSpec as { answerTemplate?: string } | undefined;
             const answerTemplate = answerSpec?.answerTemplate ?? '';
             const hasNumberlineTemplate = answerTemplate.includes('[[numberline');
 

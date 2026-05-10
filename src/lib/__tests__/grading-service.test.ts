@@ -27,7 +27,7 @@ function createProblem(overrides: Partial<ProblemForGrading> = {}): ProblemForGr
 
 describe('grading-service helpers', () => {
     it('structured 問題: 問題文は structuredContent から、正解は Problem.answer から組み立てる', () => {
-        // publish 時に answerSpec.correctAnswer は Problem.answer に同期されているため
+        // publish 時に ProblemRevision.correctAnswer は Problem.answer に同期されているため
         // 採点側は Problem.answer / acceptedAnswers のみを正解の信頼源として扱う。
         const context = buildProblemContextForGemini(createProblem({
             subjectName: '理科',

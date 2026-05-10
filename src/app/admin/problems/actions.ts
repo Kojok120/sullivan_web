@@ -16,6 +16,7 @@ import {
 } from '@/lib/problem-ui';
 import {
     deriveLegacyFieldsFromStructuredData,
+    normalizeAnswerForAuthoring,
     normalizeAnswerSpecForAuthoring,
     parseAnswerSpec,
     parsePrintConfig,
@@ -188,16 +189,27 @@ function normalizeStructuredDraftInput(data: {
     document: unknown;
     answerSpec: unknown;
     printConfig?: unknown;
+    correctAnswer: string | null | undefined;
+    acceptedAnswers: readonly string[] | null | undefined;
 }) {
     const document = parseStructuredDocument(data.document);
     const answerSpec = normalizeAnswerSpecForAuthoring(parseAnswerSpec(data.answerSpec));
     const printConfig = parsePrintConfig(data.printConfig ?? {});
-    const legacy = deriveLegacyFieldsFromStructuredData({ document, answerSpec });
+    const answer = normalizeAnswerForAuthoring({
+        correctAnswer: data.correctAnswer,
+        acceptedAnswers: data.acceptedAnswers,
+    });
+    const legacy = deriveLegacyFieldsFromStructuredData({
+        document,
+        correctAnswer: answer.correctAnswer,
+        acceptedAnswers: answer.acceptedAnswers,
+    });
 
     return {
         document,
         answerSpec,
         printConfig,
+        answer,
         legacy,
     };
 }
@@ -450,11 +462,24 @@ export async function createProblemDraft(data: {
     document: unknown;
     answerSpec: unknown;
     printConfig?: unknown;
+    /**
+     * Stage B' 以降、正解情報は answerSpec ではなく専用フィールドで受け取る。
+     * 受け取った値は ProblemRevision.correctAnswer / acceptedAnswers (新カラム) に書き、
+     * 公開リビジョンが未存在の場合のみ Problem.answer / acceptedAnswers にも同期する。
+     */
+    correctAnswer?: string | null;
+    acceptedAnswers?: string[];
 }) {
     await requireProblemAuthor();
 
     try {
-        const normalized = normalizeStructuredDraftInput(data);
+        const normalized = normalizeStructuredDraftInput({
+            document: data.document,
+            answerSpec: data.answerSpec,
+            printConfig: data.printConfig,
+            correctAnswer: data.correctAnswer,
+            acceptedAnswers: data.acceptedAnswers,
+        });
         const subjectId = await resolveSubjectIdFromCoreProblemIds(data.coreProblemIds);
         const subjectName = await getSubjectNameById(subjectId);
         const contentFormat = 'STRUCTURED_V1';
@@ -544,6 +569,9 @@ export async function createProblemDraft(data: {
                     data: {
                         structuredContent: normalized.document as Prisma.InputJsonValue,
                         answerSpec: normalized.answerSpec as Prisma.InputJsonValue,
+                        // Stage B': 正解情報は専用カラムに書く (answerSpec JSON からは除外する)
+                        correctAnswer: normalized.answer.correctAnswer || null,
+                        acceptedAnswers: normalized.answer.acceptedAnswers,
                         printConfig: normalized.printConfig as Prisma.InputJsonValue,
                         authoringTool: data.authoringTool ?? 'MANUAL',
                         authoringState: (data.authoringState ?? undefined) as Prisma.InputJsonValue | undefined,
@@ -566,6 +594,9 @@ export async function createProblemDraft(data: {
                     status: 'DRAFT',
                     structuredContent: normalized.document as Prisma.InputJsonValue,
                     answerSpec: normalized.answerSpec as Prisma.InputJsonValue,
+                    // Stage B': 正解情報は専用カラムに書く
+                    correctAnswer: normalized.answer.correctAnswer || null,
+                    acceptedAnswers: normalized.answer.acceptedAnswers,
                     printConfig: normalized.printConfig as Prisma.InputJsonValue,
                     authoringTool: data.authoringTool ?? 'MANUAL',
                     authoringState: (data.authoringState ?? undefined) as Prisma.InputJsonValue | undefined,
@@ -609,10 +640,14 @@ export async function publishProblemRevision(problemId: string) {
             return { error: '公開可能な下書きがありません' };
         }
 
+        // Stage B' 以降、正解情報は ProblemRevision の専用カラム (correctAnswer / acceptedAnswers) から読む。
+        // 旧 answerSpec JSON 内の値は backfill 済みなので二重ソースにはしない。
         const normalized = normalizeStructuredDraftInput({
             document: draftRevision.structuredContent,
             answerSpec: draftRevision.answerSpec,
             printConfig: draftRevision.printConfig,
+            correctAnswer: draftRevision.correctAnswer,
+            acceptedAnswers: draftRevision.acceptedAnswers,
         });
 
         await prisma.$transaction(async (tx) => {

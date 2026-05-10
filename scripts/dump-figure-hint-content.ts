@@ -167,6 +167,8 @@ async function main() {
                     status: true,
                     structuredContent: true,
                     answerSpec: true,
+                    correctAnswer: true,
+                    acceptedAnswers: true,
                 },
             })
             : [];
@@ -200,7 +202,7 @@ async function main() {
         md.push(`- 対象件数: ${targets.length}`);
         md.push(`- 検出キーワード: ${FIGURE_HINT_KEYWORDS.join(' / ')}`);
         md.push('');
-        md.push('各問題ごとに「Problem.question (legacy)」「publishedRevision.structuredContent から抽出した本文」「Problem.answer」「answerSpec.answerTemplate」を併記する。');
+        md.push('各問題ごとに「Problem.question (legacy)」「publishedRevision.structuredContent から抽出した本文」「Problem.answer」「revision.correctAnswer / acceptedAnswers / answerSpec.answerTemplate」を併記する。');
         md.push('検出キーワードがあっても、本当に図/表が必要かは個別判断。');
         md.push('');
 
@@ -214,17 +216,17 @@ async function main() {
                 const rev = problem.publishedRevisionId ? revisionById.get(problem.publishedRevisionId) : undefined;
                 const structuredText = rev ? extractStructuredText(rev.structuredContent) : '';
                 const answerSpecRaw = rev?.answerSpec as
-                    | { correctAnswer?: unknown; acceptedAnswers?: unknown; answerTemplate?: unknown }
+                    | { answerTemplate?: unknown }
                     | undefined;
-                const answerSpec = answerSpecRaw
+                const dump = rev
                     ? {
                           correctAnswer:
-                              typeof answerSpecRaw.correctAnswer === 'string' ? answerSpecRaw.correctAnswer : '',
-                          acceptedAnswers: Array.isArray(answerSpecRaw.acceptedAnswers)
-                              ? answerSpecRaw.acceptedAnswers.filter((v): v is string => typeof v === 'string')
+                              typeof rev.correctAnswer === 'string' ? rev.correctAnswer : '',
+                          acceptedAnswers: Array.isArray(rev.acceptedAnswers)
+                              ? rev.acceptedAnswers.filter((v): v is string => typeof v === 'string')
                               : [],
                           answerTemplate:
-                              typeof answerSpecRaw.answerTemplate === 'string' ? answerSpecRaw.answerTemplate : '',
+                              typeof answerSpecRaw?.answerTemplate === 'string' ? answerSpecRaw.answerTemplate : '',
                       }
                     : undefined;
 
@@ -247,15 +249,15 @@ async function main() {
                 }
                 md.push(`**Problem.answer:** \`${problem.answer ?? '(null)'}\``);
                 md.push('');
-                if (answerSpec) {
-                    md.push(`**answerSpec.correctAnswer:** \`${answerSpec.correctAnswer}\``);
-                    if (answerSpec.acceptedAnswers.length > 0) {
-                        md.push(`**answerSpec.acceptedAnswers:** ${answerSpec.acceptedAnswers.map((a) => `\`${a}\``).join(', ')}`);
+                if (dump) {
+                    md.push(`**revision.correctAnswer:** \`${dump.correctAnswer}\``);
+                    if (dump.acceptedAnswers.length > 0) {
+                        md.push(`**revision.acceptedAnswers:** ${dump.acceptedAnswers.map((a) => `\`${a}\``).join(', ')}`);
                     }
-                    if (answerSpec.answerTemplate) {
+                    if (dump.answerTemplate) {
                         md.push(`**answerSpec.answerTemplate:**`);
                         md.push('```');
-                        md.push(answerSpec.answerTemplate);
+                        md.push(dump.answerTemplate);
                         md.push('```');
                     }
                     md.push('');

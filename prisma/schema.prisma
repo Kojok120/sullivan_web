@@ -134,6 +134,8 @@ model ProblemRevision {
   status              ProblemRevisionStatus @default(DRAFT)
   structuredContent   Json?
   answerSpec          Json?
+  correctAnswer       String?
+  acceptedAnswers     String[]              @default([])
   printConfig         Json?
   generationContext   Json?
   authoringTool       ProblemAuthoringTool  @default(MANUAL)

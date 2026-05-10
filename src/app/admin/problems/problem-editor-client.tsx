@@ -86,7 +86,13 @@ type EditorState = {
     videoStatus: VideoStatusValue;
     coreProblems: SelectedCoreProblem[];
     document: StructuredProblemDocument;
+    /**
+     * Stage B' 以降は answerSpec に正解情報を保持しない。answerTemplate のみが残る。
+     * 正解と別解は correctAnswer / acceptedAnswers に分離して保持する。
+     */
     answerSpec: AnswerSpec;
+    correctAnswer: string;
+    acceptedAnswers: string[];
     printConfig: PrintConfig;
 };
 
@@ -123,6 +129,17 @@ function buildInitialState(problem: RenderableProblemWithRelations | null, initi
     const printConfig = (draftRevision?.printConfig as PrintConfig | null) ?? base.printConfig;
     const initialProblemType = problem?.problemType ?? 'SHORT_TEXT';
 
+    // Stage B' 以降、正解情報は ProblemRevision の専用カラムから初期化する。
+    // 既存 revision でカラムが空の場合 (移行直後の編集など) は Problem.answer / Problem.acceptedAnswers に
+    // フォールバック (Stage A+A+ 以降は Problem 側が canonical のため安全)。
+    const initialCorrectAnswer = draftRevision?.correctAnswer
+        ?? problem?.answer
+        ?? '';
+    const draftAccepted = draftRevision?.acceptedAnswers ?? [];
+    const initialAcceptedAnswers = draftAccepted.length > 0
+        ? draftAccepted
+        : (problem?.acceptedAnswers ?? []);
+
     return {
         problemId: problem?.id ?? '',
         revisionId: draftRevision?.id ?? '',
@@ -134,6 +151,8 @@ function buildInitialState(problem: RenderableProblemWithRelations | null, initi
         coreProblems: (problem?.coreProblems ?? []) as SelectedCoreProblem[],
         document: structuredContent,
         answerSpec,
+        correctAnswer: initialCorrectAnswer,
+        acceptedAnswers: initialAcceptedAnswers,
         printConfig,
     };
 }
@@ -287,6 +306,8 @@ export function ProblemEditorClient({
                 document: state.document,
                 answerSpec: normalizedAnswerSpec,
                 printConfig: state.printConfig,
+                correctAnswer: state.correctAnswer,
+                acceptedAnswers: state.acceptedAnswers,
             });
 
             if (!result.success) {
@@ -640,8 +661,10 @@ export function ProblemEditorClient({
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <AnswerSpecEditor
-                                value={syncedAnswerSpec}
-                                onChange={(next) => setState((current) => ({ ...current, answerSpec: next }))}
+                                correctAnswer={state.correctAnswer}
+                                acceptedAnswers={state.acceptedAnswers}
+                                onCorrectAnswerChange={(next) => setState((current) => ({ ...current, correctAnswer: next }))}
+                                onAcceptedAnswersChange={(next) => setState((current) => ({ ...current, acceptedAnswers: next }))}
                             />
                         </CardContent>
                     </Card>
@@ -957,33 +980,35 @@ function stringifyAcceptedAnswers(values: string[]): string {
 }
 
 function AnswerSpecEditor({
-    value,
-    onChange,
+    correctAnswer,
+    acceptedAnswers,
+    onCorrectAnswerChange,
+    onAcceptedAnswersChange,
 }: {
-    value: AnswerSpec;
-    onChange: (next: AnswerSpec) => void;
+    correctAnswer: string;
+    acceptedAnswers: string[];
+    onCorrectAnswerChange: (next: string) => void;
+    onAcceptedAnswersChange: (next: string[]) => void;
 }) {
-    const exactValue = normalizeAnswerSpecForAuthoring(value);
-    const update = (patch: Partial<typeof exactValue>) => onChange({ ...exactValue, ...patch });
     const [acceptedAnswersJson, setAcceptedAnswersJson] = useState(() =>
-        stringifyAcceptedAnswers(exactValue.acceptedAnswers),
+        stringifyAcceptedAnswers(acceptedAnswers),
     );
 
     useEffect(() => {
         const parsed = parseAcceptedAnswersJson(acceptedAnswersJson);
         const parsedValues = parsed.kind === 'valid' ? parsed.values : null;
-        if (parsedValues === null || JSON.stringify(parsedValues) !== JSON.stringify(exactValue.acceptedAnswers)) {
-            setAcceptedAnswersJson(stringifyAcceptedAnswers(exactValue.acceptedAnswers));
+        if (parsedValues === null || JSON.stringify(parsedValues) !== JSON.stringify(acceptedAnswers)) {
+            setAcceptedAnswersJson(stringifyAcceptedAnswers(acceptedAnswers));
         }
-        // exactValue.acceptedAnswers のみを依存にし、ローカル文字列の変動では再同期しない。
+        // acceptedAnswers のみを依存にし、ローカル文字列の変動では再同期しない。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [JSON.stringify(exactValue.acceptedAnswers)]);
+    }, [JSON.stringify(acceptedAnswers)]);
 
     const handleAcceptedAnswersChange = (next: string) => {
         setAcceptedAnswersJson(next);
         const parsed = parseAcceptedAnswersJson(next);
         if (parsed.kind === 'valid') {
-            update({ acceptedAnswers: parsed.values });
+            onAcceptedAnswersChange(parsed.values);
         }
     };
 
@@ -993,8 +1018,8 @@ function AnswerSpecEditor({
                 <div className="space-y-2">
                     <Label>正解</Label>
                     <Textarea
-                        value={exactValue.correctAnswer}
-                        onChange={(event) => update({ correctAnswer: event.target.value })}
+                        value={correctAnswer}
+                        onChange={(event) => onCorrectAnswerChange(event.target.value)}
                         rows={4}
                         placeholder="数式は $...$ / $$...$$ で書けます。"
                     />
@@ -1002,7 +1027,7 @@ function AnswerSpecEditor({
                 <div className="space-y-2">
                     <Label>正解プレビュー</Label>
                     <ProblemTextPreview
-                        text={exactValue.correctAnswer}
+                        text={correctAnswer}
                         emptyMessage="正解を入力するとプレビューが出ます。"
                     />
                 </div>
