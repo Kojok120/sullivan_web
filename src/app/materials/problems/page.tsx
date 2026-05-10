@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 export default async function MaterialsProblemsPage({
     searchParams,
 }: {
-    searchParams: Promise<{ page?: string; q?: string; grade?: string; coreProblemId?: string; subjectId?: string; sortBy?: string; sortOrder?: string; videoStatus?: string; problemType?: string; contentFormat?: string; status?: string }>;
+    searchParams: Promise<{ page?: string; q?: string; grade?: string; coreProblemId?: string; subjectId?: string; sortBy?: string; sortOrder?: string; videoStatus?: string; problemType?: string; status?: string }>;
 }) {
     const params = await searchParams;
     const page = Number(params.page) || 1;
@@ -49,7 +49,6 @@ export default async function MaterialsProblemsPage({
         if (params.sortBy && params.sortBy !== 'masterNumber' && params.sortOrder) nextParams.set('sortOrder', params.sortOrder);
         if (params.videoStatus) nextParams.set('videoStatus', params.videoStatus);
         if (params.problemType) nextParams.set('problemType', params.problemType);
-        if (params.contentFormat) nextParams.set('contentFormat', params.contentFormat);
         if (params.status) nextParams.set('status', params.status);
 
         redirect(`/materials/problems?${nextParams.toString()}`);
@@ -65,7 +64,6 @@ export default async function MaterialsProblemsPage({
             subjectId,
             videoStatus: isVideoStatusValue(params.videoStatus) ? params.videoStatus : undefined,
             problemType: params.problemType,
-            contentFormat: params.contentFormat,
             status: isProblemStatusValue(params.status) ? params.status : undefined,
         },
         normalizeProblemSortBy(sortBy, currentSubject.name),

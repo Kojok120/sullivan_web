@@ -16,7 +16,6 @@ function createProblem(overrides: Partial<ProblemForGrading> = {}): ProblemForGr
         question: 'legacy question',
         answer: '42',
         acceptedAnswers: ['四十二'],
-        contentFormat: 'PLAIN_TEXT',
         publishedRevisionId: 'revision-1',
         structuredContent: null,
         revisionAssets: [],
@@ -31,7 +30,6 @@ describe('grading-service helpers', () => {
         // 採点側は Problem.answer / acceptedAnswers のみを正解の信頼源として扱う。
         const context = buildProblemContextForGemini(createProblem({
             subjectName: '理科',
-            contentFormat: 'STRUCTURED_V1',
             answer: 'B',
             acceptedAnswers: ['18'],
             structuredContent: {
@@ -64,10 +62,10 @@ describe('grading-service helpers', () => {
         expect(context.problemText).toContain('選択肢:');
     });
 
-    it('structured 問題: figure 取得は contentFormat ではなく structuredContent の有無で判定する', () => {
-        // 段階A+ で contentFormat 判定を撤廃したことの回帰を防ぐ。
+    it('structured 問題: figure 取得は structuredContent の有無で判定する', () => {
+        // 段階A+ で contentFormat 判定を撤廃、段階C で contentFormat カラム自体を撤去した
+        // ことの回帰を防ぐ: structuredContent != null でのみ figure 取得を行う。
         const context = buildProblemContextForGemini(createProblem({
-            contentFormat: 'PLAIN_TEXT',
             structuredContent: {
                 version: 1,
                 blocks: [{ id: 'g1', type: 'image', assetId: 'asset-graph' }],

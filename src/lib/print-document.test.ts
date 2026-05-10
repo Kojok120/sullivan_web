@@ -98,7 +98,6 @@ describe('print-document', () => {
                 customId: 'S-101',
                 question: '回路図の読み取り',
                 order: 1,
-                contentFormat: 'STRUCTURED_V1',
                 publishedRevisionId: 'rev-1',
                 structuredContent: {
                     version: 1,
@@ -135,7 +134,6 @@ describe('print-document', () => {
                 customId: 'M-202',
                 question: '図版調整',
                 order: 1,
-                contentFormat: 'STRUCTURED_V1',
                 publishedRevisionId: 'rev-display-1',
                 structuredContent: {
                     version: 1,
@@ -192,7 +190,6 @@ describe('print-document', () => {
                 customId: 'M-301',
                 question: '数直線図版',
                 order: 1,
-                contentFormat: 'STRUCTURED_V1',
                 publishedRevisionId: 'rev-directive-1',
                 structuredContent: {
                     version: 1,
@@ -225,7 +222,6 @@ describe('print-document', () => {
                 customId: 'M-201',
                 question: '数式表示',
                 order: 1,
-                contentFormat: 'STRUCTURED_V1',
                 publishedRevisionId: 'rev-math-1',
                 structuredContent: {
                     version: 1,

@@ -65,7 +65,6 @@ export async function GET(
         question: problem.question,
         order: problem.order,
         problemType: problem.problemType,
-        contentFormat: 'STRUCTURED_V1',
         status: problem.status,
         publishedRevisionId: revision.id,
         structuredContent: revision.structuredContent as never,

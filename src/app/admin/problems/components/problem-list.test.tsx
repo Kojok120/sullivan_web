@@ -35,7 +35,6 @@ describe('ProblemList', () => {
             question: '問題文',
             answer: '答え',
             problemType: 'SHORT_TEXT',
-            contentFormat: 'PLAIN_TEXT',
             status: 'PUBLISHED',
             videoUrl: null,
             coreProblems: [

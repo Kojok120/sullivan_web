@@ -12,7 +12,6 @@ import { ProblemList } from './components/problem-list';
 import { BulkImportDialog } from './components/problem-bulk-import';
 import type { ProblemWithRelations } from './types';
 import {
-    CONTENT_FORMAT_OPTIONS,
     PROBLEM_STATUS_OPTIONS,
     PROBLEM_TYPE_OPTIONS,
     VIDEO_STATUS_OPTIONS,
@@ -108,7 +107,6 @@ export function ProblemManager({
     const rawSelectedCoreProblemId = searchParams.get('coreProblemId');
     const selectedVideoStatus = searchParams.get('videoStatus') || 'ALL';
     const selectedProblemType = searchParams.get('problemType') || 'ALL';
-    const selectedContentFormat = searchParams.get('contentFormat') || 'ALL';
     const selectedStatus = searchParams.get('status') || 'ALL';
     const availableCoreProblems = currentSubject.coreProblems;
     const selectedCoreProblemId = rawSelectedCoreProblemId
@@ -156,15 +154,6 @@ export function ProblemManager({
         startTransition(() => {
             updateParams({
                 problemType: value === 'ALL' ? undefined : value,
-                page: '1',
-            });
-        });
-    };
-
-    const handleContentFormatFilter = (value: string) => {
-        startTransition(() => {
-            updateParams({
-                contentFormat: value === 'ALL' ? undefined : value,
                 page: '1',
             });
         });
@@ -235,19 +224,6 @@ export function ProblemManager({
                                 ))}
                             </SelectContent>
                         </Select>
-                        {!isAuthorView && (
-                            <Select value={selectedContentFormat} onValueChange={handleContentFormatFilter}>
-                                <SelectTrigger className="w-full sm:w-[180px]">
-                                    <SelectValue placeholder="本文形式" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="ALL">本文：全件</SelectItem>
-                                    {CONTENT_FORMAT_OPTIONS.map((option) => (
-                                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        )}
                         <Select value={selectedStatus} onValueChange={handleStatusFilter}>
                             <SelectTrigger className="w-full sm:w-[160px]">
                                 <SelectValue placeholder="公開状況" />

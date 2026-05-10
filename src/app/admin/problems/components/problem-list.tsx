@@ -30,7 +30,6 @@ import {
 import {
     PROBLEM_STATUS_OPTIONS,
     VIDEO_STATUS_OPTIONS,
-    getContentFormatLabel,
     getProblemStatusLabel,
     getProblemTypeLabel,
     getVideoStatusLabel,
@@ -255,7 +254,7 @@ export function ProblemList({
     const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
     const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
     const isAuthorView = viewMode === 'author';
-    const emptyTableColSpan = (isAuthorView ? 8 : 10) + (showMasterNumber ? 1 : 0);
+    const emptyTableColSpan = (isAuthorView ? 8 : 9) + (showMasterNumber ? 1 : 0);
 
     const handleDeleteConfirm = () => {
         if (!deleteTarget) return;
@@ -387,7 +386,6 @@ export function ProblemList({
                             <div className="space-y-2 text-sm">
                                 <div className="flex flex-wrap gap-2">
                                     <Badge>{getProblemTypeLabel(problem.problemType)}</Badge>
-                                    {!isAuthorView && <Badge variant="secondary">{getContentFormatLabel(problem.contentFormat)}</Badge>}
                                     <ProblemStatusCell problem={problem} />
                                 </div>
                                 <div>
@@ -450,7 +448,6 @@ export function ProblemList({
                             </TableHead>
                             <TableHead className="w-[320px]">問題文</TableHead>
                             <TableHead className="w-[130px]">形式</TableHead>
-                            {!isAuthorView && <TableHead className="w-[130px]">本文</TableHead>}
                             <TableHead className="w-[120px]">公開状況</TableHead>
                             <TableHead className="w-[220px]">解答</TableHead>
                             <TableHead className="w-[180px]">所属単元</TableHead>
@@ -487,7 +484,6 @@ export function ProblemList({
                                         />
                                     </TableCell>
                                     <TableCell className="text-xs">{getProblemTypeLabel(problem.problemType)}</TableCell>
-                                    {!isAuthorView && <TableCell className="text-xs">{getContentFormatLabel(problem.contentFormat)}</TableCell>}
                                     <TableCell><ProblemStatusCell problem={problem} /></TableCell>
                                     <TableCell className="max-w-[220px] align-top" title={problem.answer || ''}>
                                         <RenderedProblemText
