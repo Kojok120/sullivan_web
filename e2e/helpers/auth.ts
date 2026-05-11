@@ -33,7 +33,11 @@ export function adminCreds(): EnvCreds {
     }
     return {
         loginId: process.env.E2E_PROD_LOGIN_ID ?? 'A0001',
-        password: process.env.E2E_PROD_PASSWORD ?? 'password123',
+        // A0001 の実パスワードは DEV / PROD どちらの Supabase Auth でも 'password'。
+        // 旧 default 'password123' は実環境のどこにも存在せず、loginAs() が
+        // /login に留まる → 各 admin 系 E2E が test.skip() で全件 silent skip
+        // していた (E2E_PROD_BASE_URL 未設定のローカル DEV 実行で顕在化)。
+        password: process.env.E2E_PROD_PASSWORD ?? 'password',
     };
 }
 
