@@ -553,6 +553,14 @@ describe('problem actions permissions', () => {
         expect(transactionMock).not.toHaveBeenCalled();
     });
 
+    it('updateStandaloneProblem は payload が null でも TypeError を起こさず拒否する', async () => {
+        const result = await updateStandaloneProblem('problem-1', null as never);
+
+        expect(result.error).toBe('不正なリクエストです');
+        expect(problemFindUniqueMock).not.toHaveBeenCalled();
+        expect(transactionMock).not.toHaveBeenCalled();
+    });
+
     it('updateStandaloneProblem は string でない question (null 等) も TypeError を起こさず拒否する', async () => {
         const result = await updateStandaloneProblem('problem-1', {
             // Server Action 引数は runtime に任意値が入りうる
