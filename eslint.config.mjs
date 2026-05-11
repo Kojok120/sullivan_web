@@ -17,6 +17,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // 過去に一度きり実行された退避済みスクリプト群
+    "scripts/_archive/**",
   ]),
 ]);
 
