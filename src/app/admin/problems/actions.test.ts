@@ -542,6 +542,17 @@ describe('problem actions permissions', () => {
         expect(txProblemRevisionUpdateMock).toHaveBeenCalledOnce();
     });
 
+    it('updateStandaloneProblem は空白のみの question を拒否する (paragraphBlockSchema 違反防止)', async () => {
+        const result = await updateStandaloneProblem('problem-1', {
+            question: '   \n\t  ',
+        });
+
+        expect(result.error).toBe('問題文を入力してください');
+        // バリデーションで早期 return するので DB クエリにも到達しない
+        expect(problemFindUniqueMock).not.toHaveBeenCalled();
+        expect(transactionMock).not.toHaveBeenCalled();
+    });
+
     it('getProblems は検索が空のときは固定処理を行わず単一クエリで返す', async () => {
         const items = [
             { id: 'p1', customId: 'E-1' },

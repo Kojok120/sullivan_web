@@ -201,6 +201,9 @@ export async function createProblemCore(
     if (data.coreProblemIds.length === 0) {
         throw new Error('CoreProblemは必須です');
     }
+    if (!data.question || !data.question.trim()) {
+        throw new Error('問題文が空のため作成できません');
+    }
 
     const subjectId = await resolveSubjectId(data, prisma);
     if (!subjectId) {
@@ -442,6 +445,9 @@ async function createProblemWithRevisionUsing(
     customId: string,
     order: number,
 ): Promise<void> {
+    if (!problem.question || !problem.question.trim()) {
+        throw new Error('問題文が空のため作成できません');
+    }
     const revisionData = buildPublishedRevisionData({ ...problem, revisionNumber: 1 });
     const created = await tx.problem.create({
         data: {
@@ -613,6 +619,9 @@ async function updateProblemWithRevisionUsing(
     tx: ProblemServiceClient,
     item: NormalizedProblemData & { id: string; publishedRevisionId: string | null },
 ): Promise<void> {
+    if (!item.question || !item.question.trim()) {
+        throw new Error('問題文が空のため更新できません');
+    }
     await tx.problem.update({
         where: { id: item.id },
         data: {

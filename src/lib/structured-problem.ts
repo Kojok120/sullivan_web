@@ -407,25 +407,30 @@ export function wouldFlattenLoseStructuredContent(raw: unknown): boolean {
 /**
  * プレーンテキストの問題文から最小構成の structuredContent ドキュメントを組み立てる。
  * 連続する改行で段落を切り出し、空段落はスキップする。
- * 入力が空文字の場合は空段落 1 つ (`text: ''`) を含めた骨組みを返す。
+ * 空文字や空白のみの入力は paragraph schema (text.min(1)) に違反するため例外を投げる。
  */
+export class BlankStructuredQuestionError extends Error {
+    constructor() {
+        super('問題文が空のため structured content を生成できません');
+        this.name = 'BlankStructuredQuestionError';
+    }
+}
+
 export function buildStructuredDocumentFromText(text: string): StructuredProblemDocument {
     const paragraphs = (text ?? '')
         .split(/\r?\n+/)
         .map((line) => line.trim())
         .filter((line) => line.length > 0);
 
-    const blocks = paragraphs.length > 0
-        ? paragraphs.map((paragraphText) => ({
-            id: createStructuredBlockId(),
-            type: 'paragraph' as const,
-            text: paragraphText,
-        }))
-        : [{
-            id: createStructuredBlockId(),
-            type: 'paragraph' as const,
-            text: '',
-        }];
+    if (paragraphs.length === 0) {
+        throw new BlankStructuredQuestionError();
+    }
+
+    const blocks = paragraphs.map((paragraphText) => ({
+        id: createStructuredBlockId(),
+        type: 'paragraph' as const,
+        text: paragraphText,
+    }));
 
     return {
         version: 1,

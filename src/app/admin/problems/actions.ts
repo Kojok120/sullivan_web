@@ -450,6 +450,9 @@ export async function createStandaloneProblem(data: {
     coreProblemIds: string[];
 }) {
     await requireAdmin();
+    if (!data.question || !data.question.trim()) {
+        return { error: '問題文を入力してください' };
+    }
     try {
         const resolvedVideoStatus = resolveVideoStatusFromUrl(data.videoStatus, data.videoUrl);
         const problem = await createProblemCore({
@@ -481,6 +484,11 @@ export async function updateStandaloneProblem(id: string, data: {
     coreProblemIds?: string[];
 }) {
     await requireAdmin();
+    // 空白のみの question で revision を作ると paragraphBlockSchema (text.min(1)) を
+    // 違反する structuredContent が保存され、以後の parseStructuredDocument が壊れる。
+    if (data.question !== undefined && !data.question.trim()) {
+        return { error: '問題文を入力してください' };
+    }
     try {
         const updateData: Prisma.ProblemUpdateInput = {
             question: data.question,
