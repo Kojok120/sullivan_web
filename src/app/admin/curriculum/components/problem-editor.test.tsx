@@ -12,6 +12,7 @@ vi.mock('../actions', () => ({
 
 type EditorProblemFixture = {
     id: string;
+    question: string;
     answer: string | null;
     customId: string;
     grade: string | null;
@@ -36,6 +37,7 @@ function makeStructuredContent(text: string): unknown {
 function makeProblem(overrides: Partial<EditorProblemFixture> & { id: string; question: string }): EditorProblemFixture {
     const { question, ...rest } = overrides;
     return {
+        question,
         answer: 'x=3',
         customId: 'E-1',
         grade: '中1',
@@ -126,6 +128,30 @@ describe('ProblemEditor', () => {
 
         expect(screen.getByText('未設定の問題')).toBeInTheDocument();
         expect(screen.getAllByText('-').length).toBeGreaterThanOrEqual(5);
+    });
+
+    it('publishedRevision が無い DRAFT 問題は legacy question にフォールバックする', async () => {
+        getProblemsByCoreProblemMock.mockResolvedValue({
+            success: true,
+            problems: [
+                {
+                    id: 'problem-draft',
+                    question: 'DRAFTの問題文',
+                    answer: 'x=9',
+                    customId: 'D-1',
+                    grade: '中3',
+                    masterNumber: 999,
+                    videoUrl: null,
+                    coreProblems: [],
+                    publishedRevision: null,
+                } satisfies EditorProblemFixture,
+            ],
+        });
+
+        render(<ProblemEditor coreProblemId="cp-draft" />);
+
+        expect(await screen.findByText('DRAFTの問題文')).toBeInTheDocument();
+        expect(screen.getByText('x=9')).toBeInTheDocument();
     });
 
     it('http/https 以外の動画URLはリンク化しない', async () => {

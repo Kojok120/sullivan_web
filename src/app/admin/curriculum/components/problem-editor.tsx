@@ -19,6 +19,7 @@ interface ProblemEditorProps {
 type ProblemEditorProblem = Prisma.ProblemGetPayload<{
     select: {
         id: true;
+        question: true;
         answer: true;
         customId: true;
         grade: true;
@@ -85,7 +86,10 @@ function getSafeExternalHref(rawUrl: string | null | undefined) {
 
 function ProblemItem({ problem, editHref }: { problem: ProblemEditorProblem; editHref?: string }) {
     const safeVideoUrl = getSafeExternalHref(problem.videoUrl);
-    const displayQuestion = getDisplayQuestionFromStructuredContent(problem.publishedRevision?.structuredContent);
+    const displayQuestion =
+        getDisplayQuestionFromStructuredContent(problem.publishedRevision?.structuredContent)
+        || problem.question
+        || '';
     const displayAnswer = problem.publishedRevision?.correctAnswer ?? problem.answer ?? '';
 
     return (

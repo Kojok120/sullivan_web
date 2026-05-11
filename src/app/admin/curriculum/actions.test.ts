@@ -72,6 +72,7 @@ describe('curriculum actions', () => {
                 },
                 select: {
                     id: true,
+                    question: true,
                     answer: true,
                     customId: true,
                     grade: true,

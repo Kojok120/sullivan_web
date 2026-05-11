@@ -349,7 +349,10 @@ export function ProblemList({
                     </div>
                 ) : (
                     problems.map((problem) => {
-                        const displayQuestion = getDisplayQuestionFromStructuredContent(problem.publishedRevision?.structuredContent);
+                        const displayQuestion =
+                            getDisplayQuestionFromStructuredContent(problem.publishedRevision?.structuredContent)
+                            || problem.question
+                            || '';
                         const displayAnswer = problem.publishedRevision?.correctAnswer ?? problem.answer ?? '';
                         return (
                         <div key={problem.id} className="rounded-lg border bg-card p-4">
@@ -469,7 +472,10 @@ export function ProblemList({
                             </TableRow>
                         ) : (
                             problems.map((problem) => {
-                                const displayQuestion = getDisplayQuestionFromStructuredContent(problem.publishedRevision?.structuredContent);
+                                const displayQuestion =
+                                    getDisplayQuestionFromStructuredContent(problem.publishedRevision?.structuredContent)
+                                    || problem.question
+                                    || '';
                                 const displayAnswer = problem.publishedRevision?.correctAnswer ?? problem.answer ?? '';
                                 return (
                                 <TableRow key={problem.id}>

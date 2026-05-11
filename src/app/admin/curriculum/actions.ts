@@ -578,6 +578,7 @@ export async function getProblemsByCoreProblem(coreProblemId: string) {
             },
             select: {
                 id: true,
+                question: true,
                 answer: true,
                 customId: true,
                 grade: true,
