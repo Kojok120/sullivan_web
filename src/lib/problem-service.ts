@@ -301,6 +301,13 @@ async function normalizeProblemsForBulk(
     const normalized: NormalizedProblemData[] = [];
 
     for (const problem of problems) {
+        // 空白のみの question は buildStructuredDocumentFromText で例外になり、
+        // 落とすとバッチ全体が break で中断するため、ここでスキップして warning に記録する。
+        if (typeof problem.question !== 'string' || !problem.question.trim()) {
+            warnings.push(`${getProblemLabel(problem)} は問題文が空のためスキップしました`);
+            continue;
+        }
+
         if (problem.coreProblemIds.length === 0) {
             warnings.push(`${getProblemLabel(problem)} はCoreProblem未設定のためスキップしました`);
             continue;
