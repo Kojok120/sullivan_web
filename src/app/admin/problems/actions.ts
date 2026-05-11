@@ -450,6 +450,13 @@ export async function createStandaloneProblem(data: {
     coreProblemIds: string[];
 }) {
     await requireAdmin();
+    // Server Action 引数は runtime に null/非 object も入りうるため payload 形状から検証する。
+    if (data == null || typeof data !== 'object') {
+        return { error: '不正なリクエストです' };
+    }
+    if (typeof data.question !== 'string' || !data.question.trim()) {
+        return { error: '問題文を入力してください' };
+    }
     try {
         const resolvedVideoStatus = resolveVideoStatusFromUrl(data.videoStatus, data.videoUrl);
         const problem = await createProblemCore({
@@ -481,6 +488,15 @@ export async function updateStandaloneProblem(id: string, data: {
     coreProblemIds?: string[];
 }) {
     await requireAdmin();
+    // Server Action 引数は runtime に null/非 object も入りうるため payload 形状から検証する。
+    if (data == null || typeof data !== 'object') {
+        return { error: '不正なリクエストです' };
+    }
+    // 空白のみの question で revision を作ると paragraphBlockSchema (text.min(1)) を
+    // 違反する structuredContent が保存され、以後の parseStructuredDocument が壊れる。
+    if (data.question !== undefined && (typeof data.question !== 'string' || !data.question.trim())) {
+        return { error: '問題文を入力してください' };
+    }
     try {
         const updateData: Prisma.ProblemUpdateInput = {
             question: data.question,

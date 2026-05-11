@@ -542,6 +542,36 @@ describe('problem actions permissions', () => {
         expect(txProblemRevisionUpdateMock).toHaveBeenCalledOnce();
     });
 
+    it('updateStandaloneProblem は空白のみの question を拒否する (paragraphBlockSchema 違反防止)', async () => {
+        const result = await updateStandaloneProblem('problem-1', {
+            question: '   \n\t  ',
+        });
+
+        expect(result.error).toBe('問題文を入力してください');
+        // バリデーションで早期 return するので DB クエリにも到達しない
+        expect(problemFindUniqueMock).not.toHaveBeenCalled();
+        expect(transactionMock).not.toHaveBeenCalled();
+    });
+
+    it('updateStandaloneProblem は payload が null でも TypeError を起こさず拒否する', async () => {
+        const result = await updateStandaloneProblem('problem-1', null as never);
+
+        expect(result.error).toBe('不正なリクエストです');
+        expect(problemFindUniqueMock).not.toHaveBeenCalled();
+        expect(transactionMock).not.toHaveBeenCalled();
+    });
+
+    it('updateStandaloneProblem は string でない question (null 等) も TypeError を起こさず拒否する', async () => {
+        const result = await updateStandaloneProblem('problem-1', {
+            // Server Action 引数は runtime に任意値が入りうる
+            question: null as unknown as string,
+        });
+
+        expect(result.error).toBe('問題文を入力してください');
+        expect(problemFindUniqueMock).not.toHaveBeenCalled();
+        expect(transactionMock).not.toHaveBeenCalled();
+    });
+
     it('getProblems は検索が空のときは固定処理を行わず単一クエリで返す', async () => {
         const items = [
             { id: 'p1', customId: 'E-1' },

@@ -97,7 +97,9 @@ function getProblemLabel(problem: Pick<CreateProblemData, 'question' | 'masterNu
     const masterNumberLabel = typeof problem.masterNumber === 'number'
         ? String(problem.masterNumber)
         : '未設定';
-    const question = problem.question.trim() || '(問題文なし)';
+    // 入力は Server Action 経由で runtime に何でも入りうるので非 string も安全に扱う
+    const rawQuestion = typeof problem.question === 'string' ? problem.question.trim() : '';
+    const question = rawQuestion || '(問題文なし)';
     return `【マスタNo: ${masterNumberLabel}】問題文: ${question}`;
 }
 
@@ -201,6 +203,9 @@ export async function createProblemCore(
     if (data.coreProblemIds.length === 0) {
         throw new Error('CoreProblemは必須です');
     }
+    if (!data.question || !data.question.trim()) {
+        throw new Error('問題文が空のため作成できません');
+    }
 
     const subjectId = await resolveSubjectId(data, prisma);
     if (!subjectId) {
@@ -298,6 +303,13 @@ async function normalizeProblemsForBulk(
     const normalized: NormalizedProblemData[] = [];
 
     for (const problem of problems) {
+        // 空白のみの question は buildStructuredDocumentFromText で例外になり、
+        // 落とすとバッチ全体が break で中断するため、ここでスキップして warning に記録する。
+        if (typeof problem.question !== 'string' || !problem.question.trim()) {
+            warnings.push(`${getProblemLabel(problem)} は問題文が空のためスキップしました`);
+            continue;
+        }
+
         if (problem.coreProblemIds.length === 0) {
             warnings.push(`${getProblemLabel(problem)} はCoreProblem未設定のためスキップしました`);
             continue;
@@ -442,6 +454,9 @@ async function createProblemWithRevisionUsing(
     customId: string,
     order: number,
 ): Promise<void> {
+    if (!problem.question || !problem.question.trim()) {
+        throw new Error('問題文が空のため作成できません');
+    }
     const revisionData = buildPublishedRevisionData({ ...problem, revisionNumber: 1 });
     const created = await tx.problem.create({
         data: {
@@ -613,6 +628,9 @@ async function updateProblemWithRevisionUsing(
     tx: ProblemServiceClient,
     item: NormalizedProblemData & { id: string; publishedRevisionId: string | null },
 ): Promise<void> {
+    if (!item.question || !item.question.trim()) {
+        throw new Error('問題文が空のため更新できません');
+    }
     await tx.problem.update({
         where: { id: item.id },
         data: {

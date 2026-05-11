@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+    BlankStructuredQuestionError,
     buildAiProblemText,
+    buildStructuredDocumentFromText,
     collectStructuredDocumentAssetIds,
     normalizeAnswerForAuthoring,
     normalizeAnswerSpecForAuthoring,
@@ -165,6 +167,21 @@ describe('structured-problem', () => {
         it('null / 不正な JSON は false (失う情報なしと判定)', () => {
             expect(wouldFlattenLoseStructuredContent(null)).toBe(false);
             expect(wouldFlattenLoseStructuredContent({ foo: 'bar' })).toBe(false);
+        });
+    });
+
+    describe('buildStructuredDocumentFromText', () => {
+        it('paragraph schema 違反を防ぐため、空文字入力は BlankStructuredQuestionError を投げる', () => {
+            expect(() => buildStructuredDocumentFromText('')).toThrow(BlankStructuredQuestionError);
+            expect(() => buildStructuredDocumentFromText('   ')).toThrow(BlankStructuredQuestionError);
+            expect(() => buildStructuredDocumentFromText('\n\n   \n')).toThrow(BlankStructuredQuestionError);
+        });
+
+        it('非空入力は paragraph ブロックの配列に整形する', () => {
+            const document = buildStructuredDocumentFromText('一行目\n\n二行目');
+            expect(document.blocks).toHaveLength(2);
+            expect(document.blocks[0]).toMatchObject({ type: 'paragraph', text: '一行目' });
+            expect(document.blocks[1]).toMatchObject({ type: 'paragraph', text: '二行目' });
         });
     });
 
