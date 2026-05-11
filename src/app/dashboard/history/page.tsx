@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { DateDisplay } from '@/components/ui/date-display';
 import { ProblemTextPreview } from '@/app/admin/problems/components/problem-text-preview';
+import { getDisplayQuestionFromStructuredContent } from '@/lib/structured-problem';
 
 export default async function HistoryPage({
     searchParams,
@@ -95,7 +96,7 @@ export default async function HistoryPage({
                                         </td>
                                         <td className="px-6 py-4 max-w-xs">
                                             <ProblemTextPreview
-                                                text={item.problem.question}
+                                                text={getDisplayQuestionFromStructuredContent(item.problem.publishedRevision?.structuredContent)}
                                                 className="text-sm leading-6 [&_.katex-display]:overflow-x-auto [&_.katex-display]:py-1 [&_svg.numberline]:max-w-full"
                                             />
                                         </td>

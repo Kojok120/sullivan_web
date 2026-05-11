@@ -17,6 +17,8 @@ function createProblem(overrides: Partial<ProblemForGrading> = {}): ProblemForGr
         answer: '42',
         acceptedAnswers: ['四十二'],
         publishedRevisionId: 'revision-1',
+        publishedRevisionCorrectAnswer: '42',
+        publishedRevisionAcceptedAnswers: ['四十二'],
         structuredContent: null,
         revisionAssets: [],
         coreProblems: [],
@@ -25,13 +27,14 @@ function createProblem(overrides: Partial<ProblemForGrading> = {}): ProblemForGr
 }
 
 describe('grading-service helpers', () => {
-    it('structured 問題: 問題文は structuredContent から、正解は Problem.answer から組み立てる', () => {
-        // publish 時に ProblemRevision.correctAnswer は Problem.answer に同期されているため
-        // 採点側は Problem.answer / acceptedAnswers のみを正解の信頼源として扱う。
+    it('structured 問題: 問題文は structuredContent から、正解は publishedRevision から組み立てる', () => {
+        // Phase B1 以降: 正解は publishedRevision.correctAnswer / acceptedAnswers を信頼源とする。
         const context = buildProblemContextForGemini(createProblem({
             subjectName: '理科',
-            answer: 'B',
-            acceptedAnswers: ['18'],
+            answer: 'legacy-answer',
+            acceptedAnswers: ['legacy-alt'],
+            publishedRevisionCorrectAnswer: 'B',
+            publishedRevisionAcceptedAnswers: ['18'],
             structuredContent: {
                 version: 1,
                 summary: '作図問題',
@@ -60,6 +63,19 @@ describe('grading-service helpers', () => {
         });
         expect(context.problemText).toContain('概要: 作図問題');
         expect(context.problemText).toContain('選択肢:');
+    });
+
+    it('publishedRevision の正解が空の場合は Problem.answer / acceptedAnswers にフォールバックする', () => {
+        // Phase C 完了 (Problem.answer drop) までの過渡期フォールバック動作の回帰防止。
+        const context = buildProblemContextForGemini(createProblem({
+            answer: 'legacy-fallback',
+            acceptedAnswers: ['legacy-alt'],
+            publishedRevisionCorrectAnswer: null,
+            publishedRevisionAcceptedAnswers: [],
+        }), 0);
+
+        expect(context.referenceAnswer).toBe('legacy-fallback');
+        expect(context.alternativeAnswers).toEqual(['legacy-alt']);
     });
 
     it('structured 問題: figure 取得は structuredContent の有無で判定する', () => {

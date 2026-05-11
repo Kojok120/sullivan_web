@@ -331,6 +331,31 @@ export function collectStructuredDocumentAssetIds(document: StructuredProblemDoc
  * Stage B' 以降は answer 系を answerSpec から導出せず、呼び出し側から直接渡してもらう。
  * question は document の summary と paragraph ブロックから合成する。
  */
+/**
+ * publishedRevision.structuredContent を入力として、生徒画面・履歴・一覧表示などで
+ * 「問題本文」として表示するための短い派生テキストを返す。
+ *
+ * Phase B3 で Problem.question の直接参照を撤廃するための共通ヘルパー。
+ * 入力が空・解析不能なら空文字を返す（呼び出し側でプレースホルダ等にフォールバックする）。
+ */
+export function getDisplayQuestionFromStructuredContent(raw: unknown): string {
+    if (!raw) return '';
+    try {
+        const document = parseStructuredDocument(raw);
+        return [
+            document.summary,
+            ...document.blocks
+                .filter((block) => block.type === 'paragraph')
+                .map((block) => block.text),
+        ]
+            .filter(Boolean)
+            .join('\n')
+            .slice(0, 4000);
+    } catch {
+        return '';
+    }
+}
+
 export function deriveLegacyFieldsFromStructuredData(input: {
     document: StructuredProblemDocument;
     correctAnswer: string;

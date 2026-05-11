@@ -58,10 +58,15 @@ type SessionDetailMock = {
     answeredAt: Date
     isVideoWatched: boolean
     problem: {
-        question: string
+        question?: string
         answer: string | null
         customId: string
         videoUrl: string | null
+        publishedRevision?: {
+            structuredContent: unknown
+            correctAnswer: string | null
+            acceptedAnswers: string[]
+        } | null
         coreProblems: {
             name: string
             subject: {
@@ -69,6 +74,25 @@ type SessionDetailMock = {
             }
             lectureVideos: { title: string; url: string }[]
         }[]
+    }
+}
+
+function buildPublishedRevisionFromMock(problem: SessionDetailMock['problem']): SessionDetailMock['problem']['publishedRevision'] {
+    if (problem.publishedRevision !== undefined) {
+        return problem.publishedRevision
+    }
+    if (!problem.question) {
+        return null
+    }
+    return {
+        structuredContent: {
+            version: 1,
+            blocks: [
+                { id: 'block-1', type: 'paragraph', text: problem.question },
+            ],
+        },
+        correctAnswer: problem.answer ?? null,
+        acceptedAnswers: [],
     }
 }
 
@@ -213,8 +237,15 @@ describe('SessionDetail', () => {
             )
             return
         }
+        const withRevision = details.map((detail) => ({
+            ...detail,
+            problem: {
+                ...detail.problem,
+                publishedRevision: buildPublishedRevisionFromMock(detail.problem),
+            },
+        }))
         vi.mocked(analytics.getSessionDetails).mockResolvedValue(
-            details as unknown as SessionDetailsResult
+            withRevision as unknown as SessionDetailsResult
         )
     }
 

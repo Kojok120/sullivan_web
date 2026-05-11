@@ -62,7 +62,6 @@ export async function GET(
     const printableProblem = {
         id: problem.id,
         customId,
-        question: problem.question,
         order: problem.order,
         problemType: problem.problemType,
         status: problem.status,

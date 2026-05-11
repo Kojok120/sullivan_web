@@ -507,7 +507,7 @@ export async function getLearningHistory(
                 problem: {
                     select: {
                         id: true,
-                        question: true,
+                        publishedRevision: { select: { structuredContent: true } },
                         coreProblems: {
                             select: {
                                 id: true,
@@ -654,9 +654,16 @@ export async function getSessionDetails(groupId: string, userId?: string) {
         include: {
             problem: {
                 include: {
-                    coreProblems: { include: { subject: true } }
-                }
-            }
+                    coreProblems: { include: { subject: true } },
+                    publishedRevision: {
+                        select: {
+                            structuredContent: true,
+                            correctAnswer: true,
+                            acceptedAnswers: true,
+                        },
+                    },
+                },
+            },
         },
         // ID順（挿入順）で並べる = 問題用紙と同じ順序
         orderBy: { id: 'asc' }
@@ -705,7 +712,7 @@ export async function getStudentDashboardData(userId: string) {
                 problem: {
                     select: {
                         id: true,
-                        question: true,
+                        publishedRevision: { select: { structuredContent: true } },
                         // 表示で使うのは先頭の CoreProblem のみのため、転送量と JOIN コストを抑える
                         coreProblems: {
                             select: {

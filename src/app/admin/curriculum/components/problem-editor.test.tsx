@@ -10,6 +10,48 @@ vi.mock('../actions', () => ({
     getProblemsByCoreProblem: getProblemsByCoreProblemMock,
 }));
 
+type EditorProblemFixture = {
+    id: string;
+    question: string;
+    answer: string | null;
+    customId: string;
+    grade: string | null;
+    masterNumber: number | null;
+    videoUrl: string | null;
+    publishedRevision: {
+        structuredContent: unknown;
+        correctAnswer: string | null;
+    } | null;
+    coreProblems: Array<{ id: string; name: string; subject: { name: string } }>;
+};
+
+function makeStructuredContent(text: string): unknown {
+    return {
+        version: 1,
+        blocks: [
+            { id: 'block-1', type: 'paragraph', text },
+        ],
+    };
+}
+
+function makeProblem(overrides: Partial<EditorProblemFixture> & { id: string; question: string }): EditorProblemFixture {
+    const { question, ...rest } = overrides;
+    return {
+        question,
+        answer: 'x=3',
+        customId: 'E-1',
+        grade: '中1',
+        masterNumber: 101,
+        videoUrl: null,
+        coreProblems: [],
+        publishedRevision: {
+            structuredContent: makeStructuredContent(question),
+            correctAnswer: rest.answer ?? null,
+        },
+        ...rest,
+    };
+}
+
 function createDeferred<T>() {
     let resolve!: (value: T) => void;
     let reject!: (reason?: unknown) => void;
@@ -30,7 +72,7 @@ describe('ProblemEditor', () => {
         getProblemsByCoreProblemMock.mockResolvedValue({
             success: true,
             problems: [
-                {
+                makeProblem({
                     id: 'problem-1',
                     question: '一次方程式を解け',
                     answer: 'x=3',
@@ -54,8 +96,8 @@ describe('ProblemEditor', () => {
                             },
                         },
                     ],
-                },
-                {
+                }),
+                makeProblem({
                     id: 'problem-2',
                     question: '未設定の問題',
                     answer: null,
@@ -64,7 +106,7 @@ describe('ProblemEditor', () => {
                     masterNumber: null,
                     videoUrl: null,
                     coreProblems: [],
-                },
+                }),
             ],
         });
 
@@ -88,11 +130,35 @@ describe('ProblemEditor', () => {
         expect(screen.getAllByText('-').length).toBeGreaterThanOrEqual(5);
     });
 
-    it('http/https 以外の動画URLはリンク化しない', async () => {
+    it('publishedRevision が無い DRAFT 問題は legacy question にフォールバックする', async () => {
         getProblemsByCoreProblemMock.mockResolvedValue({
             success: true,
             problems: [
                 {
+                    id: 'problem-draft',
+                    question: 'DRAFTの問題文',
+                    answer: 'x=9',
+                    customId: 'D-1',
+                    grade: '中3',
+                    masterNumber: 999,
+                    videoUrl: null,
+                    coreProblems: [],
+                    publishedRevision: null,
+                } satisfies EditorProblemFixture,
+            ],
+        });
+
+        render(<ProblemEditor coreProblemId="cp-draft" />);
+
+        expect(await screen.findByText('DRAFTの問題文')).toBeInTheDocument();
+        expect(screen.getByText('x=9')).toBeInTheDocument();
+    });
+
+    it('http/https 以外の動画URLはリンク化しない', async () => {
+        getProblemsByCoreProblemMock.mockResolvedValue({
+            success: true,
+            problems: [
+                makeProblem({
                     id: 'problem-unsafe',
                     question: '危険なURLの問題',
                     answer: 'x=1',
@@ -101,7 +167,7 @@ describe('ProblemEditor', () => {
                     masterNumber: 102,
                     videoUrl: 'javascript:alert(1)',
                     coreProblems: [],
-                },
+                }),
             ],
         });
 
@@ -119,29 +185,11 @@ describe('ProblemEditor', () => {
     it('coreProblemId 切り替え後に古いリクエスト結果で上書きしない', async () => {
         const firstRequest = createDeferred<{
             success: boolean;
-            problems?: Array<{
-                id: string;
-                question: string;
-                answer: string | null;
-                customId: string;
-                grade: string | null;
-                masterNumber: number | null;
-                videoUrl: string | null;
-                coreProblems: Array<{ id: string; name: string; subject: { name: string } }>;
-            }>;
+            problems?: EditorProblemFixture[];
         }>();
         const secondRequest = createDeferred<{
             success: boolean;
-            problems?: Array<{
-                id: string;
-                question: string;
-                answer: string | null;
-                customId: string;
-                grade: string | null;
-                masterNumber: number | null;
-                videoUrl: string | null;
-                coreProblems: Array<{ id: string; name: string; subject: { name: string } }>;
-            }>;
+            problems?: EditorProblemFixture[];
         }>();
 
         getProblemsByCoreProblemMock.mockImplementation((coreProblemId: string) => {
@@ -168,7 +216,7 @@ describe('ProblemEditor', () => {
             secondRequest.resolve({
                 success: true,
                 problems: [
-                    {
+                    makeProblem({
                         id: 'problem-new',
                         question: '新しい問題',
                         answer: 'x=4',
@@ -177,7 +225,7 @@ describe('ProblemEditor', () => {
                         masterNumber: 201,
                         videoUrl: null,
                         coreProblems: [],
-                    },
+                    }),
                 ],
             });
             await secondRequest.promise;
@@ -189,7 +237,7 @@ describe('ProblemEditor', () => {
             firstRequest.resolve({
                 success: true,
                 problems: [
-                    {
+                    makeProblem({
                         id: 'problem-old',
                         question: '古い問題',
                         answer: 'x=1',
@@ -198,7 +246,7 @@ describe('ProblemEditor', () => {
                         masterNumber: 101,
                         videoUrl: null,
                         coreProblems: [],
-                    },
+                    }),
                 ],
             });
             await firstRequest.promise;
@@ -213,7 +261,7 @@ describe('ProblemEditor', () => {
             .mockResolvedValueOnce({
                 success: true,
                 problems: [
-                    {
+                    makeProblem({
                         id: 'problem-1',
                         question: '表示中の問題',
                         answer: 'x=3',
@@ -222,7 +270,7 @@ describe('ProblemEditor', () => {
                         masterNumber: 101,
                         videoUrl: null,
                         coreProblems: [],
-                    },
+                    }),
                 ],
             })
             .mockResolvedValueOnce({
@@ -243,29 +291,11 @@ describe('ProblemEditor', () => {
     it('coreProblemId 切り替え中は前回の問題一覧ではなくローディングを表示する', async () => {
         const firstRequest = createDeferred<{
             success: boolean;
-            problems?: Array<{
-                id: string;
-                question: string;
-                answer: string | null;
-                customId: string;
-                grade: string | null;
-                masterNumber: number | null;
-                videoUrl: string | null;
-                coreProblems: Array<{ id: string; name: string; subject: { name: string } }>;
-            }>;
+            problems?: EditorProblemFixture[];
         }>();
         const secondRequest = createDeferred<{
             success: boolean;
-            problems?: Array<{
-                id: string;
-                question: string;
-                answer: string | null;
-                customId: string;
-                grade: string | null;
-                masterNumber: number | null;
-                videoUrl: string | null;
-                coreProblems: Array<{ id: string; name: string; subject: { name: string } }>;
-            }>;
+            problems?: EditorProblemFixture[];
         }>();
 
         getProblemsByCoreProblemMock.mockImplementation((coreProblemId: string) => {
@@ -282,7 +312,7 @@ describe('ProblemEditor', () => {
             firstRequest.resolve({
                 success: true,
                 problems: [
-                    {
+                    makeProblem({
                         id: 'problem-1',
                         question: '表示中の問題',
                         answer: 'x=3',
@@ -291,7 +321,7 @@ describe('ProblemEditor', () => {
                         masterNumber: 101,
                         videoUrl: null,
                         coreProblems: [],
-                    },
+                    }),
                 ],
             });
             await firstRequest.promise;

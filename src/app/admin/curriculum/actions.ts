@@ -584,6 +584,12 @@ export async function getProblemsByCoreProblem(coreProblemId: string) {
                 grade: true,
                 masterNumber: true,
                 videoUrl: true,
+                publishedRevision: {
+                    select: {
+                        structuredContent: true,
+                        correctAnswer: true,
+                    },
+                },
                 coreProblems: {
                     select: {
                         id: true,
