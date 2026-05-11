@@ -33,11 +33,12 @@ export function adminCreds(): EnvCreds {
     }
     return {
         loginId: process.env.E2E_PROD_LOGIN_ID ?? 'A0001',
-        // A0001 の実パスワードは DEV / PROD どちらの Supabase Auth でも 'password'。
-        // 旧 default 'password123' は実環境のどこにも存在せず、loginAs() が
-        // /login に留まる → 各 admin 系 E2E が test.skip() で全件 silent skip
-        // していた (E2E_PROD_BASE_URL 未設定のローカル DEV 実行で顕在化)。
-        password: process.env.E2E_PROD_PASSWORD ?? 'password',
+        // default は prisma/seed.ts の DEFAULT_PASSWORD ('password123') と
+        // 揃えている。実運用の Supabase Auth は A0001 を 'password' に
+        // 変更しているなど seed default と乖離している場合があるので、
+        // その時は環境変数 E2E_PROD_PASSWORD で実態を上書きする
+        // (fresh seeded 環境では下記 default で素直に動く)。
+        password: process.env.E2E_PROD_PASSWORD ?? 'password123',
     };
 }
 
