@@ -59,6 +59,9 @@ next-env.d.ts
 /scripts/data/_extracted/math-cp-*.json
 /tmp/
 
+# 英語問題の解答バックフィル用ワークスペース (extract / generate / review)
+/.tmp/
+
 # 数学の問題格納
 /math_problems_originals/*
 

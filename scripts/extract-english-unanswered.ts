@@ -1,0 +1,323 @@
+/**
+ * 英語問題のうち解答が未設定のものを抽出し、サブエージェント分割用バッチ JSON
+ * として書き出す read-only スクリプト。
+ *
+ * 出力構造（既定: <repo>/.tmp/english-answers/）:
+ *   manifest.json                            進捗管理（pending / generated / reviewed / applied）
+ *   batch-001.json, batch-002.json, ...      50 問単位のバッチ（generation agent への入力）
+ *   divergence.json                          Problem.answer と correctAnswer の片方だけ埋まる問題（要別タスク）
+ *
+ * 抽出条件:
+ *   - subject.name = '英語'
+ *   - status = 'PUBLISHED'
+ *   - Problem.answer が NULL/空
+ *
+ * 実態として PROD/DEV の英語問題は 99.9% が publishedRevisionId = NULL で、
+ * Problem.answer が単独 canonical の状態。残りの僅かな問題（PR #169 以降に
+ * 編集 UI を通った分）は publishedRevisionId を持ち、ProblemRevision.correctAnswer
+ * と同期する必要がある。各アイテムに revisionId を持たせ、apply 側で経路分岐する:
+ *   - revisionId === null → Problem.answer のみ update
+ *   - revisionId !== null → ProblemRevision.correctAnswer と Problem.answer を
+ *     同一トランザクションで両方 update（publish フローの片方向同期に整合）。
+ *
+ * publishedRevisionId が存在し answer と correctAnswer が片方だけ空という divergence
+ * は別タスクとして divergence.json に分離する。
+ *
+ * 使い方:
+ *   tsx scripts/extract-english-unanswered.ts --env dev
+ *   tsx scripts/extract-english-unanswered.ts --env production --limit 100
+ *   tsx scripts/extract-english-unanswered.ts --env production --batch-size 50
+ */
+
+import 'dotenv/config';
+import { config as loadDotenv } from 'dotenv';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+type EnvName = 'dev' | 'production';
+
+interface CliOptions {
+    env: EnvName;
+    limit: number | null;
+    batchSize: number;
+    outDir: string;
+}
+
+function envFileFor(name: EnvName): string {
+    return name === 'production'
+        ? resolve(__dirname, '..', '.env.PRODUCTION')
+        : resolve(__dirname, '..', '.env.DEV');
+}
+
+function parseArgs(argv: string[]): CliOptions {
+    const opts: CliOptions = {
+        env: 'dev',
+        limit: null,
+        batchSize: 50,
+        outDir: resolve(__dirname, '..', '.tmp', 'english-answers'),
+    };
+    for (let i = 0; i < argv.length; i += 1) {
+        const arg = argv[i];
+        if (arg === '--env') {
+            const v = argv[i + 1];
+            if (v !== 'dev' && v !== 'production') {
+                throw new Error(`--env には dev か production を指定してください (received: ${v ?? '(none)'})`);
+            }
+            opts.env = v;
+            i += 1;
+            continue;
+        }
+        if (arg === '--limit') {
+            const v = argv[i + 1];
+            const parsed = Number.parseInt(v ?? '', 10);
+            if (!Number.isFinite(parsed) || parsed <= 0) {
+                throw new Error('--limit は正の整数を指定してください');
+            }
+            opts.limit = parsed;
+            i += 1;
+            continue;
+        }
+        if (arg === '--batch-size') {
+            const v = argv[i + 1];
+            const parsed = Number.parseInt(v ?? '', 10);
+            if (!Number.isFinite(parsed) || parsed <= 0) {
+                throw new Error('--batch-size は正の整数を指定してください');
+            }
+            opts.batchSize = parsed;
+            i += 1;
+            continue;
+        }
+        if (arg === '--out-dir') {
+            const v = argv[i + 1];
+            if (!v || v.startsWith('--')) throw new Error('--out-dir の値が不正です');
+            opts.outDir = resolve(v);
+            i += 1;
+            continue;
+        }
+        if (arg?.startsWith('--')) {
+            throw new Error(`未知のオプション: ${arg}`);
+        }
+    }
+    return opts;
+}
+
+function describeDatabaseUrl(databaseUrl: string | undefined) {
+    if (!databaseUrl) return '(未設定)';
+    try {
+        const url = new URL(databaseUrl);
+        const dbName = url.pathname.replace(/^\//, '') || '(no-db)';
+        return `${url.protocol}//${url.username || '(no-user)'}@${url.host}/${dbName}`;
+    } catch {
+        return '(parse-error)';
+    }
+}
+
+async function loadPrisma() {
+    const mod = await import('../src/lib/prisma');
+    return mod.prisma;
+}
+
+interface ExtractedItem {
+    problemId: string;
+    revisionId: string | null;
+    customId: string;
+    subjectName: string;
+    grade: string | null;
+    masterNumber: number | null;
+    question: string;
+    structuredContent: unknown;
+}
+
+interface DivergenceItem {
+    problemId: string;
+    revisionId: string;
+    customId: string;
+    problemAnswer: string;
+    revisionCorrectAnswer: string;
+}
+
+interface BatchManifestEntry {
+    batchId: string;
+    fileName: string;
+    count: number;
+    status: 'pending' | 'generated' | 'reviewed' | 'applied';
+}
+
+interface Manifest {
+    generatedAt: string;
+    env: EnvName;
+    totalCandidates: number;
+    divergenceCount: number;
+    batchSize: number;
+    batches: BatchManifestEntry[];
+}
+
+function chunk<T>(arr: T[], size: number): T[][] {
+    const out: T[][] = [];
+    for (let i = 0; i < arr.length; i += size) {
+        out.push(arr.slice(i, i + size));
+    }
+    return out;
+}
+
+async function main() {
+    const opts = parseArgs(process.argv.slice(2));
+    const envFile = envFileFor(opts.env);
+    if (!existsSync(envFile)) {
+        throw new Error(`env ファイルが見つかりません: ${envFile}`);
+    }
+    loadDotenv({ path: envFile, override: true });
+
+    console.log('--- 英語問題 未解答抽出 ---');
+    console.log(`env: ${opts.env} (${envFile})`);
+    console.log(`接続先 DB: ${describeDatabaseUrl(process.env.DATABASE_URL)}`);
+    console.log(`オプション: ${JSON.stringify({ ...opts, outDir: opts.outDir })}`);
+
+    const prisma = await loadPrisma();
+    try {
+        // 公開済みの英語問題を全件取得し、JS 側で振り分ける。
+        // PROD/DEV では 99.9% が publishedRevisionId = NULL で Problem.answer が単独 canonical。
+        // 残り僅かは publishedRevisionId を持つので、両カラムの状態で次に分類する:
+        //   - revision なし & answer 空                          → 抽出対象 (revisionId=null)
+        //   - revision なし & answer 埋                          → skip
+        //   - revision あり & 両方空                             → 抽出対象 (revisionId=...)
+        //   - revision あり & 片方のみ空 (divergence)             → 別タスク
+        //   - revision あり & 両方埋                             → skip
+        const problems = await prisma.problem.findMany({
+            where: {
+                subject: { name: '英語' },
+                status: 'PUBLISHED',
+            },
+            select: {
+                id: true,
+                customId: true,
+                question: true,
+                answer: true,
+                grade: true,
+                masterNumber: true,
+                publishedRevisionId: true,
+                publishedRevision: {
+                    select: {
+                        id: true,
+                        correctAnswer: true,
+                        structuredContent: true,
+                    },
+                },
+                subject: { select: { name: true } },
+            },
+            orderBy: [{ subjectId: 'asc' }, { customIdSortKey: 'asc' }],
+        });
+
+        const targets: ExtractedItem[] = [];
+        const divergence: DivergenceItem[] = [];
+        let bothFilled = 0;
+        let answeredNoRev = 0;
+
+        for (const p of problems) {
+            const probAnswer = (p.answer ?? '').trim();
+            const revisionId = p.publishedRevision?.id ?? null;
+
+            if (revisionId === null) {
+                // revision なしパス: Problem.answer のみで判断
+                if (probAnswer === '') {
+                    targets.push({
+                        problemId: p.id,
+                        revisionId: null,
+                        customId: p.customId,
+                        subjectName: p.subject.name,
+                        grade: p.grade,
+                        masterNumber: p.masterNumber,
+                        question: p.question,
+                        structuredContent: null,
+                    });
+                } else {
+                    answeredNoRev += 1;
+                }
+                continue;
+            }
+
+            // revision ありパス: 両カラムを照合
+            const revCorrect = (p.publishedRevision?.correctAnswer ?? '').trim();
+            if (probAnswer === '' && revCorrect === '') {
+                targets.push({
+                    problemId: p.id,
+                    revisionId,
+                    customId: p.customId,
+                    subjectName: p.subject.name,
+                    grade: p.grade,
+                    masterNumber: p.masterNumber,
+                    question: p.question,
+                    structuredContent: p.publishedRevision?.structuredContent ?? null,
+                });
+                continue;
+            }
+            if (probAnswer === '' || revCorrect === '') {
+                divergence.push({
+                    problemId: p.id,
+                    revisionId,
+                    customId: p.customId,
+                    problemAnswer: probAnswer,
+                    revisionCorrectAnswer: revCorrect,
+                });
+                continue;
+            }
+            bothFilled += 1;
+        }
+
+        const limited = opts.limit ? targets.slice(0, opts.limit) : targets;
+        const batches = chunk(limited, opts.batchSize);
+
+        mkdirSync(opts.outDir, { recursive: true });
+
+        const manifestEntries: BatchManifestEntry[] = [];
+        batches.forEach((items, i) => {
+            const batchId = `batch-${String(i + 1).padStart(3, '0')}`;
+            const fileName = `${batchId}.json`;
+            writeFileSync(
+                resolve(opts.outDir, fileName),
+                `${JSON.stringify({ batchId, items }, null, 2)}\n`,
+            );
+            manifestEntries.push({ batchId, fileName, count: items.length, status: 'pending' });
+        });
+
+        if (divergence.length > 0) {
+            writeFileSync(
+                resolve(opts.outDir, 'divergence.json'),
+                `${JSON.stringify({ generatedAt: new Date().toISOString(), env: opts.env, items: divergence }, null, 2)}\n`,
+            );
+        }
+
+        const manifest: Manifest = {
+            generatedAt: new Date().toISOString(),
+            env: opts.env,
+            totalCandidates: limited.length,
+            divergenceCount: divergence.length,
+            batchSize: opts.batchSize,
+            batches: manifestEntries,
+        };
+        writeFileSync(
+            resolve(opts.outDir, 'manifest.json'),
+            `${JSON.stringify(manifest, null, 2)}\n`,
+        );
+
+        const targetsNoRev = targets.filter((t) => t.revisionId === null).length;
+        const targetsWithRev = targets.length - targetsNoRev;
+        console.log('');
+        console.log(`[extract] 公開済み英語問題: ${problems.length} 件`);
+        console.log(`[extract]   ├─ 抽出対象 (answer 空): ${targets.length}${opts.limit ? ` (--limit ${opts.limit} 適用後 ${limited.length})` : ''}`);
+        console.log(`[extract]   │   ├─ revision なし (Problem.answer 単独 update): ${targetsNoRev}`);
+        console.log(`[extract]   │   └─ revision あり (両カラム同期 update): ${targetsWithRev}`);
+        console.log(`[extract]   ├─ divergence (要別タスク): ${divergence.length}`);
+        console.log(`[extract]   ├─ revision なし & answer 埋 (skip): ${answeredNoRev}`);
+        console.log(`[extract]   └─ revision あり & 両方埋 (skip): ${bothFilled}`);
+        console.log(`[extract] バッチ数: ${batches.length} (size=${opts.batchSize})`);
+        console.log(`[extract] 出力先: ${opts.outDir}`);
+    } finally {
+        await prisma.$disconnect();
+    }
+}
+
+main().catch((err) => {
+    console.error('スクリプトが失敗しました:', err);
+    process.exitCode = 1;
+});
