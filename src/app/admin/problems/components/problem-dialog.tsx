@@ -48,11 +48,46 @@ function ProblemDialogForm({
     onSuccess,
 }: Omit<ProblemDialogProps, 'open'>) {
     const [isPending, startTransition] = useTransition();
-    const [formData, setFormData] = useState<ProblemFormState>(() => createInitialFormState(problem));
+    const [initialFormData] = useState<ProblemFormState>(() => createInitialFormState(problem));
+    const [formData, setFormData] = useState<ProblemFormState>(initialFormData);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         startTransition(async () => {
+            // 編集時は触っていないフィールドを送らない。
+            // updateStandaloneProblem は question/answer/acceptedAnswers のいずれかが
+            // 来ると publishedRevision.structuredContent を paragraph テキストで上書きするため、
+            // 未変更のフィールドを送ると構造化ブロック (figure, directive, layout) を破壊する。
+            const questionChanged = formData.question !== initialFormData.question;
+            const answerChanged = formData.answer !== initialFormData.answer;
+
+            if (problem) {
+                const data: {
+                    question?: string;
+                    answer?: string;
+                    grade?: string;
+                    videoUrl?: string;
+                    videoStatus: VideoStatusValue;
+                    coreProblemIds: string[];
+                } = {
+                    grade: formData.grade || undefined,
+                    videoUrl: formData.videoUrl || undefined,
+                    videoStatus: resolveVideoStatusFromUrl(formData.videoStatus, formData.videoUrl),
+                    coreProblemIds: formData.coreProblems.map((cp) => cp.id),
+                };
+                if (questionChanged) data.question = formData.question;
+                if (answerChanged) data.answer = formData.answer;
+
+                const result = await updateStandaloneProblem(problem.id, data);
+                if (result.success) {
+                    toast.success('問題を更新しました');
+                    onSuccess();
+                } else {
+                    toast.error(result.error || '保存に失敗しました');
+                }
+                return;
+            }
+
             const data = {
                 question: formData.question,
                 answer: formData.answer,
@@ -62,12 +97,10 @@ function ProblemDialogForm({
                 coreProblemIds: formData.coreProblems.map((cp) => cp.id),
             };
 
-            const result = problem
-                ? await updateStandaloneProblem(problem.id, data)
-                : await createStandaloneProblem(data);
+            const result = await createStandaloneProblem(data);
 
             if (result.success) {
-                toast.success(problem ? '問題を更新しました' : '問題を作成しました');
+                toast.success('問題を作成しました');
                 onSuccess();
             } else {
                 toast.error(result.error || '保存に失敗しました');
