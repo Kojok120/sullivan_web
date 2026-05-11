@@ -384,6 +384,27 @@ export function deriveLegacyFieldsFromStructuredData(input: {
 }
 
 /**
+ * `buildStructuredDocumentFromText` の出力が paragraph ブロックのみで構成されるため、
+ * 既存 structuredContent に非 paragraph ブロックや summary/instructions が含まれる場合は
+ * プレーンテキストから再構築する処理で図形・選択肢・空欄などの構造化データが消失する。
+ * 本ヘルパーは「プレーンテキストへ flatten すると情報が失われる構造を持つか」を判定する。
+ *
+ * 入力が空・解析不能な場合は false (= 失われる情報なし) を返す。
+ */
+export function wouldFlattenLoseStructuredContent(raw: unknown): boolean {
+    if (!raw) return false;
+    try {
+        const document = parseStructuredDocument(raw);
+        if (document.summary?.trim() || document.instructions?.trim()) {
+            return true;
+        }
+        return document.blocks.some((block) => block.type !== 'paragraph');
+    } catch {
+        return false;
+    }
+}
+
+/**
  * プレーンテキストの問題文から最小構成の structuredContent ドキュメントを組み立てる。
  * 連続する改行で段落を切り出し、空段落はスキップする。
  * 入力が空文字の場合は空段落 1 つ (`text: ''`) を含めた骨組みを返す。

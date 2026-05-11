@@ -22,6 +22,7 @@ import {
     parseAnswerSpec,
     parsePrintConfig,
     parseStructuredDocument,
+    wouldFlattenLoseStructuredContent,
 } from '@/lib/structured-problem';
 import { createProblemAssetSignedUrl, removeProblemAssetFromStorage, uploadProblemAssetToStorage } from '@/lib/problem-assets';
 import { SENT_BACK_REASON_MAX } from './constants';
@@ -498,10 +499,23 @@ export async function updateStandaloneProblem(id: string, data: {
                 question: true,
                 answer: true,
                 acceptedAnswers: true,
+                publishedRevision: {
+                    select: { structuredContent: true },
+                },
             },
         });
         if (!existing) {
             return { error: '問題が見つかりません' };
+        }
+
+        const shouldUpdateRevision =
+            data.question !== undefined || data.answer !== undefined || data.acceptedAnswers !== undefined;
+
+        // 構造化問題 (figure / directive / choices / summary 等) を本フォームから
+        // 上書きすると `buildStructuredDocumentFromText` が paragraph のみへ flatten して
+        // 構造化ブロックを破壊する。図形入りの問題はこの導線では編集させない。
+        if (shouldUpdateRevision && wouldFlattenLoseStructuredContent(existing.publishedRevision?.structuredContent)) {
+            return { error: '構造化ブロックを含む問題はこの画面から編集できません。問題編集画面をご利用ください。' };
         }
 
         if (data.videoUrl !== undefined || data.videoStatus !== undefined) {
@@ -523,9 +537,6 @@ export async function updateStandaloneProblem(id: string, data: {
                 updateData.masterNumber = null;
             }
         }
-
-        const shouldUpdateRevision =
-            data.question !== undefined || data.answer !== undefined || data.acceptedAnswers !== undefined;
 
         const problem = await prisma.$transaction(async (tx) => {
             const updated = await tx.problem.update({

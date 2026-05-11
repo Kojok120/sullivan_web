@@ -6,6 +6,7 @@ const {
     coreProblemFindManyMock,
     problemFindManyMock,
     problemFindFirstMock,
+    problemFindUniqueMock,
     problemCountMock,
     subjectFindUniqueMock,
     transactionMock,
@@ -19,6 +20,7 @@ const {
     normalizeAnswerSpecForAuthoringMock,
     normalizeAnswerForAuthoringMock,
     deriveLegacyFieldsFromStructuredDataMock,
+    wouldFlattenLoseStructuredContentMock,
     txProblemCreateMock,
     txProblemUpdateMock,
     txProblemFindUniqueMock,
@@ -31,6 +33,7 @@ const {
     coreProblemFindManyMock: vi.fn(),
     problemFindManyMock: vi.fn(),
     problemFindFirstMock: vi.fn(),
+    problemFindUniqueMock: vi.fn(),
     problemCountMock: vi.fn(),
     subjectFindUniqueMock: vi.fn(),
     transactionMock: vi.fn(),
@@ -44,6 +47,7 @@ const {
     normalizeAnswerSpecForAuthoringMock: vi.fn(),
     normalizeAnswerForAuthoringMock: vi.fn(),
     deriveLegacyFieldsFromStructuredDataMock: vi.fn(),
+    wouldFlattenLoseStructuredContentMock: vi.fn(),
     txProblemCreateMock: vi.fn(),
     txProblemUpdateMock: vi.fn(),
     txProblemFindUniqueMock: vi.fn(),
@@ -65,6 +69,7 @@ vi.mock('@/lib/prisma', () => ({
         problem: {
             findMany: problemFindManyMock,
             findFirst: problemFindFirstMock,
+            findUnique: problemFindUniqueMock,
             count: problemCountMock,
         },
         subject: {
@@ -90,12 +95,14 @@ vi.mock('@/lib/curriculum-service', () => ({
 
 vi.mock('@/lib/structured-problem', () => ({
     buildDefaultStructuredDraft: vi.fn(),
+    buildStructuredDocumentFromText: vi.fn((text: string) => ({ version: 1, blocks: [{ id: 'p1', type: 'paragraph', text }] })),
     deriveLegacyFieldsFromStructuredData: deriveLegacyFieldsFromStructuredDataMock,
     normalizeAnswerSpecForAuthoring: normalizeAnswerSpecForAuthoringMock,
     normalizeAnswerForAuthoring: normalizeAnswerForAuthoringMock,
     parseAnswerSpec: parseAnswerSpecMock,
     parsePrintConfig: parsePrintConfigMock,
     parseStructuredDocument: parseStructuredDocumentMock,
+    wouldFlattenLoseStructuredContent: wouldFlattenLoseStructuredContentMock,
 }));
 
 vi.mock('@/lib/problem-assets', () => ({
@@ -115,6 +122,7 @@ import {
     deleteStandaloneProblem,
     getProblems,
     searchProblemsByMasterNumbers,
+    updateStandaloneProblem,
 } from './actions';
 
 describe('problem actions permissions', () => {
@@ -143,6 +151,7 @@ describe('problem actions permissions', () => {
             answer: '答え',
             acceptedAnswers: [],
         });
+        wouldFlattenLoseStructuredContentMock.mockReturnValue(false);
         transactionMock.mockImplementation(async (callback: (tx: {
             problem: {
                 create: typeof txProblemCreateMock;
@@ -469,6 +478,68 @@ describe('problem actions permissions', () => {
         expect(result.success).toBe(true);
         expect(result.problems).toEqual([exactItem, recentPartial, oldPartial]);
         expect(result.total).toBe(3);
+    });
+
+    it('updateStandaloneProblem は構造化ブロック付き問題への question 上書きを拒否する', async () => {
+        problemFindUniqueMock.mockResolvedValueOnce({
+            videoUrl: null,
+            videoStatus: 'NONE',
+            publishedRevisionId: 'rev-1',
+            question: '旧テキスト',
+            answer: '旧解答',
+            acceptedAnswers: [],
+            publishedRevision: {
+                structuredContent: {
+                    version: 1,
+                    blocks: [
+                        { id: 'p1', type: 'paragraph', text: '本文' },
+                        { id: 't1', type: 'table', headers: ['x'], rows: [['1']] },
+                    ],
+                },
+            },
+        });
+        wouldFlattenLoseStructuredContentMock.mockReturnValueOnce(true);
+
+        const result = await updateStandaloneProblem('problem-1', {
+            question: '新テキスト',
+            grade: '中2',
+        });
+
+        expect(result.error).toBe('構造化ブロックを含む問題はこの画面から編集できません。問題編集画面をご利用ください。');
+        // 構造化破壊が発生しないよう、transaction (= 書き込み経路) に到達しないこと
+        expect(transactionMock).not.toHaveBeenCalled();
+    });
+
+    it('updateStandaloneProblem は paragraph のみの問題なら question 編集を許可する', async () => {
+        problemFindUniqueMock.mockResolvedValueOnce({
+            videoUrl: null,
+            videoStatus: 'NONE',
+            publishedRevisionId: 'rev-1',
+            question: '旧テキスト',
+            answer: '旧解答',
+            acceptedAnswers: [],
+            publishedRevision: {
+                structuredContent: {
+                    version: 1,
+                    blocks: [
+                        { id: 'p1', type: 'paragraph', text: '本文のみ' },
+                    ],
+                },
+            },
+        });
+        // paragraph のみなので flatten 安全
+        wouldFlattenLoseStructuredContentMock.mockReturnValueOnce(false);
+        txProblemUpdateMock.mockResolvedValueOnce({ id: 'problem-1' });
+        txProblemRevisionUpdateMock.mockResolvedValueOnce({ id: 'rev-1' });
+        txProblemFindUniqueMock.mockResolvedValueOnce({ id: 'problem-1' });
+
+        const result = await updateStandaloneProblem('problem-1', {
+            question: '新テキスト',
+        });
+
+        expect(result).toMatchObject({ success: true });
+        expect(transactionMock).toHaveBeenCalledOnce();
+        expect(txProblemRevisionUpdateMock).toHaveBeenCalledOnce();
     });
 
     it('getProblems は検索が空のときは固定処理を行わず単一クエリで返す', async () => {

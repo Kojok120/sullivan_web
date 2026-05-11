@@ -7,6 +7,7 @@ import {
     normalizeAnswerSpecForAuthoring,
     parseAnswerSpec,
     parseStructuredDocument,
+    wouldFlattenLoseStructuredContent,
 } from './structured-problem';
 
 describe('structured-problem', () => {
@@ -122,6 +123,49 @@ describe('structured-problem', () => {
         expect(buildAiProblemText(document)).toContain('選択肢:');
         expect(buildAiProblemText(document)).toContain('空欄:');
         expect(collectStructuredDocumentAssetIds(document)).toEqual(['asset-image']);
+    });
+
+    describe('wouldFlattenLoseStructuredContent', () => {
+        it('paragraph のみで summary/instructions が無ければ false', () => {
+            const raw = {
+                version: 1,
+                blocks: [
+                    { id: 'p1', type: 'paragraph', text: '本文' },
+                    { id: 'p2', type: 'paragraph', text: '続き' },
+                ],
+            };
+            expect(wouldFlattenLoseStructuredContent(raw)).toBe(false);
+        });
+
+        it('非 paragraph ブロックを含めば true (figure / choices などが消えるため)', () => {
+            const raw = {
+                version: 1,
+                blocks: [
+                    { id: 'p1', type: 'paragraph', text: '本文' },
+                    { id: 't1', type: 'table', headers: ['x'], rows: [['1']] },
+                ],
+            };
+            expect(wouldFlattenLoseStructuredContent(raw)).toBe(true);
+        });
+
+        it('summary または instructions に値があれば true', () => {
+            expect(wouldFlattenLoseStructuredContent({
+                version: 1,
+                summary: '次の問いに答えよ',
+                blocks: [{ id: 'p1', type: 'paragraph', text: '本文' }],
+            })).toBe(true);
+
+            expect(wouldFlattenLoseStructuredContent({
+                version: 1,
+                instructions: '計算過程も書け',
+                blocks: [{ id: 'p1', type: 'paragraph', text: '本文' }],
+            })).toBe(true);
+        });
+
+        it('null / 不正な JSON は false (失う情報なしと判定)', () => {
+            expect(wouldFlattenLoseStructuredContent(null)).toBe(false);
+            expect(wouldFlattenLoseStructuredContent({ foo: 'bar' })).toBe(false);
+        });
     });
 
     it('legacy な graphAsset / geometryAsset ブロックは読み込み時に黙って捨てる', () => {
