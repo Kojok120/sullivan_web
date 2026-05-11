@@ -553,6 +553,17 @@ describe('problem actions permissions', () => {
         expect(transactionMock).not.toHaveBeenCalled();
     });
 
+    it('updateStandaloneProblem は string でない question (null 等) も TypeError を起こさず拒否する', async () => {
+        const result = await updateStandaloneProblem('problem-1', {
+            // Server Action 引数は runtime に任意値が入りうる
+            question: null as unknown as string,
+        });
+
+        expect(result.error).toBe('問題文を入力してください');
+        expect(problemFindUniqueMock).not.toHaveBeenCalled();
+        expect(transactionMock).not.toHaveBeenCalled();
+    });
+
     it('getProblems は検索が空のときは固定処理を行わず単一クエリで返す', async () => {
         const items = [
             { id: 'p1', customId: 'E-1' },

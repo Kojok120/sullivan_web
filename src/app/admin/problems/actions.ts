@@ -450,7 +450,8 @@ export async function createStandaloneProblem(data: {
     coreProblemIds: string[];
 }) {
     await requireAdmin();
-    if (!data.question || !data.question.trim()) {
+    // Server Action 引数は runtime に何でも入りうるので typeof で string ガードする。
+    if (typeof data.question !== 'string' || !data.question.trim()) {
         return { error: '問題文を入力してください' };
     }
     try {
@@ -486,7 +487,8 @@ export async function updateStandaloneProblem(id: string, data: {
     await requireAdmin();
     // 空白のみの question で revision を作ると paragraphBlockSchema (text.min(1)) を
     // 違反する structuredContent が保存され、以後の parseStructuredDocument が壊れる。
-    if (data.question !== undefined && !data.question.trim()) {
+    // Server Action 引数は runtime に何でも入りうるので typeof で string ガードする。
+    if (data.question !== undefined && (typeof data.question !== 'string' || !data.question.trim())) {
         return { error: '問題文を入力してください' };
     }
     try {
