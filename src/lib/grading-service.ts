@@ -609,9 +609,6 @@ export type ProblemForGrading = {
     id: string;
     customId: string;
     subjectName: string;
-    question: string;
-    answer: string | null;
-    acceptedAnswers: string[];
     publishedRevisionId: string | null;
     publishedRevisionCorrectAnswer: string | null;
     publishedRevisionAcceptedAnswers: string[];
@@ -719,20 +716,19 @@ export function buildSubjectSpecificGuidelines(problems: ProblemForGrading[]): s
 }
 
 export function buildProblemContextForGemini(problem: ProblemForGrading, index: number): GeminiProblemContext {
-    // 正解は publishedRevision を信頼源とする。Phase A で全 Problem に publishedRevision が紐付いた前提で、
-    // Phase C 完了 (Problem.answer / acceptedAnswers の drop) までの過渡期は legacy 側にフォールバック。
-    let problemText = problem.question?.trim() || '(問題文なし)';
-    const revisionAnswer = problem.publishedRevisionCorrectAnswer?.trim() ?? '';
-    const referenceAnswer = revisionAnswer || (problem.answer?.trim() ?? '');
-    const revisionAccepted = uniqueNonEmpty(problem.publishedRevisionAcceptedAnswers);
-    const alternativeAnswers = revisionAccepted.length > 0
-        ? revisionAccepted
-        : uniqueNonEmpty(problem.acceptedAnswers);
+    // Phase A で全 Problem に publishedRevision が紐付き、Phase C で legacy カラムを撤廃したため
+    // 採点は publishedRevision のみを信頼源とする。
+    let problemText = '(問題文なし)';
+    const referenceAnswer = problem.publishedRevisionCorrectAnswer?.trim() ?? '';
+    const alternativeAnswers = uniqueNonEmpty(problem.publishedRevisionAcceptedAnswers);
 
     if (problem.structuredContent) {
         try {
             const document = parseStructuredDocumentJson(problem.structuredContent);
-            problemText = buildAiProblemText(document).trim() || problemText;
+            const text = buildAiProblemText(document).trim();
+            if (text) {
+                problemText = text;
+            }
         } catch (error) {
             console.warn('[grading-service] failed to parse structured problem document', {
                 problemId: problem.id,
@@ -1158,9 +1154,6 @@ async function gradeWithGemini(
             id: p.id,
             customId,
             subjectName: p.subject.name,
-            question: p.question,
-            answer: p.answer,
-            acceptedAnswers: p.acceptedAnswers,
             publishedRevisionId: matchedRevision?.id ?? p.publishedRevisionId,
             publishedRevisionCorrectAnswer: matchedRevision?.correctAnswer ?? null,
             publishedRevisionAcceptedAnswers: matchedRevision?.acceptedAnswers ?? [],

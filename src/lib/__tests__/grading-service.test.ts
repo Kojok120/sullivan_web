@@ -13,9 +13,6 @@ function createProblem(overrides: Partial<ProblemForGrading> = {}): ProblemForGr
         id: 'problem-1',
         customId: 'S-1',
         subjectName: '数学',
-        question: 'legacy question',
-        answer: '42',
-        acceptedAnswers: ['四十二'],
         publishedRevisionId: 'revision-1',
         publishedRevisionCorrectAnswer: '42',
         publishedRevisionAcceptedAnswers: ['四十二'],
@@ -28,11 +25,9 @@ function createProblem(overrides: Partial<ProblemForGrading> = {}): ProblemForGr
 
 describe('grading-service helpers', () => {
     it('structured 問題: 問題文は structuredContent から、正解は publishedRevision から組み立てる', () => {
-        // Phase B1 以降: 正解は publishedRevision.correctAnswer / acceptedAnswers を信頼源とする。
+        // Phase C: 採点は publishedRevision のみを参照し、legacy フィールドは見ない。
         const context = buildProblemContextForGemini(createProblem({
             subjectName: '理科',
-            answer: 'legacy-answer',
-            acceptedAnswers: ['legacy-alt'],
             publishedRevisionCorrectAnswer: 'B',
             publishedRevisionAcceptedAnswers: ['18'],
             structuredContent: {
@@ -65,17 +60,15 @@ describe('grading-service helpers', () => {
         expect(context.problemText).toContain('選択肢:');
     });
 
-    it('publishedRevision の正解が空の場合は Problem.answer / acceptedAnswers にフォールバックする', () => {
-        // Phase C 完了 (Problem.answer drop) までの過渡期フォールバック動作の回帰防止。
+    it('publishedRevision の正解が空の場合は referenceAnswer も空文字で返す', () => {
+        // Phase C: legacy フィールドは参照しないため、revision が空なら空のまま返す。
         const context = buildProblemContextForGemini(createProblem({
-            answer: 'legacy-fallback',
-            acceptedAnswers: ['legacy-alt'],
             publishedRevisionCorrectAnswer: null,
             publishedRevisionAcceptedAnswers: [],
         }), 0);
 
-        expect(context.referenceAnswer).toBe('legacy-fallback');
-        expect(context.alternativeAnswers).toEqual(['legacy-alt']);
+        expect(context.referenceAnswer).toBe('');
+        expect(context.alternativeAnswers).toEqual([]);
     });
 
     it('structured 問題: figure 取得は structuredContent の有無で判定する', () => {

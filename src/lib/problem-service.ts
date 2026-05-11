@@ -6,14 +6,56 @@
 import { prisma } from '@/lib/prisma';
 import { getNextCustomId, getNextCustomIds } from '@/lib/curriculum-service';
 import { resolveVideoStatusFromUrl, type VideoStatusValue } from '@/lib/problem-ui';
+import { buildStructuredDocumentFromText } from '@/lib/structured-problem';
 import type { Prisma } from '@prisma/client';
 
 type ProblemServiceClient = Pick<
     typeof prisma,
-    'coreProblem' | 'problem' | 'learningHistory' | 'userProblemState' | 'subject' | '$queryRaw'
+    | 'coreProblem'
+    | 'problem'
+    | 'problemRevision'
+    | 'learningHistory'
+    | 'userProblemState'
+    | 'subject'
+    | '$queryRaw'
 >;
 
 type ProblemServiceClientWithTransaction = ProblemServiceClient & Partial<Pick<typeof prisma, '$transaction'>>;
+
+type ProblemRevisionWriteInput = {
+    structuredContent: Prisma.InputJsonValue;
+    correctAnswer: string | null;
+    acceptedAnswers: string[];
+};
+
+/**
+ * createProblemCore / bulk 系で作成する初期 PUBLISHED ProblemRevision の入力データ。
+ * 旧 Problem.question / answer / acceptedAnswers と等価な内容を構造化ソースとして残す。
+ */
+function buildInitialPublishedRevisionData(input: {
+    question: string;
+    answer?: string | null;
+    acceptedAnswers?: string[];
+}): Omit<Prisma.ProblemRevisionUncheckedCreateInput, 'problemId'> {
+    return {
+        revisionNumber: 1,
+        status: 'PUBLISHED',
+        ...buildRevisionWriteInput(input),
+        publishedAt: new Date(),
+    };
+}
+
+function buildRevisionWriteInput(input: {
+    question: string;
+    answer?: string | null;
+    acceptedAnswers?: string[];
+}): ProblemRevisionWriteInput {
+    return {
+        structuredContent: buildStructuredDocumentFromText(input.question) as unknown as Prisma.InputJsonValue,
+        correctAnswer: input.answer?.trim() ? input.answer : null,
+        acceptedAnswers: input.acceptedAnswers ?? [],
+    };
+}
 
 type NormalizedProblemData = Omit<CreateProblemData, 'subjectId'> & {
     subjectId: string;
@@ -129,47 +171,67 @@ async function resolveSubjectId(
 
 /**
  * 問題作成の共通ロジック
+ *
+ * Problem 行と PUBLISHED ProblemRevision を 1 トランザクションで作成し、
+ * Problem.publishedRevisionId をリビジョンに紐付けて返す。Phase C で legacy カラム
+ * (question / answer / acceptedAnswers) は drop 予定だが、ロールバック安全性のため
+ * 削除 migration 前は Problem 側にも値を書き込む。
  */
 export async function createProblemCore(
     data: CreateProblemData,
-    tx: ProblemServiceClient = prisma
 ) {
     if (data.coreProblemIds.length === 0) {
         throw new Error('CoreProblemは必須です');
     }
 
-    const subjectId = await resolveSubjectId(data, tx);
+    const subjectId = await resolveSubjectId(data, prisma);
     if (!subjectId) {
         throw new Error('教科を特定できませんでした');
     }
 
-    const customId = await getNextCustomId(subjectId, tx);
+    const customId = await getNextCustomId(subjectId, prisma);
 
     let order = data.order;
     if (order === undefined) {
-        const lastProblem = await tx.problem.findFirst({
+        const lastProblem = await prisma.problem.findFirst({
             orderBy: { order: 'desc' },
             select: { order: true }
         });
         order = (lastProblem?.order ?? 0) + 1;
     }
 
-    return tx.problem.create({
-        data: {
-            question: data.question,
-            answer: data.answer,
-            acceptedAnswers: data.acceptedAnswers || [],
-            grade: data.grade,
-            masterNumber: data.masterNumber,
-            videoUrl: data.videoUrl,
-            videoStatus: resolveVideoStatusFromUrl(data.videoStatus, data.videoUrl),
-            customId,
-            subjectId,
-            order,
-            coreProblems: {
-                connect: data.coreProblemIds.map(id => ({ id }))
+    const revisionData = buildInitialPublishedRevisionData(data);
+
+    return prisma.$transaction(async (tx) => {
+        const problem = await tx.problem.create({
+            data: {
+                question: data.question,
+                answer: data.answer,
+                acceptedAnswers: data.acceptedAnswers || [],
+                grade: data.grade,
+                masterNumber: data.masterNumber,
+                videoUrl: data.videoUrl,
+                videoStatus: resolveVideoStatusFromUrl(data.videoStatus, data.videoUrl),
+                customId,
+                subjectId,
+                order,
+                coreProblems: {
+                    connect: data.coreProblemIds.map(id => ({ id }))
+                }
             }
-        }
+        });
+
+        const revision = await tx.problemRevision.create({
+            data: {
+                ...revisionData,
+                problemId: problem.id,
+            },
+        });
+
+        return tx.problem.update({
+            where: { id: problem.id },
+            data: { publishedRevisionId: revision.id },
+        });
     });
 }
 
@@ -201,20 +263,6 @@ export async function deleteProblemsWithRelations(
 
     const deleteBatchPayload = deleteResult as { count?: number };
     return deleteBatchPayload.count ?? ids.length;
-}
-
-/**
- * 問題の重複チェック
- */
-async function checkDuplicateQuestions(
-    questions: string[],
-    tx: ProblemServiceClient = prisma
-): Promise<Set<string>> {
-    const existingProblems = await tx.problem.findMany({
-        where: { question: { in: questions } },
-        select: { question: true }
-    });
-    return new Set(existingProblems.map((p: { question: string }) => p.question));
 }
 
 /**
@@ -284,24 +332,7 @@ async function bulkCreateProblemsCore(
         return { count: 0, warnings };
     }
 
-    const duplicateQuestions = await checkDuplicateQuestions(
-        problems.map(p => p.question),
-        client
-    );
-
-    const problemsToCreate = problems.filter(p => {
-        if (duplicateQuestions.has(p.question)) {
-            warnings.push(`${getProblemLabel(p)} は既に存在するためスキップしました`);
-            return false;
-        }
-        return true;
-    });
-
-    if (problemsToCreate.length === 0) {
-        return { count: 0, warnings };
-    }
-
-    const normalizedProblems = await normalizeProblemsForBulk(problemsToCreate, options, client, warnings);
+    const normalizedProblems = await normalizeProblemsForBulk(problems, options, client, warnings);
     if (normalizedProblems.length === 0) {
         return { count: 0, warnings };
     }
@@ -339,35 +370,18 @@ async function bulkCreateProblemsCore(
     for (let i = 0; i < normalizedProblems.length; i += batchSize) {
         const batch = normalizedProblems.slice(i, i + batchSize);
 
+        const preparedBatch = batch.map((problem) => {
+            const ids = customIdsBySubject.get(problem.subjectId) || [];
+            const idx = subjectIndexes.get(problem.subjectId) || 0;
+            const customId = ids[idx];
+            subjectIndexes.set(problem.subjectId, idx + 1);
+
+            const order = assignOrder ? nextOrder++ : 0;
+            return { problem, customId, order };
+        });
+
         try {
-            const createOperations = batch.map((problem) => {
-                const ids = customIdsBySubject.get(problem.subjectId) || [];
-                const idx = subjectIndexes.get(problem.subjectId) || 0;
-                const customId = ids[idx];
-                subjectIndexes.set(problem.subjectId, idx + 1);
-
-                const order = assignOrder ? nextOrder++ : 0;
-
-                return client.problem.create({
-                    data: {
-                        question: problem.question,
-                        answer: problem.answer,
-                        acceptedAnswers: problem.acceptedAnswers || [],
-                        grade: problem.grade,
-                        masterNumber: problem.masterNumber,
-                        videoUrl: problem.videoUrl,
-                        videoStatus: resolveVideoStatusFromUrl(problem.videoStatus, problem.videoUrl),
-                        customId,
-                        subjectId: problem.subjectId,
-                        order,
-                        coreProblems: {
-                            connect: problem.coreProblemIds.map((id) => ({ id }))
-                        }
-                    }
-                });
-            });
-
-            await runBatchTransaction(client, createOperations);
+            await createBatchWithRevisions(client, preparedBatch);
             createdCount += batch.length;
         } catch (error) {
             const errorMessage = formatProblemServiceError(error);
@@ -378,6 +392,63 @@ async function bulkCreateProblemsCore(
     }
 
     return { count: createdCount, warnings };
+}
+
+/**
+ * Problem + 初期 PUBLISHED ProblemRevision のペアを 1 トランザクション内で作成し、
+ * publishedRevisionId を確定させる。バッチ単位で呼び出す前提。
+ */
+async function createBatchWithRevisions(
+    client: ProblemServiceClientWithTransaction,
+    items: Array<{ problem: NormalizedProblemData; customId: string; order: number }>,
+): Promise<void> {
+    if (items.length === 0) return;
+
+    if (typeof client.$transaction !== 'function') {
+        for (const { problem, customId, order } of items) {
+            await createProblemWithRevisionUsing(client as ProblemServiceClient, problem, customId, order);
+        }
+        return;
+    }
+
+    await client.$transaction(async (tx) => {
+        for (const { problem, customId, order } of items) {
+            await createProblemWithRevisionUsing(tx as ProblemServiceClient, problem, customId, order);
+        }
+    });
+}
+
+async function createProblemWithRevisionUsing(
+    tx: ProblemServiceClient,
+    problem: NormalizedProblemData,
+    customId: string,
+    order: number,
+): Promise<void> {
+    const revisionData = buildInitialPublishedRevisionData(problem);
+    const created = await tx.problem.create({
+        data: {
+            question: problem.question,
+            answer: problem.answer,
+            acceptedAnswers: problem.acceptedAnswers || [],
+            grade: problem.grade,
+            masterNumber: problem.masterNumber,
+            videoUrl: problem.videoUrl,
+            videoStatus: resolveVideoStatusFromUrl(problem.videoStatus, problem.videoUrl),
+            customId,
+            subjectId: problem.subjectId,
+            order,
+            coreProblems: {
+                connect: problem.coreProblemIds.map((id) => ({ id })),
+            },
+        },
+    });
+    const revision = await tx.problemRevision.create({
+        data: { ...revisionData, problemId: created.id },
+    });
+    await tx.problem.update({
+        where: { id: created.id },
+        data: { publishedRevisionId: revision.id },
+    });
 }
 
 /**
@@ -420,7 +491,7 @@ export async function bulkUpsertProblemsCore(
             masterNumber: problem.masterNumber as number,
         }));
 
-    const existingProblemsMap = new Map<string, { id: string }>();
+    const existingProblemsMap = new Map<string, { id: string; publishedRevisionId: string | null }>();
     if (lookupTargets.length > 0) {
         const existing = await client.problem.findMany({
             where: {
@@ -434,6 +505,7 @@ export async function bulkUpsertProblemsCore(
                 subjectId: true,
                 masterNumber: true,
                 customId: true,
+                publishedRevisionId: true,
             }
         });
 
@@ -442,19 +514,26 @@ export async function bulkUpsertProblemsCore(
                 continue;
             }
             const key = makeSubjectMasterKey(problem.subjectId, problem.masterNumber);
-            existingProblemsMap.set(key, { id: problem.id });
+            existingProblemsMap.set(key, {
+                id: problem.id,
+                publishedRevisionId: problem.publishedRevisionId,
+            });
         }
     }
 
     const toCreate: CreateProblemData[] = [];
-    const toUpdate: (NormalizedProblemData & { id: string })[] = [];
+    const toUpdate: (NormalizedProblemData & { id: string; publishedRevisionId: string | null })[] = [];
 
     for (const problem of dedupedProblems) {
         if (typeof problem.masterNumber === 'number') {
             const key = makeSubjectMasterKey(problem.subjectId, problem.masterNumber);
             const existingProblem = existingProblemsMap.get(key);
             if (existingProblem) {
-                toUpdate.push({ ...problem, id: existingProblem.id });
+                toUpdate.push({
+                    ...problem,
+                    id: existingProblem.id,
+                    publishedRevisionId: existingProblem.publishedRevisionId,
+                });
                 continue;
             }
         }
@@ -475,26 +554,7 @@ export async function bulkUpsertProblemsCore(
         for (let i = 0; i < toUpdate.length; i += batchSize) {
             const batch = toUpdate.slice(i, i + batchSize);
             try {
-                const updateOperations = batch.map((problem) => (
-                    client.problem.update({
-                        where: { id: problem.id },
-                        data: {
-                            question: problem.question,
-                            answer: problem.answer,
-                            acceptedAnswers: problem.acceptedAnswers || [],
-                            grade: problem.grade,
-                            masterNumber: problem.masterNumber,
-                            videoUrl: problem.videoUrl,
-                            videoStatus: resolveVideoStatusFromUrl(problem.videoStatus, problem.videoUrl),
-                            subjectId: problem.subjectId,
-                            coreProblems: {
-                                set: problem.coreProblemIds.map((id) => ({ id }))
-                            }
-                        }
-                    })
-                ));
-
-                await runBatchTransaction(client, updateOperations);
+                await updateBatchWithRevisions(client, batch);
                 updatedCount += batch.length;
             } catch (error) {
                 const errorMessage = formatProblemServiceError(error);
@@ -504,4 +564,70 @@ export async function bulkUpsertProblemsCore(
     }
 
     return { createdCount, updatedCount, warnings };
+}
+
+/**
+ * 既存 Problem の bulk 更新を 1 トランザクションで行う。
+ * publishedRevision の structuredContent / correctAnswer / acceptedAnswers も同期更新し、
+ * publishedRevision 未設定の Problem には PUBLISHED revision を新規作成して紐付ける。
+ */
+async function updateBatchWithRevisions(
+    client: ProblemServiceClientWithTransaction,
+    items: Array<NormalizedProblemData & { id: string; publishedRevisionId: string | null }>,
+): Promise<void> {
+    if (items.length === 0) return;
+
+    if (typeof client.$transaction !== 'function') {
+        for (const item of items) {
+            await updateProblemWithRevisionUsing(client as ProblemServiceClient, item);
+        }
+        return;
+    }
+
+    await client.$transaction(async (tx) => {
+        for (const item of items) {
+            await updateProblemWithRevisionUsing(tx as ProblemServiceClient, item);
+        }
+    });
+}
+
+async function updateProblemWithRevisionUsing(
+    tx: ProblemServiceClient,
+    item: NormalizedProblemData & { id: string; publishedRevisionId: string | null },
+): Promise<void> {
+    await tx.problem.update({
+        where: { id: item.id },
+        data: {
+            question: item.question,
+            answer: item.answer,
+            acceptedAnswers: item.acceptedAnswers || [],
+            grade: item.grade,
+            masterNumber: item.masterNumber,
+            videoUrl: item.videoUrl,
+            videoStatus: resolveVideoStatusFromUrl(item.videoStatus, item.videoUrl),
+            subjectId: item.subjectId,
+            coreProblems: {
+                set: item.coreProblemIds.map((id) => ({ id })),
+            },
+        },
+    });
+
+    const revisionWrite = buildRevisionWriteInput(item);
+
+    if (item.publishedRevisionId) {
+        await tx.problemRevision.update({
+            where: { id: item.publishedRevisionId },
+            data: revisionWrite,
+        });
+        return;
+    }
+
+    const initialRevision = buildInitialPublishedRevisionData(item);
+    const revision = await tx.problemRevision.create({
+        data: { ...initialRevision, problemId: item.id },
+    });
+    await tx.problem.update({
+        where: { id: item.id },
+        data: { publishedRevisionId: revision.id },
+    });
 }

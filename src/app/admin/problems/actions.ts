@@ -15,6 +15,7 @@ import {
     type VideoStatusValue,
 } from '@/lib/problem-ui';
 import {
+    buildStructuredDocumentFromText,
     deriveLegacyFieldsFromStructuredData,
     normalizeAnswerForAuthoring,
     normalizeAnswerSpecForAuthoring,
@@ -488,14 +489,22 @@ export async function updateStandaloneProblem(id: string, data: {
             videoUrl: data.videoUrl,
         };
 
+        const existing = await prisma.problem.findUnique({
+            where: { id },
+            select: {
+                videoUrl: true,
+                videoStatus: true,
+                publishedRevisionId: true,
+                question: true,
+                answer: true,
+                acceptedAnswers: true,
+            },
+        });
+        if (!existing) {
+            return { error: '問題が見つかりません' };
+        }
+
         if (data.videoUrl !== undefined || data.videoStatus !== undefined) {
-            const existing = await prisma.problem.findUnique({
-                where: { id },
-                select: { videoUrl: true, videoStatus: true },
-            });
-            if (!existing) {
-                return { error: '問題が見つかりません' };
-            }
             const nextVideoUrl = data.videoUrl !== undefined ? data.videoUrl : existing.videoUrl;
             const desiredStatus = data.videoStatus ?? (existing.videoStatus as VideoStatusValue);
             updateData.videoStatus = resolveVideoStatusFromUrl(desiredStatus, nextVideoUrl);
@@ -515,10 +524,52 @@ export async function updateStandaloneProblem(id: string, data: {
             }
         }
 
-        const problem = await prisma.problem.update({
-            where: { id },
-            data: updateData,
-            include: problemAdminInclude,
+        const shouldUpdateRevision =
+            data.question !== undefined || data.answer !== undefined || data.acceptedAnswers !== undefined;
+
+        const problem = await prisma.$transaction(async (tx) => {
+            const updated = await tx.problem.update({
+                where: { id },
+                data: updateData,
+            });
+
+            if (shouldUpdateRevision) {
+                const nextQuestion = data.question !== undefined ? data.question : existing.question;
+                const nextAnswer = data.answer !== undefined ? data.answer : existing.answer;
+                const nextAcceptedAnswers = data.acceptedAnswers !== undefined ? data.acceptedAnswers : existing.acceptedAnswers;
+
+                const revisionWrite = {
+                    structuredContent: buildStructuredDocumentFromText(nextQuestion) as unknown as Prisma.InputJsonValue,
+                    correctAnswer: nextAnswer?.trim() ? nextAnswer : null,
+                    acceptedAnswers: nextAcceptedAnswers ?? [],
+                };
+
+                if (existing.publishedRevisionId) {
+                    await tx.problemRevision.update({
+                        where: { id: existing.publishedRevisionId },
+                        data: revisionWrite,
+                    });
+                } else {
+                    const created = await tx.problemRevision.create({
+                        data: {
+                            problemId: id,
+                            revisionNumber: 1,
+                            status: 'PUBLISHED',
+                            publishedAt: new Date(),
+                            ...revisionWrite,
+                        },
+                    });
+                    await tx.problem.update({
+                        where: { id },
+                        data: { publishedRevisionId: created.id },
+                    });
+                }
+            }
+
+            return tx.problem.findUnique({
+                where: { id: updated.id },
+                include: problemAdminInclude,
+            });
         });
 
         revalidateProblemPaths(id);

@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2 } from 'lucide-react';
 import { VIDEO_STATUS_OPTIONS, resolveVideoStatusFromUrl, type VideoStatusValue } from '@/lib/problem-ui';
+import { getDisplayQuestionFromStructuredContent } from '@/lib/structured-problem';
 import { createStandaloneProblem, updateStandaloneProblem } from '../actions';
 import { toast } from 'sonner';
 import { CoreProblemSelector, SelectedCoreProblem } from './core-problem-selector';
@@ -32,8 +33,8 @@ type ProblemFormState = {
 
 function createInitialFormState(problem: ProblemWithRelations | null): ProblemFormState {
     return {
-        question: problem?.question ?? '',
-        answer: problem?.answer ?? '',
+        question: getDisplayQuestionFromStructuredContent(problem?.publishedRevision?.structuredContent),
+        answer: problem?.publishedRevision?.correctAnswer ?? '',
         grade: problem?.grade ?? '',
         videoUrl: problem?.videoUrl ?? '',
         videoStatus: ((problem?.videoStatus as VideoStatusValue | undefined) ?? 'NONE'),
