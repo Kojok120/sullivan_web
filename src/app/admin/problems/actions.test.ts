@@ -497,6 +497,7 @@ describe('problem actions permissions', () => {
                     ],
                 },
             },
+            revisions: [],
         });
         wouldFlattenLoseStructuredContentMock.mockReturnValueOnce(true);
 
@@ -526,6 +527,7 @@ describe('problem actions permissions', () => {
                     ],
                 },
             },
+            revisions: [],
         });
         // paragraph のみなので flatten 安全
         wouldFlattenLoseStructuredContentMock.mockReturnValueOnce(false);
@@ -540,6 +542,35 @@ describe('problem actions permissions', () => {
         expect(result).toMatchObject({ success: true });
         expect(transactionMock).toHaveBeenCalledOnce();
         expect(txProblemRevisionUpdateMock).toHaveBeenCalledOnce();
+    });
+
+    it('updateStandaloneProblem は publishedRevision 無しでも DRAFT に構造化ブロックがあれば拒否する', async () => {
+        problemFindUniqueMock.mockResolvedValueOnce({
+            videoUrl: null,
+            videoStatus: 'NONE',
+            publishedRevisionId: null,
+            question: '旧テキスト',
+            answer: '旧解答',
+            acceptedAnswers: [],
+            publishedRevision: null,
+            revisions: [{
+                structuredContent: {
+                    version: 1,
+                    blocks: [
+                        { id: 'p1', type: 'paragraph', text: '本文' },
+                        { id: 'c1', type: 'choices', options: [{ id: 'A', label: 'A' }] },
+                    ],
+                },
+            }],
+        });
+        wouldFlattenLoseStructuredContentMock.mockReturnValueOnce(true);
+
+        const result = await updateStandaloneProblem('problem-1', {
+            question: '上書き',
+        });
+
+        expect(result.error).toBe('構造化ブロックを含む問題はこの画面から編集できません。問題編集画面をご利用ください。');
+        expect(transactionMock).not.toHaveBeenCalled();
     });
 
     it('updateStandaloneProblem は空白のみの question を拒否する (paragraphBlockSchema 違反防止)', async () => {

@@ -518,6 +518,13 @@ export async function updateStandaloneProblem(id: string, data: {
                 publishedRevision: {
                     select: { structuredContent: true },
                 },
+                // publishedRevision が無い問題でも最新 revision の structuredContent を
+                // flatten ガード対象に含めるため、最新 1 件だけ引いて参照する。
+                revisions: {
+                    orderBy: { revisionNumber: 'desc' },
+                    take: 1,
+                    select: { structuredContent: true },
+                },
             },
         });
         if (!existing) {
@@ -529,8 +536,11 @@ export async function updateStandaloneProblem(id: string, data: {
 
         // 構造化問題 (figure / directive / choices / summary 等) を本フォームから
         // 上書きすると `buildStructuredDocumentFromText` が paragraph のみへ flatten して
-        // 構造化ブロックを破壊する。図形入りの問題はこの導線では編集させない。
-        if (shouldUpdateRevision && wouldFlattenLoseStructuredContent(existing.publishedRevision?.structuredContent)) {
+        // 構造化ブロックを破壊する。publishedRevision が無い legacy / DRAFT 問題でも
+        // 最新 revision に構造化ブロックがあれば編集を拒否する。
+        const guardSource = existing.publishedRevision?.structuredContent
+            ?? existing.revisions[0]?.structuredContent;
+        if (shouldUpdateRevision && wouldFlattenLoseStructuredContent(guardSource)) {
             return { error: '構造化ブロックを含む問題はこの画面から編集できません。問題編集画面をご利用ください。' };
         }
 

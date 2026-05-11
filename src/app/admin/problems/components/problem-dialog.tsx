@@ -32,9 +32,13 @@ type ProblemFormState = {
 };
 
 function createInitialFormState(problem: ProblemWithRelations | null): ProblemFormState {
+    // problem-list.tsx と同じく publishedRevision が無い問題は最新 DRAFT で補う。
+    // list 側で表示されているテキストが dialog で空になり、誤って空のまま保存され
+    // 既存内容を上書きしてしまうのを防ぐ。
+    const sourceRevision = problem?.publishedRevision ?? problem?.revisions?.[0] ?? null;
     return {
-        question: getDisplayQuestionFromStructuredContent(problem?.publishedRevision?.structuredContent),
-        answer: problem?.publishedRevision?.correctAnswer ?? '',
+        question: getDisplayQuestionFromStructuredContent(sourceRevision?.structuredContent),
+        answer: sourceRevision?.correctAnswer ?? '',
         grade: problem?.grade ?? '',
         videoUrl: problem?.videoUrl ?? '',
         videoStatus: ((problem?.videoStatus as VideoStatusValue | undefined) ?? 'NONE'),
