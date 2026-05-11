@@ -29,16 +29,34 @@ type ProblemRevisionWriteInput = {
 };
 
 /**
- * createProblemCore / bulk 系で作成する初期 PUBLISHED ProblemRevision の入力データ。
+ * 既存 Problem に新規 PUBLISHED ProblemRevision を作るときは、
+ * (problemId, revisionNumber) の UNIQUE 制約と衝突しないよう
+ * `max(revisionNumber) + 1` を採番する。リビジョンが無い問題には 1 を返す。
+ */
+async function getNextRevisionNumber(
+    tx: ProblemServiceClient,
+    problemId: string,
+): Promise<number> {
+    const latest = await tx.problemRevision.findFirst({
+        where: { problemId },
+        orderBy: { revisionNumber: 'desc' },
+        select: { revisionNumber: true },
+    });
+    return (latest?.revisionNumber ?? 0) + 1;
+}
+
+/**
+ * createProblemCore / bulk 系で作成する PUBLISHED ProblemRevision の入力データ。
  * 旧 Problem.question / answer / acceptedAnswers と等価な内容を構造化ソースとして残す。
  */
-function buildInitialPublishedRevisionData(input: {
+function buildPublishedRevisionData(input: {
     question: string;
     answer?: string | null;
     acceptedAnswers?: string[];
+    revisionNumber: number;
 }): Omit<Prisma.ProblemRevisionUncheckedCreateInput, 'problemId'> {
     return {
-        revisionNumber: 1,
+        revisionNumber: input.revisionNumber,
         status: 'PUBLISHED',
         ...buildRevisionWriteInput(input),
         publishedAt: new Date(),
@@ -200,7 +218,7 @@ export async function createProblemCore(
         order = (lastProblem?.order ?? 0) + 1;
     }
 
-    const revisionData = buildInitialPublishedRevisionData(data);
+    const revisionData = buildPublishedRevisionData({ ...data, revisionNumber: 1 });
 
     return prisma.$transaction(async (tx) => {
         const problem = await tx.problem.create({
@@ -424,7 +442,7 @@ async function createProblemWithRevisionUsing(
     customId: string,
     order: number,
 ): Promise<void> {
-    const revisionData = buildInitialPublishedRevisionData(problem);
+    const revisionData = buildPublishedRevisionData({ ...problem, revisionNumber: 1 });
     const created = await tx.problem.create({
         data: {
             question: problem.question,
@@ -622,7 +640,9 @@ async function updateProblemWithRevisionUsing(
         return;
     }
 
-    const initialRevision = buildInitialPublishedRevisionData(item);
+    // 既存 DRAFT リビジョンと revisionNumber が衝突しないよう次番を採番する
+    const nextRevisionNumber = await getNextRevisionNumber(tx, item.id);
+    const initialRevision = buildPublishedRevisionData({ ...item, revisionNumber: nextRevisionNumber });
     const revision = await tx.problemRevision.create({
         data: { ...initialRevision, problemId: item.id },
     });

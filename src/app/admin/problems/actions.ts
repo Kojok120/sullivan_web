@@ -550,10 +550,17 @@ export async function updateStandaloneProblem(id: string, data: {
                         data: revisionWrite,
                     });
                 } else {
+                    // 既存 DRAFT リビジョンと revisionNumber が衝突しないよう次番を採番する
+                    const latestRevision = await tx.problemRevision.findFirst({
+                        where: { problemId: id },
+                        orderBy: { revisionNumber: 'desc' },
+                        select: { revisionNumber: true },
+                    });
+                    const nextRevisionNumber = (latestRevision?.revisionNumber ?? 0) + 1;
                     const created = await tx.problemRevision.create({
                         data: {
                             problemId: id,
-                            revisionNumber: 1,
+                            revisionNumber: nextRevisionNumber,
                             status: 'PUBLISHED',
                             publishedAt: new Date(),
                             ...revisionWrite,
