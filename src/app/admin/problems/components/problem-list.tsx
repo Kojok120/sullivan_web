@@ -38,6 +38,7 @@ import {
     type VideoStatusValue,
 } from '@/lib/problem-ui';
 import { renderProblemTextHtml } from '@/lib/problem-text';
+import { getDisplayQuestionFromStructuredContent } from '@/lib/structured-problem';
 import {
     bulkDeleteProblems,
     deleteStandaloneProblem,
@@ -347,7 +348,10 @@ export function ProblemList({
                         問題が見つかりませんでした
                     </div>
                 ) : (
-                    problems.map((problem) => (
+                    problems.map((problem) => {
+                        const displayQuestion = getDisplayQuestionFromStructuredContent(problem.publishedRevision?.structuredContent);
+                        const displayAnswer = problem.publishedRevision?.correctAnswer ?? problem.answer ?? '';
+                        return (
                         <div key={problem.id} className="rounded-lg border bg-card p-4">
                             <div className="mb-3 flex items-start justify-between gap-3">
                                 <div className="flex items-center gap-2">
@@ -391,14 +395,14 @@ export function ProblemList({
                                 <div>
                                     <p className="text-xs text-muted-foreground">問題文</p>
                                     <RenderedProblemText
-                                        text={problem.question}
+                                        text={displayQuestion}
                                         className="whitespace-pre-wrap text-sm leading-7 [&_.katex-display]:overflow-x-auto [&_.katex-display]:py-1"
                                     />
                                 </div>
                                 <div>
                                     <p className="text-xs text-muted-foreground">解答</p>
                                     <RenderedProblemText
-                                        text={problem.answer}
+                                        text={displayAnswer}
                                         className="whitespace-pre-wrap text-sm leading-7 [&_.katex-display]:overflow-x-auto [&_.katex-display]:py-1"
                                     />
                                 </div>
@@ -423,7 +427,8 @@ export function ProblemList({
                                 </div>
                             </div>
                         </div>
-                    ))
+                        );
+                    })
                 )}
             </div>
 
@@ -463,7 +468,10 @@ export function ProblemList({
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            problems.map((problem) => (
+                            problems.map((problem) => {
+                                const displayQuestion = getDisplayQuestionFromStructuredContent(problem.publishedRevision?.structuredContent);
+                                const displayAnswer = problem.publishedRevision?.correctAnswer ?? problem.answer ?? '';
+                                return (
                                 <TableRow key={problem.id}>
                                     {!isAuthorView && (
                                         <TableCell>
@@ -477,17 +485,17 @@ export function ProblemList({
                                         <TableCell className="font-mono text-sm font-bold">{problem.masterNumber || '-'}</TableCell>
                                     )}
                                     <TableCell className="font-mono text-xs text-muted-foreground">{problem.customId}</TableCell>
-                                    <TableCell className="max-w-[320px] align-top" title={problem.question}>
+                                    <TableCell className="max-w-[320px] align-top" title={displayQuestion}>
                                         <RenderedProblemText
-                                            text={problem.question}
+                                            text={displayQuestion}
                                             className="whitespace-pre-wrap break-words text-sm leading-7 [&_.katex-display]:overflow-x-auto [&_.katex-display]:py-1"
                                         />
                                     </TableCell>
                                     <TableCell className="text-xs">{getProblemTypeLabel(problem.problemType)}</TableCell>
                                     <TableCell><ProblemStatusCell problem={problem} /></TableCell>
-                                    <TableCell className="max-w-[220px] align-top" title={problem.answer || ''}>
+                                    <TableCell className="max-w-[220px] align-top" title={displayAnswer}>
                                         <RenderedProblemText
-                                            text={problem.answer}
+                                            text={displayAnswer}
                                             className="whitespace-pre-wrap break-words text-sm leading-7 [&_.katex-display]:overflow-x-auto [&_.katex-display]:py-1"
                                         />
                                     </TableCell>
@@ -526,7 +534,8 @@ export function ProblemList({
                                         </div>
                                     </TableCell>
                                 </TableRow>
-                            ))
+                                );
+                            })
                         )}
                     </TableBody>
                 </Table>

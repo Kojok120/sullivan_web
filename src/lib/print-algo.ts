@@ -93,7 +93,6 @@ export async function selectProblemsForPrint(
         select: {
             id: true,
             customId: true,
-            question: true,
             order: true,
             problemType: true,
             status: true,
@@ -167,7 +166,6 @@ export async function selectProblemsForPrint(
             problem: {
                 id: problem.id,
                 customId,
-                question: problem.question,
                 order: problem.order,
                 problemType: problem.problemType,
                 status: problem.status,

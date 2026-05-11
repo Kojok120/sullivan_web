@@ -600,6 +600,8 @@ type ProblemRevisionAssetForGrading = {
 type ProblemRevisionForGrading = {
     id: string;
     structuredContent: Prisma.JsonValue | null;
+    correctAnswer: string | null;
+    acceptedAnswers: string[];
     assets: ProblemRevisionAssetForGrading[];
 };
 
@@ -611,6 +613,8 @@ export type ProblemForGrading = {
     answer: string | null;
     acceptedAnswers: string[];
     publishedRevisionId: string | null;
+    publishedRevisionCorrectAnswer: string | null;
+    publishedRevisionAcceptedAnswers: string[];
     structuredContent: Prisma.JsonValue | null;
     revisionAssets: ProblemRevisionAssetForGrading[];
     coreProblems: { id: string; name: string }[];
@@ -715,11 +719,15 @@ export function buildSubjectSpecificGuidelines(problems: ProblemForGrading[]): s
 }
 
 export function buildProblemContextForGemini(problem: ProblemForGrading, index: number): GeminiProblemContext {
-    // 正解は常に Problem.answer / acceptedAnswers を信頼源とする。
-    // STRUCTURED_V1 形式でも publish 時に answerSpec から Problem 側へ同期される運用。
+    // 正解は publishedRevision を信頼源とする。Phase A で全 Problem に publishedRevision が紐付いた前提で、
+    // Phase C 完了 (Problem.answer / acceptedAnswers の drop) までの過渡期は legacy 側にフォールバック。
     let problemText = problem.question?.trim() || '(問題文なし)';
-    const referenceAnswer = problem.answer?.trim() || '';
-    const alternativeAnswers = uniqueNonEmpty(problem.acceptedAnswers);
+    const revisionAnswer = problem.publishedRevisionCorrectAnswer?.trim() ?? '';
+    const referenceAnswer = revisionAnswer || (problem.answer?.trim() ?? '');
+    const revisionAccepted = uniqueNonEmpty(problem.publishedRevisionAcceptedAnswers);
+    const alternativeAnswers = revisionAccepted.length > 0
+        ? revisionAccepted
+        : uniqueNonEmpty(problem.acceptedAnswers);
 
     if (problem.structuredContent) {
         try {
@@ -1073,6 +1081,8 @@ async function gradeWithGemini(
                 select: {
                     id: true,
                     structuredContent: true,
+                    correctAnswer: true,
+                    acceptedAnswers: true,
                     assets: {
                         select: {
                             id: true,
@@ -1152,6 +1162,8 @@ async function gradeWithGemini(
             answer: p.answer,
             acceptedAnswers: p.acceptedAnswers,
             publishedRevisionId: matchedRevision?.id ?? p.publishedRevisionId,
+            publishedRevisionCorrectAnswer: matchedRevision?.correctAnswer ?? null,
+            publishedRevisionAcceptedAnswers: matchedRevision?.acceptedAnswers ?? [],
             structuredContent: matchedRevision?.structuredContent ?? null,
             revisionAssets: matchedRevision?.assets.map((asset) => ({
                 id: asset.id,

@@ -18,6 +18,7 @@ import { canUseAiTutor } from "@/lib/plan-entitlements";
 import { SessionReviewTracker } from "@/components/history/session-review-tracker";
 import { getSession } from "@/lib/auth";
 import { ProblemTextPreview } from "@/app/admin/problems/components/problem-text-preview";
+import { getDisplayQuestionFromStructuredContent } from "@/lib/structured-problem";
 
 type SessionDetailProps = {
     groupId: string;
@@ -71,7 +72,7 @@ export async function SessionDetail({
         .map(d => ({
             historyId: d.id,
             videoUrl: d.problem.videoUrl!,
-            question: d.problem.question
+            question: getDisplayQuestionFromStructuredContent(d.problem.publishedRevision?.structuredContent),
         }));
     const shouldTrackReview = !isTeacherView && currentSession?.userId === userId;
 
@@ -99,6 +100,8 @@ export async function SessionDetail({
                     const coreProblem = item.problem.coreProblems[0];
                     const lectureVideos = (coreProblem?.lectureVideos as { title: string; url: string }[] | null) || [];
                     const coreProblemName = coreProblem?.name || '単元不明';
+                    const displayQuestion = getDisplayQuestionFromStructuredContent(item.problem.publishedRevision?.structuredContent);
+                    const correctAnswer = item.problem.publishedRevision?.correctAnswer ?? item.problem.answer ?? '';
 
                     return (
                         <Card key={item.id} className={!isCorrect ? "border-l-4 border-l-red-500" : ""}>
@@ -114,7 +117,7 @@ export async function SessionDetail({
                                     </div>
                                     <CardTitle className="pt-2">
                                         <ProblemTextPreview
-                                            text={item.problem.question}
+                                            text={displayQuestion}
                                             className="text-lg leading-relaxed [&_.katex-display]:overflow-x-auto [&_.katex-display]:py-2"
                                         />
                                     </CardTitle>
@@ -124,8 +127,8 @@ export async function SessionDetail({
                                         <ChatTutorButton
                                             targetStudentId={userId}
                                             problemContext={{
-                                                question: item.problem.question,
-                                                answer: item.problem.answer || '',
+                                                question: displayQuestion,
+                                                answer: correctAnswer,
                                                 userAnswer: item.userAnswer || '',
                                                 explanation: item.feedback || ''
                                             }}
@@ -134,8 +137,8 @@ export async function SessionDetail({
                                         <PhoneTutorButton
                                             targetStudentId={userId}
                                             problemContext={{
-                                                question: item.problem.question,
-                                                answer: item.problem.answer || '',
+                                                question: displayQuestion,
+                                                answer: correctAnswer,
                                                 userAnswer: item.userAnswer || '',
                                                 explanation: item.feedback || ''
                                             }}
@@ -154,9 +157,9 @@ export async function SessionDetail({
                                     </div>
                                     <div>
                                         <span className="font-semibold block mb-1">正解:</span>
-                                        {item.problem.answer ? (
+                                        {correctAnswer ? (
                                             <div className="text-green-700">
-                                                <ProblemTextPreview text={item.problem.answer} />
+                                                <ProblemTextPreview text={correctAnswer} />
                                             </div>
                                         ) : (
                                             <div className="bg-white p-2 rounded border text-lg min-h-[40px] text-green-700">

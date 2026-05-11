@@ -9,6 +9,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { getProblemsByCoreProblem } from '../actions';
 import { LinkIcon, GraduationCap, Hash, KeyRound, BookOpen, Pencil } from 'lucide-react';
 import { ProblemTextPreview } from '@/app/admin/problems/components/problem-text-preview';
+import { getDisplayQuestionFromStructuredContent } from '@/lib/structured-problem';
 
 interface ProblemEditorProps {
     coreProblemId: string;
@@ -18,12 +19,17 @@ interface ProblemEditorProps {
 type ProblemEditorProblem = Prisma.ProblemGetPayload<{
     select: {
         id: true;
-        question: true;
         answer: true;
         customId: true;
         grade: true;
         masterNumber: true;
         videoUrl: true;
+        publishedRevision: {
+            select: {
+                structuredContent: true;
+                correctAnswer: true;
+            };
+        };
         coreProblems: {
             select: {
                 id: true;
@@ -79,6 +85,8 @@ function getSafeExternalHref(rawUrl: string | null | undefined) {
 
 function ProblemItem({ problem, editHref }: { problem: ProblemEditorProblem; editHref?: string }) {
     const safeVideoUrl = getSafeExternalHref(problem.videoUrl);
+    const displayQuestion = getDisplayQuestionFromStructuredContent(problem.publishedRevision?.structuredContent);
+    const displayAnswer = problem.publishedRevision?.correctAnswer ?? problem.answer ?? '';
 
     return (
         <div className="group flex items-start gap-2 p-2 px-3 border-b bg-background hover:bg-muted/30 transition-colors">
@@ -86,12 +94,12 @@ function ProblemItem({ problem, editHref }: { problem: ProblemEditorProblem; edi
                 <div className="flex flex-col items-stretch gap-2 sm:flex-row">
                     <div className="flex-1 border rounded-md bg-transparent">
                         <ProblemTextPreview
-                            text={problem.question}
+                            text={displayQuestion}
                             className="p-2 text-sm font-medium leading-6 [&_.katex-display]:overflow-x-auto [&_.katex-display]:py-1 [&_svg.numberline]:max-w-full"
                         />
                     </div>
                     <div className="w-full p-2 text-sm whitespace-pre-wrap border rounded-md bg-transparent sm:w-1/3">
-                        {problem.answer || '-'}
+                        {displayAnswer || '-'}
                     </div>
                     {editHref ? (
                         <div className="flex sm:items-start">
