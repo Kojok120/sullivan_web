@@ -46,6 +46,26 @@ type FilterCondition =
 
 const SEARCH_SCALAR_FIELDS = ['question', 'answer', 'customId'] as const;
 
+function buildExactMatchSearchOR(searchTerm: string): Prisma.ProblemWhereInput[] {
+    // customId の大文字小文字を区別しない完全一致 (例: "E-355" や "e-355" を直接入力したケース)
+    const conditions: Prisma.ProblemWhereInput[] = [
+        { customId: { equals: searchTerm, mode: 'insensitive' } },
+    ];
+
+    if (/^\d+$/.test(searchTerm)) {
+        // 数字だけ入力されたケース ("355") は customId が "-355" で終わるものを完全一致候補に含める
+        // ※ "E-3355" の suffix は "-3355" なので "-355" には一致しない
+        conditions.push({ customId: { endsWith: `-${searchTerm}` } });
+
+        const masterNumber = Number.parseInt(searchTerm, 10);
+        if (Number.isSafeInteger(masterNumber)) {
+            conditions.push({ masterNumber });
+        }
+    }
+
+    return conditions;
+}
+
 function revalidateProblemPaths(problemId?: string) {
     revalidatePath('/admin/problems');
     revalidatePath('/materials/problems');
@@ -264,18 +284,83 @@ export async function getProblems(
                         ? [{ masterNumber: { sort: sortOrder, nulls: 'last' } }, { id: 'asc' }]
                         : [{ updatedAt: sortOrder }, { id: 'asc' }];
 
-        const [problems, total] = await Promise.all([
-            prisma.problem.findMany({
-                where,
-                include: problemAdminInclude,
+        // 検索語が無い場合は従来通りのページネーション
+        if (!normalizedSearch) {
+            const [problems, total] = await Promise.all([
+                prisma.problem.findMany({
+                    where,
+                    include: problemAdminInclude,
+                    orderBy,
+                    skip,
+                    take: limit,
+                }),
+                prisma.problem.count({ where }),
+            ]);
+            return { success: true, problems, total, page, limit };
+        }
+
+        // 検索語があるときは完全一致を先頭に固定し、残りを既存の orderBy で並べる
+        const filterOnlyWhere = buildProblemWhere(filters);
+        const exactWhere: Prisma.ProblemWhereInput = {
+            AND: [filterOnlyWhere, { OR: buildExactMatchSearchOR(normalizedSearch) }],
+        };
+
+        const exactIds = (
+            await prisma.problem.findMany({
+                where: exactWhere,
+                select: { id: true },
                 orderBy,
-                skip,
-                take: limit,
-            }),
+            })
+        ).map((problem) => problem.id);
+
+        const exactCount = exactIds.length;
+        let pinnedPageIds: string[] = [];
+        let restSkip = skip;
+        let restTake = limit;
+
+        if (skip < exactCount) {
+            pinnedPageIds = exactIds.slice(skip, skip + limit);
+            restSkip = 0;
+            restTake = limit - pinnedPageIds.length;
+        } else {
+            restSkip = skip - exactCount;
+        }
+
+        const restWhere: Prisma.ProblemWhereInput =
+            exactIds.length > 0 ? { AND: [where, { id: { notIn: exactIds } }] } : where;
+
+        const [pinnedItems, restItems, total] = await Promise.all([
+            pinnedPageIds.length > 0
+                ? prisma.problem.findMany({
+                      where: { id: { in: pinnedPageIds } },
+                      include: problemAdminInclude,
+                  })
+                : Promise.resolve([] as Prisma.ProblemGetPayload<{ include: typeof problemAdminInclude }>[]),
+            restTake > 0
+                ? prisma.problem.findMany({
+                      where: restWhere,
+                      include: problemAdminInclude,
+                      orderBy,
+                      skip: restSkip,
+                      take: restTake,
+                  })
+                : Promise.resolve([] as Prisma.ProblemGetPayload<{ include: typeof problemAdminInclude }>[]),
             prisma.problem.count({ where }),
         ]);
 
-        return { success: true, problems, total, page, limit };
+        // 完全一致の元の並び順を維持する
+        const pinnedItemMap = new Map(pinnedItems.map((item) => [item.id, item]));
+        const pinnedOrdered = pinnedPageIds
+            .map((id) => pinnedItemMap.get(id))
+            .filter((item): item is NonNullable<typeof item> => item !== undefined);
+
+        return {
+            success: true,
+            problems: [...pinnedOrdered, ...restItems],
+            total,
+            page,
+            limit,
+        };
     } catch (error) {
         console.error('Failed to get problems:', error);
         return { error: '問題の取得に失敗しました' };

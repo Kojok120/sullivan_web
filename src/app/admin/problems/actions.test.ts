@@ -6,6 +6,7 @@ const {
     coreProblemFindManyMock,
     problemFindManyMock,
     problemFindFirstMock,
+    problemCountMock,
     subjectFindUniqueMock,
     transactionMock,
     bulkUpsertProblemsCoreMock,
@@ -30,6 +31,7 @@ const {
     coreProblemFindManyMock: vi.fn(),
     problemFindManyMock: vi.fn(),
     problemFindFirstMock: vi.fn(),
+    problemCountMock: vi.fn(),
     subjectFindUniqueMock: vi.fn(),
     transactionMock: vi.fn(),
     bulkUpsertProblemsCoreMock: vi.fn(),
@@ -63,6 +65,7 @@ vi.mock('@/lib/prisma', () => ({
         problem: {
             findMany: problemFindManyMock,
             findFirst: problemFindFirstMock,
+            count: problemCountMock,
         },
         subject: {
             findUnique: subjectFindUniqueMock,
@@ -110,6 +113,7 @@ import {
     bulkUpsertStandaloneProblems,
     createProblemDraft,
     deleteStandaloneProblem,
+    getProblems,
     searchProblemsByMasterNumbers,
 } from './actions';
 
@@ -443,5 +447,42 @@ describe('problem actions permissions', () => {
         expect(requireProblemAuthorMock).not.toHaveBeenCalled();
         expect(deleteProblemsWithRelationsMock).toHaveBeenCalledWith(['problem-1']);
         expect(result).toEqual({ success: true });
+    });
+
+    it('getProblems は検索時に customId 完全一致を先頭に固定する', async () => {
+        // 検索 "355" で E-355 が完全一致、E-3355 / E-2355 は部分一致（更新日時で新しい）
+        const exactItem = { id: 'problem-exact', customId: 'E-355', updatedAt: new Date('2026-04-01') };
+        const recentPartial = { id: 'problem-recent', customId: 'E-3355', updatedAt: new Date('2026-05-01') };
+        const oldPartial = { id: 'problem-old', customId: 'E-2355', updatedAt: new Date('2026-04-20') };
+
+        problemFindManyMock
+            // 1回目: 完全一致 ID 抽出 (select: id)
+            .mockResolvedValueOnce([{ id: exactItem.id }])
+            // 2回目: pinned アイテム本体 (Promise.all 内 1 番目)
+            .mockResolvedValueOnce([exactItem])
+            // 3回目: 残り (Promise.all 内 2 番目)
+            .mockResolvedValueOnce([recentPartial, oldPartial]);
+        problemCountMock.mockResolvedValueOnce(3);
+
+        const result = await getProblems(1, 20, '355');
+
+        expect(result.success).toBe(true);
+        expect(result.problems).toEqual([exactItem, recentPartial, oldPartial]);
+        expect(result.total).toBe(3);
+    });
+
+    it('getProblems は検索が空のときは固定処理を行わず単一クエリで返す', async () => {
+        const items = [
+            { id: 'p1', customId: 'E-1' },
+            { id: 'p2', customId: 'E-2' },
+        ];
+        problemFindManyMock.mockResolvedValueOnce(items);
+        problemCountMock.mockResolvedValueOnce(2);
+
+        const result = await getProblems(1, 20, '');
+
+        expect(result.success).toBe(true);
+        expect(result.problems).toEqual(items);
+        expect(problemFindManyMock).toHaveBeenCalledTimes(1);
     });
 });
