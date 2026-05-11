@@ -22,6 +22,9 @@ const SOLID_TARGETS: { customId: string; cuid: string; expected: string }[] = [
 test.describe('PROD: 立体 DSL レンダリング (admin editor)', () => {
   test.beforeEach(async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'chromium', 'desktop chromium のみ実行');
+    // 本テストの cuid は PROD DB のもの (header 参照)。DEV DB には存在せず
+    // 編集ページが 404 になるので、E2E_PROD_BASE_URL 未設定の実行は skip する。
+    test.skip(!process.env.E2E_PROD_BASE_URL, 'PROD-only: cuid は PROD DB 由来');
     const admin = adminCreds();
     await loginAs(page, admin.loginId, admin.password);
     if (page.url().includes('/login')) {
