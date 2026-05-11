@@ -7,7 +7,6 @@ function makeProblem(id: string, customId = `E-${id}`): PrintableProblem {
     return {
         id,
         customId,
-        question: `question-${id}`,
         order: 0,
     };
 }

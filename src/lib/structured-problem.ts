@@ -331,6 +331,31 @@ export function collectStructuredDocumentAssetIds(document: StructuredProblemDoc
  * Stage B' 以降は answer 系を answerSpec から導出せず、呼び出し側から直接渡してもらう。
  * question は document の summary と paragraph ブロックから合成する。
  */
+/**
+ * publishedRevision.structuredContent を入力として、生徒画面・履歴・一覧表示などで
+ * 「問題本文」として表示するための短い派生テキストを返す。
+ *
+ * Phase B3 で Problem.question の直接参照を撤廃するための共通ヘルパー。
+ * 入力が空・解析不能なら空文字を返す（呼び出し側でプレースホルダ等にフォールバックする）。
+ */
+export function getDisplayQuestionFromStructuredContent(raw: unknown): string {
+    if (!raw) return '';
+    try {
+        const document = parseStructuredDocument(raw);
+        return [
+            document.summary,
+            ...document.blocks
+                .filter((block) => block.type === 'paragraph')
+                .map((block) => block.text),
+        ]
+            .filter(Boolean)
+            .join('\n')
+            .slice(0, 4000);
+    } catch {
+        return '';
+    }
+}
+
 export function deriveLegacyFieldsFromStructuredData(input: {
     document: StructuredProblemDocument;
     correctAnswer: string;
@@ -355,6 +380,61 @@ export function deriveLegacyFieldsFromStructuredData(input: {
         question,
         answer: correctAnswer.trim(),
         acceptedAnswers: uniqueNonEmpty(Array.from(acceptedAnswers)),
+    };
+}
+
+/**
+ * `buildStructuredDocumentFromText` の出力が paragraph ブロックのみで構成されるため、
+ * 既存 structuredContent に非 paragraph ブロックや summary/instructions が含まれる場合は
+ * プレーンテキストから再構築する処理で図形・選択肢・空欄などの構造化データが消失する。
+ * 本ヘルパーは「プレーンテキストへ flatten すると情報が失われる構造を持つか」を判定する。
+ *
+ * 入力が空・解析不能な場合は false (= 失われる情報なし) を返す。
+ */
+export function wouldFlattenLoseStructuredContent(raw: unknown): boolean {
+    if (!raw) return false;
+    try {
+        const document = parseStructuredDocument(raw);
+        if (document.summary?.trim() || document.instructions?.trim()) {
+            return true;
+        }
+        return document.blocks.some((block) => block.type !== 'paragraph');
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * プレーンテキストの問題文から最小構成の structuredContent ドキュメントを組み立てる。
+ * 連続する改行で段落を切り出し、空段落はスキップする。
+ * 空文字や空白のみの入力は paragraph schema (text.min(1)) に違反するため例外を投げる。
+ */
+export class BlankStructuredQuestionError extends Error {
+    constructor() {
+        super('問題文が空のため structured content を生成できません');
+        this.name = 'BlankStructuredQuestionError';
+    }
+}
+
+export function buildStructuredDocumentFromText(text: string): StructuredProblemDocument {
+    const paragraphs = (text ?? '')
+        .split(/\r?\n+/)
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0);
+
+    if (paragraphs.length === 0) {
+        throw new BlankStructuredQuestionError();
+    }
+
+    const blocks = paragraphs.map((paragraphText) => ({
+        id: createStructuredBlockId(),
+        type: 'paragraph' as const,
+        text: paragraphText,
+    }));
+
+    return {
+        version: 1,
+        blocks,
     };
 }
 

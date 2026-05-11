@@ -600,6 +600,8 @@ type ProblemRevisionAssetForGrading = {
 type ProblemRevisionForGrading = {
     id: string;
     structuredContent: Prisma.JsonValue | null;
+    correctAnswer: string | null;
+    acceptedAnswers: string[];
     assets: ProblemRevisionAssetForGrading[];
 };
 
@@ -607,10 +609,9 @@ export type ProblemForGrading = {
     id: string;
     customId: string;
     subjectName: string;
-    question: string;
-    answer: string | null;
-    acceptedAnswers: string[];
     publishedRevisionId: string | null;
+    publishedRevisionCorrectAnswer: string | null;
+    publishedRevisionAcceptedAnswers: string[];
     structuredContent: Prisma.JsonValue | null;
     revisionAssets: ProblemRevisionAssetForGrading[];
     coreProblems: { id: string; name: string }[];
@@ -715,16 +716,19 @@ export function buildSubjectSpecificGuidelines(problems: ProblemForGrading[]): s
 }
 
 export function buildProblemContextForGemini(problem: ProblemForGrading, index: number): GeminiProblemContext {
-    // 正解は常に Problem.answer / acceptedAnswers を信頼源とする。
-    // STRUCTURED_V1 形式でも publish 時に answerSpec から Problem 側へ同期される運用。
-    let problemText = problem.question?.trim() || '(問題文なし)';
-    const referenceAnswer = problem.answer?.trim() || '';
-    const alternativeAnswers = uniqueNonEmpty(problem.acceptedAnswers);
+    // Phase A で全 Problem に publishedRevision が紐付き、Phase C で legacy カラムを撤廃したため
+    // 採点は publishedRevision のみを信頼源とする。
+    let problemText = '(問題文なし)';
+    const referenceAnswer = problem.publishedRevisionCorrectAnswer?.trim() ?? '';
+    const alternativeAnswers = uniqueNonEmpty(problem.publishedRevisionAcceptedAnswers);
 
     if (problem.structuredContent) {
         try {
             const document = parseStructuredDocumentJson(problem.structuredContent);
-            problemText = buildAiProblemText(document).trim() || problemText;
+            const text = buildAiProblemText(document).trim();
+            if (text) {
+                problemText = text;
+            }
         } catch (error) {
             console.warn('[grading-service] failed to parse structured problem document', {
                 problemId: problem.id,
@@ -1073,6 +1077,8 @@ async function gradeWithGemini(
                 select: {
                     id: true,
                     structuredContent: true,
+                    correctAnswer: true,
+                    acceptedAnswers: true,
                     assets: {
                         select: {
                             id: true,
@@ -1148,10 +1154,9 @@ async function gradeWithGemini(
             id: p.id,
             customId,
             subjectName: p.subject.name,
-            question: p.question,
-            answer: p.answer,
-            acceptedAnswers: p.acceptedAnswers,
             publishedRevisionId: matchedRevision?.id ?? p.publishedRevisionId,
+            publishedRevisionCorrectAnswer: matchedRevision?.correctAnswer ?? null,
+            publishedRevisionAcceptedAnswers: matchedRevision?.acceptedAnswers ?? [],
             structuredContent: matchedRevision?.structuredContent ?? null,
             revisionAssets: matchedRevision?.assets.map((asset) => ({
                 id: asset.id,

@@ -578,12 +578,26 @@ export async function getProblemsByCoreProblem(coreProblemId: string) {
             },
             select: {
                 id: true,
-                question: true,
-                answer: true,
                 customId: true,
                 grade: true,
                 masterNumber: true,
                 videoUrl: true,
+                publishedRevision: {
+                    select: {
+                        structuredContent: true,
+                        correctAnswer: true,
+                    },
+                },
+                // publishedRevision が無い DRAFT 問題用に最新リビジョンを 1 件取得し、
+                // structuredContent / correctAnswer のフォールバックに使う。
+                revisions: {
+                    orderBy: { revisionNumber: 'desc' },
+                    take: 1,
+                    select: {
+                        structuredContent: true,
+                        correctAnswer: true,
+                    },
+                },
                 coreProblems: {
                     select: {
                         id: true,

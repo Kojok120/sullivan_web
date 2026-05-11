@@ -72,12 +72,24 @@ describe('curriculum actions', () => {
                 },
                 select: {
                     id: true,
-                    question: true,
-                    answer: true,
                     customId: true,
                     grade: true,
                     masterNumber: true,
                     videoUrl: true,
+                    publishedRevision: {
+                        select: {
+                            structuredContent: true,
+                            correctAnswer: true,
+                        },
+                    },
+                    revisions: {
+                        orderBy: { revisionNumber: 'desc' },
+                        take: 1,
+                        select: {
+                            structuredContent: true,
+                            correctAnswer: true,
+                        },
+                    },
                     coreProblems: {
                         select: {
                             id: true,

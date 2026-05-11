@@ -469,13 +469,7 @@ export async function buildPrintDocumentMarkup(input: PrintDocumentInput): Promi
 
     const sections = input.problemSets.map((setProblems, setIndex) => {
         const setLabel = input.problemSets.length > 1 ? ` (Set ${setIndex + 1})` : '';
-        const hasStructured = setProblems.some(isStructuredPrintableProblem);
-
-        const questionRows = setProblems.map((problem) => (
-            isStructuredPrintableProblem(problem)
-                ? renderStructuredProblem(problem)
-                : renderPlainProblem(problem)
-        )).join('');
+        const questionRows = setProblems.map((problem) => renderStructuredProblem(problem)).join('');
 
         const answerRows = setProblems.map((problem) => {
             const displayId = getProblemDisplayId(problem);
@@ -501,8 +495,8 @@ export async function buildPrintDocumentMarkup(input: PrintDocumentInput): Promi
                         studentLoginId: input.studentLoginId,
                         sheetType: '問題',
                     })}
-                    ${hasStructured ? `<img class="qr-image qr-image-inline" src="${qrCodeBySet[setIndex] || ''}" alt="QRコード" />` : ''}
-                    <div class="${hasStructured ? 'structured-question-list' : 'question-list'}">
+                    <img class="qr-image qr-image-inline" src="${qrCodeBySet[setIndex] || ''}" alt="QRコード" />
+                    <div class="structured-question-list">
                         ${questionRows}
                     </div>
                     <div class="sheet-footer">Sullivan</div>
@@ -582,7 +576,18 @@ function renderStructuredProblem(problem: PrintableProblem): string {
     const document = parseStructuredDocumentSafely(problem);
 
     if (!document) {
-        return renderPlainProblem(problem);
+        // structuredContent が欠落・解析失敗した場合のフォールバック。Phase A 以降 PROD には存在しないが
+        // セーフティとして問題本文の代わりにエラープレースホルダを表示する。
+        return `
+            <article class="problem-card">
+                <div class="problem-card-header">
+                    <div class="question-id">${escapeHtml(displayId)}.</div>
+                </div>
+                <div class="problem-body">
+                    <p class="problem-body-error">(問題本文を表示できません)</p>
+                </div>
+            </article>
+        `;
     }
 
     const summary = document.summary?.trim();
@@ -644,18 +649,6 @@ function renderStructuredBlock(problem: PrintableProblem, block: NonNullable<Pri
         default:
             return '';
     }
-}
-
-function renderPlainProblem(problem: PrintableProblem): string {
-    const displayId = getProblemDisplayId(problem);
-    const questionText = escapeHtml(problem.question ?? '').replace(/\n/g, '<br />');
-
-    return `
-        <article class="question-row">
-            <div class="question-id">${escapeHtml(displayId)}.</div>
-            <div class="question-text">${questionText}</div>
-        </article>
-    `;
 }
 
 function renderAssetFigure(
@@ -815,10 +808,6 @@ function renderKatex(latex: string, displayMode: boolean): string {
     } catch {
         return `<code>${escapeHtml(latex)}</code>`;
     }
-}
-
-function isStructuredPrintableProblem(problem: PrintableProblem): boolean {
-    return Boolean(problem.structuredContent);
 }
 
 export function getProblemDisplayId(problem: PrintableProblem): string {

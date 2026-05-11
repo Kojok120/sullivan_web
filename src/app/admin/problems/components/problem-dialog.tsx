@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2 } from 'lucide-react';
 import { VIDEO_STATUS_OPTIONS, resolveVideoStatusFromUrl, type VideoStatusValue } from '@/lib/problem-ui';
+import { getDisplayQuestionFromStructuredContent } from '@/lib/structured-problem';
 import { createStandaloneProblem, updateStandaloneProblem } from '../actions';
 import { toast } from 'sonner';
 import { CoreProblemSelector, SelectedCoreProblem } from './core-problem-selector';
@@ -31,9 +32,13 @@ type ProblemFormState = {
 };
 
 function createInitialFormState(problem: ProblemWithRelations | null): ProblemFormState {
+    // problem-list.tsx と同じく publishedRevision が無い問題は最新 DRAFT で補う。
+    // list 側で表示されているテキストが dialog で空になり、誤って空のまま保存され
+    // 既存内容を上書きしてしまうのを防ぐ。
+    const sourceRevision = problem?.publishedRevision ?? problem?.revisions?.[0] ?? null;
     return {
-        question: problem?.question ?? '',
-        answer: problem?.answer ?? '',
+        question: getDisplayQuestionFromStructuredContent(sourceRevision?.structuredContent),
+        answer: sourceRevision?.correctAnswer ?? '',
         grade: problem?.grade ?? '',
         videoUrl: problem?.videoUrl ?? '',
         videoStatus: ((problem?.videoStatus as VideoStatusValue | undefined) ?? 'NONE'),
@@ -47,11 +52,46 @@ function ProblemDialogForm({
     onSuccess,
 }: Omit<ProblemDialogProps, 'open'>) {
     const [isPending, startTransition] = useTransition();
-    const [formData, setFormData] = useState<ProblemFormState>(() => createInitialFormState(problem));
+    const [initialFormData] = useState<ProblemFormState>(() => createInitialFormState(problem));
+    const [formData, setFormData] = useState<ProblemFormState>(initialFormData);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         startTransition(async () => {
+            // 編集時は触っていないフィールドを送らない。
+            // updateStandaloneProblem は question/answer/acceptedAnswers のいずれかが
+            // 来ると publishedRevision.structuredContent を paragraph テキストで上書きするため、
+            // 未変更のフィールドを送ると構造化ブロック (figure, directive, layout) を破壊する。
+            const questionChanged = formData.question !== initialFormData.question;
+            const answerChanged = formData.answer !== initialFormData.answer;
+
+            if (problem) {
+                const data: {
+                    question?: string;
+                    answer?: string;
+                    grade?: string;
+                    videoUrl?: string;
+                    videoStatus: VideoStatusValue;
+                    coreProblemIds: string[];
+                } = {
+                    grade: formData.grade || undefined,
+                    videoUrl: formData.videoUrl || undefined,
+                    videoStatus: resolveVideoStatusFromUrl(formData.videoStatus, formData.videoUrl),
+                    coreProblemIds: formData.coreProblems.map((cp) => cp.id),
+                };
+                if (questionChanged) data.question = formData.question;
+                if (answerChanged) data.answer = formData.answer;
+
+                const result = await updateStandaloneProblem(problem.id, data);
+                if (result.success) {
+                    toast.success('問題を更新しました');
+                    onSuccess();
+                } else {
+                    toast.error(result.error || '保存に失敗しました');
+                }
+                return;
+            }
+
             const data = {
                 question: formData.question,
                 answer: formData.answer,
@@ -61,12 +101,10 @@ function ProblemDialogForm({
                 coreProblemIds: formData.coreProblems.map((cp) => cp.id),
             };
 
-            const result = problem
-                ? await updateStandaloneProblem(problem.id, data)
-                : await createStandaloneProblem(data);
+            const result = await createStandaloneProblem(data);
 
             if (result.success) {
-                toast.success(problem ? '問題を更新しました' : '問題を作成しました');
+                toast.success('問題を作成しました');
                 onSuccess();
             } else {
                 toast.error(result.error || '保存に失敗しました');

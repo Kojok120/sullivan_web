@@ -48,7 +48,6 @@ describe('selectProblemsForPrint', () => {
             select: {
                 id: true,
                 customId: true,
-                question: true,
                 order: true,
                 userStates: {
                     where: { userId: 'user-1' },
@@ -57,6 +56,7 @@ describe('selectProblemsForPrint', () => {
                 },
             },
         });
+        expect(query.select.question).toBeUndefined();
         expect(query.include).toBeUndefined();
     });
 

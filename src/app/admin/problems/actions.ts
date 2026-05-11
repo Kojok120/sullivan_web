@@ -15,12 +15,14 @@ import {
     type VideoStatusValue,
 } from '@/lib/problem-ui';
 import {
+    buildStructuredDocumentFromText,
     deriveLegacyFieldsFromStructuredData,
     normalizeAnswerForAuthoring,
     normalizeAnswerSpecForAuthoring,
     parseAnswerSpec,
     parsePrintConfig,
     parseStructuredDocument,
+    wouldFlattenLoseStructuredContent,
 } from '@/lib/structured-problem';
 import { createProblemAssetSignedUrl, removeProblemAssetFromStorage, uploadProblemAssetToStorage } from '@/lib/problem-assets';
 import { SENT_BACK_REASON_MAX } from './constants';
@@ -448,6 +450,13 @@ export async function createStandaloneProblem(data: {
     coreProblemIds: string[];
 }) {
     await requireAdmin();
+    // Server Action 引数は runtime に null/非 object も入りうるため payload 形状から検証する。
+    if (data == null || typeof data !== 'object') {
+        return { error: '不正なリクエストです' };
+    }
+    if (typeof data.question !== 'string' || !data.question.trim()) {
+        return { error: '問題文を入力してください' };
+    }
     try {
         const resolvedVideoStatus = resolveVideoStatusFromUrl(data.videoStatus, data.videoUrl);
         const problem = await createProblemCore({
@@ -479,6 +488,15 @@ export async function updateStandaloneProblem(id: string, data: {
     coreProblemIds?: string[];
 }) {
     await requireAdmin();
+    // Server Action 引数は runtime に null/非 object も入りうるため payload 形状から検証する。
+    if (data == null || typeof data !== 'object') {
+        return { error: '不正なリクエストです' };
+    }
+    // 空白のみの question で revision を作ると paragraphBlockSchema (text.min(1)) を
+    // 違反する structuredContent が保存され、以後の parseStructuredDocument が壊れる。
+    if (data.question !== undefined && (typeof data.question !== 'string' || !data.question.trim())) {
+        return { error: '問題文を入力してください' };
+    }
     try {
         const updateData: Prisma.ProblemUpdateInput = {
             question: data.question,
@@ -488,14 +506,45 @@ export async function updateStandaloneProblem(id: string, data: {
             videoUrl: data.videoUrl,
         };
 
+        const existing = await prisma.problem.findUnique({
+            where: { id },
+            select: {
+                videoUrl: true,
+                videoStatus: true,
+                publishedRevisionId: true,
+                question: true,
+                answer: true,
+                acceptedAnswers: true,
+                publishedRevision: {
+                    select: { structuredContent: true },
+                },
+                // publishedRevision が無い問題でも最新 revision の structuredContent を
+                // flatten ガード対象に含めるため、最新 1 件だけ引いて参照する。
+                revisions: {
+                    orderBy: { revisionNumber: 'desc' },
+                    take: 1,
+                    select: { structuredContent: true },
+                },
+            },
+        });
+        if (!existing) {
+            return { error: '問題が見つかりません' };
+        }
+
+        const shouldUpdateRevision =
+            data.question !== undefined || data.answer !== undefined || data.acceptedAnswers !== undefined;
+
+        // 構造化問題 (figure / directive / choices / summary 等) を本フォームから
+        // 上書きすると `buildStructuredDocumentFromText` が paragraph のみへ flatten して
+        // 構造化ブロックを破壊する。publishedRevision が無い legacy / DRAFT 問題でも
+        // 最新 revision に構造化ブロックがあれば編集を拒否する。
+        const guardSource = existing.publishedRevision?.structuredContent
+            ?? existing.revisions[0]?.structuredContent;
+        if (shouldUpdateRevision && wouldFlattenLoseStructuredContent(guardSource)) {
+            return { error: '構造化ブロックを含む問題はこの画面から編集できません。問題編集画面をご利用ください。' };
+        }
+
         if (data.videoUrl !== undefined || data.videoStatus !== undefined) {
-            const existing = await prisma.problem.findUnique({
-                where: { id },
-                select: { videoUrl: true, videoStatus: true },
-            });
-            if (!existing) {
-                return { error: '問題が見つかりません' };
-            }
             const nextVideoUrl = data.videoUrl !== undefined ? data.videoUrl : existing.videoUrl;
             const desiredStatus = data.videoStatus ?? (existing.videoStatus as VideoStatusValue);
             updateData.videoStatus = resolveVideoStatusFromUrl(desiredStatus, nextVideoUrl);
@@ -515,10 +564,56 @@ export async function updateStandaloneProblem(id: string, data: {
             }
         }
 
-        const problem = await prisma.problem.update({
-            where: { id },
-            data: updateData,
-            include: problemAdminInclude,
+        const problem = await prisma.$transaction(async (tx) => {
+            const updated = await tx.problem.update({
+                where: { id },
+                data: updateData,
+            });
+
+            if (shouldUpdateRevision) {
+                const nextQuestion = data.question !== undefined ? data.question : existing.question;
+                const nextAnswer = data.answer !== undefined ? data.answer : existing.answer;
+                const nextAcceptedAnswers = data.acceptedAnswers !== undefined ? data.acceptedAnswers : existing.acceptedAnswers;
+
+                const revisionWrite = {
+                    structuredContent: buildStructuredDocumentFromText(nextQuestion) as unknown as Prisma.InputJsonValue,
+                    correctAnswer: nextAnswer?.trim() ? nextAnswer : null,
+                    acceptedAnswers: nextAcceptedAnswers ?? [],
+                };
+
+                if (existing.publishedRevisionId) {
+                    await tx.problemRevision.update({
+                        where: { id: existing.publishedRevisionId },
+                        data: revisionWrite,
+                    });
+                } else {
+                    // 既存 DRAFT リビジョンと revisionNumber が衝突しないよう次番を採番する
+                    const latestRevision = await tx.problemRevision.findFirst({
+                        where: { problemId: id },
+                        orderBy: { revisionNumber: 'desc' },
+                        select: { revisionNumber: true },
+                    });
+                    const nextRevisionNumber = (latestRevision?.revisionNumber ?? 0) + 1;
+                    const created = await tx.problemRevision.create({
+                        data: {
+                            problemId: id,
+                            revisionNumber: nextRevisionNumber,
+                            status: 'PUBLISHED',
+                            publishedAt: new Date(),
+                            ...revisionWrite,
+                        },
+                    });
+                    await tx.problem.update({
+                        where: { id },
+                        data: { publishedRevisionId: created.id },
+                    });
+                }
+            }
+
+            return tx.problem.findUnique({
+                where: { id: updated.id },
+                include: problemAdminInclude,
+            });
         });
 
         revalidateProblemPaths(id);

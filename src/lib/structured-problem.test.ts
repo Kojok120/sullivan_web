@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+    BlankStructuredQuestionError,
     buildAiProblemText,
+    buildStructuredDocumentFromText,
     collectStructuredDocumentAssetIds,
     normalizeAnswerForAuthoring,
     normalizeAnswerSpecForAuthoring,
     parseAnswerSpec,
     parseStructuredDocument,
+    wouldFlattenLoseStructuredContent,
 } from './structured-problem';
 
 describe('structured-problem', () => {
@@ -122,6 +125,64 @@ describe('structured-problem', () => {
         expect(buildAiProblemText(document)).toContain('選択肢:');
         expect(buildAiProblemText(document)).toContain('空欄:');
         expect(collectStructuredDocumentAssetIds(document)).toEqual(['asset-image']);
+    });
+
+    describe('wouldFlattenLoseStructuredContent', () => {
+        it('paragraph のみで summary/instructions が無ければ false', () => {
+            const raw = {
+                version: 1,
+                blocks: [
+                    { id: 'p1', type: 'paragraph', text: '本文' },
+                    { id: 'p2', type: 'paragraph', text: '続き' },
+                ],
+            };
+            expect(wouldFlattenLoseStructuredContent(raw)).toBe(false);
+        });
+
+        it('非 paragraph ブロックを含めば true (figure / choices などが消えるため)', () => {
+            const raw = {
+                version: 1,
+                blocks: [
+                    { id: 'p1', type: 'paragraph', text: '本文' },
+                    { id: 't1', type: 'table', headers: ['x'], rows: [['1']] },
+                ],
+            };
+            expect(wouldFlattenLoseStructuredContent(raw)).toBe(true);
+        });
+
+        it('summary または instructions に値があれば true', () => {
+            expect(wouldFlattenLoseStructuredContent({
+                version: 1,
+                summary: '次の問いに答えよ',
+                blocks: [{ id: 'p1', type: 'paragraph', text: '本文' }],
+            })).toBe(true);
+
+            expect(wouldFlattenLoseStructuredContent({
+                version: 1,
+                instructions: '計算過程も書け',
+                blocks: [{ id: 'p1', type: 'paragraph', text: '本文' }],
+            })).toBe(true);
+        });
+
+        it('null / 不正な JSON は false (失う情報なしと判定)', () => {
+            expect(wouldFlattenLoseStructuredContent(null)).toBe(false);
+            expect(wouldFlattenLoseStructuredContent({ foo: 'bar' })).toBe(false);
+        });
+    });
+
+    describe('buildStructuredDocumentFromText', () => {
+        it('paragraph schema 違反を防ぐため、空文字入力は BlankStructuredQuestionError を投げる', () => {
+            expect(() => buildStructuredDocumentFromText('')).toThrow(BlankStructuredQuestionError);
+            expect(() => buildStructuredDocumentFromText('   ')).toThrow(BlankStructuredQuestionError);
+            expect(() => buildStructuredDocumentFromText('\n\n   \n')).toThrow(BlankStructuredQuestionError);
+        });
+
+        it('非空入力は paragraph ブロックの配列に整形する', () => {
+            const document = buildStructuredDocumentFromText('一行目\n\n二行目');
+            expect(document.blocks).toHaveLength(2);
+            expect(document.blocks[0]).toMatchObject({ type: 'paragraph', text: '一行目' });
+            expect(document.blocks[1]).toMatchObject({ type: 'paragraph', text: '二行目' });
+        });
     });
 
     it('legacy な graphAsset / geometryAsset ブロックは読み込み時に黙って捨てる', () => {

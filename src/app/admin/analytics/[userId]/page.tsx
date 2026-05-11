@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { SubjectProgressList } from '@/components/subject-progress-list';
 import { DateDisplay } from '@/components/ui/date-display';
 import { ProblemTextPreview } from '@/app/admin/problems/components/problem-text-preview';
+import { getDisplayQuestionFromStructuredContent } from '@/lib/structured-problem';
 
 interface PageProps {
     params: Promise<{
@@ -99,7 +100,7 @@ export default async function StudentAnalyticsPage({ params }: PageProps) {
                                     {history.problem.coreProblems[0]?.subject.name || '-'} / {history.problem.coreProblems[0]?.name || '-'}
                                 </p>
                                 <ProblemTextPreview
-                                    text={history.problem.question}
+                                    text={getDisplayQuestionFromStructuredContent(history.problem.publishedRevision?.structuredContent)}
                                     className="mt-1 text-sm leading-6 [&_.katex-display]:overflow-x-auto [&_.katex-display]:py-1 [&_svg.numberline]:max-w-full"
                                 />
                                 <div className="mt-2 space-y-1 text-xs">
@@ -147,7 +148,7 @@ export default async function StudentAnalyticsPage({ params }: PageProps) {
                                         </TableCell>
                                         <TableCell className="max-w-[300px]">
                                             <ProblemTextPreview
-                                                text={history.problem.question}
+                                                text={getDisplayQuestionFromStructuredContent(history.problem.publishedRevision?.structuredContent)}
                                                 className="text-sm leading-6 [&_.katex-display]:overflow-x-auto [&_.katex-display]:py-1 [&_svg.numberline]:max-w-full"
                                             />
                                         </TableCell>

@@ -13,10 +13,9 @@ function createProblem(overrides: Partial<ProblemForGrading> = {}): ProblemForGr
         id: 'problem-1',
         customId: 'S-1',
         subjectName: '数学',
-        question: 'legacy question',
-        answer: '42',
-        acceptedAnswers: ['四十二'],
         publishedRevisionId: 'revision-1',
+        publishedRevisionCorrectAnswer: '42',
+        publishedRevisionAcceptedAnswers: ['四十二'],
         structuredContent: null,
         revisionAssets: [],
         coreProblems: [],
@@ -25,13 +24,12 @@ function createProblem(overrides: Partial<ProblemForGrading> = {}): ProblemForGr
 }
 
 describe('grading-service helpers', () => {
-    it('structured 問題: 問題文は structuredContent から、正解は Problem.answer から組み立てる', () => {
-        // publish 時に ProblemRevision.correctAnswer は Problem.answer に同期されているため
-        // 採点側は Problem.answer / acceptedAnswers のみを正解の信頼源として扱う。
+    it('structured 問題: 問題文は structuredContent から、正解は publishedRevision から組み立てる', () => {
+        // Phase C: 採点は publishedRevision のみを参照し、legacy フィールドは見ない。
         const context = buildProblemContextForGemini(createProblem({
             subjectName: '理科',
-            answer: 'B',
-            acceptedAnswers: ['18'],
+            publishedRevisionCorrectAnswer: 'B',
+            publishedRevisionAcceptedAnswers: ['18'],
             structuredContent: {
                 version: 1,
                 summary: '作図問題',
@@ -60,6 +58,17 @@ describe('grading-service helpers', () => {
         });
         expect(context.problemText).toContain('概要: 作図問題');
         expect(context.problemText).toContain('選択肢:');
+    });
+
+    it('publishedRevision の正解が空の場合は referenceAnswer も空文字で返す', () => {
+        // Phase C: legacy フィールドは参照しないため、revision が空なら空のまま返す。
+        const context = buildProblemContextForGemini(createProblem({
+            publishedRevisionCorrectAnswer: null,
+            publishedRevisionAcceptedAnswers: [],
+        }), 0);
+
+        expect(context.referenceAnswer).toBe('');
+        expect(context.alternativeAnswers).toEqual([]);
     });
 
     it('structured 問題: figure 取得は structuredContent の有無で判定する', () => {
