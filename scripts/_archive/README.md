@@ -27,6 +27,8 @@
 
 - `apply-structured-content.ts` — 単発の `structuredContent` 上書き
 - `correct-english-answers-format.ts` — `--limit 100` 試走で誤生成された英語解答の一回限り是正
+- `apply-english-answers.ts` — レビュー済み JSON を `Problem.answer` に反映する一回限り操作
+- `strip-prefecture-tags.ts` — 英語問題末尾の「【〇〇県】」タグを除去する一回限りデータ修正
 
 ### 完了済み調査・triage
 
@@ -34,3 +36,4 @@
 - `dump-figure-hint-content.ts` — 上記 audit の二次出力（個別レビュー用）
 - `dump-triage-bcd-csv.ts` — 上記 audit の triage 結果 CSV 化
 - `inspect-english-problems.ts` — 「使い捨ての診断スクリプト」と自己申告
+- `inspect-prefecture-tags.ts` — 英語問題末尾「【〇〇県】」タグの件数・分布調査

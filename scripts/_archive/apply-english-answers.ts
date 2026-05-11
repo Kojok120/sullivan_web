@@ -142,7 +142,7 @@ function describeDatabaseUrl(databaseUrl: string | undefined) {
     }
 }
 
-function loadReviewedFiles(dir: string): { batchIds: string[]; items: ReviewedItem[] } {
+function loadReviewedFiles(dir: string): { batchIds: string[]; items: ReviewedItem[]; questionByProblemId: Map<string, string> } {
     if (!existsSync(dir)) {
         throw new Error(`入力ディレクトリが存在しません: ${dir}`);
     }
@@ -160,7 +160,15 @@ function loadReviewedFiles(dir: string): { batchIds: string[]; items: ReviewedIt
         batchIds.push(parsed.batchId);
         items.push(...parsed.items);
     }
-    return { batchIds, items };
+    // flagged CSV に問題文を出力するため、対応する batch-XXX.json から question を引く
+    const questionByProblemId = new Map<string, string>();
+    const inputFiles = readdirSync(dir).filter((n) => /^batch-\d+\.json$/.test(n));
+    for (const name of inputFiles) {
+        const raw = readFileSync(resolve(dir, name), 'utf-8');
+        const parsed = JSON.parse(raw) as { items: Array<{ problemId: string; question: string }> };
+        for (const it of parsed.items) questionByProblemId.set(it.problemId, it.question);
+    }
+    return { batchIds, items, questionByProblemId };
 }
 
 function csvEscape(s: string): string {
@@ -192,7 +200,7 @@ async function main() {
     }
     loadDotenv({ path: envFile, override: true });
 
-    const { batchIds, items } = loadReviewedFiles(opts.inDir);
+    const { batchIds, items, questionByProblemId } = loadReviewedFiles(opts.inDir);
 
     const approved = items.filter((i) => i.verdict === 'approved');
     const flagged = items.filter((i) => i.verdict !== 'approved');
@@ -210,14 +218,23 @@ async function main() {
     console.log(`  flagged_low_confidence:  ${countByVerdict('flagged_low_confidence')}`);
 
     if (flagged.length > 0) {
-        const header = 'customId,problemId,verdict,generatedAnswer,reviewerAnswer,note';
+        const header = 'customId,problemId,verdict,question,generatedAnswer,reviewerAnswer,note';
         const rows = flagged.map((i) =>
-            [i.customId, i.problemId, i.verdict, i.generatedAnswer, i.reviewerAnswer, i.note]
+            [
+                i.customId,
+                i.problemId,
+                i.verdict,
+                questionByProblemId.get(i.problemId) ?? '',
+                i.generatedAnswer,
+                i.reviewerAnswer,
+                i.note,
+            ]
                 .map(csvEscape)
                 .join(','),
         );
         const csvPath = resolve(opts.inDir, 'flagged.csv');
-        writeFileSync(csvPath, `${[header, ...rows].join('\n')}\n`);
+        // Excel / Numbers が UTF-8 を判定できるよう BOM を付与（日本語 note の文字化け対策）
+        writeFileSync(csvPath, `\uFEFF${[header, ...rows].join('\n')}\n`);
         console.log('');
         console.log(`[flagged] CSV を出力しました: ${csvPath}`);
     }
