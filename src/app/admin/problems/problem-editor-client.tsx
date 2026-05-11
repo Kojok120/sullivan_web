@@ -6,7 +6,6 @@ import type { Dispatch, SetStateAction } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
-    Check,
     ChevronDown,
     ChevronUp,
     FileUp,
@@ -14,7 +13,6 @@ import {
     Trash2,
 } from 'lucide-react';
 
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -475,16 +473,6 @@ export function ProblemEditorClient({
                     </Button>
                 </div>
             </div>
-
-            {!isAuthorView && (
-                <Alert>
-                    <Check className="h-4 w-4" />
-                    <AlertTitle>DEV限定</AlertTitle>
-                    <AlertDescription>
-                        structured problem は feature flag で有効化された環境でのみ利用されます。PRODUCTION DB には適用しません。
-                    </AlertDescription>
-                </Alert>
-            )}
 
             <Tabs defaultValue="basic" className="space-y-4">
                 <TabsList className="flex h-auto w-full flex-wrap justify-start gap-2 bg-transparent p-0">
