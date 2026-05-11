@@ -97,7 +97,9 @@ function getProblemLabel(problem: Pick<CreateProblemData, 'question' | 'masterNu
     const masterNumberLabel = typeof problem.masterNumber === 'number'
         ? String(problem.masterNumber)
         : '未設定';
-    const question = problem.question.trim() || '(問題文なし)';
+    // 入力は Server Action 経由で runtime に何でも入りうるので非 string も安全に扱う
+    const rawQuestion = typeof problem.question === 'string' ? problem.question.trim() : '';
+    const question = rawQuestion || '(問題文なし)';
     return `【マスタNo: ${masterNumberLabel}】問題文: ${question}`;
 }
 
