@@ -349,11 +349,11 @@ export function ProblemList({
                     </div>
                 ) : (
                     problems.map((problem) => {
+                        // publishedRevision が無い DRAFT 問題では最新リビジョンの structuredContent を表示する。
+                        const sourceRevision = problem.publishedRevision ?? problem.revisions?.[0] ?? null;
                         const displayQuestion =
-                            getDisplayQuestionFromStructuredContent(problem.publishedRevision?.structuredContent)
-                            || problem.question
-                            || '';
-                        const displayAnswer = problem.publishedRevision?.correctAnswer ?? problem.answer ?? '';
+                            getDisplayQuestionFromStructuredContent(sourceRevision?.structuredContent);
+                        const displayAnswer = sourceRevision?.correctAnswer ?? '';
                         return (
                         <div key={problem.id} className="rounded-lg border bg-card p-4">
                             <div className="mb-3 flex items-start justify-between gap-3">
@@ -472,11 +472,11 @@ export function ProblemList({
                             </TableRow>
                         ) : (
                             problems.map((problem) => {
+                                // publishedRevision が無い DRAFT 問題では最新リビジョンの structuredContent を表示する。
+                                const sourceRevision = problem.publishedRevision ?? problem.revisions?.[0] ?? null;
                                 const displayQuestion =
-                                    getDisplayQuestionFromStructuredContent(problem.publishedRevision?.structuredContent)
-                                    || problem.question
-                                    || '';
-                                const displayAnswer = problem.publishedRevision?.correctAnswer ?? problem.answer ?? '';
+                                    getDisplayQuestionFromStructuredContent(sourceRevision?.structuredContent);
+                                const displayAnswer = sourceRevision?.correctAnswer ?? '';
                                 return (
                                 <TableRow key={problem.id}>
                                     {!isAuthorView && (

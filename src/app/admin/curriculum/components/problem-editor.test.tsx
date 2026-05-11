@@ -12,8 +12,6 @@ vi.mock('../actions', () => ({
 
 type EditorProblemFixture = {
     id: string;
-    question: string;
-    answer: string | null;
     customId: string;
     grade: string | null;
     masterNumber: number | null;
@@ -22,6 +20,10 @@ type EditorProblemFixture = {
         structuredContent: unknown;
         correctAnswer: string | null;
     } | null;
+    revisions: Array<{
+        structuredContent: unknown;
+        correctAnswer: string | null;
+    }>;
     coreProblems: Array<{ id: string; name: string; subject: { name: string } }>;
 };
 
@@ -34,11 +36,10 @@ function makeStructuredContent(text: string): unknown {
     };
 }
 
-function makeProblem(overrides: Partial<EditorProblemFixture> & { id: string; question: string }): EditorProblemFixture {
-    const { question, ...rest } = overrides;
+function makeProblem(overrides: Partial<EditorProblemFixture> & { id: string; question: string; answer?: string | null }): EditorProblemFixture {
+    const { question, answer, ...rest } = overrides;
+    const correctAnswer = 'answer' in overrides ? answer ?? null : 'x=3';
     return {
-        question,
-        answer: 'x=3',
         customId: 'E-1',
         grade: '中1',
         masterNumber: 101,
@@ -46,8 +47,12 @@ function makeProblem(overrides: Partial<EditorProblemFixture> & { id: string; qu
         coreProblems: [],
         publishedRevision: {
             structuredContent: makeStructuredContent(question),
-            correctAnswer: rest.answer ?? null,
+            correctAnswer,
         },
+        revisions: [{
+            structuredContent: makeStructuredContent(question),
+            correctAnswer,
+        }],
         ...rest,
     };
 }
@@ -130,20 +135,22 @@ describe('ProblemEditor', () => {
         expect(screen.getAllByText('-').length).toBeGreaterThanOrEqual(5);
     });
 
-    it('publishedRevision が無い DRAFT 問題は legacy question にフォールバックする', async () => {
+    it('publishedRevision が無い DRAFT 問題は最新リビジョンの structuredContent を表示する', async () => {
         getProblemsByCoreProblemMock.mockResolvedValue({
             success: true,
             problems: [
                 {
                     id: 'problem-draft',
-                    question: 'DRAFTの問題文',
-                    answer: 'x=9',
                     customId: 'D-1',
                     grade: '中3',
                     masterNumber: 999,
                     videoUrl: null,
                     coreProblems: [],
                     publishedRevision: null,
+                    revisions: [{
+                        structuredContent: makeStructuredContent('DRAFTの問題文'),
+                        correctAnswer: 'x=9',
+                    }],
                 } satisfies EditorProblemFixture,
             ],
         });

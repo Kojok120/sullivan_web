@@ -19,13 +19,17 @@ interface ProblemEditorProps {
 type ProblemEditorProblem = Prisma.ProblemGetPayload<{
     select: {
         id: true;
-        question: true;
-        answer: true;
         customId: true;
         grade: true;
         masterNumber: true;
         videoUrl: true;
         publishedRevision: {
+            select: {
+                structuredContent: true;
+                correctAnswer: true;
+            };
+        };
+        revisions: {
             select: {
                 structuredContent: true;
                 correctAnswer: true;
@@ -86,11 +90,10 @@ function getSafeExternalHref(rawUrl: string | null | undefined) {
 
 function ProblemItem({ problem, editHref }: { problem: ProblemEditorProblem; editHref?: string }) {
     const safeVideoUrl = getSafeExternalHref(problem.videoUrl);
-    const displayQuestion =
-        getDisplayQuestionFromStructuredContent(problem.publishedRevision?.structuredContent)
-        || problem.question
-        || '';
-    const displayAnswer = problem.publishedRevision?.correctAnswer ?? problem.answer ?? '';
+    // publishedRevision が無い DRAFT 問題では最新リビジョンの structuredContent を表示する。
+    const sourceRevision = problem.publishedRevision ?? problem.revisions[0] ?? null;
+    const displayQuestion = getDisplayQuestionFromStructuredContent(sourceRevision?.structuredContent);
+    const displayAnswer = sourceRevision?.correctAnswer ?? '';
 
     return (
         <div className="group flex items-start gap-2 p-2 px-3 border-b bg-background hover:bg-muted/30 transition-colors">

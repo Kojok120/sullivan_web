@@ -101,7 +101,7 @@ export async function SessionDetail({
                     const lectureVideos = (coreProblem?.lectureVideos as { title: string; url: string }[] | null) || [];
                     const coreProblemName = coreProblem?.name || '単元不明';
                     const displayQuestion = getDisplayQuestionFromStructuredContent(item.problem.publishedRevision?.structuredContent);
-                    const correctAnswer = item.problem.publishedRevision?.correctAnswer ?? item.problem.answer ?? '';
+                    const correctAnswer = item.problem.publishedRevision?.correctAnswer ?? '';
 
                     return (
                         <Card key={item.id} className={!isCorrect ? "border-l-4 border-l-red-500" : ""}>

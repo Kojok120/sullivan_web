@@ -383,6 +383,35 @@ export function deriveLegacyFieldsFromStructuredData(input: {
     };
 }
 
+/**
+ * プレーンテキストの問題文から最小構成の structuredContent ドキュメントを組み立てる。
+ * 連続する改行で段落を切り出し、空段落はスキップする。
+ * 入力が空文字の場合は空段落 1 つ (`text: ''`) を含めた骨組みを返す。
+ */
+export function buildStructuredDocumentFromText(text: string): StructuredProblemDocument {
+    const paragraphs = (text ?? '')
+        .split(/\r?\n+/)
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0);
+
+    const blocks = paragraphs.length > 0
+        ? paragraphs.map((paragraphText) => ({
+            id: createStructuredBlockId(),
+            type: 'paragraph' as const,
+            text: paragraphText,
+        }))
+        : [{
+            id: createStructuredBlockId(),
+            type: 'paragraph' as const,
+            text: '',
+        }];
+
+    return {
+        version: 1,
+        blocks,
+    };
+}
+
 export function buildDefaultStructuredDraft(problemType: string) {
     const safeType = problemType || 'SHORT_TEXT';
 

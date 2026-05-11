@@ -70,3 +70,6 @@ next-env.d.ts
 
 # Claude Code 自動生成ランタイム
 .claude/scheduled_tasks.lock
+
+# Playwright MCP のスナップショット
+.playwright-mcp/
