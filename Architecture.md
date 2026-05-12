@@ -91,26 +91,30 @@ Sullivan は次の分業を前提に設計されています。
 ## 4. 認証・認可モデル
 
 - セッション取得: `@supabase/ssr`
-- ロール: `STUDENT`, `TEACHER`, `HEAD_TEACHER`, `PARENT`, `ADMIN`
+- ロール: `STUDENT`, `TEACHER`, `HEAD_TEACHER`, `PARENT`, `ADMIN`, `MATERIAL_AUTHOR`
+- ロール判定の信頼源: `user.app_metadata.role`（`user_metadata` は信頼しない）
 - 権限制御:
   - 管理者は全体アクセス
   - 講師系ロールは教室スコープで生徒アクセス
+  - 教材作成者は問題 / Revision の編集権限のみ
   - AIチューターは `ClassroomPlan.PREMIUM` のみ許可
 
 ## 5. データモデル（主要）
 
 - 教材:
-  - `Subject` -> `CoreProblem` -> `Problem`
+  - `Subject` -> `CoreProblem` -> `Problem` -> `ProblemRevision`
+  - `Problem.publishedRevisionId` が真のソース。`Problem.answer` / `acceptedAnswers` は `publishedRevision` から派生
 - 学習ログ:
   - `LearningHistory`
 - 学習状態:
   - `UserProblemState`
   - `UserCoreProblemState`
+  - `UserStatsDaily`（ダッシュボード集計を範囲読み出しに置き換える日次集計）
 - 運用:
   - `GradingJob`（冪等性/再試行管理）
   - `DistributedLock`（採点ロック）
   - `DriveWatchState`（Drive watch 状態）
-  - `RealtimeEvent`
+  - `RealtimeEvent`（`realtime_events` テーブル）
 - 情意・習慣:
   - `GuidanceRecord`
   - `SurveyResponse`
@@ -142,5 +146,10 @@ prisma/schema.prisma        # DBスキーマ
 - Web と Worker を分離デプロイ
 - `SERVICE_ROLE=web|worker` で実行責務を切替
 - Drive Watch は定期更新運用（7日失効対策）
+- リリースは GitHub Actions 主導:
+  - `dev` ブランチ push → `.github/workflows/deploy-dev.yml`
+  - `main` ブランチ push → `.github/workflows/deploy-production.yml`
+  - main へのマージ元は `dev` に制限（`restrict-main-merge-source.yml`）
+- いずれも内部で `deploy-web-*.sh` / `deploy-grading-worker-*.sh` を実行し、DB マイグレーション → Worker → Web の順でデプロイ
 
 実運用手順は [docs/deploy_runbook.md](./docs/deploy_runbook.md) を参照してください。
