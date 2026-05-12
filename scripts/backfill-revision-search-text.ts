@@ -164,7 +164,10 @@ async function runBackfill(
                 acceptedAnswers: revision.acceptedAnswers,
             });
 
-            const prev = revision.searchText ?? '';
+            // searchText が NULL のまま残ると --only-null の where に毎回マッチしてしまうので、
+            // 抽出結果が空文字でも DB 値が NULL なら必ず書き込む。null !== '' で判定するため
+            // 生の DB 値 (null | string) を保持する。
+            const prev = revision.searchText;
             if (prev === next) {
                 unchanged += 1;
             } else if (args.apply) {
