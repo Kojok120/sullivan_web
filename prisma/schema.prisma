@@ -126,6 +126,11 @@ model ProblemRevision {
   answerSpec          Json?
   correctAnswer       String?
   acceptedAnswers     String[]              @default([])
+  // Phase D: 構造化本文 (paragraph / table cell / choices label / katex 等) と
+  // correctAnswer / acceptedAnswers を改行区切りで連結した検索用テキスト。
+  // 書き込み時に extractSearchTextFromRevision() で再生成し、pg_trgm GIN index 経由で
+  // 管理画面の問題検索 (`getProblems`) の ILIKE を高速化する。
+  searchText          String?
   printConfig         Json?
   generationContext   Json?
   authoringTool       ProblemAuthoringTool  @default(MANUAL)

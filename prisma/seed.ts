@@ -14,6 +14,7 @@ import {
 import { createClient } from '@supabase/supabase-js';
 import {
   buildStructuredDocumentFromText,
+  extractSearchTextFromRevision,
   type AnswerSpec,
   type PrintConfig,
   type StructuredProblemDocument,
@@ -296,6 +297,11 @@ async function upsertProblem(subjectId: string, coreProblemId: string, problem: 
   // Problem 行にはメタ情報のみを upsert し、PUBLISHED revision を 1 本紐付ける。
   const structuredContent = buildStructuredDocumentFromText(problem.question) as unknown as Prisma.InputJsonValue;
   const acceptedAnswers = problem.acceptedAnswers ?? [];
+  const searchText = extractSearchTextFromRevision({
+    structuredContent,
+    correctAnswer: problem.answer,
+    acceptedAnswers,
+  });
 
   const upserted = await prisma.problem.upsert({
     where: {
@@ -331,6 +337,7 @@ async function upsertProblem(subjectId: string, coreProblemId: string, problem: 
       structuredContent,
       correctAnswer: problem.answer,
       acceptedAnswers,
+      searchText,
       publishedAt: new Date(),
     },
     create: {
@@ -340,6 +347,7 @@ async function upsertProblem(subjectId: string, coreProblemId: string, problem: 
       structuredContent,
       correctAnswer: problem.answer,
       acceptedAnswers,
+      searchText,
       publishedAt: new Date(),
     },
   });
@@ -722,6 +730,12 @@ async function seedStructuredProblemSamples() {
       },
     });
 
+    const sampleSearchText = extractSearchTextFromRevision({
+      structuredContent: sample.problem.document,
+      correctAnswer: sample.problem.correctAnswer || null,
+      acceptedAnswers: sample.problem.acceptedAnswers,
+    });
+
     const revision = await prisma.problemRevision.upsert({
       where: {
         problemId_revisionNumber: {
@@ -735,6 +749,7 @@ async function seedStructuredProblemSamples() {
         answerSpec: sample.problem.answerSpec,
         correctAnswer: sample.problem.correctAnswer || null,
         acceptedAnswers: sample.problem.acceptedAnswers,
+        searchText: sampleSearchText,
         printConfig: sample.problem.printConfig,
         authoringTool: sample.problem.authoringTool,
         publishedAt,
@@ -757,6 +772,7 @@ async function seedStructuredProblemSamples() {
         answerSpec: sample.problem.answerSpec,
         correctAnswer: sample.problem.correctAnswer || null,
         acceptedAnswers: sample.problem.acceptedAnswers,
+        searchText: sampleSearchText,
         printConfig: sample.problem.printConfig,
         authoringTool: sample.problem.authoringTool,
         publishedAt,

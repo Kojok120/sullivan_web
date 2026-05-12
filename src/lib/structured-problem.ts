@@ -353,6 +353,79 @@ export function getDisplayQuestionFromStructuredContent(raw: unknown): string {
 }
 
 /**
+ * Phase D: ProblemRevision の検索用 denormalized テキストを構築する。
+ *
+ * structuredContent (paragraph / katex / table cell / choices label / blank label /
+ * directive source / summary / instructions) と correctAnswer / acceptedAnswers を
+ * 改行区切りで連結し、`ProblemRevision.searchText` に保存する。pg_trgm GIN index で
+ * 管理画面の問題検索 (ILIKE) を高速化する用途に限定し、画面表示には使わない。
+ *
+ * 長過ぎる入力で index が肥大化しないよう 8000 文字で切る。structuredContent が壊れて
+ * いて parse できないときは構造化部分を空にして正解情報だけを返す。
+ */
+export function extractSearchTextFromRevision(input: {
+    structuredContent: unknown;
+    correctAnswer: string | null | undefined;
+    acceptedAnswers: readonly string[] | null | undefined;
+}): string {
+    const parts: string[] = [];
+
+    if (input.structuredContent) {
+        try {
+            const document = parseStructuredDocument(input.structuredContent);
+            if (document.summary) parts.push(document.summary);
+            if (document.instructions) parts.push(document.instructions);
+            for (const block of document.blocks) {
+                switch (block.type) {
+                    case 'paragraph':
+                        parts.push(block.text);
+                        break;
+                    case 'katexInline':
+                    case 'katexDisplay':
+                        parts.push(block.latex);
+                        break;
+                    case 'table':
+                        for (const header of block.headers) parts.push(header);
+                        for (const row of block.rows) {
+                            for (const cell of row) parts.push(cell);
+                        }
+                        break;
+                    case 'choices':
+                        for (const option of block.options) parts.push(option.label);
+                        break;
+                    case 'blankGroup':
+                        for (const blank of block.blanks) {
+                            parts.push(blank.label);
+                            if (blank.placeholder) parts.push(blank.placeholder);
+                        }
+                        break;
+                    case 'directive':
+                        parts.push(block.source);
+                        break;
+                    default:
+                        break;
+                }
+            }
+        } catch {
+            // structuredContent が壊れていても正解情報だけは検索可能にする
+        }
+    }
+
+    if (input.correctAnswer) parts.push(input.correctAnswer);
+    if (input.acceptedAnswers) {
+        for (const value of input.acceptedAnswers) {
+            parts.push(value);
+        }
+    }
+
+    return parts
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0)
+        .join('\n')
+        .slice(0, 8000);
+}
+
+/**
  * `buildStructuredDocumentFromText` の出力が paragraph ブロックのみで構成されるため、
  * 既存 structuredContent に非 paragraph ブロックや summary/instructions が含まれる場合は
  * プレーンテキストから再構築する処理で図形・選択肢・空欄などの構造化データが消失する。

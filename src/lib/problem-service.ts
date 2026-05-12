@@ -6,7 +6,7 @@
 import { prisma } from '@/lib/prisma';
 import { getNextCustomId, getNextCustomIds } from '@/lib/curriculum-service';
 import { resolveVideoStatusFromUrl, type VideoStatusValue } from '@/lib/problem-ui';
-import { buildStructuredDocumentFromText } from '@/lib/structured-problem';
+import { buildStructuredDocumentFromText, extractSearchTextFromRevision } from '@/lib/structured-problem';
 import type { Prisma } from '@prisma/client';
 
 type ProblemServiceClient = Pick<
@@ -26,6 +26,7 @@ type ProblemRevisionWriteInput = {
     structuredContent: Prisma.InputJsonValue;
     correctAnswer: string | null;
     acceptedAnswers: string[];
+    searchText: string;
 };
 
 /**
@@ -70,10 +71,18 @@ function buildRevisionWriteInput(input: {
     answer?: string | null;
     acceptedAnswers?: string[];
 }): ProblemRevisionWriteInput {
+    const structuredContent = buildStructuredDocumentFromText(input.question);
+    const correctAnswer = input.answer?.trim() ? input.answer : null;
+    const acceptedAnswers = input.acceptedAnswers ?? [];
     return {
-        structuredContent: buildStructuredDocumentFromText(input.question) as unknown as Prisma.InputJsonValue,
-        correctAnswer: input.answer?.trim() ? input.answer : null,
-        acceptedAnswers: input.acceptedAnswers ?? [],
+        structuredContent: structuredContent as unknown as Prisma.InputJsonValue,
+        correctAnswer,
+        acceptedAnswers,
+        searchText: extractSearchTextFromRevision({
+            structuredContent,
+            correctAnswer,
+            acceptedAnswers,
+        }),
     };
 }
 
