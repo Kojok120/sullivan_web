@@ -22,12 +22,17 @@
 - `cleanup-duplicate-accepted-answers.ts` — `acceptedAnswers` の正解重複削除
 - `backfill-problem-revisions.ts` — 編集画面表示用 `ProblemRevision` の初期化
 - `backfill-role-classroom.ts` — デモ教室の初期データ投入
+- `backfill-initial-core-problem-states.ts` — 初回 CoreProblem を無条件アンロックに合わせる backfill（手順書 `backfill-initial-core-problem-states.md` 併設）
+- `publish-null-revisions.ts` — 旧エディタ由来の `publishedRevisionId = NULL` 問題 4801 件を PUBLISHED に一斉昇格
+- `rollback-publish-null-revisions.ts` — 上記の巻き戻し用（revisionId リスト指定）
+- `strip-prefecture-tags-structured.ts` — `strip-prefecture-tags.ts` の structuredContent 版（編集 UI ソース側の同パターン削除）
 
 ### 完了済み一回限り操作
 
 - `apply-structured-content.ts` — 単発の `structuredContent` 上書き
 - `correct-english-answers-format.ts` — `--limit 100` 試走で誤生成された英語解答の一回限り是正
 - `apply-english-answers.ts` — レビュー済み JSON を `Problem.answer` に反映する一回限り操作
+- `extract-english-unanswered.ts` — 上記 apply の前段抽出（バッチ JSON 生成）
 - `strip-prefecture-tags.ts` — 英語問題末尾の「【〇〇県】」タグを除去する一回限りデータ修正
 
 ### 完了済み調査・triage
@@ -37,3 +42,4 @@
 - `dump-triage-bcd-csv.ts` — 上記 audit の triage 結果 CSV 化
 - `inspect-english-problems.ts` — 「使い捨ての診断スクリプト」と自己申告
 - `inspect-prefecture-tags.ts` — 英語問題末尾「【〇〇県】」タグの件数・分布調査
+- `inspect-revision-e3159.ts` — `E-3159` 個別 customId の revision 状態調査
