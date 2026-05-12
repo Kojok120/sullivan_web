@@ -16,7 +16,7 @@ import {
 } from '@/lib/problem-ui';
 import {
     buildStructuredDocumentFromText,
-    deriveLegacyFieldsFromStructuredData,
+    getDisplayQuestionFromStructuredContent,
     normalizeAnswerForAuthoring,
     normalizeAnswerSpecForAuthoring,
     parseAnswerSpec,
@@ -46,7 +46,10 @@ type FilterCondition =
     | { type: 'problemType'; value: string }
     | { type: 'status'; value: string };
 
-const SEARCH_SCALAR_FIELDS = ['question', 'answer', 'customId'] as const;
+// Phase C で Problem.question / answer を drop したので、検索は customId のみが対象。
+// 問題本文での全文検索が必要になった場合は publishedRevision.structuredContent の
+// JSON full-text 検索 (PostgreSQL `to_tsvector`) を別途検討する。
+const SEARCH_SCALAR_FIELDS = ['customId'] as const;
 
 function buildExactMatchSearchOR(searchTerm: string): Prisma.ProblemWhereInput[] {
     // customId の大文字小文字を区別しない完全一致 (例: "E-355" や "e-355" を直接入力したケース)
@@ -215,18 +218,12 @@ function normalizeStructuredDraftInput(data: {
         correctAnswer: data.correctAnswer,
         acceptedAnswers: data.acceptedAnswers,
     });
-    const legacy = deriveLegacyFieldsFromStructuredData({
-        document,
-        correctAnswer: answer.correctAnswer,
-        acceptedAnswers: answer.acceptedAnswers,
-    });
 
     return {
         document,
         answerSpec,
         printConfig,
         answer,
-        legacy,
     };
 }
 
@@ -499,9 +496,6 @@ export async function updateStandaloneProblem(id: string, data: {
     }
     try {
         const updateData: Prisma.ProblemUpdateInput = {
-            question: data.question,
-            answer: data.answer,
-            acceptedAnswers: data.acceptedAnswers,
             grade: data.grade,
             videoUrl: data.videoUrl,
         };
@@ -512,18 +506,23 @@ export async function updateStandaloneProblem(id: string, data: {
                 videoUrl: true,
                 videoStatus: true,
                 publishedRevisionId: true,
-                question: true,
-                answer: true,
-                acceptedAnswers: true,
                 publishedRevision: {
-                    select: { structuredContent: true },
+                    select: {
+                        structuredContent: true,
+                        correctAnswer: true,
+                        acceptedAnswers: true,
+                    },
                 },
                 // publishedRevision が無い問題でも最新 revision の structuredContent を
                 // flatten ガード対象に含めるため、最新 1 件だけ引いて参照する。
                 revisions: {
                     orderBy: { revisionNumber: 'desc' },
                     take: 1,
-                    select: { structuredContent: true },
+                    select: {
+                        structuredContent: true,
+                        correctAnswer: true,
+                        acceptedAnswers: true,
+                    },
                 },
             },
         });
@@ -571,9 +570,19 @@ export async function updateStandaloneProblem(id: string, data: {
             });
 
             if (shouldUpdateRevision) {
-                const nextQuestion = data.question !== undefined ? data.question : existing.question;
-                const nextAnswer = data.answer !== undefined ? data.answer : existing.answer;
-                const nextAcceptedAnswers = data.acceptedAnswers !== undefined ? data.acceptedAnswers : existing.acceptedAnswers;
+                // Phase C で Problem.question / answer / acceptedAnswers を drop したので、
+                // 未指定フィールドは既存 revision (publishedRevision または最新 revision) から復元する。
+                // publishedRevision が無くて revisions も空の問題は構造上ありえないが、
+                // 念のため安全側に倒して空文字 / 空配列にフォールバックする。
+                const guardRevision = existing.publishedRevision ?? existing.revisions[0] ?? null;
+                const existingQuestion = guardRevision?.structuredContent
+                    ? getDisplayQuestionFromStructuredContent(guardRevision.structuredContent)
+                    : '';
+                const existingAnswer = guardRevision?.correctAnswer ?? null;
+                const existingAcceptedAnswers = guardRevision?.acceptedAnswers ?? [];
+                const nextQuestion = data.question !== undefined ? data.question : existingQuestion;
+                const nextAnswer = data.answer !== undefined ? data.answer : existingAnswer;
+                const nextAcceptedAnswers = data.acceptedAnswers !== undefined ? data.acceptedAnswers : existingAcceptedAnswers;
 
                 const revisionWrite = {
                     structuredContent: buildStructuredDocumentFromText(nextQuestion) as unknown as Prisma.InputJsonValue,
@@ -637,9 +646,10 @@ export async function createProblemDraft(data: {
     answerSpec: unknown;
     printConfig?: unknown;
     /**
-     * Stage B' 以降、正解情報は answerSpec ではなく専用フィールドで受け取る。
-     * 受け取った値は ProblemRevision.correctAnswer / acceptedAnswers (新カラム) に書き、
-     * 公開リビジョンが未存在の場合のみ Problem.answer / acceptedAnswers にも同期する。
+     * Stage B' 以降、正解情報は answerSpec ではなく専用フィールドで受け取り、
+     * ProblemRevision.correctAnswer / acceptedAnswers (専用カラム) に書く。
+     * Phase C で Problem.answer / acceptedAnswers カラムは drop 済みのため、
+     * Problem 行への legacy 同期は行わない (revision が単一の信頼源)。
      */
     correctAnswer?: string | null;
     acceptedAnswers?: string[];
@@ -656,8 +666,6 @@ export async function createProblemDraft(data: {
         });
         const subjectId = await resolveSubjectIdFromCoreProblemIds(data.coreProblemIds);
         const subjectName = await getSubjectNameById(subjectId);
-        const legacyQuestion = normalized.legacy.question.trim() || '構造化問題';
-        const legacyAnswer = normalized.legacy.answer.trim() || null;
 
         let problemId = data.problemId;
         let revisionId: string;
@@ -669,9 +677,6 @@ export async function createProblemDraft(data: {
                 const newVideoStatus = resolveVideoStatusFromUrl(data.videoStatus, data.videoUrl);
                 const createdProblem = await tx.problem.create({
                     data: {
-                        question: legacyQuestion,
-                        answer: legacyAnswer,
-                        acceptedAnswers: normalized.legacy.acceptedAnswers,
                         grade: data.grade,
                         videoUrl: data.videoUrl,
                         videoStatus: newVideoStatus,
@@ -680,7 +685,6 @@ export async function createProblemDraft(data: {
                         order,
                         problemType: data.problemType as never,
                         status: 'DRAFT',
-                        hasStructuredContent: true,
                         coreProblems: {
                             connect: data.coreProblemIds.map((id) => ({ id })),
                         },
@@ -703,21 +707,10 @@ export async function createProblemDraft(data: {
                     },
                     problemType: data.problemType as never,
                     status: 'DRAFT',
-                    hasStructuredContent: true,
                     coreProblems: {
                         set: data.coreProblemIds.map((id) => ({ id })),
                     },
                 };
-
-                // 公開リビジョンが未存在の問題 (新規下書き編集) でのみ legacy フィールドを下書きと同期する。
-                // 既に公開済み (publishedRevisionId !== null) の問題では legacy フィールドを
-                // 公開時のスナップショットとして保持し、下書き保存で上書きしない。
-                // 上書きすると配布済みプリントの採点が未公開ドラフトの正解で行われ、誤採点になる。
-                if (!existing?.publishedRevisionId) {
-                    problemUpdateData.question = legacyQuestion;
-                    problemUpdateData.answer = legacyAnswer;
-                    problemUpdateData.acceptedAnswers = normalized.legacy.acceptedAnswers;
-                }
 
                 if (!shouldPreserveProblemMasterNumber(subjectName)) {
                     problemUpdateData.masterNumber = null;
@@ -811,16 +804,8 @@ export async function publishProblemRevision(problemId: string) {
             return { error: '公開可能な下書きがありません' };
         }
 
-        // Stage B' 以降、正解情報は ProblemRevision の専用カラム (correctAnswer / acceptedAnswers) から読む。
-        // 旧 answerSpec JSON 内の値は backfill 済みなので二重ソースにはしない。
-        const normalized = normalizeStructuredDraftInput({
-            document: draftRevision.structuredContent,
-            answerSpec: draftRevision.answerSpec,
-            printConfig: draftRevision.printConfig,
-            correctAnswer: draftRevision.correctAnswer,
-            acceptedAnswers: draftRevision.acceptedAnswers,
-        });
-
+        // Phase C: 正解情報は ProblemRevision の専用カラム (correctAnswer / acceptedAnswers) のみが真のソース。
+        // publish は draft revision を PUBLISHED に昇格させ、Problem.publishedRevisionId を更新するだけで足りる。
         await prisma.$transaction(async (tx) => {
             if (problem.publishedRevisionId) {
                 await tx.problemRevision.updateMany({
@@ -847,10 +832,6 @@ export async function publishProblemRevision(problemId: string) {
                     publishedRevisionId: draftRevision.id,
                     status: 'PUBLISHED',
                     sentBackReason: null,
-                    hasStructuredContent: true,
-                    question: normalized.legacy.question.trim() || '構造化問題',
-                    answer: normalized.legacy.answer || null,
-                    acceptedAnswers: normalized.legacy.acceptedAnswers,
                 },
             });
         });

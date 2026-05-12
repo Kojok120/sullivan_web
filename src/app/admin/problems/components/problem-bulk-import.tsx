@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { parseProblemTSV } from '@/lib/tsv-parser';
 import { CoreProblemSelector, SelectedCoreProblem } from './core-problem-selector';
 import type { BulkImportVariant } from '../problem-list-policy';
+import { getDisplayQuestionFromStructuredContent } from '@/lib/structured-problem';
 
 interface BulkImportDialogProps {
     open: boolean;
@@ -46,11 +47,13 @@ type ResolvedCoreProblem = {
 type ParsedExistingProblem = {
     subjectId: string;
     masterNumber: number | null;
-    question: string;
-    answer: string | null;
     grade: string | null;
     videoUrl: string | null;
     coreProblems: { id: string }[];
+    publishedRevision: {
+        structuredContent: unknown;
+        correctAnswer: string | null;
+    } | null;
 };
 
 interface ParsedProblem {
@@ -342,14 +345,20 @@ export function BulkImportDialog({
         if (lookupTargets.length > 0) {
             const { problems } = await searchProblemsByMasterNumbers(lookupTargets);
             if (problems) {
-                const existingProblems = problems as ParsedExistingProblem[];
+                const existingProblems = problems as unknown as ParsedExistingProblem[];
                 existingProblems.forEach((problem) => {
                     if (problem.masterNumber === null) {
                         return;
                     }
+                    // Phase C: 既存問題の本文 / 正解は publishedRevision から派生する
+                    const revisionContent = problem.publishedRevision?.structuredContent ?? null;
+                    const question = revisionContent
+                        ? getDisplayQuestionFromStructuredContent(revisionContent)
+                        : '';
+                    const answer = problem.publishedRevision?.correctAnswer ?? null;
                     existingMap.set(makeSubjectMasterKey(problem.subjectId, problem.masterNumber), {
-                        question: problem.question,
-                        answer: problem.answer,
+                        question,
+                        answer,
                         grade: problem.grade,
                         videoUrl: problem.videoUrl,
                         coreProblems: problem.coreProblems,

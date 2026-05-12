@@ -13,7 +13,7 @@ import {
 } from '@prisma/client';
 import { createClient } from '@supabase/supabase-js';
 import {
-  deriveLegacyFieldsFromStructuredData,
+  buildStructuredDocumentFromText,
   type AnswerSpec,
   type PrintConfig,
   type StructuredProblemDocument,
@@ -292,7 +292,12 @@ async function upsertCoreProblem(subjectId: string, coreProblem: SeedCoreProblem
 }
 
 async function upsertProblem(subjectId: string, coreProblemId: string, problem: SeedProblem) {
-  return await prisma.problem.upsert({
+  // Phase C: 問題文/正解は ProblemRevision (structuredContent / correctAnswer / acceptedAnswers) 側に書く。
+  // Problem 行にはメタ情報のみを upsert し、PUBLISHED revision を 1 本紐付ける。
+  const structuredContent = buildStructuredDocumentFromText(problem.question) as unknown as Prisma.InputJsonValue;
+  const acceptedAnswers = problem.acceptedAnswers ?? [];
+
+  const upserted = await prisma.problem.upsert({
     where: {
       subjectId_customId: {
         subjectId,
@@ -300,25 +305,51 @@ async function upsertProblem(subjectId: string, coreProblemId: string, problem: 
       },
     },
     update: {
-      question: problem.question,
-      answer: problem.answer,
       order: problem.order,
       videoUrl: problem.videoUrl,
-      acceptedAnswers: problem.acceptedAnswers ?? [],
       subjectId,
       coreProblems: { set: [{ id: coreProblemId }] },
     },
     create: {
       subjectId,
       customId: problem.customId,
-      question: problem.question,
-      answer: problem.answer,
       order: problem.order,
       videoUrl: problem.videoUrl,
-      acceptedAnswers: problem.acceptedAnswers ?? [],
       coreProblems: { connect: [{ id: coreProblemId }] },
     },
   });
+
+  const revision = await prisma.problemRevision.upsert({
+    where: {
+      problemId_revisionNumber: {
+        problemId: upserted.id,
+        revisionNumber: 1,
+      },
+    },
+    update: {
+      status: ProblemRevisionStatus.PUBLISHED,
+      structuredContent,
+      correctAnswer: problem.answer,
+      acceptedAnswers,
+      publishedAt: new Date(),
+    },
+    create: {
+      problemId: upserted.id,
+      revisionNumber: 1,
+      status: ProblemRevisionStatus.PUBLISHED,
+      structuredContent,
+      correctAnswer: problem.answer,
+      acceptedAnswers,
+      publishedAt: new Date(),
+    },
+  });
+
+  await prisma.problem.update({
+    where: { id: upserted.id },
+    data: { publishedRevisionId: revision.id },
+  });
+
+  return upserted;
 }
 
 function getLegacySeedCustomId(customId: string) {
@@ -663,12 +694,7 @@ async function seedStructuredProblemSamples() {
       problems: [],
     });
 
-    const legacy = deriveLegacyFieldsFromStructuredData({
-      document: sample.problem.document,
-      correctAnswer: sample.problem.correctAnswer,
-      acceptedAnswers: sample.problem.acceptedAnswers,
-    });
-
+    // Phase C: Problem の legacy フィールドは drop 済み。問題文 / 正解情報は revision のみが保持する。
     const problem = await prisma.problem.upsert({
       where: {
         subjectId_customId: {
@@ -677,29 +703,21 @@ async function seedStructuredProblemSamples() {
         },
       },
       update: {
-        question: legacy.question,
-        answer: legacy.answer,
-        acceptedAnswers: legacy.acceptedAnswers,
         grade: sample.problem.grade,
         masterNumber: sample.problem.masterNumber,
         subjectId: subject.id,
         problemType: sample.problem.problemType,
         status: ProblemStatus.PUBLISHED,
-        hasStructuredContent: true,
         coreProblems: { set: [{ id: coreProblem.id }] },
       },
       create: {
         subjectId: subject.id,
         customId: sample.problem.customId,
-        question: legacy.question,
-        answer: legacy.answer,
-        acceptedAnswers: legacy.acceptedAnswers,
         grade: sample.problem.grade,
         masterNumber: sample.problem.masterNumber,
         order: sample.problem.masterNumber,
         problemType: sample.problem.problemType,
         status: ProblemStatus.PUBLISHED,
-        hasStructuredContent: true,
         coreProblems: { connect: [{ id: coreProblem.id }] },
       },
     });
