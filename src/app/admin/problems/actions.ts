@@ -48,10 +48,9 @@ type FilterCondition =
     | { type: 'status'; value: string };
 
 // Phase C で Problem.question / answer を drop したので、Problem 側のスカラ検索は customId のみ。
-// 旧 Problem.answer 検索は ProblemRevision.correctAnswer (PUBLISHED / DRAFT 問わず any) の
-// relation filter で代替し、旧 Problem.question 検索は ProblemRevision.structuredContent::text
-// ILIKE で代替する (getProblems 内で raw query を発行し、結果 ID を OR に注入)。
-// PUBLISHED に限定すると DRAFT-only の問題が検索から漏れるため、いずれの代替も全 revision を見る。
+// 問題本文と正解情報は Phase D で `ProblemRevision.searchText` に denormalize 済み (pg_trgm
+// GIN index 付き) なので、検索は `revisions.some.searchText` の ILIKE 1 本で済む。
+// PUBLISHED / DRAFT を区別せず全 revision を見ることで DRAFT-only 問題も漏れなく拾う。
 const SEARCH_SCALAR_FIELDS = ['customId'] as const;
 
 function buildExactMatchSearchOR(searchTerm: string): Prisma.ProblemWhereInput[] {
@@ -119,6 +118,10 @@ function conditionsToPrismaWhere(conditions: FilterCondition[]): Prisma.ProblemW
                 where.videoStatus = cond.value as VideoStatus;
                 break;
             case 'search':
+                // Phase D: 問題本文 (structuredContent の paragraph/katex/table/choices/blank/directive)
+                // と correctAnswer / acceptedAnswers は ProblemRevision.searchText に denormalize
+                // 済み。pg_trgm GIN index 経由の ILIKE を 1 本走らせれば DRAFT-only 問題も含めて
+                // 検索できる。Phase C 時代の $queryRaw + structuredContent::text ILIKE は撤廃。
                 where.OR = [
                     ...SEARCH_SCALAR_FIELDS.map((field) => ({
                         [field]: { contains: cond.value, mode: 'insensitive' as const },
@@ -130,12 +133,10 @@ function conditionsToPrismaWhere(conditions: FilterCondition[]): Prisma.ProblemW
                             },
                         },
                     },
-                    // Phase C 前の Problem.answer 検索を全 revision の correctAnswer で代替
-                    // (DRAFT-only の問題も検索対象に含める)
                     {
                         revisions: {
                             some: {
-                                correctAnswer: { contains: cond.value, mode: 'insensitive' },
+                                searchText: { contains: cond.value, mode: 'insensitive' },
                             },
                         },
                     },
@@ -284,21 +285,6 @@ export async function getProblems(
     try {
         const normalizedSearch = search.trim();
         const where = buildProblemWhere(filters, normalizedSearch || undefined);
-
-        // Phase C 前の Problem.question 検索を ProblemRevision.structuredContent の
-        // JSON テキストキャスト ILIKE で代替する。PUBLISHED に限定すると DRAFT-only の
-        // 問題が検索から漏れるため、全 revision を見て DISTINCT で Problem.id に集約する。
-        if (normalizedSearch && Array.isArray(where.OR)) {
-            const escapedPattern = `%${normalizedSearch.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
-            const structuredContentMatches = await prisma.$queryRaw<{ id: string }[]>`
-                SELECT DISTINCT pr."problemId" AS id
-                FROM "ProblemRevision" pr
-                WHERE pr."structuredContent"::text ILIKE ${escapedPattern} ESCAPE '\'
-            `;
-            if (structuredContentMatches.length > 0) {
-                where.OR.push({ id: { in: structuredContentMatches.map((row) => row.id) } });
-            }
-        }
 
         const skip = (page - 1) * limit;
 

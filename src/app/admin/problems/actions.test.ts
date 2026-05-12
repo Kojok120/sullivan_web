@@ -97,6 +97,7 @@ vi.mock('@/lib/curriculum-service', () => ({
 vi.mock('@/lib/structured-problem', () => ({
     buildDefaultStructuredDraft: vi.fn(),
     buildStructuredDocumentFromText: vi.fn((text: string) => ({ version: 1, blocks: [{ id: 'p1', type: 'paragraph', text }] })),
+    extractSearchTextFromRevision: vi.fn(() => ''),
     getDisplayQuestionFromStructuredContent: vi.fn(() => ''),
     normalizeAnswerSpecForAuthoring: normalizeAnswerSpecForAuthoringMock,
     normalizeAnswerForAuthoring: normalizeAnswerForAuthoringMock,
@@ -450,8 +451,7 @@ describe('problem actions permissions', () => {
         const recentPartial = { id: 'problem-recent', customId: 'E-3355', updatedAt: new Date('2026-05-01') };
         const oldPartial = { id: 'problem-old', customId: 'E-2355', updatedAt: new Date('2026-04-20') };
 
-        // structuredContent 全文検索 (該当なし)
-        queryRawMock.mockResolvedValueOnce([]);
+        // Phase D: structuredContent 全文検索 (raw query) は撤廃済みなので queryRaw は使わない
         problemFindManyMock
             // 1回目: 完全一致 ID 抽出 (select: id)
             .mockResolvedValueOnce([{ id: exactItem.id }])
@@ -601,12 +601,12 @@ describe('problem actions permissions', () => {
         expect(result.success).toBe(true);
         expect(result.problems).toEqual(items);
         expect(problemFindManyMock).toHaveBeenCalledTimes(1);
-        // 検索が空のときは structuredContent 全文検索の raw query を発行しない
+        // Phase D: 検索は revisions.some.searchText の relation filter で完結するので
+        // raw query は使わない (全シナリオで $queryRaw は発行されない)
         expect(queryRawMock).not.toHaveBeenCalled();
     });
 
-    it('getProblems は revisions.some.correctAnswer の検索条件を OR に含める (DRAFT-only 問題もカバー)', async () => {
-        queryRawMock.mockResolvedValueOnce([]);
+    it('getProblems は revisions.some.searchText の検索条件を OR に含める (DRAFT-only 問題もカバー)', async () => {
         problemFindManyMock
             .mockResolvedValueOnce([])
             .mockResolvedValueOnce([])
@@ -620,41 +620,18 @@ describe('problem actions permissions', () => {
             return Array.isArray(where?.OR);
         });
         expect(searchCalls.length).toBeGreaterThan(0);
-        const orHasCorrectAnswerSearch = searchCalls.some((call) => {
+        const orHasSearchTextFilter = searchCalls.some((call) => {
             const where = call[0]?.where as { OR?: Array<Record<string, unknown>> } | { AND?: Array<{ OR?: Array<Record<string, unknown>> }> };
             const ors = (where as { OR?: Array<Record<string, unknown>> }).OR
                 ?? (where as { AND?: Array<{ OR?: Array<Record<string, unknown>> }> }).AND?.flatMap((c) => c.OR ?? [])
                 ?? [];
             return ors.some((cond) => {
-                const rev = (cond as { revisions?: { some?: { correctAnswer?: unknown } } }).revisions;
-                return Boolean(rev?.some?.correctAnswer);
+                const rev = (cond as { revisions?: { some?: { searchText?: { contains?: string } } } }).revisions;
+                return rev?.some?.searchText?.contains === 'こんにちは';
             });
         });
-        expect(orHasCorrectAnswerSearch).toBe(true);
-    });
-
-    it('getProblems は structuredContent ILIKE で取得した Problem.id を OR に注入する', async () => {
-        // 内容検索で 2 件ヒット
-        queryRawMock.mockResolvedValueOnce([{ id: 'problem-match-1' }, { id: 'problem-match-2' }]);
-        problemFindManyMock
-            .mockResolvedValueOnce([])
-            .mockResolvedValueOnce([])
-            .mockResolvedValueOnce([]);
-        problemCountMock.mockResolvedValueOnce(0);
-
-        await getProblems(1, 20, 'マグマ');
-
-        // 通常 (search あり) クエリの where.OR (または AND[].OR) に id: { in: [...] } を含む
-        const includesIdIn = problemFindManyMock.mock.calls.some((call) => {
-            const where = call[0]?.where as { OR?: Array<Record<string, unknown>> } | { AND?: Array<{ OR?: Array<Record<string, unknown>> }> };
-            const ors = (where as { OR?: Array<Record<string, unknown>> }).OR
-                ?? (where as { AND?: Array<{ OR?: Array<Record<string, unknown>> }> }).AND?.flatMap((c) => c.OR ?? [])
-                ?? [];
-            return ors.some((cond) => {
-                const id = (cond as { id?: { in?: string[] } }).id;
-                return Array.isArray(id?.in) && id.in.includes('problem-match-1');
-            });
-        });
-        expect(includesIdIn).toBe(true);
+        expect(orHasSearchTextFilter).toBe(true);
+        // Phase D: raw query は不要 (relation filter 1 本で完結する)
+        expect(queryRawMock).not.toHaveBeenCalled();
     });
 });
