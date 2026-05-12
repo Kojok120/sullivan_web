@@ -327,15 +327,11 @@ export function collectStructuredDocumentAssetIds(document: StructuredProblemDoc
 }
 
 /**
- * 構造化ドキュメントから legacy `Problem.question` / `answer` / `acceptedAnswers` 用の値を組み立てる。
- * Stage B' 以降は answer 系を answerSpec から導出せず、呼び出し側から直接渡してもらう。
- * question は document の summary と paragraph ブロックから合成する。
- */
-/**
  * publishedRevision.structuredContent を入力として、生徒画面・履歴・一覧表示などで
  * 「問題本文」として表示するための短い派生テキストを返す。
  *
- * Phase B3 で Problem.question の直接参照を撤廃するための共通ヘルパー。
+ * Phase C で Problem.question カラムが drop されたため、表示用テキストは
+ * 構造化ドキュメントの summary と paragraph ブロックから都度合成する。
  * 入力が空・解析不能なら空文字を返す（呼び出し側でプレースホルダ等にフォールバックする）。
  */
 export function getDisplayQuestionFromStructuredContent(raw: unknown): string {
@@ -354,33 +350,6 @@ export function getDisplayQuestionFromStructuredContent(raw: unknown): string {
     } catch {
         return '';
     }
-}
-
-export function deriveLegacyFieldsFromStructuredData(input: {
-    document: StructuredProblemDocument;
-    correctAnswer: string;
-    acceptedAnswers: readonly string[];
-}): {
-    question: string;
-    answer: string;
-    acceptedAnswers: string[];
-} {
-    const { document, correctAnswer, acceptedAnswers } = input;
-    const question = [
-        document.summary,
-        ...document.blocks
-            .filter((block) => block.type === 'paragraph')
-            .map((block) => block.text),
-    ]
-        .filter(Boolean)
-        .join('\n')
-        .slice(0, 4000);
-
-    return {
-        question,
-        answer: correctAnswer.trim(),
-        acceptedAnswers: uniqueNonEmpty(Array.from(acceptedAnswers)),
-    };
 }
 
 /**

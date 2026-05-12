@@ -127,16 +127,10 @@ function buildInitialState(problem: RenderableProblemWithRelations | null, initi
     const printConfig = (draftRevision?.printConfig as PrintConfig | null) ?? base.printConfig;
     const initialProblemType = problem?.problemType ?? 'SHORT_TEXT';
 
-    // Stage B' 以降、正解情報は ProblemRevision の専用カラムから初期化する。
-    // 既存 revision でカラムが空の場合 (移行直後の編集など) は Problem.answer / Problem.acceptedAnswers に
-    // フォールバック (Stage A+A+ 以降は Problem 側が canonical のため安全)。
-    const initialCorrectAnswer = draftRevision?.correctAnswer
-        ?? problem?.answer
-        ?? '';
-    const draftAccepted = draftRevision?.acceptedAnswers ?? [];
-    const initialAcceptedAnswers = draftAccepted.length > 0
-        ? draftAccepted
-        : (problem?.acceptedAnswers ?? []);
+    // Phase C で Problem の legacy フィールドは drop 済み。
+    // 正解情報は ProblemRevision の correctAnswer / acceptedAnswers から初期化する。
+    const initialCorrectAnswer = draftRevision?.correctAnswer ?? '';
+    const initialAcceptedAnswers = draftRevision?.acceptedAnswers ?? [];
 
     return {
         problemId: problem?.id ?? '',
