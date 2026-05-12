@@ -1,6 +1,6 @@
-import 'dotenv/config';
-import { prisma } from '../src/lib/prisma';
-import { extractSearchTextFromRevision } from '../src/lib/structured-problem';
+import { config as loadDotenv } from 'dotenv';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 /**
  * Phase D: 既存 ProblemRevision の `searchText` を埋め直すバックフィルスクリプト。
@@ -12,13 +12,17 @@ import { extractSearchTextFromRevision } from '../src/lib/structured-problem';
  * idempotent: 何度実行しても同じ値に収束する。
  *
  * 使い方:
- *   npx tsx scripts/backfill-revision-search-text.ts            # dry-run, 全件
- *   npx tsx scripts/backfill-revision-search-text.ts --yes      # 実行
- *   npx tsx scripts/backfill-revision-search-text.ts --yes --limit 100
- *   npx tsx scripts/backfill-revision-search-text.ts --yes --only-null   # NULL のみ
+ *   npx tsx scripts/backfill-revision-search-text.ts --env dev               # dry-run, 全件
+ *   npx tsx scripts/backfill-revision-search-text.ts --env dev --yes         # DEV 実行
+ *   npx tsx scripts/backfill-revision-search-text.ts --env production --yes  # PROD 実行
+ *   npx tsx scripts/backfill-revision-search-text.ts --env dev --yes --limit 100
+ *   npx tsx scripts/backfill-revision-search-text.ts --env dev --yes --only-null   # NULL のみ
  */
 
+type EnvName = 'dev' | 'production';
+
 type Args = {
+    env: EnvName;
     apply: boolean;
     limit: number | null;
     onlyNull: boolean;
@@ -26,16 +30,29 @@ type Args = {
     sleepMs: number;
 };
 
+function envFileFor(name: EnvName): string {
+    return name === 'production'
+        ? resolve(__dirname, '..', '.env.PRODUCTION')
+        : resolve(__dirname, '..', '.env.DEV');
+}
+
 function parseArgs(argv: string[]): Args {
     const apply = argv.includes('--yes');
     const onlyNull = argv.includes('--only-null');
+    let env: EnvName | null = null;
     let limit: number | null = null;
     let batchSize = 200;
     let sleepMs = 20;
 
     for (let i = 0; i < argv.length; i++) {
         const arg = argv[i];
-        if (arg === '--limit') {
+        if (arg === '--env') {
+            const v = argv[i + 1];
+            if (!v || v.startsWith('--')) throw new Error('--env の値が不正です (dev | production)');
+            if (v !== 'dev' && v !== 'production') throw new Error(`--env: ${v} (dev | production)`);
+            env = v;
+            i++;
+        } else if (arg === '--limit') {
             const v = Number(argv[i + 1]);
             if (!Number.isFinite(v) || v <= 0) {
                 throw new Error(`--limit には正の整数を指定してください: ${argv[i + 1]}`);
@@ -59,7 +76,11 @@ function parseArgs(argv: string[]): Args {
         }
     }
 
-    return { apply, limit, onlyNull, batchSize, sleepMs };
+    if (env === null) {
+        throw new Error('--env を指定してください (dev | production)');
+    }
+
+    return { env, apply, limit, onlyNull, batchSize, sleepMs };
 }
 
 async function sleep(ms: number): Promise<void> {
@@ -67,8 +88,40 @@ async function sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function loadPrisma() {
+    const mod = await import('../src/lib/prisma');
+    return mod.prisma;
+}
+
+async function loadExtractor() {
+    const mod = await import('../src/lib/structured-problem');
+    return mod.extractSearchTextFromRevision;
+}
+
 async function main(): Promise<void> {
     const args = parseArgs(process.argv.slice(2));
+    const envFile = envFileFor(args.env);
+    if (!existsSync(envFile)) {
+        throw new Error(`env ファイルが見つかりません: ${envFile}`);
+    }
+    loadDotenv({ path: envFile, override: true });
+    console.log(`[backfill] env=${args.env} (loaded ${envFile})`);
+
+    const prisma = await loadPrisma();
+    const extractSearchTextFromRevision = await loadExtractor();
+
+    try {
+        await runBackfill(args, prisma, extractSearchTextFromRevision);
+    } finally {
+        await prisma.$disconnect();
+    }
+}
+
+async function runBackfill(
+    args: Args,
+    prisma: Awaited<ReturnType<typeof loadPrisma>>,
+    extractSearchTextFromRevision: Awaited<ReturnType<typeof loadExtractor>>,
+): Promise<void> {
     const where = args.onlyNull ? { searchText: null } : {};
 
     const totalCount = await prisma.problemRevision.count({ where });
@@ -143,11 +196,7 @@ async function main(): Promise<void> {
     console.log(`  変化なし: ${unchanged}`);
 }
 
-main()
-    .catch((error) => {
-        console.error('[backfill] 失敗:', error);
-        process.exitCode = 1;
-    })
-    .finally(async () => {
-        await prisma.$disconnect();
-    });
+main().catch((error) => {
+    console.error('[backfill] 失敗:', error);
+    process.exitCode = 1;
+});
