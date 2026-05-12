@@ -47,7 +47,9 @@ async function getNextRevisionNumber(
 
 /**
  * createProblemCore / bulk 系で作成する PUBLISHED ProblemRevision の入力データ。
- * 旧 Problem.question / answer / acceptedAnswers と等価な内容を構造化ソースとして残す。
+ * Phase C で Problem.question / answer / acceptedAnswers は drop 済みのため、
+ * 入力 (question / answer / acceptedAnswers) を `structuredContent` + 正解専用カラムへ
+ * 一度だけ書き込む。Problem 行には customId / subjectId などのメタ情報のみが残る。
  */
 function buildPublishedRevisionData(input: {
     question: string;
@@ -193,9 +195,9 @@ async function resolveSubjectId(
  * 問題作成の共通ロジック
  *
  * Problem 行と PUBLISHED ProblemRevision を 1 トランザクションで作成し、
- * Problem.publishedRevisionId をリビジョンに紐付けて返す。Phase C で legacy カラム
- * (question / answer / acceptedAnswers) は drop 予定だが、ロールバック安全性のため
- * 削除 migration 前は Problem 側にも値を書き込む。
+ * Problem.publishedRevisionId をリビジョンに紐付けて返す。問題文・正解は
+ * ProblemRevision (structuredContent / correctAnswer / acceptedAnswers) を
+ * 唯一の真のソースとして書き込み、Problem 行にはメタ情報のみが残る。
  */
 export async function createProblemCore(
     data: CreateProblemData,
@@ -228,9 +230,6 @@ export async function createProblemCore(
     return prisma.$transaction(async (tx) => {
         const problem = await tx.problem.create({
             data: {
-                question: data.question,
-                answer: data.answer,
-                acceptedAnswers: data.acceptedAnswers || [],
                 grade: data.grade,
                 masterNumber: data.masterNumber,
                 videoUrl: data.videoUrl,
@@ -460,9 +459,6 @@ async function createProblemWithRevisionUsing(
     const revisionData = buildPublishedRevisionData({ ...problem, revisionNumber: 1 });
     const created = await tx.problem.create({
         data: {
-            question: problem.question,
-            answer: problem.answer,
-            acceptedAnswers: problem.acceptedAnswers || [],
             grade: problem.grade,
             masterNumber: problem.masterNumber,
             videoUrl: problem.videoUrl,
@@ -634,9 +630,6 @@ async function updateProblemWithRevisionUsing(
     await tx.problem.update({
         where: { id: item.id },
         data: {
-            question: item.question,
-            answer: item.answer,
-            acceptedAnswers: item.acceptedAnswers || [],
             grade: item.grade,
             masterNumber: item.masterNumber,
             videoUrl: item.videoUrl,

@@ -19,7 +19,6 @@ const {
     parsePrintConfigMock,
     normalizeAnswerSpecForAuthoringMock,
     normalizeAnswerForAuthoringMock,
-    deriveLegacyFieldsFromStructuredDataMock,
     wouldFlattenLoseStructuredContentMock,
     txProblemCreateMock,
     txProblemUpdateMock,
@@ -27,6 +26,7 @@ const {
     txProblemRevisionFindFirstMock,
     txProblemRevisionUpdateMock,
     txProblemRevisionCreateMock,
+    queryRawMock,
 } = vi.hoisted(() => ({
     requireAdminMock: vi.fn(),
     requireProblemAuthorMock: vi.fn(),
@@ -46,7 +46,6 @@ const {
     parsePrintConfigMock: vi.fn(),
     normalizeAnswerSpecForAuthoringMock: vi.fn(),
     normalizeAnswerForAuthoringMock: vi.fn(),
-    deriveLegacyFieldsFromStructuredDataMock: vi.fn(),
     wouldFlattenLoseStructuredContentMock: vi.fn(),
     txProblemCreateMock: vi.fn(),
     txProblemUpdateMock: vi.fn(),
@@ -54,6 +53,7 @@ const {
     txProblemRevisionFindFirstMock: vi.fn(),
     txProblemRevisionUpdateMock: vi.fn(),
     txProblemRevisionCreateMock: vi.fn(),
+    queryRawMock: vi.fn(),
 }));
 
 vi.mock('@/lib/auth', () => ({
@@ -76,6 +76,7 @@ vi.mock('@/lib/prisma', () => ({
             findUnique: subjectFindUniqueMock,
         },
         $transaction: transactionMock,
+        $queryRaw: queryRawMock,
     },
 }));
 
@@ -96,7 +97,7 @@ vi.mock('@/lib/curriculum-service', () => ({
 vi.mock('@/lib/structured-problem', () => ({
     buildDefaultStructuredDraft: vi.fn(),
     buildStructuredDocumentFromText: vi.fn((text: string) => ({ version: 1, blocks: [{ id: 'p1', type: 'paragraph', text }] })),
-    deriveLegacyFieldsFromStructuredData: deriveLegacyFieldsFromStructuredDataMock,
+    getDisplayQuestionFromStructuredContent: vi.fn(() => ''),
     normalizeAnswerSpecForAuthoring: normalizeAnswerSpecForAuthoringMock,
     normalizeAnswerForAuthoring: normalizeAnswerForAuthoringMock,
     parseAnswerSpec: parseAnswerSpecMock,
@@ -146,11 +147,6 @@ describe('problem actions permissions', () => {
                 ? acceptedAnswers.filter((v: unknown): v is string => typeof v === 'string')
                 : [],
         }));
-        deriveLegacyFieldsFromStructuredDataMock.mockReturnValue({
-            question: '構造化問題',
-            answer: '答え',
-            acceptedAnswers: [],
-        });
         wouldFlattenLoseStructuredContentMock.mockReturnValue(false);
         transactionMock.mockImplementation(async (callback: (tx: {
             problem: {
@@ -355,7 +351,7 @@ describe('problem actions permissions', () => {
         expect(result).toEqual({ success: true, problemId: 'problem-1', revisionId: 'draft-1' });
     });
 
-    it('createProblemDraft は公開リビジョンが無い問題では legacy フィールド (question/answer/acceptedAnswers) を下書きと同期する', async () => {
+    it('createProblemDraft は未公開問題の下書き保存でも Problem の legacy フィールドに書き込まない (Phase C drop 済み)', async () => {
         coreProblemFindManyMock.mockResolvedValueOnce([
             { id: 'core-1', subjectId: 'subject-math' },
         ]);
@@ -369,11 +365,6 @@ describe('problem actions permissions', () => {
         txProblemUpdateMock.mockResolvedValueOnce({ id: 'problem-1' });
         txProblemRevisionFindFirstMock.mockResolvedValueOnce({ id: 'draft-1' });
         txProblemRevisionUpdateMock.mockResolvedValueOnce({ id: 'draft-1' });
-        deriveLegacyFieldsFromStructuredDataMock.mockReturnValueOnce({
-            question: '下書きの問題文',
-            answer: '下書きの正解',
-            acceptedAnswers: ['許容1'],
-        });
 
         await createProblemDraft({
             problemId: 'problem-1',
@@ -387,14 +378,14 @@ describe('problem actions permissions', () => {
             acceptedAnswers: ['許容1'],
         });
 
+        // Phase C: Problem.question / answer / acceptedAnswers / hasStructuredContent は drop 済み
         const data = txProblemUpdateMock.mock.calls[0][0].data;
-        expect(data).toMatchObject({
-            question: '下書きの問題文',
-            answer: '下書きの正解',
-            acceptedAnswers: ['許容1'],
-        });
+        expect(data).not.toHaveProperty('question');
+        expect(data).not.toHaveProperty('answer');
+        expect(data).not.toHaveProperty('acceptedAnswers');
+        expect(data).not.toHaveProperty('hasStructuredContent');
 
-        // ProblemRevision の専用カラムにも書き込まれること (Stage B')
+        // 正解情報は ProblemRevision の専用カラムのみが受け取る
         const revisionData = txProblemRevisionUpdateMock.mock.calls[0][0].data;
         expect(revisionData).toMatchObject({
             correctAnswer: '下書きの正解',
@@ -402,12 +393,11 @@ describe('problem actions permissions', () => {
         });
     });
 
-    it('createProblemDraft は公開済み問題の下書き保存で legacy フィールドを上書きしない (配布済みプリント採点保護)', async () => {
+    it('createProblemDraft は公開済み問題の下書き保存で Problem の legacy フィールドに書き込まない (Phase C drop 済み)', async () => {
         coreProblemFindManyMock.mockResolvedValueOnce([
             { id: 'core-1', subjectId: 'subject-math' },
         ]);
         subjectFindUniqueMock.mockResolvedValueOnce({ name: '数学' });
-        // publishedRevisionId がある = 既に公開済み。下書き保存しても legacy フィールドは公開時のまま保持
         txProblemFindUniqueMock.mockResolvedValueOnce({
             videoUrl: null,
             videoStatus: 'NONE',
@@ -416,11 +406,6 @@ describe('problem actions permissions', () => {
         txProblemUpdateMock.mockResolvedValueOnce({ id: 'problem-1' });
         txProblemRevisionFindFirstMock.mockResolvedValueOnce({ id: 'draft-1' });
         txProblemRevisionUpdateMock.mockResolvedValueOnce({ id: 'draft-1' });
-        deriveLegacyFieldsFromStructuredDataMock.mockReturnValueOnce({
-            question: '更新中の下書き',
-            answer: '更新中の正解',
-            acceptedAnswers: ['更新中の許容'],
-        });
 
         await createProblemDraft({
             problemId: 'problem-1',
@@ -438,8 +423,9 @@ describe('problem actions permissions', () => {
         expect(data).not.toHaveProperty('question');
         expect(data).not.toHaveProperty('answer');
         expect(data).not.toHaveProperty('acceptedAnswers');
+        expect(data).not.toHaveProperty('hasStructuredContent');
 
-        // ただし ProblemRevision (下書き側) には新しい正解情報が書かれること (Stage B')
+        // 下書き revision には新しい正解情報が書かれる
         const revisionData = txProblemRevisionUpdateMock.mock.calls[0][0].data;
         expect(revisionData).toMatchObject({
             correctAnswer: '更新中の正解',
@@ -464,6 +450,8 @@ describe('problem actions permissions', () => {
         const recentPartial = { id: 'problem-recent', customId: 'E-3355', updatedAt: new Date('2026-05-01') };
         const oldPartial = { id: 'problem-old', customId: 'E-2355', updatedAt: new Date('2026-04-20') };
 
+        // structuredContent 全文検索 (該当なし)
+        queryRawMock.mockResolvedValueOnce([]);
         problemFindManyMock
             // 1回目: 完全一致 ID 抽出 (select: id)
             .mockResolvedValueOnce([{ id: exactItem.id }])
@@ -485,9 +473,6 @@ describe('problem actions permissions', () => {
             videoUrl: null,
             videoStatus: 'NONE',
             publishedRevisionId: 'rev-1',
-            question: '旧テキスト',
-            answer: '旧解答',
-            acceptedAnswers: [],
             publishedRevision: {
                 structuredContent: {
                     version: 1,
@@ -496,6 +481,8 @@ describe('problem actions permissions', () => {
                         { id: 't1', type: 'table', headers: ['x'], rows: [['1']] },
                     ],
                 },
+                correctAnswer: '旧解答',
+                acceptedAnswers: [],
             },
             revisions: [],
         });
@@ -516,9 +503,6 @@ describe('problem actions permissions', () => {
             videoUrl: null,
             videoStatus: 'NONE',
             publishedRevisionId: 'rev-1',
-            question: '旧テキスト',
-            answer: '旧解答',
-            acceptedAnswers: [],
             publishedRevision: {
                 structuredContent: {
                     version: 1,
@@ -526,6 +510,8 @@ describe('problem actions permissions', () => {
                         { id: 'p1', type: 'paragraph', text: '本文のみ' },
                     ],
                 },
+                correctAnswer: '旧解答',
+                acceptedAnswers: [],
             },
             revisions: [],
         });
@@ -549,9 +535,6 @@ describe('problem actions permissions', () => {
             videoUrl: null,
             videoStatus: 'NONE',
             publishedRevisionId: null,
-            question: '旧テキスト',
-            answer: '旧解答',
-            acceptedAnswers: [],
             publishedRevision: null,
             revisions: [{
                 structuredContent: {
@@ -561,6 +544,8 @@ describe('problem actions permissions', () => {
                         { id: 'c1', type: 'choices', options: [{ id: 'A', label: 'A' }] },
                     ],
                 },
+                correctAnswer: '旧解答',
+                acceptedAnswers: [],
             }],
         });
         wouldFlattenLoseStructuredContentMock.mockReturnValueOnce(true);
@@ -616,5 +601,60 @@ describe('problem actions permissions', () => {
         expect(result.success).toBe(true);
         expect(result.problems).toEqual(items);
         expect(problemFindManyMock).toHaveBeenCalledTimes(1);
+        // 検索が空のときは structuredContent 全文検索の raw query を発行しない
+        expect(queryRawMock).not.toHaveBeenCalled();
+    });
+
+    it('getProblems は revisions.some.correctAnswer の検索条件を OR に含める (DRAFT-only 問題もカバー)', async () => {
+        queryRawMock.mockResolvedValueOnce([]);
+        problemFindManyMock
+            .mockResolvedValueOnce([])
+            .mockResolvedValueOnce([])
+            .mockResolvedValueOnce([]);
+        problemCountMock.mockResolvedValueOnce(0);
+
+        await getProblems(1, 20, 'こんにちは');
+
+        const searchCalls = problemFindManyMock.mock.calls.filter((call) => {
+            const where = call[0]?.where as { OR?: Array<Record<string, unknown>> } | undefined;
+            return Array.isArray(where?.OR);
+        });
+        expect(searchCalls.length).toBeGreaterThan(0);
+        const orHasCorrectAnswerSearch = searchCalls.some((call) => {
+            const where = call[0]?.where as { OR?: Array<Record<string, unknown>> } | { AND?: Array<{ OR?: Array<Record<string, unknown>> }> };
+            const ors = (where as { OR?: Array<Record<string, unknown>> }).OR
+                ?? (where as { AND?: Array<{ OR?: Array<Record<string, unknown>> }> }).AND?.flatMap((c) => c.OR ?? [])
+                ?? [];
+            return ors.some((cond) => {
+                const rev = (cond as { revisions?: { some?: { correctAnswer?: unknown } } }).revisions;
+                return Boolean(rev?.some?.correctAnswer);
+            });
+        });
+        expect(orHasCorrectAnswerSearch).toBe(true);
+    });
+
+    it('getProblems は structuredContent ILIKE で取得した Problem.id を OR に注入する', async () => {
+        // 内容検索で 2 件ヒット
+        queryRawMock.mockResolvedValueOnce([{ id: 'problem-match-1' }, { id: 'problem-match-2' }]);
+        problemFindManyMock
+            .mockResolvedValueOnce([])
+            .mockResolvedValueOnce([])
+            .mockResolvedValueOnce([]);
+        problemCountMock.mockResolvedValueOnce(0);
+
+        await getProblems(1, 20, 'マグマ');
+
+        // 通常 (search あり) クエリの where.OR (または AND[].OR) に id: { in: [...] } を含む
+        const includesIdIn = problemFindManyMock.mock.calls.some((call) => {
+            const where = call[0]?.where as { OR?: Array<Record<string, unknown>> } | { AND?: Array<{ OR?: Array<Record<string, unknown>> }> };
+            const ors = (where as { OR?: Array<Record<string, unknown>> }).OR
+                ?? (where as { AND?: Array<{ OR?: Array<Record<string, unknown>> }> }).AND?.flatMap((c) => c.OR ?? [])
+                ?? [];
+            return ors.some((cond) => {
+                const id = (cond as { id?: { in?: string[] } }).id;
+                return Array.isArray(id?.in) && id.in.includes('problem-match-1');
+            });
+        });
+        expect(includesIdIn).toBe(true);
     });
 });
