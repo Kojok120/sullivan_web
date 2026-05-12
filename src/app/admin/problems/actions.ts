@@ -16,6 +16,7 @@ import {
 } from '@/lib/problem-ui';
 import {
     buildStructuredDocumentFromText,
+    extractSearchTextFromRevision,
     getDisplayQuestionFromStructuredContent,
     normalizeAnswerForAuthoring,
     normalizeAnswerSpecForAuthoring,
@@ -611,10 +612,18 @@ export async function updateStandaloneProblem(id: string, data: {
                 const nextAnswer = data.answer !== undefined ? data.answer : existingAnswer;
                 const nextAcceptedAnswers = data.acceptedAnswers !== undefined ? data.acceptedAnswers : existingAcceptedAnswers;
 
+                const nextStructuredContent = buildStructuredDocumentFromText(nextQuestion);
+                const normalizedCorrectAnswer = nextAnswer?.trim() ? nextAnswer : null;
+                const normalizedAcceptedAnswers = nextAcceptedAnswers ?? [];
                 const revisionWrite = {
-                    structuredContent: buildStructuredDocumentFromText(nextQuestion) as unknown as Prisma.InputJsonValue,
-                    correctAnswer: nextAnswer?.trim() ? nextAnswer : null,
-                    acceptedAnswers: nextAcceptedAnswers ?? [],
+                    structuredContent: nextStructuredContent as unknown as Prisma.InputJsonValue,
+                    correctAnswer: normalizedCorrectAnswer,
+                    acceptedAnswers: normalizedAcceptedAnswers,
+                    searchText: extractSearchTextFromRevision({
+                        structuredContent: nextStructuredContent,
+                        correctAnswer: normalizedCorrectAnswer,
+                        acceptedAnswers: normalizedAcceptedAnswers,
+                    }),
                 };
 
                 if (existing.publishedRevisionId) {
@@ -694,6 +703,14 @@ export async function createProblemDraft(data: {
         const subjectId = await resolveSubjectIdFromCoreProblemIds(data.coreProblemIds);
         const subjectName = await getSubjectNameById(subjectId);
 
+        const nextCorrectAnswer = normalized.answer.correctAnswer || null;
+        const nextAcceptedAnswers = normalized.answer.acceptedAnswers;
+        const nextSearchText = extractSearchTextFromRevision({
+            structuredContent: normalized.document,
+            correctAnswer: nextCorrectAnswer,
+            acceptedAnswers: nextAcceptedAnswers,
+        });
+
         let problemId = data.problemId;
         let revisionId: string;
 
@@ -761,8 +778,9 @@ export async function createProblemDraft(data: {
                         structuredContent: normalized.document as Prisma.InputJsonValue,
                         answerSpec: normalized.answerSpec as Prisma.InputJsonValue,
                         // Stage B': 正解情報は専用カラムに書く (answerSpec JSON からは除外する)
-                        correctAnswer: normalized.answer.correctAnswer || null,
-                        acceptedAnswers: normalized.answer.acceptedAnswers,
+                        correctAnswer: nextCorrectAnswer,
+                        acceptedAnswers: nextAcceptedAnswers,
+                        searchText: nextSearchText,
                         printConfig: normalized.printConfig as Prisma.InputJsonValue,
                         authoringTool: data.authoringTool ?? 'MANUAL',
                         authoringState: (data.authoringState ?? undefined) as Prisma.InputJsonValue | undefined,
@@ -786,8 +804,9 @@ export async function createProblemDraft(data: {
                     structuredContent: normalized.document as Prisma.InputJsonValue,
                     answerSpec: normalized.answerSpec as Prisma.InputJsonValue,
                     // Stage B': 正解情報は専用カラムに書く
-                    correctAnswer: normalized.answer.correctAnswer || null,
-                    acceptedAnswers: normalized.answer.acceptedAnswers,
+                    correctAnswer: nextCorrectAnswer,
+                    acceptedAnswers: nextAcceptedAnswers,
+                    searchText: nextSearchText,
                     printConfig: normalized.printConfig as Prisma.InputJsonValue,
                     authoringTool: data.authoringTool ?? 'MANUAL',
                     authoringState: (data.authoringState ?? undefined) as Prisma.InputJsonValue | undefined,
