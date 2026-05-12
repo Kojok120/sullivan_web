@@ -23,8 +23,9 @@
 - `backfill-problem-revisions.ts` — 編集画面表示用 `ProblemRevision` の初期化
 - `backfill-role-classroom.ts` — デモ教室の初期データ投入
 - `backfill-initial-core-problem-states.ts` — 初回 CoreProblem を無条件アンロックに合わせる backfill（手順書 `backfill-initial-core-problem-states.md` 併設）
-- `publish-null-revisions.ts` — 旧エディタ由来の `publishedRevisionId = NULL` 問題 4801 件を PUBLISHED に一斉昇格
-- `rollback-publish-null-revisions.ts` — 上記の巻き戻し用（revisionId リスト指定）
+- `publish-null-revisions.ts` — 旧エディタ由来の `publishedRevisionId = NULL` 問題 4801 件を PUBLISHED に一斉昇格。**事故**: `Problem.status` まで無条件で `PUBLISHED` に上書きしたため、本来 DRAFT/SENT_BACK だった数学 1414 件が公開状態になった (2026-05-11)
+- `rollback-publish-null-revisions.ts` — 上記の巻き戻し用（`publishedRevisionId` / `ProblemRevision.status` のみ）。`Problem.status` は対象外なので上記事故は救えない
+- `restore-problem-status-from-backup.ts` — 上記事故の `Problem.status` 復旧用 (2026-05-12)。マージ直前 (2026-05-11 12:09) の PROD ダンプから抽出した `(id,status)` CSV を入力に、現在 PUBLISHED の Problem のみバックアップ値へ巻き戻し。`publishedRevisionId` / `ProblemRevision.status` には触らない。1409 件適用済み
 - `strip-prefecture-tags-structured.ts` — `strip-prefecture-tags.ts` の structuredContent 版（編集 UI ソース側の同パターン削除）
 
 ### 完了済み一回限り操作
