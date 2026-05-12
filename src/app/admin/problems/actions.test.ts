@@ -605,7 +605,7 @@ describe('problem actions permissions', () => {
         expect(queryRawMock).not.toHaveBeenCalled();
     });
 
-    it('getProblems は publishedRevision.correctAnswer の検索条件を OR に含める', async () => {
+    it('getProblems は revisions.some.correctAnswer の検索条件を OR に含める (DRAFT-only 問題もカバー)', async () => {
         queryRawMock.mockResolvedValueOnce([]);
         problemFindManyMock
             .mockResolvedValueOnce([])
@@ -615,8 +615,6 @@ describe('problem actions permissions', () => {
 
         await getProblems(1, 20, 'こんにちは');
 
-        // 検索条件は filterOnlyWhere と (where + structuredContent) の両方で 2 回 buildProblemWhere が走るが、
-        // 検索クエリ本体は最低 1 回は OR に publishedRevision.correctAnswer を含む
         const searchCalls = problemFindManyMock.mock.calls.filter((call) => {
             const where = call[0]?.where as { OR?: Array<Record<string, unknown>> } | undefined;
             return Array.isArray(where?.OR);
@@ -628,8 +626,8 @@ describe('problem actions permissions', () => {
                 ?? (where as { AND?: Array<{ OR?: Array<Record<string, unknown>> }> }).AND?.flatMap((c) => c.OR ?? [])
                 ?? [];
             return ors.some((cond) => {
-                const pr = (cond as { publishedRevision?: { is?: { correctAnswer?: unknown } } }).publishedRevision;
-                return Boolean(pr?.is?.correctAnswer);
+                const rev = (cond as { revisions?: { some?: { correctAnswer?: unknown } } }).revisions;
+                return Boolean(rev?.some?.correctAnswer);
             });
         });
         expect(orHasCorrectAnswerSearch).toBe(true);
