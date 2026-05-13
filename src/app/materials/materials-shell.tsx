@@ -107,7 +107,6 @@ function MaterialsDesktopNav({
                             fill
                             className="object-contain object-left"
                             priority
-                            placeholder="blur"
                         />
                     </div>
                 </Link>
@@ -174,7 +173,6 @@ function MaterialsMobileNav({
                             fill
                             className="object-contain object-left"
                             priority
-                            placeholder="blur"
                         />
                     </div>
                 </SheetHeader>
@@ -227,7 +225,6 @@ export function MaterialsShell({ children, problemSubjects }: MaterialsShellProp
                                 fill
                                 className="object-contain object-center"
                                 priority
-                                placeholder="blur"
                             />
                         </div>
                     </Link>
