@@ -43,7 +43,6 @@ export function AdminShell({ children, problemSubjects }: AdminShellProps) {
                                 fill
                                 className="object-contain object-center"
                                 priority
-                                placeholder="blur"
                             />
                         </div>
                     </Link>

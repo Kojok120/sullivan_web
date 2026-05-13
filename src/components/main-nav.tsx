@@ -71,7 +71,6 @@ export function MainNav({ role }: { role?: string }) {
                                 fill
                                 className="object-contain object-left"
                                 priority
-                                placeholder="blur"
                             />
                         </div>
                     </Link>
@@ -124,7 +123,6 @@ export function MainNav({ role }: { role?: string }) {
                                         fill
                                         className="object-contain object-left"
                                         priority
-                                        placeholder="blur"
                                     />
                                 </div>
                             </SheetHeader>
