@@ -83,7 +83,6 @@ export function AdminNav({ isCollapsed = false, onToggle, problemSubjects }: Adm
                             fill
                             className="object-contain object-left"
                             priority
-                            placeholder="blur"
                         />
                     </div>
                 )}
@@ -205,7 +204,6 @@ export function AdminMobileNav({
                             fill
                             className="object-contain object-left"
                             priority
-                            placeholder="blur"
                         />
                     </div>
                 </SheetHeader>

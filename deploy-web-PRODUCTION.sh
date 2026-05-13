@@ -48,6 +48,16 @@ upsert_scheduler_job() {
   local message_body="${4:-}"
   local header_arg="Authorization=Bearer $INTERNAL_API_SECRET_VALUE,Content-Type=application/json"
 
+  # Cloud Run Admin API などの上流 API が transient な 5xx を返すと、
+  # gcloud の既定 (--max-retry-attempts=0) では Scheduler が再試行せずに
+  # warm-start/stop を 1 回取りこぼす。30s → 60s → 120s でリトライさせる。
+  local retry_args=(
+    --max-retry-attempts 3
+    --min-backoff 30s
+    --max-backoff 300s
+    --max-doublings 2
+  )
+
   if gcloud scheduler jobs describe "$job_name" --location "$SCHEDULER_LOCATION" --project "$GOOGLE_CLOUD_PROJECT_ID" >/dev/null 2>&1; then
     local update_args=(
       scheduler jobs update http "$job_name"
@@ -58,6 +68,7 @@ upsert_scheduler_job() {
       --uri "$uri"
       --http-method POST
       --update-headers "$header_arg"
+      "${retry_args[@]}"
     )
 
     if [ -n "$message_body" ]; then
@@ -79,6 +90,7 @@ upsert_scheduler_job() {
     --uri "$uri"
     --http-method POST
     --headers "$header_arg"
+    "${retry_args[@]}"
   )
 
   if [ -n "$message_body" ]; then
