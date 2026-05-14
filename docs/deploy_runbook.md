@@ -213,11 +213,14 @@ Cloud Runシークレット公式: https://docs.cloud.google.com/run/docs/config
 具体手順（例）:
 ```bash
 # 1) Secret を作成 (値はコマンド内に literal で置かず、stdin/コマンド置換で渡す)
-openssl rand -hex 32 | gcloud secrets create internal-api-secret \
+# ※ `openssl rand -hex 32` は末尾に LF が付く。Cloud Run の secret env 注入は LF を含む生バイトを
+#    そのまま渡すため、`$(...)` で LF が strip される側 (workflow の curl など) と不一致になり 401 を引き起こす。
+#    `printf %s "$(...)"` で LF を落とした 64 byte のまま保存する。
+printf %s "$(openssl rand -hex 32)" | gcloud secrets create internal-api-secret \
   --replication-policy="automatic" \
   --data-file=-
 
-openssl rand -hex 32 | gcloud secrets create drive-webhook-token \
+printf %s "$(openssl rand -hex 32)" | gcloud secrets create drive-webhook-token \
   --replication-policy="automatic" \
   --data-file=-
 
@@ -231,7 +234,8 @@ gcloud secrets add-iam-policy-binding drive-webhook-token \
   --role="roles/secretmanager.secretAccessor"
 
 # 3) ローテーション (新値追加 → Cloud Run 再デプロイ → 旧版 destroy)
-printf %s "<NEW_VALUE>" | gcloud secrets versions add internal-api-secret --data-file=-
+# ※ ここも 1) と同じ理由で必ず `printf %s "$(...)"` で LF を strip すること。
+printf %s "$(openssl rand -hex 32)" | gcloud secrets versions add internal-api-secret --data-file=-
 # Cloud Run は :latest を起動時に解決するため、新版反映には revision 再作成が必要。
 # 続いて旧 version を destroy:
 gcloud secrets versions destroy <OLD_VERSION_NUMBER> --secret=internal-api-secret
