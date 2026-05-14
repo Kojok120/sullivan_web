@@ -46,8 +46,9 @@
   #    Driveの対象フォルダを RUNTIME_SA_EMAIL に共有するだけでOK
 
   # 7) INTERNAL_API_SECRET を Secret Manager に登録
-INTERNAL_API_SECRET="e75c5eb33d072af5f49cdbb5d77ddbc91123aa3d1bf23d914aead0df68cb252d"  
-printf %s "$INTERNAL_API_SECRET" | gcloud secrets create internal-api-secret --replication-policy="automatic" --data-file=-
+  # ※ 値はリポジトリにコミットしない。`openssl rand -hex 32` 等でローカル生成してから
+  #    SM に直接書き込む。下記コマンドは生成と書き込みを 1 行で行う例。
+printf %s "$(openssl rand -hex 32)" | gcloud secrets create internal-api-secret --replication-policy="automatic" --data-file=-
 
   # 8) Cloud Run 実行SAに Secret 参照権限を付与
   gcloud secrets add-iam-policy-binding internal-api-secret --member="serviceAccount:$RUNTIME_SA_EMAIL" --role="roles/secretmanager.secretAccessor"
