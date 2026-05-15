@@ -55,5 +55,33 @@
     "close": "閉じる",
     "savingWatchState": "視聴状態を保存中...",
     "fallbackVideoTitle": "{coreProblemName} {index}"
+  },
+  "GoalReadonlyPanel": {
+    "unset": "未設定",
+    "problemCountGoal": "問題数目標",
+    "customGoal": "任意目標",
+    "problemCountValue": "{count}問",
+    "todayGoal": "今日の目標",
+    "todayEmpty": "今日は設定された目標がありません",
+    "tomorrowGoal": "明日の目標",
+    "tomorrowEmpty": "明日の目標は未設定です",
+    "activeGoalsTitle": "期限付き目標一覧",
+    "activeGoalCount": "有効目標 {count}件",
+    "noActiveGoals": "有効な目標はありません",
+    "dueDateBadge": "{date}まで",
+    "subjectLabel": "科目: {subjectName}",
+    "dueValueLabel": "期限値: {value}",
+    "remainingDays": "残り{days}日",
+    "timelineTitle": "日付タイムライン",
+    "timelineDescription": "過去半年〜未来半年を日付で確認",
+    "syncing": "同期中...",
+    "entryCount": "{count}件",
+    "selectedDateGoals": "{date} の目標",
+    "selectedRelativeDisplay": "{relativeLabel}の表示",
+    "selectedDateDisplay": "選択した日付の表示",
+    "totalCount": "合計 {count}件",
+    "totalProblemCount": "問題数 {count}問",
+    "totalCustomCount": "任意目標 {count}件",
+    "selectedDateEmpty": "この日は目標が設定されていません"
   }
 }

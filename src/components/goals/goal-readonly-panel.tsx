@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import type { ReactNode } from 'react';
 import { CalendarDays, CalendarRange, Target } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 import { getGoalDailyViewAction } from '@/app/actions/student-goals';
 import { Badge } from '@/components/ui/badge';
@@ -33,16 +34,27 @@ function clampSelectedDateKey(selectedDateKey: string, data: GoalDailyViewPayloa
     return selectedDateKey;
 }
 
-function toGoalValueLabel(entry: DailyGoalEntry): string {
+type GoalReadonlyLabels = {
+    unset: string;
+    problemCountGoal: string;
+    customGoal: string;
+    problemCountValue: (count: number) => string;
+};
+
+function getGoalTypeLabel(goalType: DailyGoalEntry['goalType'], labels: GoalReadonlyLabels): string {
+    return goalType === 'PROBLEM_COUNT' ? labels.problemCountGoal : labels.customGoal;
+}
+
+function toGoalValueLabel(entry: DailyGoalEntry, labels: GoalReadonlyLabels): string {
     if (entry.goalType === 'PROBLEM_COUNT') {
-        const countLabel = entry.targetCount !== null ? `${entry.targetCount}問` : '未設定';
+        const countLabel = entry.targetCount !== null ? labels.problemCountValue(entry.targetCount) : labels.unset;
         return entry.targetText ? `${countLabel} / ${entry.targetText}` : countLabel;
     }
 
     const pieces: string[] = [];
     if (entry.targetText) pieces.push(entry.targetText);
     if (entry.targetCount !== null) pieces.push(String(entry.targetCount));
-    return pieces.length > 0 ? pieces.join(' / ') : '未設定';
+    return pieces.length > 0 ? pieces.join(' / ') : labels.unset;
 }
 
 function getDaysDiff(baseDateKey: string, targetDateKey: string): number {
@@ -51,15 +63,15 @@ function getDaysDiff(baseDateKey: string, targetDateKey: string): number {
     return Math.floor((target - base) / (24 * 60 * 60 * 1000));
 }
 
-function GoalEntryItem({ entry }: { entry: DailyGoalEntry }) {
+function GoalEntryItem({ entry, labels }: { entry: DailyGoalEntry; labels: GoalReadonlyLabels }) {
     return (
         <div className="rounded-lg border border-border/70 bg-background px-3 py-2">
             <div className="flex flex-wrap items-center gap-2 text-sm">
                 <span className="font-semibold">{entry.subjectName || entry.goalName}</span>
                 <Badge variant="outline" className="text-[11px]">
-                    {entry.goalType === 'PROBLEM_COUNT' ? '問題数目標' : '任意目標'}
+                    {getGoalTypeLabel(entry.goalType, labels)}
                 </Badge>
-                <span className="text-muted-foreground">{toGoalValueLabel(entry)}</span>
+                <span className="text-muted-foreground">{toGoalValueLabel(entry, labels)}</span>
             </div>
         </div>
     );
@@ -72,6 +84,7 @@ function PriorityDayCard(props: {
     entries: DailyGoalEntry[];
     timeZone: string;
     emptyText: string;
+    labels: GoalReadonlyLabels;
     emphasis?: 'strong' | 'normal';
 }) {
     return (
@@ -93,7 +106,7 @@ function PriorityDayCard(props: {
                 ) : (
                     <div className="space-y-2">
                         {props.entries.map((entry) => (
-                            <GoalEntryItem key={`${entry.goalId}-${props.dateKey}`} entry={entry} />
+                            <GoalEntryItem key={`${entry.goalId}-${props.dateKey}`} entry={entry} labels={props.labels} />
                         ))}
                     </div>
                 )}
@@ -109,6 +122,13 @@ export function GoalReadonlyPanel({
     showTimeline = false,
     className,
 }: GoalReadonlyPanelProps) {
+    const t = useTranslations('GoalReadonlyPanel');
+    const labels = useMemo<GoalReadonlyLabels>(() => ({
+        unset: t('unset'),
+        problemCountGoal: t('problemCountGoal'),
+        customGoal: t('customGoal'),
+        problemCountValue: (count) => t('problemCountValue', { count }),
+    }), [t]);
     const [state, setState] = useState(() => ({
         data: initialData,
         initialDataSnapshot: initialData,
@@ -226,22 +246,24 @@ export function GoalReadonlyPanel({
         <div className={cn('space-y-4', className)}>
             <div className={cn('grid gap-4', showTomorrow ? 'md:grid-cols-2 xl:grid-cols-3' : 'lg:grid-cols-2')}>
                 <PriorityDayCard
-                    title="今日の目標"
+                    title={t('todayGoal')}
                     dateKey={data.todayKey}
                     timeZone={data.timeZone}
                     entries={todayEntries}
-                    emptyText="今日は設定された目標がありません"
+                    emptyText={t('todayEmpty')}
+                    labels={labels}
                     icon={<Target className="h-4 w-4" />}
                     emphasis="strong"
                 />
 
                 {showTomorrow ? (
                     <PriorityDayCard
-                        title="明日の目標"
+                        title={t('tomorrowGoal')}
                         dateKey={data.tomorrowKey}
                         timeZone={data.timeZone}
                         entries={tomorrowEntries}
-                        emptyText="明日の目標は未設定です"
+                        emptyText={t('tomorrowEmpty')}
+                        labels={labels}
                         icon={<CalendarDays className="h-4 w-4" />}
                     />
                 ) : null}
@@ -250,8 +272,8 @@ export function GoalReadonlyPanel({
                     <CardHeader className="pb-3">
                         <div className="flex items-start justify-between gap-2">
                             <div>
-                                <CardTitle className="text-base">期限付き目標一覧</CardTitle>
-                                <p className="mt-1 text-xs text-muted-foreground">有効目標 {data.activeGoals.length}件</p>
+                                <CardTitle className="text-base">{t('activeGoalsTitle')}</CardTitle>
+                                <p className="mt-1 text-xs text-muted-foreground">{t('activeGoalCount', { count: data.activeGoals.length })}</p>
                             </div>
                             <div className="rounded-md border border-border/60 bg-background/80 p-2 text-muted-foreground">
                                 <CalendarRange className="h-4 w-4" />
@@ -260,27 +282,27 @@ export function GoalReadonlyPanel({
                     </CardHeader>
                     <CardContent className="space-y-2">
                         {data.activeGoals.length === 0 ? (
-                            <p className="rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">有効な目標はありません</p>
+                            <p className="rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">{t('noActiveGoals')}</p>
                         ) : (
                             data.activeGoals.map((goal) => {
                                 const remainingDays = getDaysDiff(data.todayKey, goal.dueDateKey);
                                 const dueValue = resolveGoalTargetForDate(goal.milestones, goal.dueDateKey);
                                 const valueLabel = goal.type === 'PROBLEM_COUNT'
                                     ? dueValue.targetCount !== null
-                                        ? `${dueValue.targetCount}問`
-                                        : '未設定'
-                                    : dueValue.targetText || (dueValue.targetCount !== null ? String(dueValue.targetCount) : '未設定');
+                                        ? labels.problemCountValue(dueValue.targetCount)
+                                        : labels.unset
+                                    : dueValue.targetText || (dueValue.targetCount !== null ? String(dueValue.targetCount) : labels.unset);
 
                                 return (
                                     <div key={goal.id} className="rounded-lg border border-border/70 bg-background px-3 py-2.5">
                                         <div className="flex flex-wrap items-center justify-between gap-2">
                                             <div className="text-sm font-semibold">{goal.name}</div>
-                                            <Badge variant="outline">{formatGoalDateKeyLabel(goal.dueDateKey, data.timeZone)}まで</Badge>
+                                            <Badge variant="outline">{t('dueDateBadge', { date: formatGoalDateKeyLabel(goal.dueDateKey, data.timeZone) })}</Badge>
                                         </div>
                                         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                            {goal.subjectName ? <span>科目: {goal.subjectName}</span> : null}
-                                            <span>期限値: {valueLabel}</span>
-                                            <span>残り{Math.max(0, remainingDays)}日</span>
+                                            {goal.subjectName ? <span>{t('subjectLabel', { subjectName: goal.subjectName })}</span> : null}
+                                            <span>{t('dueValueLabel', { value: valueLabel })}</span>
+                                            <span>{t('remainingDays', { days: Math.max(0, remainingDays) })}</span>
                                         </div>
                                     </div>
                                 );
@@ -296,12 +318,12 @@ export function GoalReadonlyPanel({
                         <CardHeader className="pb-3">
                             <div className="flex items-center justify-between gap-2">
                                 <div>
-                                    <CardTitle className="text-base">日付タイムライン</CardTitle>
+                                    <CardTitle className="text-base">{t('timelineTitle')}</CardTitle>
                                     <p className="mt-1 text-xs text-muted-foreground">
-                                        過去半年〜未来半年を日付で確認
+                                        {t('timelineDescription')}
                                     </p>
                                 </div>
-                                {isPending ? <span className="text-xs text-muted-foreground">同期中...</span> : null}
+                                {isPending ? <span className="text-xs text-muted-foreground">{t('syncing')}</span> : null}
                             </div>
                         </CardHeader>
                         <CardContent>
@@ -351,7 +373,7 @@ export function GoalReadonlyPanel({
                                                         {relativeLabel ? (
                                                             <Badge variant="secondary" className="text-[10px]">{relativeLabel}</Badge>
                                                         ) : null}
-                                                        <Badge variant="outline" className="text-[10px]">{row.entries.length}件</Badge>
+                                                        <Badge variant="outline" className="text-[10px]">{t('entryCount', { count: row.entries.length })}</Badge>
                                                     </div>
                                                 </div>
                                             </button>
@@ -366,22 +388,26 @@ export function GoalReadonlyPanel({
                         <CardHeader className="pb-3">
                             <div className="flex flex-wrap items-center justify-between gap-2">
                                 <div>
-                                    <CardTitle className="text-base">{formatGoalDateKeyLabel(effectiveSelectedDateKey, data.timeZone)} の目標</CardTitle>
+                                    <CardTitle className="text-base">
+                                        {t('selectedDateGoals', { date: formatGoalDateKeyLabel(effectiveSelectedDateKey, data.timeZone) })}
+                                    </CardTitle>
                                     <p className="mt-1 text-xs text-muted-foreground">
-                                        {selectedRelativeLabel ? `${selectedRelativeLabel}の表示` : '選択した日付の表示'}
+                                        {selectedRelativeLabel
+                                            ? t('selectedRelativeDisplay', { relativeLabel: selectedRelativeLabel })
+                                            : t('selectedDateDisplay')}
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-2 text-xs">
-                                    <Badge variant="outline">合計 {selectedTotals.entryCount}件</Badge>
-                                    <Badge variant="outline">問題数 {selectedTotals.problemCount}問</Badge>
-                                    <Badge variant="outline">任意目標 {selectedTotals.customCount}件</Badge>
+                                    <Badge variant="outline">{t('totalCount', { count: selectedTotals.entryCount })}</Badge>
+                                    <Badge variant="outline">{t('totalProblemCount', { count: selectedTotals.problemCount })}</Badge>
+                                    <Badge variant="outline">{t('totalCustomCount', { count: selectedTotals.customCount })}</Badge>
                                 </div>
                             </div>
                         </CardHeader>
                         <CardContent>
                             {selectedEntries.length === 0 ? (
                                 <p className="rounded-lg border border-dashed px-3 py-6 text-sm text-muted-foreground">
-                                    この日は目標が設定されていません
+                                    {t('selectedDateEmpty')}
                                 </p>
                             ) : (
                                 <div className="space-y-2">
@@ -391,14 +417,14 @@ export function GoalReadonlyPanel({
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-sm font-semibold">{entry.subjectName || entry.goalName}</span>
                                                     <Badge variant="outline" className="text-[11px]">
-                                                        {entry.goalType === 'PROBLEM_COUNT' ? '問題数目標' : '任意目標'}
+                                                        {getGoalTypeLabel(entry.goalType, labels)}
                                                     </Badge>
                                                 </div>
                                                 <Badge variant="secondary" className="text-[11px]">
-                                                    {formatGoalDateKeyLabel(entry.dueDateKey, data.timeZone)}まで
+                                                    {t('dueDateBadge', { date: formatGoalDateKeyLabel(entry.dueDateKey, data.timeZone) })}
                                                 </Badge>
                                             </div>
-                                            <p className="mt-1 text-sm text-muted-foreground">{toGoalValueLabel(entry)}</p>
+                                            <p className="mt-1 text-sm text-muted-foreground">{toGoalValueLabel(entry, labels)}</p>
                                         </div>
                                     ))}
                                 </div>
