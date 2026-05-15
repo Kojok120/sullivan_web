@@ -1,31 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { getReadyCoreProblemIds } from "@/lib/progression";
+import { DEFAULT_PRINT_CONFIG, type PrintSelectionConfig } from "@/lib/print-config";
 import type { PrintableProblem } from "@/lib/print-types";
 
-export const PRINT_CONFIG = {
-    // 既存重み（後方互換のため値は維持）
-    WEIGHT_TIME: 2.0,
-    WEIGHT_WEAKNESS: 1.0,
-    WEIGHT_UNANSWERED: 1.5,
-    FORGETTING_RATE: 5.0,
-
-    // 未着手のベーススコア。十分大きく取って既着手より優先する
-    UNANSWERED_BASE: 1000,
-
-    // 既着手の時間スコア上限。長期放置の score 暴走を防ぐ
-    TIME_SCORE_CAP: 800,
-
-    // 正解済問題のスコア減算。再演優先度を大きく下げる
-    CORRECT_PENALTY: 150,
-
-    // 不正解問題の弱点ボーナス（WEIGHT_WEAKNESS を実際に使用）
-    WEAKNESS_BONUS: 100,
-
-    // 印刷スロットのうち未着手枠の割合と最低数
-    NEW_QUOTA_RATIO: 0.4,
-    NEW_QUOTA_MIN: 5,
-};
+export const PRINT_CONFIG = DEFAULT_PRINT_CONFIG;
 
 type ScoredProblem = {
     problem: PrintableProblem;
@@ -47,7 +26,8 @@ export async function selectProblemsForPrint(
     subjectId: string,
     coreProblemId?: string,
     count: number = 30,
-    shuffleSeed?: string
+    shuffleSeed?: string,
+    config: PrintSelectionConfig = DEFAULT_PRINT_CONFIG
 ): Promise<PrintableProblem[]> {
 
     // 2. Fetch Candidate Problems with Integrated Filtering & User State
@@ -143,22 +123,22 @@ export async function selectProblemsForPrint(
         if (!state || !state.lastAnsweredAt) {
             // 未着手: ベーススコアを大きく取って既着手より優先する
             isUnanswered = true;
-            score += PRINT_CONFIG.UNANSWERED_BASE * PRINT_CONFIG.WEIGHT_UNANSWERED;
+            score += config.UNANSWERED_BASE * config.WEIGHT_UNANSWERED;
             score -= problem.order * 0.1; // 順序を僅かに優先
         } else {
             // 既着手: 経過日数 → 上限クリップ
             const diffMs = now - state.lastAnsweredAt.getTime();
             const diffDays = diffMs / (1000 * 60 * 60 * 24);
 
-            const rawTimeScore = diffDays * PRINT_CONFIG.FORGETTING_RATE * PRINT_CONFIG.WEIGHT_TIME;
-            score += Math.min(rawTimeScore, PRINT_CONFIG.TIME_SCORE_CAP);
+            const rawTimeScore = diffDays * config.FORGETTING_RATE * config.WEIGHT_TIME;
+            score += Math.min(rawTimeScore, config.TIME_SCORE_CAP);
 
             if (state.isCleared) {
                 // 正解済: 大きくスコアを下げて再演優先度を後ろに送る
-                score -= PRINT_CONFIG.CORRECT_PENALTY;
+                score -= config.CORRECT_PENALTY;
             } else {
                 // 不正解: 弱点として加点
-                score += PRINT_CONFIG.WEAKNESS_BONUS * PRINT_CONFIG.WEIGHT_WEAKNESS;
+                score += config.WEAKNESS_BONUS * config.WEIGHT_WEAKNESS;
             }
         }
 
@@ -199,7 +179,7 @@ export async function selectProblemsForPrint(
     //    こうしないと未着手プールが多いとき復習が消え、少ないとき既着手で埋まってしまうので
     //    両者の最低出題数を担保する。
     const newQuota = Math.min(
-        Math.max(PRINT_CONFIG.NEW_QUOTA_MIN, Math.floor(count * PRINT_CONFIG.NEW_QUOTA_RATIO)),
+        Math.max(config.NEW_QUOTA_MIN, Math.floor(count * config.NEW_QUOTA_RATIO)),
         count
     );
     const unansweredRanked = rankedProblems.filter(sp => sp.isUnanswered);

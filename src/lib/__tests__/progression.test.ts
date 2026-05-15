@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
     calculateCoreProblemStatus,
+    DEFAULT_PROGRESSION_RULES,
     UNLOCK_ANSWER_RATE,
     UNLOCK_CORRECT_RATE,
     getEntryCoreProblemId,
@@ -57,6 +58,17 @@ describe('calculateCoreProblemStatus', () => {
         expect(result.isPassed).toBe(true)
         expect(result.answerRate).toBe(UNLOCK_ANSWER_RATE)
         expect(result.correctRate).toBe(UNLOCK_CORRECT_RATE)
+    })
+
+    it('パック固有の進行ルールを指定できる', () => {
+        const result = calculateCoreProblemStatus(10, 5, 3, {
+            ...DEFAULT_PROGRESSION_RULES,
+            unlockAnswerRate: 0.6,
+        })
+
+        expect(result.answerRate).toBe(0.5)
+        expect(result.correctRate).toBe(0.6)
+        expect(result.isPassed).toBe(false)
     })
 
     it('全問正解の場合、isPassed=trueを返す', () => {

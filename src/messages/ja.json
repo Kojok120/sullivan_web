@@ -1,0 +1,23 @@
+{
+  "CommonShell": {
+    "nav": {
+      "home": "ホーム",
+      "unitFocus": "単元集中",
+      "dashboard": "ダッシュボード",
+      "ranking": "ランキング",
+      "achievements": "実績",
+      "teacher": "講師用"
+    },
+    "settings": "設定",
+    "logout": "ログアウト",
+    "openMenu": "メニューを開く",
+    "menu": "メニュー"
+  },
+  "Realtime": {
+    "gradingCompleted": "採点が完了しました！",
+    "gradingCompletedDescription": "クリックして結果を確認する",
+    "view": "見る",
+    "gradingFailed": "採点中にエラーが発生しました",
+    "gradingFailedDescription": "お手数ですが、講師に相談してください。"
+  }
+}

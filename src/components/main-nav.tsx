@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useState } from "react";
 import SullivanLogo from "@/assets/Sullivan-Logo.jpg";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { LogOut, Menu } from "lucide-react";
 import { logoutAction } from "@/app/actions";
@@ -19,6 +20,7 @@ import { cn } from "@/lib/utils";
 
 export function MainNav({ role }: { role?: string }) {
     const pathname = usePathname();
+    const t = useTranslations("CommonShell");
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const isTeacherRole = role === 'TEACHER' || role === 'HEAD_TEACHER';
     const isAdmin = role === 'ADMIN';
@@ -37,21 +39,21 @@ export function MainNav({ role }: { role?: string }) {
 
     const navLinks = !isTeacherRole
         ? [
-            { href: "/", label: "ホーム", active: pathname === "/" },
-            { href: "/unit-focus", label: "単元集中", active: pathname.startsWith("/unit-focus") },
-            { href: "/dashboard", label: "ダッシュボード", active: pathname === "/dashboard" },
-            ...(role === 'STUDENT' ? [{ href: "/ranking", label: "ランキング", active: pathname.startsWith("/ranking") }] : []),
-            { href: "/achievements", label: "実績", active: pathname === "/achievements" },
+            { href: "/", label: t("nav.home"), active: pathname === "/" },
+            { href: "/unit-focus", label: t("nav.unitFocus"), active: pathname.startsWith("/unit-focus") },
+            { href: "/dashboard", label: t("nav.dashboard"), active: pathname === "/dashboard" },
+            ...(role === 'STUDENT' ? [{ href: "/ranking", label: t("nav.ranking"), active: pathname.startsWith("/ranking") }] : []),
+            { href: "/achievements", label: t("nav.achievements"), active: pathname === "/achievements" },
             ...(isAdmin
                 ? [
-                    { href: "/teacher", label: "講師用", active: isTeacherDashboardActive },
-                    { href: "/teacher/ranking", label: "ランキング", active: pathname.startsWith("/teacher/ranking") },
+                    { href: "/teacher", label: t("nav.teacher"), active: isTeacherDashboardActive },
+                    { href: "/teacher/ranking", label: t("nav.ranking"), active: pathname.startsWith("/teacher/ranking") },
                 ]
                 : []),
         ]
         : [
-            { href: "/teacher", label: "講師用", active: isTeacherDashboardActive },
-            { href: "/teacher/ranking", label: "ランキング", active: pathname.startsWith("/teacher/ranking") },
+            { href: "/teacher", label: t("nav.teacher"), active: isTeacherDashboardActive },
+            { href: "/teacher/ranking", label: t("nav.ranking"), active: pathname.startsWith("/teacher/ranking") },
         ];
 
     const linkClass = (isActive: boolean) =>
@@ -85,7 +87,7 @@ export function MainNav({ role }: { role?: string }) {
 
                 <div className="hidden items-center gap-4 md:flex">
                     <Link href="/settings" className="text-sm font-medium text-foreground/60 transition-colors hover:text-foreground">
-                        設定
+                        {t("settings")}
                     </Link>
                     <form action={logoutAction}>
                         <Button
@@ -95,7 +97,7 @@ export function MainNav({ role }: { role?: string }) {
                             data-testid="main-nav-logout-button"
                         >
                             <LogOut className="mr-2 h-4 w-4" />
-                            ログアウト
+                            {t("logout")}
                         </Button>
                     </form>
                 </div>
@@ -110,12 +112,12 @@ export function MainNav({ role }: { role?: string }) {
                                 data-testid="mobile-nav-trigger"
                             >
                                 <Menu className="h-5 w-5" />
-                                <span className="sr-only">メニューを開く</span>
+                                <span className="sr-only">{t("openMenu")}</span>
                             </Button>
                         </SheetTrigger>
                         <SheetContent side="right" className="flex h-dvh w-[85vw] max-w-[320px] flex-col p-0">
                             <SheetHeader className="border-b px-4 py-4">
-                                <SheetTitle className="sr-only">メニュー</SheetTitle>
+                                <SheetTitle className="sr-only">{t("menu")}</SheetTitle>
                                 <div className="relative h-9 w-32">
                                     <Image
                                         src={SullivanLogo}
@@ -147,7 +149,7 @@ export function MainNav({ role }: { role?: string }) {
                                     asChild
                                     onClick={() => setMobileMenuOpen(false)}
                                 >
-                                    <Link href="/settings">設定</Link>
+                                    <Link href="/settings">{t("settings")}</Link>
                                 </Button>
                             </nav>
                             <div className="border-t p-3">
@@ -158,7 +160,7 @@ export function MainNav({ role }: { role?: string }) {
                                         data-testid="mobile-nav-logout-button"
                                     >
                                         <LogOut className="mr-2 h-4 w-4" />
-                                        ログアウト
+                                        {t("logout")}
                                     </Button>
                                 </form>
                             </div>

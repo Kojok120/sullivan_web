@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 
 import { markLevelAsSeen } from '@/app/actions/level';
@@ -26,6 +27,7 @@ type StudentRealtimeEventRecord =
 
 export function StudentRealtimeEvents() {
     const router = useRouter();
+    const t = useTranslations('Realtime');
     const [levelUpData, setLevelUpData] = useState<LevelUpState>(null);
     const [isLevelUpOpen, setIsLevelUpOpen] = useState(false);
 
@@ -39,10 +41,10 @@ export function StudentRealtimeEvents() {
                     if (record.type === 'grading_completed') {
                         const groupId = record.payload?.groupId;
 
-                        toast.success("採点が完了しました！", {
-                            description: "クリックして結果を確認する",
+                        toast.success(t('gradingCompleted'), {
+                            description: t('gradingCompletedDescription'),
                             action: {
-                                label: "見る",
+                                label: t('view'),
                                 onClick: () => {
                                     router.push(groupId ? `/dashboard/history/${groupId}` : '/dashboard/history');
                                 },
@@ -53,8 +55,8 @@ export function StudentRealtimeEvents() {
                     }
 
                     if (record.type === 'grading_failed') {
-                        toast.error("採点中にエラーが発生しました", {
-                            description: "お手数ですが、講師に相談してください。",
+                        toast.error(t('gradingFailed'), {
+                            description: t('gradingFailedDescription'),
                             duration: 6000,
                             dismissible: true,
                         });
@@ -88,7 +90,7 @@ export function StudentRealtimeEvents() {
         return () => {
             unsubscribe();
         };
-    }, [router]);
+    }, [router, t]);
 
     return (
         <LevelUpModal

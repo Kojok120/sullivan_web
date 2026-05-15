@@ -1,7 +1,9 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
+import { NextIntlClientProvider } from 'next-intl';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { StudentRealtimeEvents } from '@/components/student-realtime-events';
+import jaMessages from '@/messages/ja.json';
 
 const {
     markLevelAsSeenMock,
@@ -57,6 +59,14 @@ vi.mock('@/components/gamification/level-up-modal', () => ({
     }) => (open && data ? <div>level-up:{data.newLevel}:{data.xpGained}</div> : null),
 }));
 
+function renderWithIntl() {
+    return render(
+        <NextIntlClientProvider locale="ja" messages={jaMessages}>
+            <StudentRealtimeEvents />
+        </NextIntlClientProvider>
+    );
+}
+
 describe('StudentRealtimeEvents', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -64,7 +74,7 @@ describe('StudentRealtimeEvents', () => {
     });
 
     it('学生向け購読を 1 回だけ開始する', async () => {
-        render(<StudentRealtimeEvents />);
+        renderWithIntl();
 
         await waitFor(() => {
             expect(subscribeToUserRealtimeEventsMock).toHaveBeenCalledTimes(1);
@@ -72,7 +82,7 @@ describe('StudentRealtimeEvents', () => {
     });
 
     it('grading_completed で toast を表示し、アクションから履歴へ遷移する', async () => {
-        render(<StudentRealtimeEvents />);
+        renderWithIntl();
 
         await waitFor(() => {
             expect(subscribeToUserRealtimeEventsMock).toHaveBeenCalledTimes(1);
@@ -94,7 +104,7 @@ describe('StudentRealtimeEvents', () => {
     });
 
     it('gamification_update で level up modal を開き、既読更新を呼ぶ', async () => {
-        render(<StudentRealtimeEvents />);
+        renderWithIntl();
 
         await waitFor(() => {
             expect(subscribeToUserRealtimeEventsMock).toHaveBeenCalledTimes(1);

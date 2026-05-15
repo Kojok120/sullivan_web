@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { Inter, Noto_Sans_JP } from "next/font/google";
 import { GeistMono } from "geist/font/mono";
+import { NextIntlClientProvider } from "next-intl";
 import "./globals.css";
 import 'katex/dist/katex.min.css';
 import { Toaster } from "@/components/ui/sonner";
@@ -52,12 +53,14 @@ export default async function RootLayout({
         className="antialiased"
         suppressHydrationWarning
       >
-        {shouldRenderMainNav ? <MainNav role={session?.role} /> : null}
-        {children}
-        {chromeEnabledByPath && session?.role === 'STUDENT' && (
-          <StudentRealtimeEvents />
-        )}
-        <Toaster />
+        <NextIntlClientProvider>
+          {shouldRenderMainNav ? <MainNav role={session?.role} /> : null}
+          {children}
+          {chromeEnabledByPath && session?.role === 'STUDENT' && (
+            <StudentRealtimeEvents />
+          )}
+          <Toaster />
+        </NextIntlClientProvider>
       </body>
     </html>
   );

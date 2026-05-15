@@ -4,6 +4,16 @@ import { prisma } from '@/lib/prisma';
 export const UNLOCK_ANSWER_RATE = 0.4; // 40%
 export const UNLOCK_CORRECT_RATE = 0.5; // 50%
 
+export type ProgressionRules = {
+    unlockAnswerRate: number;
+    unlockCorrectRate: number;
+};
+
+export const DEFAULT_PROGRESSION_RULES: ProgressionRules = {
+    unlockAnswerRate: UNLOCK_ANSWER_RATE,
+    unlockCorrectRate: UNLOCK_CORRECT_RATE,
+};
+
 // CoreProblem 単位の進行状態
 export type CoreProblemStatus = {
     isPassed: boolean;
@@ -55,7 +65,8 @@ export function hasLectureVideos(lectureVideos: unknown): boolean {
 export function calculateCoreProblemStatus(
     totalProblems: number,
     answeredCount: number,
-    correctCount: number
+    correctCount: number,
+    rules: ProgressionRules = DEFAULT_PROGRESSION_RULES
 ): CoreProblemStatus {
     if (totalProblems === 0) {
         return { isPassed: false, answerRate: 0, correctRate: 0 };
@@ -66,7 +77,7 @@ export function calculateCoreProblemStatus(
     // （総問題数では割らない）
     const correctRate = answeredCount > 0 ? correctCount / answeredCount : 0;
 
-    const isPassed = answerRate >= UNLOCK_ANSWER_RATE && correctRate >= UNLOCK_CORRECT_RATE;
+    const isPassed = answerRate >= rules.unlockAnswerRate && correctRate >= rules.unlockCorrectRate;
 
     return {
         isPassed,

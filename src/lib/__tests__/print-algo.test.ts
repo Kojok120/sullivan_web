@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import { PRINT_CONFIG } from '@/lib/print-algo'
+import { DEFAULT_PRINT_CONFIG } from '@/lib/print-config'
 
 describe('PRINT_CONFIG', () => {
+    it('print-algo からの既存 export はデフォルト設定を参照する', () => {
+        expect(PRINT_CONFIG).toBe(DEFAULT_PRINT_CONFIG)
+    })
+
     it('既存重みは後方互換のために値を維持する', () => {
         expect(PRINT_CONFIG.WEIGHT_TIME).toBe(2.0)
         expect(PRINT_CONFIG.WEIGHT_WEAKNESS).toBe(1.0)
