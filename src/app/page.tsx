@@ -1,4 +1,5 @@
 import { getSession } from "@/lib/auth";
+import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 import { SessionList } from "./dashboard/components/session-list";
 import { getSubjectProgress } from "@/lib/analytics";
@@ -11,6 +12,7 @@ import { getGoalDailyViewPayload } from '@/lib/student-goal-service';
 import { GoalReadonlyPanel } from '@/components/goals/goal-readonly-panel';
 
 export default async function Home() {
+    const t = await getTranslations("Home");
     const session = await getSession();
     if (!session) redirect("/login");
     if (session.role === 'ADMIN') redirect('/admin');
@@ -54,7 +56,7 @@ export default async function Home() {
                 <div className="mb-6">
                     <h2 className="text-2xl font-bold mb-2 flex items-center gap-2">
                         <History className="h-6 w-6" />
-                        学習履歴
+                        {t("learningHistory")}
                     </h2>
                 </div>
                 <SessionList userId={session.userId} />

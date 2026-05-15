@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Minus, Plus, Printer } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 
 import { appendCacheBust } from '@/components/print/cache-bust';
 import { Button } from '@/components/ui/button';
@@ -57,6 +58,7 @@ type GateModalState = {
 
 export function PrintSelector({ subjects }: PrintSelectorProps) {
     const router = useRouter();
+    const t = useTranslations('PrintSelector');
     const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
     const [sets, setSets] = useState(1);
     const [isCheckingGate, setIsCheckingGate] = useState(false);
@@ -132,7 +134,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                     previewTab.close();
                 }
                 console.error(`印刷ゲート判定に失敗しました: ${response.status}`);
-                setGateErrorMessage('印刷可否の確認に失敗しました。通信状態を確認して、もう一度お試しください。');
+                setGateErrorMessage(t('gateCheckFailed'));
                 return;
             }
 
@@ -162,7 +164,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                 previewTab.close();
             }
             console.error('印刷ゲート判定中に例外が発生しました:', error);
-            setGateErrorMessage('印刷可否の確認中にエラーが発生しました。時間をおいて再試行してください。');
+            setGateErrorMessage(t('gateCheckUnexpectedError'));
         } finally {
             setIsCheckingGate(false);
         }
@@ -202,7 +204,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
         if (!gateModal.coreProblemId) {
             setIsGateVideoOpen(false);
             watchedVideoIndicesRef.current = new Set();
-            setGateWatchErrorMessage('講義動画の視聴状態を保存できませんでした。時間をおいて再度お試しください。');
+            setGateWatchErrorMessage(t('watchStateMissing'));
             return;
         }
 
@@ -219,7 +221,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
             if (!success) {
                 setIsGateVideoOpen(false);
                 watchedVideoIndicesRef.current = new Set();
-                setGateWatchErrorMessage('視聴状態の保存に失敗しました。もう一度最初から視聴してください。');
+                setGateWatchErrorMessage(t('watchStateSaveFailed'));
                 return;
             }
 
@@ -229,7 +231,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
             console.error('講義動画の視聴状態保存に失敗しました:', error);
             setIsGateVideoOpen(false);
             watchedVideoIndicesRef.current = new Set();
-            setGateWatchErrorMessage('視聴状態の保存に失敗しました。もう一度最初から視聴してください。');
+            setGateWatchErrorMessage(t('watchStateSaveFailed'));
         } finally {
             setIsSubmittingWatch(false);
         }
@@ -266,11 +268,11 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
         : null;
     const canOpenGateVideo = Boolean(gateModal?.coreProblemId && hasTrackableGateVideos);
     const gateVideoSupportMessage = !hasGateVideos
-        ? '講義動画情報を取得できませんでした。時間をおいて再度お試しください。'
+        ? t('videoInfoMissing')
         : !hasTrackableGateVideos
-            ? '講義動画の URL が YouTube ではないため、視聴完了を自動判定できません。管理者に設定をご確認ください。'
+            ? t('unsupportedVideoUrl')
             : !gateModal?.coreProblemId
-                ? '講義動画情報を取得できませんでした。時間をおいて再度お試しください。'
+                ? t('videoInfoMissing')
                 : null;
 
     return (
@@ -326,7 +328,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
-                                                        aria-label="セット数を減らす"
+                                                        aria-label={t('decrementSets')}
                                                         onClick={(event) => {
                                                             event.stopPropagation();
                                                             decrementSets();
@@ -343,7 +345,7 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
-                                                        aria-label="セット数を増やす"
+                                                        aria-label={t('incrementSets')}
                                                         onClick={(event) => {
                                                             event.stopPropagation();
                                                             incrementSets();
@@ -365,10 +367,10 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                                                     }}
                                                 >
                                                     <Printer className="w-5 h-5" />
-                                                    {isCheckingGate ? '確認中...' : '印刷する'}
+                                                    {isCheckingGate ? t('checking') : t('print')}
                                                 </Button>
                                                 <p className="text-xs text-center text-muted-foreground">
-                                                    {sets * 10}問 / {sets}セット
+                                                    {t('setsSummary', { problems: sets * 10, sets })}
                                                 </p>
                                                 {gateErrorMessage && (
                                                     <p className="text-xs text-center text-red-600">
@@ -397,13 +399,13 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                     <DialogHeader className="space-y-3">
                         <DialogTitle>
                             {gateModal?.coreProblemName
-                                ? `「${gateModal.coreProblemName}」がアンロックされました`
-                                : '新しい単元がアンロックされました'}
+                                ? t('unlockedTitleWithName', { coreProblemName: gateModal.coreProblemName })
+                                : t('unlockedTitle')}
                         </DialogTitle>
                         <DialogDescription>
                             {gateModal?.coreProblemName
-                                ? `次の問題を印刷する前に「${gateModal.coreProblemName}」の講義動画を視聴してください。`
-                                : '次の問題を印刷する前に講義動画を視聴してください。'}
+                                ? t('unlockedDescriptionWithName', { coreProblemName: gateModal.coreProblemName })
+                                : t('unlockedDescription')}
                         </DialogDescription>
                     </DialogHeader>
 
@@ -418,29 +420,29 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                                 {previewUrl ? (
                                     <iframe
                                         src={previewUrl}
-                                        title={`${gateModal?.coreProblemName ?? '講義動画'} のプレビュー`}
+                                        title={t('previewTitle', { coreProblemName: gateModal?.coreProblemName ?? t('lectureVideo') })}
                                         className="h-full w-full pointer-events-none"
                                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                         allowFullScreen
                                     />
                                 ) : (
                                     <div className="flex h-full items-center justify-center bg-slate-950 px-6 text-center text-sm text-slate-200">
-                                        {gateVideoSupportMessage ?? 'この講義動画のプレビューを読み込めませんでした。'}
+                                        {gateVideoSupportMessage ?? t('previewLoadFailed')}
                                     </div>
                                 )}
                                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-black/25" />
                                 <div className="pointer-events-none absolute inset-x-0 bottom-0 p-4 text-white">
-                                    <p className="text-sm font-semibold">{previewVideo?.title || gateModal?.coreProblemName || '講義動画'}</p>
+                                    <p className="text-sm font-semibold">{previewVideo?.title || gateModal?.coreProblemName || t('lectureVideo')}</p>
                                     <p className="text-xs text-white/80">
                                         {canOpenGateVideo
-                                            ? 'このプレビューを押すと全画面で再生します。'
-                                            : gateVideoSupportMessage ?? 'この講義動画は再生できません。'}
+                                            ? t('previewPlayable')
+                                            : gateVideoSupportMessage ?? t('videoCannotPlay')}
                                     </p>
                                 </div>
                                 <Button
                                     type="button"
                                     variant="ghost"
-                                    aria-label={`${gateModal?.coreProblemName ?? '講義動画'} の講義動画プレビューを再生`}
+                                    aria-label={t('playPreviewLabel', { coreProblemName: gateModal?.coreProblemName ?? t('lectureVideo') })}
                                     onClick={handleOpenGateVideo}
                                     disabled={!canOpenGateVideo}
                                     className={cn(
@@ -449,27 +451,27 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                                     )}
                                 >
                                     <span className="sr-only">
-                                        {canOpenGateVideo ? 'プレビューを押して全画面で再生する' : '講義動画を再生できない'}
+                                        {canOpenGateVideo ? t('playPreviewSr') : t('cannotPlaySr')}
                                     </span>
                                 </Button>
                             </div>
                             <p className="text-xs text-muted-foreground">
-                                視聴が終わるとトップ画面に戻ります。講義動画を見終わった後、同じトップ画面から再度「印刷する」を押してください。
+                                {t('watchInstruction')}
                             </p>
                         </div>
 
                         <div className="space-y-4 rounded-lg border bg-muted p-4">
                             <div className="space-y-2">
                                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Core Problem</p>
-                                <p className="text-lg font-semibold text-foreground">{gateModal?.coreProblemName ?? '講義動画'}</p>
+                                <p className="text-lg font-semibold text-foreground">{gateModal?.coreProblemName ?? t('lectureVideo')}</p>
                             </div>
                             <div className="flex items-center justify-between rounded-lg bg-white px-4 py-3">
-                                <span className="text-sm text-muted-foreground">動画本数</span>
-                                <span className="text-lg font-semibold text-foreground">{gateModal?.lectureVideos.length ?? 0}本</span>
+                                <span className="text-sm text-muted-foreground">{t('videoCount')}</span>
+                                <span className="text-lg font-semibold text-foreground">{t('videoCountValue', { count: gateModal?.lectureVideos.length ?? 0 })}</span>
                             </div>
                             <div className="space-y-2 rounded-lg bg-white px-4 py-3 text-sm text-slate-600">
-                                <p>1. 左のプレビューを押して講義動画を全画面で視聴します。</p>
-                                <p>2. 視聴が終わったらトップ画面で再度「印刷する」を押します。</p>
+                                <p>{t('stepWatch')}</p>
+                                <p>{t('stepRetryPrint')}</p>
                             </div>
                             {!canOpenGateVideo && (
                                 <p className="text-sm text-red-600">
@@ -486,10 +488,10 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
 
                     <DialogFooter className="gap-2 sm:justify-between">
                         <Button type="button" variant="outline" onClick={() => closeGateModal()} disabled={isSubmittingWatch}>
-                            閉じる
+                            {t('close')}
                         </Button>
                         {isSubmittingWatch ? (
-                            <p className="text-sm text-muted-foreground">視聴状態を保存中...</p>
+                            <p className="text-sm text-muted-foreground">{t('savingWatchState')}</p>
                         ) : null}
                     </DialogFooter>
                 </DialogContent>
@@ -501,7 +503,10 @@ export function PrintSelector({ subjects }: PrintSelectorProps) {
                     onClose={handleGateVideoClose}
                     initialIndex={0}
                     playlist={gateModal.lectureVideos.map((video, index) => ({
-                        title: video.title || `${gateModal.coreProblemName || '講義動画'} ${index + 1}`,
+                        title: video.title || t('fallbackVideoTitle', {
+                            coreProblemName: gateModal.coreProblemName || t('lectureVideo'),
+                            index: index + 1,
+                        }),
                         url: video.url,
                     }))}
                     onVideoEnd={handleGateVideoEnd}

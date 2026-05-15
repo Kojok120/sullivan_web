@@ -19,5 +19,41 @@
     "view": "見る",
     "gradingFailed": "採点中にエラーが発生しました",
     "gradingFailedDescription": "お手数ですが、講師に相談してください。"
+  },
+  "Home": {
+    "learningHistory": "学習履歴"
+  },
+  "PrintSelector": {
+    "decrementSets": "セット数を減らす",
+    "incrementSets": "セット数を増やす",
+    "checking": "確認中...",
+    "print": "印刷する",
+    "setsSummary": "{problems}問 / {sets}セット",
+    "gateCheckFailed": "印刷可否の確認に失敗しました。通信状態を確認して、もう一度お試しください。",
+    "gateCheckUnexpectedError": "印刷可否の確認中にエラーが発生しました。時間をおいて再試行してください。",
+    "watchStateMissing": "講義動画の視聴状態を保存できませんでした。時間をおいて再度お試しください。",
+    "watchStateSaveFailed": "視聴状態の保存に失敗しました。もう一度最初から視聴してください。",
+    "videoInfoMissing": "講義動画情報を取得できませんでした。時間をおいて再度お試しください。",
+    "unsupportedVideoUrl": "講義動画の URL が YouTube ではないため、視聴完了を自動判定できません。管理者に設定をご確認ください。",
+    "unlockedTitleWithName": "「{coreProblemName}」がアンロックされました",
+    "unlockedTitle": "新しい単元がアンロックされました",
+    "unlockedDescriptionWithName": "次の問題を印刷する前に「{coreProblemName}」の講義動画を視聴してください。",
+    "unlockedDescription": "次の問題を印刷する前に講義動画を視聴してください。",
+    "lectureVideo": "講義動画",
+    "previewTitle": "{coreProblemName} のプレビュー",
+    "previewLoadFailed": "この講義動画のプレビューを読み込めませんでした。",
+    "previewPlayable": "このプレビューを押すと全画面で再生します。",
+    "videoCannotPlay": "この講義動画は再生できません。",
+    "playPreviewLabel": "{coreProblemName} の講義動画プレビューを再生",
+    "playPreviewSr": "プレビューを押して全画面で再生する",
+    "cannotPlaySr": "講義動画を再生できない",
+    "watchInstruction": "視聴が終わるとトップ画面に戻ります。講義動画を見終わった後、同じトップ画面から再度「印刷する」を押してください。",
+    "videoCount": "動画本数",
+    "videoCountValue": "{count}本",
+    "stepWatch": "1. 左のプレビューを押して講義動画を全画面で視聴します。",
+    "stepRetryPrint": "2. 視聴が終わったらトップ画面で再度「印刷する」を押します。",
+    "close": "閉じる",
+    "savingWatchState": "視聴状態を保存中...",
+    "fallbackVideoTitle": "{coreProblemName} {index}"
   }
 }
