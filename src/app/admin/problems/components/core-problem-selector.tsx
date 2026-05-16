@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { X } from 'lucide-react';
 
 import { getProblemEditorContext } from '../actions';
@@ -72,13 +73,14 @@ export function CoreProblemSelector({
     selected,
     onChange,
     active = true,
-    placeholder = '単元・コア問題を選択して追加',
-    emptyText = '紐付けなし',
+    placeholder,
+    emptyText,
     disabled = false,
     subjectId,
     subjects = [],
     coreProblems = [],
 }: CoreProblemSelectorProps) {
+    const t = useTranslations('CoreProblemSelector');
     const [fetchedSubjects, setFetchedSubjects] = useState<SubjectOption[]>([]);
 
     const providedSubjects = useMemo(
@@ -125,8 +127,9 @@ export function CoreProblemSelector({
         || subjectOptions.length === 0
         || (isSubjectScoped && !hasSelectedSubject);
     const placeholderText = isSubjectScoped && !hasSelectedSubject
-        ? '先に科目を選択してください'
-        : placeholder;
+        ? t('selectSubjectFirst')
+        : placeholder ?? t('placeholder');
+    const emptyTextValue = emptyText ?? t('empty');
 
     const handleAdd = (id: string) => {
         if (selectedIds.has(id)) {
@@ -161,7 +164,7 @@ export function CoreProblemSelector({
             <div className="min-h-[40px] rounded border bg-background p-2">
                 <div className="flex flex-wrap gap-2">
                     {selected.length === 0 && (
-                        <span className="py-1 text-xs text-muted-foreground">{emptyText}</span>
+                        <span className="py-1 text-xs text-muted-foreground">{emptyTextValue}</span>
                     )}
                     {selected.map((coreProblem) => (
                         <Badge key={coreProblem.id} variant="secondary" className="flex items-center gap-1">
@@ -170,7 +173,7 @@ export function CoreProblemSelector({
                             </span>
                             <button
                                 type="button"
-                                aria-label={`${coreProblem.name || '単元'}を削除`}
+                                aria-label={t('removeAria', { name: coreProblem.name || t('unitFallback') })}
                                 onClick={() => handleRemove(coreProblem.id)}
                             >
                                 <X className="h-3 w-3" />
@@ -197,13 +200,13 @@ export function CoreProblemSelector({
                                             value={coreProblem.id}
                                             disabled={isSelected}
                                         >
-                                            {coreProblem.name} {isSelected ? '(追加済み)' : ''}
+                                            {coreProblem.name} {isSelected ? t('alreadyAdded') : ''}
                                         </SelectItem>
                                     );
                                 })
                             ) : (
                                 <div className="px-2 py-1 text-xs text-muted-foreground">
-                                    コア問題がありません
+                                    {t('noCoreProblems')}
                                 </div>
                             )}
                         </SelectGroup>

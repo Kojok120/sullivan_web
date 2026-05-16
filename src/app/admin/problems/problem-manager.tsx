@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { Plus } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -63,9 +64,10 @@ export function ProblemManager({
     viewMode = 'admin',
     showMasterNumber = true,
     showBulkImport,
-    bulkImportLabel = '一括登録',
+    bulkImportLabel,
     bulkImportConfig,
 }: ProblemManagerProps) {
+    const t = useTranslations('ProblemManager');
     const router = useRouter();
     const searchParams = useSearchParams();
     const [isPending, startTransition] = useTransition();
@@ -176,25 +178,25 @@ export function ProblemManager({
                         <Input
                             placeholder={
                                 isAuthorView
-                                    ? '問題名、問題文、ID、単元名で検索...'
+                                    ? t('authorSearchPlaceholder')
                                     : showMasterNumber
-                                        ? '問題文、解答、ID、マスタNo、単元名で検索...'
-                                        : '問題文、解答、ID、単元名で検索...'
+                                        ? t('adminSearchPlaceholderWithMasterNumber')
+                                        : t('adminSearchPlaceholder')
                             }
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
                         />
                         <Button type="submit" disabled={isPending} className="min-h-11 sm:min-h-10">
-                            検索
+                            {t('search')}
                         </Button>
                     </form>
                     <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
                         <Select value={selectedCoreProblemId} onValueChange={handleCoreProblemFilter}>
                             <SelectTrigger className="w-full sm:w-[180px]">
-                                <SelectValue placeholder="単元" />
+                                <SelectValue placeholder={t('coreProblemPlaceholder')} />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="ALL">全単元</SelectItem>
+                                <SelectItem value="ALL">{t('allCoreProblems')}</SelectItem>
                                 {availableCoreProblems.map((coreProblem) => (
                                     <SelectItem key={coreProblem.id} value={coreProblem.id}>
                                         {`#${coreProblem.masterNumber ?? '-'} ${coreProblem.name}`}
@@ -204,10 +206,10 @@ export function ProblemManager({
                         </Select>
                         <Select value={selectedVideoStatus} onValueChange={handleVideoStatusFilter}>
                             <SelectTrigger className="w-full sm:w-[170px]">
-                                <SelectValue placeholder="動画" />
+                                <SelectValue placeholder={t('videoPlaceholder')} />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="ALL">動画：全件</SelectItem>
+                                <SelectItem value="ALL">{t('allVideos')}</SelectItem>
                                 {VIDEO_STATUS_OPTIONS.map((option) => (
                                     <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                                 ))}
@@ -215,10 +217,10 @@ export function ProblemManager({
                         </Select>
                         <Select value={selectedProblemType} onValueChange={handleProblemTypeFilter}>
                             <SelectTrigger className="w-full sm:w-[180px]">
-                                <SelectValue placeholder="問題形式" />
+                                <SelectValue placeholder={t('problemTypePlaceholder')} />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="ALL">形式：全件</SelectItem>
+                                <SelectItem value="ALL">{t('allProblemTypes')}</SelectItem>
                                 {PROBLEM_TYPE_OPTIONS.map((option) => (
                                     <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                                 ))}
@@ -226,10 +228,10 @@ export function ProblemManager({
                         </Select>
                         <Select value={selectedStatus} onValueChange={handleStatusFilter}>
                             <SelectTrigger className="w-full sm:w-[160px]">
-                                <SelectValue placeholder="公開状況" />
+                                <SelectValue placeholder={t('statusPlaceholder')} />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="ALL">公開状況：全件</SelectItem>
+                                <SelectItem value="ALL">{t('allStatuses')}</SelectItem>
                                 {PROBLEM_STATUS_OPTIONS.map((option) => (
                                     <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                                 ))}
@@ -241,13 +243,13 @@ export function ProblemManager({
                 <div className="flex gap-2">
                     {resolvedShowBulkImport && (
                         <Button onClick={() => setIsBulkDialogOpen(true)} variant="outline" className="min-h-11 flex-1 sm:min-h-10 sm:flex-none">
-                            {bulkImportLabel}
+                            {bulkImportLabel ?? t('bulkImport')}
                         </Button>
                     )}
                     <Button asChild className="min-h-11 flex-1 sm:min-h-10 sm:flex-none">
                         <Link href={`${routeBase}/new?subjectId=${currentSubject.id}`}>
                             <Plus className="mr-2 h-4 w-4" />
-                            {isAuthorView ? '新しい問題を作成' : '問題を作成'}
+                            {isAuthorView ? t('createNewAuthor') : t('create')}
                         </Link>
                     </Button>
                 </div>
@@ -264,15 +266,15 @@ export function ProblemManager({
             />
 
             <div className="flex flex-col items-start justify-between gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center">
-                <div>全 {totalCount} 件</div>
+                <div>{t('totalCount', { count: totalCount })}</div>
                 <div className="flex items-center gap-2">
                     {currentPage > 1 ? (
                         <Button variant="outline" size="sm" asChild>
-                            <Link href={buildHref({ page: String(currentPage - 1) })}>前へ</Link>
+                            <Link href={buildHref({ page: String(currentPage - 1) })}>{t('previous')}</Link>
                         </Button>
                     ) : (
                         <Button variant="outline" size="sm" disabled>
-                            前へ
+                            {t('previous')}
                         </Button>
                     )}
                     <span className="flex items-center px-2">
@@ -280,11 +282,11 @@ export function ProblemManager({
                     </span>
                     {currentPage * 20 < totalCount ? (
                         <Button variant="outline" size="sm" asChild>
-                            <Link href={buildHref({ page: String(currentPage + 1) })}>次へ</Link>
+                            <Link href={buildHref({ page: String(currentPage + 1) })}>{t('next')}</Link>
                         </Button>
                     ) : (
                         <Button variant="outline" size="sm" disabled>
-                            次へ
+                            {t('next')}
                         </Button>
                     )}
                 </div>

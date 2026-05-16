@@ -950,5 +950,73 @@
     "problemHeader": "問題",
     "evaluationHeader": "評価",
     "aiGradingHeader": "AI採点"
+  },
+  "ProblemManager": {
+    "authorSearchPlaceholder": "問題名、問題文、ID、単元名で検索...",
+    "adminSearchPlaceholderWithMasterNumber": "問題文、解答、ID、マスタNo、単元名で検索...",
+    "adminSearchPlaceholder": "問題文、解答、ID、単元名で検索...",
+    "search": "検索",
+    "coreProblemPlaceholder": "単元",
+    "allCoreProblems": "全単元",
+    "videoPlaceholder": "動画",
+    "allVideos": "動画: 全件",
+    "problemTypePlaceholder": "問題形式",
+    "allProblemTypes": "形式: 全件",
+    "statusPlaceholder": "公開状況",
+    "allStatuses": "公開状況: 全件",
+    "bulkImport": "一括登録",
+    "createNewAuthor": "新しい問題を作成",
+    "create": "問題を作成",
+    "totalCount": "全 {count} 件",
+    "previous": "前へ",
+    "next": "次へ"
+  },
+  "AdminProblemsPage": {
+    "title": "問題一覧",
+    "unknownError": "不明なエラーが発生しました",
+    "subjectTitle": "問題一覧 - {subjectName}"
+  },
+  "ProblemSubjectRequiredState": {
+    "title": "教科別の問題一覧を選択してください",
+    "description": "全教科横断の問題一覧は廃止しました。ナビゲーション、または下の教科別リンクから開いてください。",
+    "subjectLink": "問題一覧 - {subjectName}"
+  },
+  "CoreProblemSelector": {
+    "placeholder": "単元・コア問題を選択して追加",
+    "empty": "紐付けなし",
+    "selectSubjectFirst": "先に科目を選択してください",
+    "unitFallback": "単元",
+    "removeAria": "{name}を削除",
+    "alreadyAdded": "(追加済み)",
+    "noCoreProblems": "コア問題がありません"
+  },
+  "SendBackDialog": {
+    "reasonRequired": "差し戻し理由を入力してください",
+    "reasonTooLong": "差し戻し理由は{max}文字以内で入力してください",
+    "title": "差し戻し理由",
+    "placeholder": "どこを直してほしいかを書いてください",
+    "remaining": "残り {remaining} 文字",
+    "cancel": "キャンセル",
+    "submit": "差し戻す"
+  },
+  "ProblemDialog": {
+    "updateSuccess": "問題を更新しました",
+    "createSuccess": "問題を作成しました",
+    "saveFailed": "保存に失敗しました",
+    "editTitle": "問題の編集",
+    "createTitle": "新規問題作成",
+    "description": "問題の内容と紐付けを設定します。",
+    "questionLabel": "問題文",
+    "questionPlaceholder": "問題文を入力してください",
+    "answerLabel": "解答 (任意)",
+    "answerPlaceholder": "解答 (空欄可)",
+    "gradeLabel": "学年 (任意)",
+    "gradePlaceholder": "例: 中1",
+    "videoUrlLabel": "解説動画URL (任意)",
+    "videoStatusLabel": "動画ステータス",
+    "videoUrlAutoStatus": "URL設定済みのため自動的に「設定済み」になります",
+    "coreProblemsLabel": "紐付け（コア問題・単元）",
+    "cancel": "キャンセル",
+    "save": "保存"
   }
 }

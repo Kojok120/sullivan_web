@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { NextIntlClientProvider } from 'next-intl';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import jaMessages from '@/messages/ja.json';
 import { CoreProblemSelector } from './core-problem-selector';
 
 const { getProblemEditorContextMock } = vi.hoisted(() => ({
@@ -84,6 +86,14 @@ vi.mock('@/components/ui/select', async () => {
     };
 });
 
+function renderWithIntl(ui: ReactNode) {
+    return render(
+        <NextIntlClientProvider locale="ja" messages={jaMessages}>
+            {ui}
+        </NextIntlClientProvider>,
+    );
+}
+
 describe('CoreProblemSelector', () => {
     const subjects = [
         { id: 'subject-math', name: '数学' },
@@ -105,7 +115,7 @@ describe('CoreProblemSelector', () => {
     });
 
     it('科目未選択時は単元セレクタを無効化する', () => {
-        render(
+        renderWithIntl(
             <CoreProblemSelector
                 selected={[]}
                 onChange={vi.fn()}
@@ -123,7 +133,7 @@ describe('CoreProblemSelector', () => {
     it('選択した科目の単元だけを表示する', () => {
         const handleChange = vi.fn();
 
-        render(
+        renderWithIntl(
             <CoreProblemSelector
                 selected={[]}
                 onChange={handleChange}
@@ -151,7 +161,7 @@ describe('CoreProblemSelector', () => {
     });
 
     it('科目指定がない既存用途では全科目の単元を表示する', () => {
-        render(
+        renderWithIntl(
             <CoreProblemSelector
                 selected={[]}
                 onChange={vi.fn()}
