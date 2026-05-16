@@ -167,9 +167,9 @@ async function findSupabaseAuthUserByEmail(email: string) {
 
 async function seedUsers() {
   const classroom = await prisma.classroom.upsert({
-    where: { name: 'デモ教室' },
+    where: { packId_name: { packId: 'jp-juken', name: 'デモ教室' } },
     update: { groups: ['月曜', '水曜'], plan: ClassroomPlan.STANDARD },
-    create: { name: 'デモ教室', groups: ['月曜', '水曜'], plan: ClassroomPlan.STANDARD },
+    create: { packId: 'jp-juken', name: 'デモ教室', groups: ['月曜', '水曜'], plan: ClassroomPlan.STANDARD },
   });
 
   const users: SeedUser[] = [
@@ -478,9 +478,9 @@ async function seedCurriculum() {
 
   for (const subject of subjects) {
     const subjectRecord = await prisma.subject.upsert({
-      where: { name: subject.name },
+      where: { packId_name: { packId: 'jp-juken', name: subject.name } },
       update: { order: subject.order },
-      create: { name: subject.name, order: subject.order },
+      create: { packId: 'jp-juken', name: subject.name, order: subject.order },
     });
 
     for (const coreProblem of subject.coreProblems) {
@@ -692,9 +692,9 @@ async function seedStructuredProblemSamples() {
 
   for (const sample of samples) {
     const subject = await prisma.subject.upsert({
-      where: { name: sample.subject.name },
+      where: { packId_name: { packId: 'jp-juken', name: sample.subject.name } },
       update: { order: sample.subject.order },
-      create: { name: sample.subject.name, order: sample.subject.order },
+      create: { packId: 'jp-juken', name: sample.subject.name, order: sample.subject.order },
     });
 
     const coreProblem = await upsertCoreProblem(subject.id, {
@@ -962,9 +962,9 @@ async function seedAchievements() {
 
   for (const achievement of achievements) {
     await prisma.achievement.upsert({
-      where: { slug: achievement.slug },
+      where: { packId_slug: { packId: 'jp-juken', slug: achievement.slug } },
       update: achievement,
-      create: achievement,
+      create: { packId: 'jp-juken', ...achievement },
     });
   }
 }
