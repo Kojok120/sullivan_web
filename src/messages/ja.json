@@ -1018,5 +1018,56 @@
     "coreProblemsLabel": "紐付け（コア問題・単元）",
     "cancel": "キャンセル",
     "save": "保存"
+  },
+  "ProblemList": {
+    "publishSuccess": "公開しました",
+    "publishFailed": "公開に失敗しました",
+    "statusUpdateSuccess": "ステータスを更新しました",
+    "statusUpdateFailed": "ステータスの更新に失敗しました",
+    "sendBackSuccess": "差し戻しに変更しました",
+    "sendBackFailed": "差し戻しに失敗しました",
+    "videoStatusUpdateSuccess": "動画ステータスを更新しました",
+    "deleteSuccess": "問題を削除しました",
+    "deleteFailed": "削除に失敗しました",
+    "bulkDeleteSuccess": "{count}件の問題を削除しました",
+    "bulkDeleteFailed": "一括削除に失敗しました",
+    "clearAll": "全解除",
+    "selectAll": "全選択",
+    "bulkDelete": "{count}件削除",
+    "empty": "問題が見つかりませんでした",
+    "open": "開く",
+    "edit": "編集",
+    "delete": "削除",
+    "question": "問題文",
+    "answer": "解答",
+    "units": "所属単元",
+    "video": "動画",
+    "openVideo": "動画を開く",
+    "masterNumber": "マスタNo",
+    "type": "形式",
+    "statusHeader": "公開状況",
+    "actions": "操作",
+    "deleteTitle": "問題を削除しますか？",
+    "deleteDescription": "この操作は取り消せません。学習履歴なども削除されます。",
+    "bulkDeleteTitle": "{count}件の問題を削除しますか？",
+    "bulkDeleteDescription": "選択した問題と関連する学習履歴が削除されます。この操作は取り消せません。",
+    "cancel": "キャンセル",
+    "fallback": "-",
+    "problemType": {
+      "SHORT_TEXT": "短い記述",
+      "GRAPH_DRAW": "関数・グラフ",
+      "GEOMETRY": "図形"
+    },
+    "status": {
+      "DRAFT": "下書き",
+      "PUBLISHED": "公開中",
+      "SENT_BACK": "差し戻し"
+    },
+    "videoStatus": {
+      "NONE": "-",
+      "SHOT": "撮影完了",
+      "UPLOADED": "Drive完了",
+      "CONFIGURED": "設定済み"
+    }
   }
 }
