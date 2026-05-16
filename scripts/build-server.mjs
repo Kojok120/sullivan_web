@@ -1,9 +1,16 @@
 // custom server (server.ts) と grading worker (worker/server.ts) を esbuild で
 // 単一の CJS ファイルに bundle する。本番では tsx を経由せず
 // `node dist/server.js` / `node dist/worker.js` で直接起動できるようにする。
-// node_modules の依存はすべて external にし、ランタイム側の node_modules で解決する。
-// Next.js (web) の場合は standalone 出力側で trace された node_modules、
-// worker の場合は `npm ci --omit=dev` で構築した本番依存を利用する。
+//
+// npm の依存 (@prisma/client, @google/genai, ws など) はすべて external にし、
+// ランタイム側の node_modules で解決する。Next.js (web) は standalone 出力側で
+// trace された node_modules、worker は `pnpm prune --prod` で構築した本番依存を利用する。
+//
+// 一方 workspace packages (@sullivan/*) は **bundle に inline する**。
+// pnpm workspace の symlink は本番 runner image では packages/ ディレクトリが
+// 同梱されないため壊れる上、各 package の main / exports は `.ts` ソースを直接
+// 指しており Node.js では実行できない。esbuild に TS を transpile させて
+// bundle に焼き込むことで、runner stage が packages/ を持たなくても動作する。
 
 import { build } from "esbuild";
 import { fileURLToPath } from "node:url";
@@ -38,6 +45,20 @@ if (unknown.length > 0) {
 }
 const entries = selected.map((key) => TARGETS[key]);
 
+// bare import のうち @sullivan/* 以外を external 扱いする esbuild plugin。
+// @sullivan/* は workspace package の TS ソースを inline bundle に取り込む。
+const markNpmExternalPlugin = {
+  name: "mark-npm-external",
+  setup(build) {
+    build.onResolve({ filter: /^[^./]/ }, (args) => {
+      if (args.path === "@sullivan" || args.path.startsWith("@sullivan/")) {
+        return null; // 通常解決して bundle に inline する
+      }
+      return { external: true };
+    });
+  },
+};
+
 await Promise.all(
   entries.map((entry) =>
     build({
@@ -47,7 +68,7 @@ await Promise.all(
       platform: "node",
       target,
       format: "cjs",
-      packages: "external",
+      plugins: [markNpmExternalPlugin],
       sourcemap: "inline",
       legalComments: "none",
       logLevel: "info",
