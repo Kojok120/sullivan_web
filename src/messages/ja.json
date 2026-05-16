@@ -714,5 +714,43 @@
     "selectSubject": "科目を選択してください",
     "selectCoreProblem": "CoreProblemを選択してください",
     "selectCoreProblemFromList": "左側のリストからCoreProblemを選択して、問題を表示・編集してください"
+  },
+  "AdminCurriculumPage": {
+    "error": "エラーが発生しました: {message}",
+    "loadFailed": "データの取得に失敗しました",
+    "title": "Core Problem管理",
+    "description": "科目、単元、コア問題、および個々の問題と解説動画を管理します。"
+  },
+  "AdminCurriculumManager": {
+    "subjectSelection": "科目選択:",
+    "coreProblemList": "CoreProblem一覧",
+    "problemList": "問題一覧",
+    "unitsAndCoreProblems": "単元・コア問題",
+    "count": "{count}件",
+    "selectSubject": "科目を選択してください",
+    "selectCoreProblem": "CoreProblemを選択してください",
+    "selectCoreProblemFromList": "左側のリストからCoreProblemを選択して、問題を表示・編集してください"
+  },
+  "AdminCurriculumActions": {
+    "subjectsLoadFailed": "科目の取得に失敗しました",
+    "unauthorized": "権限がありません",
+    "coreProblemsLoadFailed": "CoreProblemの取得に失敗しました",
+    "duplicateMasterNumber": "同じ教科でマスタNoが重複しています",
+    "uniqueConstraint": "一意制約に違反しています",
+    "coreProblemCreateFailed": "CoreProblemの作成に失敗しました",
+    "coreProblemNotFound": "CoreProblemが見つかりません",
+    "coreProblemUpdateFailed": "CoreProblemの更新に失敗しました",
+    "coreProblemSearchFailed": "既存CoreProblemの検索に失敗しました",
+    "coreProblemDeleteFailed": "CoreProblemの削除に失敗しました",
+    "coreProblemBulkDeleteFailed": "コア問題の一括削除に失敗しました",
+    "invalidMasterNumberRow": "行{row}: マスタNoは1以上の整数で指定してください",
+    "coreProblemNameRequiredRow": "行{row}: CoreProblem名は必須です",
+    "duplicateMasterNumberRow": "行{row}: 同一TSV内でマスタNo {masterNumber} が重複しています",
+    "assignedMasterNumberRow": "行{row}: 同名既存CoreProblemにマスタNo {masterNumber} を割り当てて更新しました",
+    "ambiguousNameRow": "行{row}: 同名候補が複数のため更新先を特定できずスキップしました",
+    "bulkImportFailed": "一括登録に失敗しました",
+    "sameSubjectOnly": "同一教科のCoreProblemのみ並び替えできます",
+    "coreProblemReorderFailed": "CoreProblemの並び替えに失敗しました",
+    "problemsLoadFailed": "問題の取得に失敗しました"
   }
 }

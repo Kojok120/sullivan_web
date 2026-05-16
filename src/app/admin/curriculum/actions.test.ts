@@ -29,6 +29,29 @@ vi.mock('next/cache', () => ({
     revalidatePath: revalidatePathMock,
 }));
 
+vi.mock('next-intl/server', async () => {
+    const messages = (await import('@/messages/ja.json')).default as unknown as Record<string, Record<string, string>>;
+
+    return {
+        getTranslations: vi.fn(async (namespace: string) => {
+            const namespaceMessages = messages[namespace];
+
+            return (key: string, values?: Record<string, string | number>) => {
+                const message = namespaceMessages[key];
+
+                if (!values) {
+                    return message;
+                }
+
+                return Object.entries(values).reduce(
+                    (current, [name, value]) => current.replaceAll(`{${name}}`, String(value)),
+                    message,
+                );
+            };
+        }),
+    };
+});
+
 import { getProblemsByCoreProblem } from './actions';
 
 describe('curriculum actions', () => {
