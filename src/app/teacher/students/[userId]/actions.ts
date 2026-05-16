@@ -8,6 +8,17 @@ import { normalizeOptionalSelection } from '@/lib/form-selection';
 import { z } from 'zod';
 import { addDaysToDateKey, getTodayDateKey, isValidDateKey, listDateKeysBetween, normalizeTimeZone } from '@/lib/date-key';
 import type { DraftGranularity, GoalDraftProposal, TeacherGoalInput } from '@/lib/types/student-goal';
+import { getTranslations } from 'next-intl/server';
+
+type TeacherStudentActionsT = Awaited<ReturnType<typeof getTranslations>>;
+type DraftGoalActionInput = {
+    type: 'PROBLEM_COUNT' | 'CUSTOM';
+    name: string;
+    dueDateKey: string;
+    subjectName?: string | null;
+    targetCount?: number | null;
+    targetText?: string | null;
+};
 
 async function ensureTeacherCanAccessStudent(
     teacherId: string,
@@ -35,53 +46,67 @@ async function ensureTeacherCanAccessStudent(
 const MAX_ACTIVE_GOALS = 10;
 const DATE_KEY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
-const milestoneSchema = z.object({
-    dateKey: z.string().regex(DATE_KEY_REGEX, '日付形式が不正です'),
-    targetCount: z.number().int().min(0).nullable().optional(),
-    targetText: z.string().max(500, 'テキストが長すぎます').nullable().optional(),
-});
+function createMilestoneSchema(t: TeacherStudentActionsT) {
+    return z.object({
+        dateKey: z.string().regex(DATE_KEY_REGEX, t('invalidDateFormat')),
+        targetCount: z.number().int().min(0).nullable().optional(),
+        targetText: z.string().max(500, t('textTooLong')).nullable().optional(),
+    });
+}
 
-const teacherGoalSchema: z.ZodType<TeacherGoalInput> = z.object({
-    id: z.string().optional(),
-    type: z.enum(['PROBLEM_COUNT', 'CUSTOM']),
-    name: z.string().trim().min(1, '目標名は必須です').max(120, '目標名が長すぎます'),
-    subjectId: z.string().trim().nullable().optional(),
-    dueDateKey: z.string().regex(DATE_KEY_REGEX, '期限日付形式が不正です'),
-    milestones: z.array(milestoneSchema).max(400, 'マイルストーン数が多すぎます'),
-});
+function createTeacherGoalSchema(t: TeacherStudentActionsT): z.ZodType<TeacherGoalInput> {
+    const milestoneSchema = createMilestoneSchema(t);
 
-const saveStudentGoalsSchema = z.object({
-    goals: z.array(teacherGoalSchema),
-    timeZone: z.string().optional().nullable(),
-});
+    return z.object({
+        id: z.string().optional(),
+        type: z.enum(['PROBLEM_COUNT', 'CUSTOM']),
+        name: z.string().trim().min(1, t('goalNameRequired')).max(120, t('goalNameTooLong')),
+        subjectId: z.string().trim().nullable().optional(),
+        dueDateKey: z.string().regex(DATE_KEY_REGEX, t('dueDateInvalid')),
+        milestones: z.array(milestoneSchema).max(400, t('tooManyMilestones')),
+    });
+}
 
-const updateStudentGoalDaySchema = z.object({
-    dateKey: z.string().regex(DATE_KEY_REGEX),
-    timeZone: z.string().optional().nullable(),
-    entries: z.array(
-        z.object({
-            goalId: z.string().min(1),
-            targetCount: z.number().int().min(0).nullable().optional(),
-            targetText: z.string().max(500).nullable().optional(),
-        })
-    ),
-});
+function createSaveStudentGoalsSchema(t: TeacherStudentActionsT) {
+    return z.object({
+        goals: z.array(createTeacherGoalSchema(t)),
+        timeZone: z.string().optional().nullable(),
+    });
+}
 
-const draftGoalSchema = z.object({
-    type: z.enum(['PROBLEM_COUNT', 'CUSTOM']),
-    name: z.string().trim().min(1).max(120),
-    dueDateKey: z.string().regex(DATE_KEY_REGEX),
-    subjectName: z.string().trim().max(120).optional().nullable(),
-    targetCount: z.number().int().min(0).nullable().optional(),
-    targetText: z.string().trim().max(500).optional().nullable(),
-    milestones: z.array(milestoneSchema).optional(),
-});
+function createUpdateStudentGoalDaySchema(t: TeacherStudentActionsT) {
+    return z.object({
+        dateKey: z.string().regex(DATE_KEY_REGEX, t('invalidDateFormat')),
+        timeZone: z.string().optional().nullable(),
+        entries: z.array(
+            z.object({
+                goalId: z.string().min(1),
+                targetCount: z.number().int().min(0).nullable().optional(),
+                targetText: z.string().max(500, t('textTooLong')).nullable().optional(),
+            })
+        ),
+    });
+}
 
-const generateDraftSchema = z.object({
-    goal: draftGoalSchema,
-    granularity: z.enum(['HALF', 'WEEKLY', 'DAILY']),
-    timeZone: z.string().optional().nullable(),
-});
+function createDraftGoalSchema(t: TeacherStudentActionsT) {
+    return z.object({
+        type: z.enum(['PROBLEM_COUNT', 'CUSTOM']),
+        name: z.string().trim().min(1, t('goalNameRequired')).max(120, t('goalNameTooLong')),
+        dueDateKey: z.string().regex(DATE_KEY_REGEX, t('dueDateInvalid')),
+        subjectName: z.string().trim().max(120).optional().nullable(),
+        targetCount: z.number().int().min(0).nullable().optional(),
+        targetText: z.string().trim().max(500, t('textTooLong')).optional().nullable(),
+        milestones: z.array(createMilestoneSchema(t)).optional(),
+    });
+}
+
+function createGenerateDraftSchema(t: TeacherStudentActionsT) {
+    return z.object({
+        goal: createDraftGoalSchema(t),
+        granularity: z.enum(['HALF', 'WEEKLY', 'DAILY']),
+        timeZone: z.string().optional().nullable(),
+    });
+}
 
 function normalizeNullableText(value: string | null | undefined): string | null {
     if (value === null || value === undefined) return null;
@@ -126,9 +151,10 @@ function buildMilestoneKeys(todayKey: string, dueDateKey: string, granularity: D
 
 function buildFallbackDraft(params: {
     milestoneKeys: string[];
-    goal: z.infer<typeof draftGoalSchema>;
+    goal: DraftGoalActionInput;
+    t: TeacherStudentActionsT;
 }): GoalDraftProposal[] {
-    const { milestoneKeys, goal } = params;
+    const { milestoneKeys, goal, t } = params;
     if (milestoneKeys.length === 0) return [];
 
     if (goal.type === 'PROBLEM_COUNT') {
@@ -143,7 +169,9 @@ function buildFallbackDraft(params: {
             return {
                 dateKey,
                 targetCount: suggested,
-                targetText: goal.subjectName ? `${goal.subjectName}の演習を進める` : '演習を進める',
+                targetText: goal.subjectName
+                    ? t('fallbackSubjectText', { subjectName: goal.subjectName })
+                    : t('fallbackGenericText'),
             };
         });
     }
@@ -151,17 +179,18 @@ function buildFallbackDraft(params: {
     return milestoneKeys.map((dateKey, index) => ({
         dateKey,
         targetText: index === 0
-            ? `${goal.name}に着手する`
+            ? t('fallbackStart', { goalName: goal.name })
             : index === milestoneKeys.length - 1
-                ? `${goal.name}を完了する`
-                : `${goal.name}を継続する`,
+                ? t('fallbackComplete', { goalName: goal.name })
+                : t('fallbackContinue', { goalName: goal.name }),
         targetCount: null,
     }));
 }
 
 async function buildDraftWithGemini(params: {
     milestoneKeys: string[];
-    goal: z.infer<typeof draftGoalSchema>;
+    goal: DraftGoalActionInput;
+    t: TeacherStudentActionsT;
 }): Promise<GoalDraftProposal[] | null> {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey || params.milestoneKeys.length === 0) {
@@ -175,16 +204,23 @@ async function buildDraftWithGemini(params: {
         const modelName = process.env.GEMINI_CHAT_MODEL || 'gemini-3.1-pro-preview';
         const dateKeysText = params.milestoneKeys.join(', ');
         const goalSummary = params.goal.type === 'PROBLEM_COUNT'
-            ? `目標名: ${params.goal.name}, 科目: ${params.goal.subjectName || '未指定'}, 合計問題数: ${params.goal.targetCount ?? 0}`
-            : `目標名: ${params.goal.name}, 目標内容: ${params.goal.targetText || params.goal.name}`;
+            ? params.t('goalSummaryProblem', {
+                goalName: params.goal.name,
+                subjectName: params.goal.subjectName || params.t('unspecified'),
+                targetCount: params.goal.targetCount ?? 0,
+            })
+            : params.t('goalSummaryCustom', {
+                goalName: params.goal.name,
+                targetText: params.goal.targetText || params.goal.name,
+            });
 
         const prompt = [
-            '学習目標のマイルストーン案を作成してください。',
-            '必ず指定日付のみを返してください。',
-            `対象日付: ${dateKeysText}`,
-            `目標情報: ${goalSummary}`,
-            'JSON配列で返してください。各要素は { "dateKey": "YYYY-MM-DD", "targetCount": number|null, "targetText": string|null }。',
-            'targetTextは短く具体的にしてください。',
+            params.t('promptCreate'),
+            params.t('promptDatesOnly'),
+            params.t('promptTargetDates', { dateKeys: dateKeysText }),
+            params.t('promptGoalInfo', { goalSummary }),
+            params.t('promptJson'),
+            params.t('promptShortText'),
         ].join('\n');
 
         const response = await ai.models.generateContent({
@@ -245,9 +281,10 @@ async function buildDraftWithGemini(params: {
 }
 
 export async function updateStudentProfile(userId: string, formData: FormData) {
+    const t = await getTranslations('TeacherStudentActions');
     const session = await getSession();
     if (!isTeacherOrAdmin(session)) {
-        return { error: '権限がありません' };
+        return { error: t('permissionDenied') };
     }
 
     // SECURITY: Teachers can only edit students in their assigned classroom (IDOR protection)
@@ -255,7 +292,7 @@ export async function updateStudentProfile(userId: string, formData: FormData) {
         const accessError = await ensureTeacherCanAccessStudent(
             session.userId,
             userId,
-            '担当教室外の生徒は編集できません'
+            t('outOfScopeEdit')
         );
         if (accessError) {
             return { error: accessError };
@@ -296,14 +333,15 @@ export async function updateStudentProfile(userId: string, formData: FormData) {
         return { success: true };
     } catch (e) {
         console.error(e);
-        return { error: 'プロフィールの更新に失敗しました' };
+        return { error: t('profileUpdateFailed') };
     }
 }
 
 export async function addGuidanceRecord(userId: string, formData: FormData) {
+    const t = await getTranslations('TeacherStudentActions');
     const session = await getSession();
     if (!isTeacherOrAdmin(session)) {
-        return { error: '権限がありません' };
+        return { error: t('permissionDenied') };
     }
 
     const content = formData.get('content') as string;
@@ -311,7 +349,7 @@ export async function addGuidanceRecord(userId: string, formData: FormData) {
     const dateStr = formData.get('date') as string;
 
     if (!content || !type || !dateStr) {
-        return { error: '必須項目が入力されていません' };
+        return { error: t('requiredFieldsMissing') };
     }
 
     // SECURITY: Verify student is in teacher's classroom
@@ -319,7 +357,7 @@ export async function addGuidanceRecord(userId: string, formData: FormData) {
         const accessError = await ensureTeacherCanAccessStudent(
             session.userId,
             userId,
-            '担当教室外の生徒です'
+            t('outOfScopeStudent')
         );
         if (accessError) {
             return { error: accessError };
@@ -342,14 +380,15 @@ export async function addGuidanceRecord(userId: string, formData: FormData) {
         return { success: true };
     } catch (e) {
         console.error(e);
-        return { error: '記録の作成に失敗しました' };
+        return { error: t('guidanceCreateFailed') };
     }
 }
 
 export async function deleteGuidanceRecord(recordId: string, studentId: string) {
+    const t = await getTranslations('TeacherStudentActions');
     const session = await getSession();
     if (!isTeacherOrAdmin(session)) {
-        return { error: '権限がありません' };
+        return { error: t('permissionDenied') };
     }
 
     try {
@@ -357,7 +396,7 @@ export async function deleteGuidanceRecord(recordId: string, studentId: string) 
         if (session.role !== 'ADMIN') {
             const record = await prisma.guidanceRecord.findUnique({ where: { id: recordId } });
             if (!record || record.teacherId !== session.userId) {
-                return { error: '削除権限がありません' };
+                return { error: t('deletePermissionDenied') };
             }
         }
 
@@ -369,24 +408,25 @@ export async function deleteGuidanceRecord(recordId: string, studentId: string) 
         return { success: true };
     } catch (e) {
         console.error(e);
-        return { error: '記録の削除に失敗しました' };
+        return { error: t('guidanceDeleteFailed') };
     }
 }
 
 export async function saveStudentGoalsAction(userId: string, input: unknown) {
+    const t = await getTranslations('TeacherStudentActions');
     const session = await getSession();
     if (!isTeacherOrAdmin(session)) {
-        return { error: '権限がありません' };
+        return { error: t('permissionDenied') };
     }
 
     if (session.role === 'TEACHER' || session.role === 'HEAD_TEACHER') {
-        const accessError = await ensureTeacherCanAccessStudent(session.userId, userId, '担当教室外の生徒は編集できません');
+        const accessError = await ensureTeacherCanAccessStudent(session.userId, userId, t('outOfScopeEdit'));
         if (accessError) return { error: accessError };
     }
 
-    const parsed = saveStudentGoalsSchema.safeParse(input);
+    const parsed = createSaveStudentGoalsSchema(t).safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.errors[0]?.message ?? '入力値が不正です' };
+        return { error: parsed.error.errors[0]?.message ?? t('invalidInput') };
     }
 
     const safeTimeZone = normalizeTimeZone(parsed.data.timeZone);
@@ -408,7 +448,7 @@ export async function saveStudentGoalsAction(userId: string, input: unknown) {
     });
 
     if (activeSubmittedGoals.length + existingActiveOtherCount > MAX_ACTIVE_GOALS) {
-        return { error: `有効目標は最大${MAX_ACTIVE_GOALS}件までです` };
+        return { error: t('maxActiveGoals', { count: MAX_ACTIVE_GOALS }) };
     }
 
     const activeCustomNames = activeSubmittedGoals
@@ -416,7 +456,7 @@ export async function saveStudentGoalsAction(userId: string, input: unknown) {
         .map((goal) => goal.name.trim().toLowerCase());
     const customNameSet = new Set(activeCustomNames);
     if (customNameSet.size !== activeCustomNames.length) {
-        return { error: '任意目標名が重複しています' };
+        return { error: t('duplicateCustomGoalName') };
     }
 
     const existingCustomNames = await prisma.studentGoal.findMany({
@@ -432,20 +472,20 @@ export async function saveStudentGoalsAction(userId: string, input: unknown) {
     const existingCustomNameSet = new Set(existingCustomNames.map((goal) => goal.name.trim().toLowerCase()));
     for (const name of activeCustomNames) {
         if (existingCustomNameSet.has(name)) {
-            return { error: '任意目標名が重複しています' };
+            return { error: t('duplicateCustomGoalName') };
         }
     }
 
     for (const goal of goals) {
         if (goal.type === 'PROBLEM_COUNT' && !goal.subjectId) {
-            return { error: '問題数目標には科目の選択が必要です' };
+            return { error: t('subjectRequiredForProblemGoal') };
         }
         const milestoneDateKeys = goal.milestones.map((m) => m.dateKey);
         if (new Set(milestoneDateKeys).size !== milestoneDateKeys.length) {
-            return { error: '同一目標内で日付が重複しています' };
+            return { error: t('duplicateMilestoneDates') };
         }
         if (!isValidDateKey(goal.dueDateKey)) {
-            return { error: '期限日付の形式が不正です' };
+            return { error: t('dueDateInvalid') };
         }
     }
 
@@ -509,24 +549,25 @@ export async function saveStudentGoalsAction(userId: string, input: unknown) {
         return { success: true };
     } catch (error) {
         console.error('[saveStudentGoalsAction] failed:', error);
-        return { error: '目標の保存に失敗しました' };
+        return { error: t('goalSaveFailed') };
     }
 }
 
 export async function updateStudentGoalDayAction(userId: string, input: unknown) {
+    const t = await getTranslations('TeacherStudentActions');
     const session = await getSession();
     if (!isTeacherOrAdmin(session)) {
-        return { error: '権限がありません' };
+        return { error: t('permissionDenied') };
     }
 
     if (session.role === 'TEACHER' || session.role === 'HEAD_TEACHER') {
-        const accessError = await ensureTeacherCanAccessStudent(session.userId, userId, '担当教室外の生徒は編集できません');
+        const accessError = await ensureTeacherCanAccessStudent(session.userId, userId, t('outOfScopeEdit'));
         if (accessError) return { error: accessError };
     }
 
-    const parsed = updateStudentGoalDaySchema.safeParse(input);
+    const parsed = createUpdateStudentGoalDaySchema(t).safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.errors[0]?.message ?? '入力値が不正です' };
+        return { error: parsed.error.errors[0]?.message ?? t('invalidInput') };
     }
 
     const { dateKey, entries } = parsed.data;
@@ -544,7 +585,7 @@ export async function updateStudentGoalDayAction(userId: string, input: unknown)
         const goalIdSet = new Set(goals.map((goal) => goal.id));
         for (const entry of entries) {
             if (!goalIdSet.has(entry.goalId)) {
-                return { error: '更新対象に無効な目標が含まれています' };
+                return { error: t('invalidGoalUpdateTarget') };
             }
         }
 
@@ -590,19 +631,20 @@ export async function updateStudentGoalDayAction(userId: string, input: unknown)
         return { success: true };
     } catch (error) {
         console.error('[updateStudentGoalDayAction] failed:', error);
-        return { error: '日次目標の更新に失敗しました' };
+        return { error: t('dailyGoalUpdateFailed') };
     }
 }
 
 export async function renameStudentGoalAction(goalId: string, newName: string) {
+    const t = await getTranslations('TeacherStudentActions');
     const session = await getSession();
     if (!isTeacherOrAdmin(session)) {
-        return { error: '権限がありません' };
+        return { error: t('permissionDenied') };
     }
 
     const normalizedName = newName.trim();
     if (!normalizedName) {
-        return { error: '目標名を入力してください' };
+        return { error: t('goalNameInputRequired') };
     }
 
     try {
@@ -611,11 +653,11 @@ export async function renameStudentGoalAction(goalId: string, newName: string) {
             select: { id: true, studentId: true, type: true, deletedAt: true },
         });
         if (!goal || goal.deletedAt) {
-            return { error: '目標が見つかりません' };
+            return { error: t('goalNotFound') };
         }
 
         if (session.role === 'TEACHER' || session.role === 'HEAD_TEACHER') {
-            const accessError = await ensureTeacherCanAccessStudent(session.userId, goal.studentId, '担当教室外の生徒は編集できません');
+            const accessError = await ensureTeacherCanAccessStudent(session.userId, goal.studentId, t('outOfScopeEdit'));
             if (accessError) return { error: accessError };
         }
 
@@ -631,7 +673,7 @@ export async function renameStudentGoalAction(goalId: string, newName: string) {
                 select: { id: true },
             });
             if (duplicate) {
-                return { error: '同名の目標がすでに存在します' };
+                return { error: t('duplicateGoalName') };
             }
         }
 
@@ -649,14 +691,15 @@ export async function renameStudentGoalAction(goalId: string, newName: string) {
         return { success: true };
     } catch (error) {
         console.error('[renameStudentGoalAction] failed:', error);
-        return { error: '目標名の更新に失敗しました' };
+        return { error: t('goalNameUpdateFailed') };
     }
 }
 
 export async function deleteStudentGoalAction(goalId: string) {
+    const t = await getTranslations('TeacherStudentActions');
     const session = await getSession();
     if (!isTeacherOrAdmin(session)) {
-        return { error: '権限がありません' };
+        return { error: t('permissionDenied') };
     }
 
     try {
@@ -666,11 +709,11 @@ export async function deleteStudentGoalAction(goalId: string) {
         });
 
         if (!goal || goal.deletedAt) {
-            return { error: '目標が見つかりません' };
+            return { error: t('goalNotFound') };
         }
 
         if (session.role === 'TEACHER' || session.role === 'HEAD_TEACHER') {
-            const accessError = await ensureTeacherCanAccessStudent(session.userId, goal.studentId, '担当教室外の生徒は編集できません');
+            const accessError = await ensureTeacherCanAccessStudent(session.userId, goal.studentId, t('outOfScopeEdit'));
             if (accessError) return { error: accessError };
         }
 
@@ -688,24 +731,25 @@ export async function deleteStudentGoalAction(goalId: string) {
         return { success: true };
     } catch (error) {
         console.error('[deleteStudentGoalAction] failed:', error);
-        return { error: '目標削除に失敗しました' };
+        return { error: t('goalDeleteFailed') };
     }
 }
 
 export async function generateStudentGoalDraftAction(userId: string, input: unknown) {
+    const t = await getTranslations('TeacherStudentActions');
     const session = await getSession();
     if (!isTeacherOrAdmin(session)) {
-        return { error: '権限がありません' };
+        return { error: t('permissionDenied') };
     }
 
     if (session.role === 'TEACHER' || session.role === 'HEAD_TEACHER') {
-        const accessError = await ensureTeacherCanAccessStudent(session.userId, userId, '担当教室外の生徒は編集できません');
+        const accessError = await ensureTeacherCanAccessStudent(session.userId, userId, t('outOfScopeEdit'));
         if (accessError) return { error: accessError };
     }
 
-    const parsed = generateDraftSchema.safeParse(input);
+    const parsed = createGenerateDraftSchema(t).safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.errors[0]?.message ?? '入力値が不正です' };
+        return { error: parsed.error.errors[0]?.message ?? t('invalidInput') };
     }
 
     const safeTimeZone = normalizeTimeZone(parsed.data.timeZone);
@@ -713,12 +757,12 @@ export async function generateStudentGoalDraftAction(userId: string, input: unkn
     const { goal, granularity } = parsed.data;
 
     if (goal.dueDateKey < todayKey) {
-        return { error: '期限日は今日以降を選択してください' };
+        return { error: t('dueDateMustBeTodayOrFuture') };
     }
 
     const milestoneKeys = buildMilestoneKeys(todayKey, goal.dueDateKey, granularity);
-    const aiDraft = await buildDraftWithGemini({ milestoneKeys, goal });
-    const fallbackDraft = buildFallbackDraft({ milestoneKeys, goal });
+    const aiDraft = await buildDraftWithGemini({ milestoneKeys, goal, t });
+    const fallbackDraft = buildFallbackDraft({ milestoneKeys, goal, t });
     const draft = aiDraft ?? fallbackDraft;
 
     return { success: true, data: draft };
