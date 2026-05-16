@@ -51,11 +51,20 @@ async function getSessionFromBearer(
             typeof appMeta.name === 'string'
                 ? appMeta.name
                 : (typeof userMeta.name === 'string' ? userMeta.name : '');
+        const allowedPackIds = Array.isArray(appMeta.allowedPackIds) && (appMeta.allowedPackIds as unknown[]).length > 0
+            ? (appMeta.allowedPackIds as unknown[]).filter((p): p is string => typeof p === 'string')
+            : ['jp-juken'];
+        const defaultPackId =
+            typeof appMeta.defaultPackId === 'string' && appMeta.defaultPackId.length > 0
+                ? appMeta.defaultPackId
+                : allowedPackIds[0];
 
         return {
             userId,
             role,
             name,
+            defaultPackId,
+            allowedPackIds,
         };
     } catch {
         return null;

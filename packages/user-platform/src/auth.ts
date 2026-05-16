@@ -6,6 +6,8 @@ export type SessionPayload = {
     userId: string;
     role: string;
     name: string;
+    defaultPackId: string;
+    allowedPackIds: string[];
 };
 
 // Deprecated functions (encrypt, decrypt, login) removed
@@ -29,10 +31,19 @@ export const getSession = cache(async (): Promise<SessionPayload | null> => {
         const appMeta = user.app_metadata || {};
         const userMeta = user.user_metadata || {}; // Kept for 'name' if allowed
 
+        const allowedPackIds = Array.isArray(appMeta.allowedPackIds) && appMeta.allowedPackIds.length > 0
+            ? appMeta.allowedPackIds.filter((p: unknown): p is string => typeof p === 'string')
+            : ['jp-juken'];
+        const defaultPackId = typeof appMeta.defaultPackId === 'string' && appMeta.defaultPackId.length > 0
+            ? appMeta.defaultPackId
+            : allowedPackIds[0];
+
         return {
             userId: appMeta.prismaUserId || user.id, // removed userMeta.prismaUserId
             role: appMeta.role || 'STUDENT',         // removed userMeta.role
             name: appMeta.name || userMeta.name || '',
+            defaultPackId,
+            allowedPackIds,
         };
     } catch {
         return null;

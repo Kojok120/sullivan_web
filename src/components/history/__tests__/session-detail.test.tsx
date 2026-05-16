@@ -232,6 +232,8 @@ describe('SessionDetail', () => {
             userId: 'user1',
             role: 'STUDENT',
             name: '生徒1',
+            defaultPackId: 'jp-juken',
+            allowedPackIds: ['jp-juken'],
         })
         vi.mocked(prisma.user.findUnique).mockResolvedValue({
             classroom: {
@@ -528,6 +530,8 @@ describe('SessionDetail', () => {
                 userId: 'other-user',
                 role: 'STUDENT',
                 name: '別の生徒',
+                defaultPackId: 'jp-juken',
+                allowedPackIds: ['jp-juken'],
             })
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
