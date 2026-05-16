@@ -4,16 +4,18 @@ import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 import { ClassroomPlan } from '@prisma/client';
+import { getTranslations } from 'next-intl/server';
 import { isTeacherOrAdminRole } from '@/lib/authorization';
 
 export async function getClassrooms(query?: string) {
+    const t = await getTranslations('AdminClassroomActions');
     const session = await getCurrentUser();
     if (!session) {
-        throw new Error('Unauthorized');
+        throw new Error(t('unauthorized'));
     }
     // 講師系ユーザーと管理者は教室一覧を閲覧可能
     if (!isTeacherOrAdminRole(session.role)) {
-        throw new Error('Forbidden');
+        throw new Error(t('forbidden'));
     }
 
     const { fetchClassrooms } = await import('@/lib/classroom-service');
@@ -26,10 +28,11 @@ export async function getClassrooms(query?: string) {
 }
 
 export async function getClassroom(id: string) {
+    const t = await getTranslations('AdminClassroomActions');
     const session = await getCurrentUser();
-    if (!session) throw new Error('Unauthorized');
+    if (!session) throw new Error(t('unauthorized'));
     if (!isTeacherOrAdminRole(session.role)) {
-        throw new Error('Forbidden');
+        throw new Error(t('forbidden'));
     }
 
     return await prisma.classroom.findUnique({
@@ -43,9 +46,10 @@ export async function getClassroom(id: string) {
 }
 
 export async function createClassroom(formData: FormData) {
+    const t = await getTranslations('AdminClassroomActions');
     const session = await getCurrentUser();
     if (!session || session.role !== 'ADMIN') {
-        return { error: 'Unauthorized' };
+        return { error: t('unauthorized') };
     }
 
     const name = formData.get('name') as string;
@@ -53,7 +57,7 @@ export async function createClassroom(formData: FormData) {
     const planRaw = formData.get('plan');
 
     if (!name || name.trim() === '') {
-        return { error: '教室名は必須です' };
+        return { error: t('nameRequired') };
     }
 
     const plan = planRaw === 'PREMIUM' ? ClassroomPlan.PREMIUM : ClassroomPlan.STANDARD;
@@ -74,16 +78,17 @@ export async function createClassroom(formData: FormData) {
         return { success: true };
     } catch (error) {
         console.error('Failed to create classroom:', error);
-        return { error: '教室の作成に失敗しました。既に存在する可能性があります。' };
+        return { error: t('createFailed') };
     }
 }
 
 // 未使用だった updateClassroom は削除済み（updateClassroomGroups を利用）
 
 export async function deleteClassroom(classroomId: string) {
+    const t = await getTranslations('AdminClassroomActions');
     const session = await getCurrentUser();
     if (!session || session.role !== 'ADMIN') {
-        return { error: 'Unauthorized' };
+        return { error: t('unauthorized') };
     }
 
     try {
@@ -93,7 +98,7 @@ export async function deleteClassroom(classroomId: string) {
         });
 
         if (usersCount > 0) {
-            return { error: 'この教室には生徒が割り当てられているため削除できません' };
+            return { error: t('deleteHasStudents') };
         }
 
         await prisma.classroom.delete({
@@ -103,14 +108,15 @@ export async function deleteClassroom(classroomId: string) {
         return { success: true };
     } catch (error) {
         console.error('Failed to delete classroom:', error);
-        return { error: '教室の削除に失敗しました' };
+        return { error: t('deleteFailed') };
     }
 }
 
 export async function updateClassroomGroups(id: string, groups: string[]) {
+    const t = await getTranslations('AdminClassroomActions');
     const session = await getCurrentUser();
     if (!session || session.role !== 'ADMIN') {
-        return { error: 'Unauthorized' };
+        return { error: t('unauthorized') };
     }
 
     try {
@@ -122,14 +128,15 @@ export async function updateClassroomGroups(id: string, groups: string[]) {
         return { success: true };
     } catch (error) {
         console.error('Failed to update classroom groups:', error);
-        return { error: 'グループの更新に失敗しました' };
+        return { error: t('groupsUpdateFailed') };
     }
 }
 
 export async function updateClassroomPlan(id: string, plan: ClassroomPlan) {
+    const t = await getTranslations('AdminClassroomActions');
     const session = await getCurrentUser();
     if (!session || session.role !== 'ADMIN') {
-        return { error: 'Unauthorized' };
+        return { error: t('unauthorized') };
     }
 
     try {
@@ -142,6 +149,6 @@ export async function updateClassroomPlan(id: string, plan: ClassroomPlan) {
         return { success: true };
     } catch (error) {
         console.error('Failed to update classroom plan:', error);
-        return { error: 'プランの更新に失敗しました' };
+        return { error: t('planUpdateFailed') };
     }
 }

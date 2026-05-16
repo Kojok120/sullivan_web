@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -32,6 +33,7 @@ interface ClassroomListProps {
 }
 
 export function ClassroomList({ initialClassrooms, searchQuery }: ClassroomListProps) {
+    const t = useTranslations('AdminClassroomList');
     const router = useRouter();
     const pathname = usePathname();
     const [isCreating, setIsCreating] = useState(false);
@@ -46,20 +48,20 @@ export function ClassroomList({ initialClassrooms, searchQuery }: ClassroomListP
         if (result.error) {
             toast.error(result.error);
         } else {
-            toast.success('教室を追加しました');
+            toast.success(t('createSuccess'));
             setIsDialogOpen(false);
             router.refresh();
         }
     }
 
     async function handleDelete(id: string) {
-        if (!confirm('本当にこの教室を削除しますか？')) return;
+        if (!confirm(t('deleteConfirm'))) return;
 
         const result = await deleteClassroom(id);
         if (result.error) {
             toast.error(result.error);
         } else {
-            toast.success('教室を削除しました');
+            toast.success(t('deleteSuccess'));
             router.refresh();
         }
     }
@@ -81,13 +83,13 @@ export function ClassroomList({ initialClassrooms, searchQuery }: ClassroomListP
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
                             type="search"
-                            placeholder="教室名を検索..."
+                            placeholder={t('searchPlaceholder')}
                             className="pl-8"
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
                         />
                     </div>
-                    <Button type="submit" className="min-h-11 sm:min-h-10">検索</Button>
+                    <Button type="submit" className="min-h-11 sm:min-h-10">{t('search')}</Button>
                 </form>
             </div>
 
@@ -97,10 +99,10 @@ export function ClassroomList({ initialClassrooms, searchQuery }: ClassroomListP
                         <div className="space-y-1">
                             <CardTitle className="flex items-center gap-2">
                                 <School className="h-5 w-5" />
-                                教室一覧
+                                {t('title')}
                             </CardTitle>
                             <CardDescription>
-                                登録済みの教室一覧です。クリックして詳細を確認できます。
+                                {t('description')}
                             </CardDescription>
                         </div>
                         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -108,29 +110,29 @@ export function ClassroomList({ initialClassrooms, searchQuery }: ClassroomListP
                                 <Button size="sm" className="h-11 gap-1 sm:h-8">
                                     <Plus className="h-3.5 w-3.5" />
                                     <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                                        追加
+                                        {t('add')}
                                     </span>
                                 </Button>
                             </DialogTrigger>
                             <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
                                 <DialogHeader>
-                                    <DialogTitle>新規教室追加</DialogTitle>
+                                    <DialogTitle>{t('dialogTitle')}</DialogTitle>
                                     <DialogDescription>
-                                        新しい教室を追加します。
+                                        {t('dialogDescription')}
                                     </DialogDescription>
                                 </DialogHeader>
                                 <form action={handleCreate} className="space-y-4">
                                     <div className="grid gap-2">
-                                        <Label htmlFor="name">教室名</Label>
+                                        <Label htmlFor="name">{t('nameLabel')}</Label>
                                         <Input
                                             id="name"
                                             name="name"
-                                            placeholder="例: 足立校"
+                                            placeholder={t('namePlaceholder')}
                                             required
                                         />
                                     </div>
                                     <div className="grid gap-2">
-                                        <Label>プラン</Label>
+                                        <Label>{t('planLabel')}</Label>
                                         <div className="space-y-2 rounded-md border p-3">
                                             <label className="flex items-center gap-2 text-sm">
                                                 <input
@@ -139,7 +141,7 @@ export function ClassroomList({ initialClassrooms, searchQuery }: ClassroomListP
                                                     value="STANDARD"
                                                     defaultChecked
                                                 />
-                                                <span>スタンダード</span>
+                                                <span>{t('standardPlan')}</span>
                                             </label>
                                             <label className="flex items-center gap-2 text-sm">
                                                 <input
@@ -147,13 +149,13 @@ export function ClassroomList({ initialClassrooms, searchQuery }: ClassroomListP
                                                     name="plan"
                                                     value="PREMIUM"
                                                 />
-                                                <span>プレミアム</span>
+                                                <span>{t('premiumPlan')}</span>
                                             </label>
                                         </div>
                                     </div>
                                     <DialogFooter>
                                         <Button type="submit" disabled={isCreating} className="min-h-11 sm:min-h-10">
-                                            {isCreating ? '追加中...' : '追加'}
+                                            {isCreating ? t('adding') : t('add')}
                                         </Button>
                                     </DialogFooter>
                                 </form>
@@ -163,7 +165,7 @@ export function ClassroomList({ initialClassrooms, searchQuery }: ClassroomListP
                     <CardContent>
                         {initialClassrooms.length === 0 ? (
                             <div className="text-center py-4 text-muted-foreground">
-                                教室が見つかりません
+                                {t('empty')}
                             </div>
                         ) : (
                             <ul className="space-y-4">
@@ -176,7 +178,7 @@ export function ClassroomList({ initialClassrooms, searchQuery }: ClassroomListP
                                             <div className="font-medium hover:underline flex items-center gap-2">
                                                 {classroom.name}
                                                 <Badge variant={classroom.plan === 'PREMIUM' ? 'default' : 'secondary'}>
-                                                    {classroom.plan === 'PREMIUM' ? 'プレミアム' : 'スタンダード'}
+                                                    {classroom.plan === 'PREMIUM' ? t('premiumPlan') : t('standardPlan')}
                                                 </Badge>
                                             </div>
                                             <div className="text-sm text-muted-foreground mt-1">
@@ -189,7 +191,7 @@ export function ClassroomList({ initialClassrooms, searchQuery }: ClassroomListP
                                                         ))}
                                                     </div>
                                                 ) : (
-                                                    <span className="text-muted-foreground/50">グループなし</span>
+                                                    <span className="text-muted-foreground/50">{t('noGroups')}</span>
                                                 )}
                                             </div>
                                         </Link>
@@ -201,7 +203,7 @@ export function ClassroomList({ initialClassrooms, searchQuery }: ClassroomListP
                                                 onClick={() => handleDelete(classroom.id)}
                                             >
                                                 <Trash2 className="h-4 w-4" />
-                                                <span className="ml-1 sm:ml-0 sm:sr-only">削除</span>
+                                                <span className="ml-1 sm:ml-0 sm:sr-only">{t('delete')}</span>
                                             </Button>
                                         </div>
                                     </li>
