@@ -926,5 +926,29 @@
     "nameRequired": "名前を入力してください",
     "classroomRequired": "この役割では所属教室を選択してください",
     "userCreateFailed": "ユーザー作成に失敗しました。もう一度お試しください。"
+  },
+  "AdminAnalyticsPage": {
+    "title": "学習状況分析",
+    "studentListTitle": "生徒一覧"
+  },
+  "AdminStudentAnalyticsPage": {
+    "studentNotFound": "生徒が見つかりません",
+    "title": "{name} の学習状況",
+    "noGroup": "グループなし",
+    "totalAnswers": "総回答数",
+    "accuracy": "正答率",
+    "currentStreak": "連続学習",
+    "streakDays": "{days}日",
+    "activityTitle": "学習アクティビティ (過去30日)",
+    "subjectProgressTitle": "教科別進捗",
+    "noLearningData": "学習データがありません",
+    "recentHistoryTitle": "最近の学習履歴 (最新50件)",
+    "answerLabel": "回答:",
+    "answerEmpty": "回答: -",
+    "dateHeader": "日時",
+    "subjectUnitHeader": "科目/単元",
+    "problemHeader": "問題",
+    "evaluationHeader": "評価",
+    "aiGradingHeader": "AI採点"
   }
 }
