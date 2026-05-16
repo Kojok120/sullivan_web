@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useTranslations } from 'next-intl';
 import {
     CalendarClock,
     Clock3,
@@ -94,6 +95,8 @@ type DraftDialogState = {
     selectedDateKeys: string[];
 };
 
+type TeacherGoalManagementTranslator = ReturnType<typeof useTranslations>;
+
 const MAX_ACTIVE_GOALS = 10;
 
 function upsertMilestone(milestones: EditableMilestone[], nextMilestone: EditableMilestone): EditableMilestone[] {
@@ -133,18 +136,20 @@ function createTemporaryGoal(params: {
     type: GoalType;
     todayKey: string;
     subjects: SubjectOption[];
+    t: TeacherGoalManagementTranslator;
 }): EditableGoal {
     const defaultSubject = params.subjects[0] ?? null;
     const isProblem = params.type === 'PROBLEM_COUNT';
     const dueDateKey = addDaysToDateKey(params.todayKey, 7);
+    const subjectName = defaultSubject?.name ?? params.t('subjectFallback');
 
     return {
         id: `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         persisted: false,
         type: params.type,
         name: isProblem
-            ? `${defaultSubject?.name ?? '科目'}の問題数`
-            : '任意目標',
+            ? params.t('problemCountGoalName', { subject: subjectName })
+            : params.t('customGoalDefaultName'),
         dueDateKey,
         subjectId: isProblem ? defaultSubject?.id ?? null : null,
         subjectName: isProblem ? defaultSubject?.name ?? null : null,
@@ -155,8 +160,8 @@ function createTemporaryGoal(params: {
     };
 }
 
-function getGoalTypeLabel(type: GoalType): string {
-    return type === 'PROBLEM_COUNT' ? '問題数目標' : '任意目標';
+function getGoalTypeLabel(t: TeacherGoalManagementTranslator, type: GoalType): string {
+    return type === 'PROBLEM_COUNT' ? t('goalType.problemCount') : t('goalType.custom');
 }
 
 function getRemainingDays(baseDateKey: string, targetDateKey: string): number {
@@ -166,6 +171,7 @@ function getRemainingDays(baseDateKey: string, targetDateKey: string): number {
 }
 
 export function TeacherGoalManagementCard({ studentId, subjects, initialData }: TeacherGoalManagementCardProps) {
+    const t = useTranslations('TeacherGoalManagementCard');
     const [timeZone, setTimeZone] = useState(initialData.timeZone);
     const [data, setData] = useState(initialData);
     const [goals, setGoals] = useState<EditableGoal[]>(() => initialData.activeGoals.map(buildEditableGoal));
@@ -219,7 +225,7 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
         });
 
         if (!result.success || !result.data) {
-            toast.error(result.error ?? '目標データの再取得に失敗しました');
+            toast.error(result.error ?? t('refreshFailed'));
             return;
         }
 
@@ -294,7 +300,7 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
 
     async function handleGenerateDraft(goal: EditableGoal) {
         if (goal.dueDateKey < data.todayKey) {
-            toast.error('期限日は今日以降を選択してください');
+            toast.error(t('dueDateMustBeFuture'));
             return;
         }
 
@@ -313,7 +319,7 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
         });
 
         if (!result.success || !result.data) {
-            toast.error(result.error ?? '下書き生成に失敗しました');
+            toast.error(result.error ?? t('draftGenerateFailed'));
             return;
         }
 
@@ -356,11 +362,11 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
         setSavingAll(false);
 
         if (!result.success) {
-            toast.error(result.error ?? '目標保存に失敗しました');
+            toast.error(result.error ?? t('saveGoalsFailed'));
             return;
         }
 
-        toast.success('目標を保存しました');
+        toast.success(t('saveGoalsSuccess'));
         await refreshGoalData(timeZone);
     }
 
@@ -387,11 +393,11 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
         setSavingDay(false);
 
         if (!result.success) {
-            toast.error(result.error ?? '日次目標の保存に失敗しました');
+            toast.error(result.error ?? t('saveDayFailed'));
             return;
         }
 
-        toast.success('日次目標を保存しました');
+        toast.success(t('saveDaySuccess'));
         await refreshGoalData(timeZone);
     }
 
@@ -403,11 +409,11 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
 
         const result = await renameStudentGoalAction(goal.id, goal.name);
         if (!result.success) {
-            toast.error(result.error ?? '目標名の更新に失敗しました');
+            toast.error(result.error ?? t('renameFailed'));
             return;
         }
 
-        toast.success('目標名を更新しました');
+        toast.success(t('renameSuccess'));
         await refreshGoalData(timeZone);
     }
 
@@ -415,7 +421,7 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
         const goal = goals.find((item) => item.id === goalId);
         if (!goal) return;
 
-        if (!confirm('この目標を削除しますか？')) return;
+        if (!confirm(t('deleteConfirm'))) return;
 
         if (!goal.persisted) {
             setGoals((prev) => prev.filter((item) => item.id !== goalId));
@@ -424,11 +430,11 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
 
         const result = await deleteStudentGoalAction(goal.id);
         if (!result.success) {
-            toast.error(result.error ?? '目標削除に失敗しました');
+            toast.error(result.error ?? t('deleteFailed'));
             return;
         }
 
-        toast.success('目標を削除しました');
+        toast.success(t('deleteSuccess'));
         await refreshGoalData(timeZone);
     }
 
@@ -446,49 +452,49 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
                 <CardHeader className="pb-3">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
-                            <CardTitle className="text-base">目標管理ダッシュボード</CardTitle>
+                            <CardTitle className="text-base">{t('dashboardTitle')}</CardTitle>
                             <p className="mt-1 text-xs text-muted-foreground">
-                                目標設計と日次編集を分けて操作できます
+                                {t('dashboardDescription')}
                             </p>
                         </div>
                         <div className="flex flex-wrap items-center gap-2 text-xs">
                             <Badge variant="outline">TZ: {timeZone}</Badge>
-                            <Badge variant="outline">有効目標 {goals.length}/{MAX_ACTIVE_GOALS}</Badge>
-                            <Badge variant="outline">今日 {todayEntries.length}件</Badge>
+                            <Badge variant="outline">{t('activeGoalsBadge', { count: goals.length, max: MAX_ACTIVE_GOALS })}</Badge>
+                            <Badge variant="outline">{t('todayEntriesBadge', { count: todayEntries.length })}</Badge>
                         </div>
                     </div>
                 </CardHeader>
                 <CardContent>
                     {todayEntries.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">今日の目標は未設定です</p>
+                        <p className="text-sm text-muted-foreground">{t('todayEmpty')}</p>
                     ) : (
                         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                             {todayEntries.map((entry) => (
                                 <div key={`${entry.goalId}-${entry.dueDateKey}`} className="rounded-lg border border-primary/20 bg-background px-3 py-2 text-sm">
                                     <p className="font-semibold">{entry.subjectName || entry.goalName}</p>
                                     <p className="text-xs text-muted-foreground">
-                                        {entry.targetCount !== null ? `${entry.targetCount}問` : '-'}
+                                        {entry.targetCount !== null ? t('questionCount', { count: entry.targetCount }) : '-'}
                                         {entry.targetText ? ` / ${entry.targetText}` : ''}
                                     </p>
                                 </div>
                             ))}
                         </div>
                     )}
-                    {refreshing ? <p className="mt-2 text-xs text-muted-foreground">ブラウザTZに同期中...</p> : null}
+                    {refreshing ? <p className="mt-2 text-xs text-muted-foreground">{t('syncingBrowserTimeZone')}</p> : null}
                 </CardContent>
             </Card>
 
             <Tabs value={goalTabValue} onValueChange={(value) => setGoalTabValue(value as 'definition' | 'daily')} className="space-y-4">
                 <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="definition">1. 目標設計</TabsTrigger>
-                    <TabsTrigger value="daily">2. 日次編集</TabsTrigger>
+                    <TabsTrigger value="definition">{t('definitionTab')}</TabsTrigger>
+                    <TabsTrigger value="daily">{t('dailyTab')}</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="definition" className="space-y-4">
                     <Card>
                         <CardHeader className="pb-3">
                             <div className="flex flex-wrap items-center justify-between gap-2">
-                                <CardTitle className="text-base">目標一覧（期限・目標値・AI下書き）</CardTitle>
+                                <CardTitle className="text-base">{t('goalListTitle')}</CardTitle>
                                 <div className="flex flex-wrap gap-2">
                                     <Button
                                         type="button"
@@ -496,7 +502,7 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
                                         size="sm"
                                         onClick={() => {
                                             if (goals.length >= MAX_ACTIVE_GOALS) {
-                                                toast.error(`有効目標は最大${MAX_ACTIVE_GOALS}件です`);
+                                                toast.error(t('activeGoalsLimit', { max: MAX_ACTIVE_GOALS }));
                                                 return;
                                             }
                                             setGoals((prev) => [
@@ -505,12 +511,13 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
                                                     type: 'PROBLEM_COUNT',
                                                     todayKey: data.todayKey,
                                                     subjects,
+                                                    t,
                                                 }),
                                             ]);
                                         }}
                                     >
                                         <Plus className="mr-1 h-4 w-4" />
-                                        問題数目標を追加
+                                        {t('addProblemGoal')}
                                     </Button>
                                     <Button
                                         type="button"
@@ -518,7 +525,7 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
                                         size="sm"
                                         onClick={() => {
                                             if (goals.length >= MAX_ACTIVE_GOALS) {
-                                                toast.error(`有効目標は最大${MAX_ACTIVE_GOALS}件です`);
+                                                toast.error(t('activeGoalsLimit', { max: MAX_ACTIVE_GOALS }));
                                                 return;
                                             }
                                             setGoals((prev) => [
@@ -527,23 +534,24 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
                                                     type: 'CUSTOM',
                                                     todayKey: data.todayKey,
                                                     subjects,
+                                                    t,
                                                 }),
                                             ]);
                                         }}
                                     >
                                         <Plus className="mr-1 h-4 w-4" />
-                                        任意目標を追加
+                                        {t('addCustomGoal')}
                                     </Button>
                                     <Button type="button" size="sm" onClick={handleSaveGoals} disabled={savingAll}>
                                         <Save className="mr-1 h-4 w-4" />
-                                        {savingAll ? '保存中...' : '目標を保存'}
+                                        {savingAll ? t('saving') : t('saveGoalsButton')}
                                     </Button>
                                 </div>
                             </div>
                         </CardHeader>
                         <CardContent>
                             {goals.length === 0 ? (
-                                <p className="rounded-lg border border-dashed px-3 py-8 text-sm text-muted-foreground">有効な目標はありません</p>
+                                <p className="rounded-lg border border-dashed px-3 py-8 text-sm text-muted-foreground">{t('noActiveGoals')}</p>
                             ) : (
                                 <Accordion type="multiple" className="rounded-lg border">
                                     {goals.map((goal) => {
@@ -555,11 +563,11 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
                                                     <div className="min-w-0 flex-1">
                                                         <div className="flex flex-wrap items-center gap-2">
                                                             <span className="truncate text-sm font-semibold">{goal.name}</span>
-                                                            <Badge variant="outline" className="text-[11px]">{getGoalTypeLabel(goal.type)}</Badge>
-                                                            <Badge variant="outline" className="text-[11px]">{formatGoalDateKeyLabel(goal.dueDateKey, timeZone)}まで</Badge>
-                                                            <Badge variant="secondary" className="text-[11px]">残り{Math.max(0, remainingDays)}日</Badge>
+                                                            <Badge variant="outline" className="text-[11px]">{getGoalTypeLabel(t, goal.type)}</Badge>
+                                                            <Badge variant="outline" className="text-[11px]">{t('dueDateBadge', { date: formatGoalDateKeyLabel(goal.dueDateKey, timeZone) })}</Badge>
+                                                            <Badge variant="secondary" className="text-[11px]">{t('remainingDaysBadge', { days: Math.max(0, remainingDays) })}</Badge>
                                                             {!goal.persisted ? (
-                                                                <Badge className="text-[11px]" variant="secondary">未保存</Badge>
+                                                                <Badge className="text-[11px]" variant="secondary">{t('unsavedBadge')}</Badge>
                                                             ) : null}
                                                         </div>
                                                     </div>
@@ -567,7 +575,7 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
                                                 <AccordionContent className="space-y-4 pb-5">
                                                     <div className="grid gap-3 xl:grid-cols-12">
                                                         <div className="space-y-1.5 xl:col-span-5">
-                                                            <label className="text-xs text-muted-foreground">目標名</label>
+                                                            <label className="text-xs text-muted-foreground">{t('goalNameLabel')}</label>
                                                             <Input
                                                                 value={goal.name}
                                                                 onChange={(event) => {
@@ -578,7 +586,7 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
                                                         </div>
 
                                                         <div className="space-y-1.5 xl:col-span-3">
-                                                            <label className="text-xs text-muted-foreground">期限</label>
+                                                            <label className="text-xs text-muted-foreground">{t('dueDateLabel')}</label>
                                                             <Button
                                                                 type="button"
                                                                 variant="outline"
@@ -600,20 +608,20 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
                                                         </div>
 
                                                         <div className="space-y-1.5 xl:col-span-2">
-                                                            <label className="text-xs text-muted-foreground">種別</label>
-                                                            <Input value={getGoalTypeLabel(goal.type)} disabled />
+                                                            <label className="text-xs text-muted-foreground">{t('typeLabel')}</label>
+                                                            <Input value={getGoalTypeLabel(t, goal.type)} disabled />
                                                         </div>
 
                                                         <div className="flex items-end gap-2 xl:col-span-2">
                                                             {goal.persisted ? (
                                                                 <Button type="button" variant="outline" size="sm" onClick={() => handleRenameGoal(goal.id)}>
                                                                     <PencilLine className="mr-1 h-4 w-4" />
-                                                                    改名を即時反映
+                                                                    {t('renameNow')}
                                                                 </Button>
                                                             ) : null}
                                                             <Button type="button" variant="destructive" size="sm" onClick={() => handleDeleteGoal(goal.id)}>
                                                                 <Trash2 className="mr-1 h-4 w-4" />
-                                                                削除
+                                                                {t('deleteButton')}
                                                             </Button>
                                                         </div>
                                                     </div>
@@ -621,7 +629,7 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
                                                     {goal.type === 'PROBLEM_COUNT' ? (
                                                         <div className="grid gap-3 lg:grid-cols-2">
                                                             <div className="space-y-1.5">
-                                                                <label className="text-xs text-muted-foreground">科目</label>
+                                                                <label className="text-xs text-muted-foreground">{t('subjectLabel')}</label>
                                                                 <Select
                                                                     value={goal.subjectId ?? ''}
                                                                     onValueChange={(value) => {
@@ -630,12 +638,12 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
                                                                             ...current,
                                                                             subjectId: value,
                                                                             subjectName: selectedSubject?.name ?? null,
-                                                                            name: selectedSubject ? `${selectedSubject.name}の問題数` : current.name,
+                                                                            name: selectedSubject ? t('problemCountGoalName', { subject: selectedSubject.name }) : current.name,
                                                                         }));
                                                                     }}
                                                                 >
                                                                     <SelectTrigger>
-                                                                        <SelectValue placeholder="科目を選択" />
+                                                                        <SelectValue placeholder={t('subjectPlaceholder')} />
                                                                     </SelectTrigger>
                                                                     <SelectContent>
                                                                         {subjects.map((subject) => (
@@ -648,7 +656,7 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
                                                             </div>
 
                                                             <div className="space-y-1.5">
-                                                                <label className="text-xs text-muted-foreground">期限までの目安問題数</label>
+                                                                <label className="text-xs text-muted-foreground">{t('periodTargetCountLabel')}</label>
                                                                 <Input
                                                                     type="number"
                                                                     min={0}
@@ -665,7 +673,7 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
                                                         </div>
                                                     ) : (
                                                         <div className="space-y-1.5">
-                                                            <label className="text-xs text-muted-foreground">期限までの目標内容</label>
+                                                            <label className="text-xs text-muted-foreground">{t('periodTargetTextLabel')}</label>
                                                             <Textarea
                                                                 value={goal.periodTargetText}
                                                                 onChange={(event) => {
@@ -681,7 +689,7 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
 
                                                     <div className="rounded-lg border border-border/70 bg-muted/25 p-3">
                                                         <div className="flex flex-wrap items-center gap-2">
-                                                            <Badge variant="outline">AI下書き</Badge>
+                                                            <Badge variant="outline">{t('aiDraftBadge')}</Badge>
                                                             <Select
                                                                 value={goal.draftGranularity}
                                                                 onValueChange={(value) => {
@@ -695,18 +703,18 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
                                                                     <SelectValue />
                                                                 </SelectTrigger>
                                                                 <SelectContent>
-                                                                    <SelectItem value="HALF">半分</SelectItem>
-                                                                    <SelectItem value="WEEKLY">1週間ごと</SelectItem>
-                                                                    <SelectItem value="DAILY">毎日</SelectItem>
+                                                                    <SelectItem value="HALF">{t('granularity.half')}</SelectItem>
+                                                                    <SelectItem value="WEEKLY">{t('granularity.weekly')}</SelectItem>
+                                                                    <SelectItem value="DAILY">{t('granularity.daily')}</SelectItem>
                                                                 </SelectContent>
                                                             </Select>
                                                             <Button type="button" size="sm" onClick={() => handleGenerateDraft(goal)}>
                                                                 <Sparkles className="mr-1 h-4 w-4" />
-                                                                下書き生成
+                                                                {t('generateDraft')}
                                                             </Button>
                                                         </div>
                                                         <p className="mt-2 text-xs text-muted-foreground">
-                                                            下書きは未保存です。比較ダイアログで適用後に「目標を保存」を押してください。
+                                                            {t('draftNotice')}
                                                         </p>
                                                     </div>
                                                 </AccordionContent>
@@ -724,7 +732,7 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
                         <Card>
                             <CardHeader className="pb-3">
                                 <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <CardTitle className="text-base">日付タイムライン</CardTitle>
+                                    <CardTitle className="text-base">{t('timelineTitle')}</CardTitle>
                                     <Button
                                         type="button"
                                         variant="outline"
@@ -739,10 +747,10 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
                                         }}
                                     >
                                         <RefreshCcw className="mr-1 h-4 w-4" />
-                                        今日へ戻る
+                                        {t('backToToday')}
                                     </Button>
                                 </div>
-                                <p className="text-xs text-muted-foreground">過去半年〜未来半年を全日表示</p>
+                                <p className="text-xs text-muted-foreground">{t('timelineDescription')}</p>
                             </CardHeader>
                             <CardContent>
                                 <div ref={timelineRef} className="max-h-[600px] overflow-y-auto rounded-lg border border-border/70">
@@ -777,7 +785,7 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
                                                             {relativeLabel ? (
                                                                 <Badge variant="secondary" className="text-[10px]">{relativeLabel}</Badge>
                                                             ) : null}
-                                                            <Badge variant="outline" className="text-[10px]">{row.entries.length}件</Badge>
+                                                            <Badge variant="outline" className="text-[10px]">{t('entryCount', { count: row.entries.length })}</Badge>
                                                         </div>
                                                     </div>
                                                 </button>
@@ -792,9 +800,9 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
                             <CardHeader className="pb-3">
                                 <div className="flex flex-wrap items-center justify-between gap-2">
                                     <div>
-                                        <CardTitle className="text-base">{formatGoalDateKeyLabel(selectedDateKey, timeZone)} の目標編集</CardTitle>
+                                        <CardTitle className="text-base">{t('dateEditTitle', { date: formatGoalDateKeyLabel(selectedDateKey, timeZone) })}</CardTitle>
                                         <p className="mt-1 text-xs text-muted-foreground">
-                                            {selectedRelativeLabel ? `${selectedRelativeLabel}の編集` : '選択日の編集'}
+                                            {selectedRelativeLabel ? t('relativeDateEdit', { label: selectedRelativeLabel }) : t('selectedDateEdit')}
                                         </p>
                                     </div>
                                     <Button
@@ -804,19 +812,19 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
                                         disabled={savingDay || persistedGoals.length === 0}
                                     >
                                         <Save className="mr-1 h-4 w-4" />
-                                        {savingDay ? '保存中...' : 'この日を保存'}
+                                        {savingDay ? t('saving') : t('saveThisDay')}
                                     </Button>
                                 </div>
                                 <div className="flex flex-wrap items-center gap-2 text-xs">
-                                    <Badge variant="outline">目標数 {selectedDateStats.allCount}件</Badge>
-                                    <Badge variant="outline">問題数 {selectedDateStats.problemTotal}問</Badge>
-                                    <Badge variant="outline">任意目標 {selectedDateStats.customCount}件</Badge>
+                                    <Badge variant="outline">{t('selectedGoalCount', { count: selectedDateStats.allCount })}</Badge>
+                                    <Badge variant="outline">{t('selectedProblemTotal', { count: selectedDateStats.problemTotal })}</Badge>
+                                    <Badge variant="outline">{t('selectedCustomCount', { count: selectedDateStats.customCount })}</Badge>
                                 </div>
                             </CardHeader>
                             <CardContent className="space-y-3">
                                 {persistedGoals.length === 0 ? (
                                     <p className="rounded-lg border border-dashed px-3 py-6 text-sm text-muted-foreground">
-                                        先に「目標設計」タブで目標を保存すると、日次編集が可能になります。
+                                        {t('dailyRequiresSavedGoals')}
                                     </p>
                                 ) : (
                                     persistedGoals.map((goal) => {
@@ -827,10 +835,10 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
                                                 <div className="flex flex-wrap items-center justify-between gap-2">
                                                     <div className="flex items-center gap-2">
                                                         <span className="text-sm font-semibold">{goal.name}</span>
-                                                        <Badge variant="outline" className="text-[11px]">{getGoalTypeLabel(goal.type)}</Badge>
+                                                        <Badge variant="outline" className="text-[11px]">{getGoalTypeLabel(t, goal.type)}</Badge>
                                                     </div>
                                                     <Badge variant="secondary" className="text-[11px]">
-                                                        {formatGoalDateKeyLabel(goal.dueDateKey, timeZone)}まで
+                                                        {t('dueDateBadge', { date: formatGoalDateKeyLabel(goal.dueDateKey, timeZone) })}
                                                     </Badge>
                                                 </div>
 
@@ -838,7 +846,7 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
                                                     <div className="space-y-1">
                                                         <label className="flex items-center gap-1 text-xs text-muted-foreground">
                                                             <Target className="h-3.5 w-3.5" />
-                                                            問題数
+                                                            {t('dailyTargetCountLabel')}
                                                         </label>
                                                         <Input
                                                             type="number"
@@ -862,7 +870,7 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
                                                     <div className="space-y-1">
                                                         <label className="flex items-center gap-1 text-xs text-muted-foreground">
                                                             <Clock3 className="h-3.5 w-3.5" />
-                                                            内容
+                                                            {t('dailyTargetTextLabel')}
                                                         </label>
                                                         <Input
                                                             value={draft.targetText}
@@ -888,15 +896,15 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
                                 )}
 
                                 <div className="rounded-lg border border-border/70 bg-muted/25 p-3 text-sm">
-                                    <div className="mb-2 font-medium">現在DBに反映済みの値（表示専用）</div>
+                                    <div className="mb-2 font-medium">{t('currentDbValuesTitle')}</div>
                                     {selectedDateEntries.length === 0 ? (
-                                        <div className="text-muted-foreground">未設定</div>
+                                        <div className="text-muted-foreground">{t('unset')}</div>
                                     ) : (
                                         <div className="space-y-1">
                                             {selectedDateEntries.map((entry) => (
                                                 <div key={`${entry.goalId}-${selectedDateKey}`}>
                                                     <span className="font-medium">{entry.subjectName || entry.goalName}</span>
-                                                    {entry.targetCount !== null ? <span className="ml-2 text-muted-foreground">{entry.targetCount}問</span> : null}
+                                                    {entry.targetCount !== null ? <span className="ml-2 text-muted-foreground">{t('questionCount', { count: entry.targetCount })}</span> : null}
                                                     {entry.targetText ? <span className="ml-2 text-muted-foreground">{entry.targetText}</span> : null}
                                                 </div>
                                             ))}
@@ -912,9 +920,9 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
             <Dialog open={!!draftDialog} onOpenChange={(open) => !open && setDraftDialog(null)}>
                 <DialogContent className="max-h-[82vh] overflow-y-auto sm:max-w-3xl">
                     <DialogHeader>
-                        <DialogTitle>AI下書き比較</DialogTitle>
+                        <DialogTitle>{t('draftDialogTitle')}</DialogTitle>
                         <DialogDescription>
-                            適用したい日付を選択してください。保存はまだ実行されません。
+                            {t('draftDialogDescription')}
                         </DialogDescription>
                     </DialogHeader>
 
@@ -943,14 +951,14 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
                                         <div className="min-w-0 flex-1 space-y-1">
                                             <div className="flex flex-wrap items-center justify-between gap-2">
                                                 <div className="text-sm font-semibold">{formatGoalDateKeyLabel(proposal.dateKey, timeZone)}</div>
-                                                <Badge variant="outline" className="text-[11px]">提案</Badge>
+                                                <Badge variant="outline" className="text-[11px]">{t('proposalBadge')}</Badge>
                                             </div>
                                             <div className="text-xs text-muted-foreground">
-                                                現在値: {currentValue.targetCount !== null ? `${currentValue.targetCount}問` : '-'}
+                                                {t('currentValueLabel')} {currentValue.targetCount !== null ? t('questionCount', { count: currentValue.targetCount }) : '-'}
                                                 {currentValue.targetText ? ` / ${currentValue.targetText}` : ''}
                                             </div>
                                             <div className="text-xs">
-                                                提案値: {proposal.targetCount !== null && proposal.targetCount !== undefined ? `${proposal.targetCount}問` : '-'}
+                                                {t('proposalValueLabel')} {proposal.targetCount !== null && proposal.targetCount !== undefined ? t('questionCount', { count: proposal.targetCount }) : '-'}
                                                 {proposal.targetText ? ` / ${proposal.targetText}` : ''}
                                             </div>
                                         </div>
@@ -971,7 +979,7 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
                                 setDraftDialog(null);
                             }}
                         >
-                            選択日を適用
+                            {t('applySelectedDates')}
                         </Button>
                         <Button
                             type="button"
@@ -981,7 +989,7 @@ export function TeacherGoalManagementCard({ studentId, subjects, initialData }: 
                                 setDraftDialog(null);
                             }}
                         >
-                            全提案を適用
+                            {t('applyAllProposals')}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
