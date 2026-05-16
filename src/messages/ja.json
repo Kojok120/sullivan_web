@@ -493,5 +493,53 @@
     "history": "学習履歴ログ",
     "guidance": "面談記録",
     "profile": "生徒情報"
+  },
+  "TeacherStudentDetailLayout": {
+    "back": "講師用ダッシュボードに戻る",
+    "description": "生徒詳細データ"
+  },
+  "TeacherStudentOverview": {
+    "accuracy": "正答率",
+    "correctCount": "正解数: {count}",
+    "currentStreak": "連続学習",
+    "streakDays": "{count}日",
+    "streakCaption": "継続は力なり",
+    "lastActivity": "最終学習",
+    "weaknessTitle": "弱点分析 (正答率ワースト)",
+    "weaknessDescription": "正答率が低く、重点的な復習が必要な単元",
+    "attemptCount": "{count}回実施",
+    "noWeakness": "顕著な弱点は見つかりませんでした",
+    "subjectProgressTitle": "科目別進捗状況",
+    "clearedCount": "{cleared} / {total} クリア"
+  },
+  "TeacherProfileCard": {
+    "updateSuccess": "プロフィールを更新しました",
+    "unset": "未設定",
+    "editTitle": "プロフィール編集",
+    "birthdayLabel": "生年月日",
+    "classroomLabel": "教室",
+    "classroomPlaceholder": "教室を選択",
+    "groupLabel": "グループ",
+    "groupPlaceholder": "グループを選択",
+    "schoolLabel": "学校",
+    "schoolPlaceholder": "例: 〇〇中学校",
+    "phoneLabel": "電話番号",
+    "phoneDisplayLabel": "電話:",
+    "phonePlaceholder": "例: 090-1234-5678",
+    "emailLabel": "メールアドレス",
+    "emailDisplayLabel": "Email:",
+    "emailPlaceholder": "例: student@example.com",
+    "bioLabel": "生徒プロフィール (部活、志望校など)",
+    "bioDisplayLabel": "生徒プロフィール",
+    "bioPlaceholder": "例: サッカー部、〇〇高校志望",
+    "notesLabel": "講師用メモ (性格、特記事項など)",
+    "notesDisplayLabel": "講師用メモ",
+    "notesPlaceholder": "例: 英語が苦手、計算ミスが多い",
+    "cancel": "キャンセル",
+    "saving": "保存中...",
+    "save": "保存",
+    "title": "プロフィール & メモ",
+    "description": "生徒の情報と講師用メモ",
+    "edit": "編集"
   }
 }

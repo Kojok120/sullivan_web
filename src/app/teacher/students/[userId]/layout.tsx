@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { getSession, isTeacherOrAdmin } from '@/lib/auth';
 import { canAccessUserWithinClassroomScope } from '@/lib/authorization';
 import { prisma } from '@/lib/prisma';
+import { getTranslations } from 'next-intl/server';
 
 import { StudentDetailTabs } from './student-detail-tabs';
 
@@ -23,6 +24,7 @@ export default async function TeacherStudentDetailLayout({
     if (!isTeacherOrAdmin(session)) {
         redirect('/login');
     }
+    const t = await getTranslations('TeacherStudentDetailLayout');
 
     const { userId } = await params;
 
@@ -57,7 +59,7 @@ export default async function TeacherStudentDetailLayout({
         <div className="container mx-auto space-y-6 px-4 py-6 sm:space-y-8 sm:py-8">
             <div className="flex items-start gap-3 sm:items-center sm:gap-4">
                 <Button variant="ghost" size="icon" asChild>
-                    <Link href="/teacher">
+                    <Link href="/teacher" aria-label={t('back')} title={t('back')}>
                         <ArrowLeft className="h-5 w-5" />
                     </Link>
                 </Button>
@@ -66,7 +68,7 @@ export default async function TeacherStudentDetailLayout({
                         {student.name || student.loginId}
                         {student.group ? <Badge variant="outline">{student.group}</Badge> : null}
                     </h1>
-                    <p className="text-muted-foreground">生徒詳細データ</p>
+                    <p className="text-muted-foreground">{t('description')}</p>
                 </div>
             </div>
 
