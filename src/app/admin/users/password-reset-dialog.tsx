@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -30,6 +31,7 @@ export function PasswordResetDialog({
     userName,
     loginId,
 }: PasswordResetDialogProps) {
+    const t = useTranslations('AdminPasswordResetDialog');
     const [password, setPassword] = useState('');
     const [isPending, startTransition] = useTransition();
     const [error, setError] = useState('');
@@ -42,7 +44,7 @@ export function PasswordResetDialog({
         setSuccess(false);
 
         if (password.length < 8) {
-            setError('パスワードは8文字以上で入力してください');
+            setError(t('passwordTooShort'));
             return;
         }
 
@@ -56,7 +58,7 @@ export function PasswordResetDialog({
                     setSuccess(false);
                 }, 2000);
             } else {
-                setError(result.error || 'パスワードのリセットに失敗しました');
+                setError(result.error || t('resetFailed'));
             }
         });
     };
@@ -65,24 +67,24 @@ export function PasswordResetDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-[425px]">
                 <DialogHeader>
-                    <DialogTitle>パスワードのリセット</DialogTitle>
+                    <DialogTitle>{t('title')}</DialogTitle>
                     <DialogDescription>
-                        {userName} ({loginId}) の新しいパスワードを設定します。
+                        {t('description', { userName, loginId })}
                         <br />
-                        <span className="text-red-500 text-xs">※この操作は即座に反映されます。</span>
+                        <span className="text-red-500 text-xs">{t('immediateNotice')}</span>
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit}>
                     <div className="grid gap-4 py-4">
                         <div className="grid gap-2">
-                            <Label htmlFor="new-password">新しいパスワード</Label>
+                            <Label htmlFor="new-password">{t('newPasswordLabel')}</Label>
                             <div className="relative">
                                 <Input
                                     id="new-password"
                                     type={showPassword ? 'text' : 'password'}
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    placeholder="8文字以上"
+                                    placeholder={t('passwordPlaceholder')}
                                     disabled={isPending || success}
                                     required
                                     minLength={8}
@@ -91,7 +93,7 @@ export function PasswordResetDialog({
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword((prev) => !prev)}
-                                    aria-label={showPassword ? 'パスワードを非表示' : 'パスワードを表示'}
+                                    aria-label={showPassword ? t('hidePassword') : t('showPassword')}
                                     aria-pressed={showPassword}
                                     disabled={isPending || success}
                                     className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -102,14 +104,14 @@ export function PasswordResetDialog({
                         </div>
                     </div>
                     {error && <p className="text-sm text-red-500 mb-4">{error}</p>}
-                    {success && <p className="text-sm text-green-600 mb-4 font-bold">パスワードを変更しました</p>}
+                    {success && <p className="text-sm text-green-600 mb-4 font-bold">{t('success')}</p>}
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending} className="min-h-11 sm:min-h-10">
-                            キャンセル
+                            {t('cancel')}
                         </Button>
                         <Button type="submit" disabled={isPending || success} className="min-h-11 sm:min-h-10">
                             {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            変更する
+                            {t('submit')}
                         </Button>
                     </DialogFooter>
                 </form>

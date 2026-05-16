@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useTranslations } from 'next-intl';
 import { User, Role } from '@prisma/client';
 import { createUser, updateUser } from '../actions';
 import { Button } from '@/components/ui/button';
@@ -77,6 +78,7 @@ function UserFormDialogContent({
     onSuccess,
     onOpenChange,
 }: Omit<UserFormDialogProps, 'open'>) {
+    const t = useTranslations('AdminUserFormDialog');
     const [isPending, startTransition] = useTransition();
     const [formData, setFormData] = useState<UserFormState>(() => createInitialFormState(mode, user));
 
@@ -88,7 +90,7 @@ function UserFormDialogContent({
             const classroomRequired = requiresClassroom(formData.role);
 
             if (classroomRequired && !normalizedClassroom) {
-                toast.error('この役割では教室選択が必須です');
+                toast.error(t('classroomRequired'));
                 return;
             }
 
@@ -118,16 +120,16 @@ function UserFormDialogContent({
                     toast.warning(result.warning);
                 }
             } else {
-                toast.error(result.error || 'ユーザー操作に失敗しました');
+                toast.error(result.error || t('operationFailed'));
             }
         });
     };
 
     const isEdit = mode === 'edit';
-    const title = isEdit ? 'ユーザー編集' : '新規ユーザー作成';
+    const title = isEdit ? t('editTitle') : t('createTitle');
     const description = isEdit
-        ? 'ユーザー情報を更新します。パスワードは変更する場合のみ入力してください。'
-        : '新しいユーザーアカウントを作成します。ログインIDは自動生成されます。';
+        ? t('editDescription')
+        : t('createDescription');
 
     return (
         <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
@@ -137,7 +139,7 @@ function UserFormDialogContent({
             </DialogHeader>
             <div className="grid gap-4 py-4">
                 <div className="grid grid-cols-1 items-center gap-2 sm:grid-cols-4 sm:gap-4">
-                    <Label htmlFor="name" className="text-left sm:text-right">名前</Label>
+                    <Label htmlFor="name" className="text-left sm:text-right">{t('nameLabel')}</Label>
                     <Input
                         id="name"
                         value={formData.name}
@@ -146,13 +148,13 @@ function UserFormDialogContent({
                     />
                 </div>
                 <div className="grid grid-cols-1 items-center gap-2 sm:grid-cols-4 sm:gap-4">
-                    <Label htmlFor="role" className="text-left sm:text-right">役割</Label>
+                    <Label htmlFor="role" className="text-left sm:text-right">{t('roleLabel')}</Label>
                     <Select
                         value={formData.role}
                         onValueChange={(value: Role) => setFormData({ ...formData, role: value })}
                     >
                         <SelectTrigger className="sm:col-span-3">
-                            <SelectValue placeholder="役割を選択" />
+                            <SelectValue placeholder={t('rolePlaceholder')} />
                         </SelectTrigger>
                         <SelectContent>
                             {ROLE_OPTIONS.map((option) => (
@@ -162,24 +164,24 @@ function UserFormDialogContent({
                     </Select>
                 </div>
                 <div className="grid grid-cols-1 items-center gap-2 sm:grid-cols-4 sm:gap-4">
-                    <Label className="text-left sm:text-right">初期パスワード</Label>
+                    <Label className="text-left sm:text-right">{t('initialPasswordLabel')}</Label>
                     <div className="text-sm text-muted-foreground sm:col-span-3">
-                        {isEdit ? 'パスワード変更は「パスワード変更」メニューから実行してください。' : (
-                            <>新規作成時の初期パスワードは <code>{DEFAULT_INITIAL_PASSWORD}</code> です（初回変更必須）。</>
+                        {isEdit ? t('passwordEditNote') : (
+                            <>{t('passwordCreatePrefix')} <code>{DEFAULT_INITIAL_PASSWORD}</code> {t('passwordCreateSuffix')}</>
                         )}
                     </div>
                 </div>
                 <div className="grid grid-cols-1 items-center gap-2 sm:grid-cols-4 sm:gap-4">
-                    <Label htmlFor="classroomId" className="text-left sm:text-right">教室</Label>
+                    <Label htmlFor="classroomId" className="text-left sm:text-right">{t('classroomLabel')}</Label>
                     <Select
                         value={formData.classroomId}
                         onValueChange={(value) => setFormData({ ...formData, classroomId: value })}
                     >
                         <SelectTrigger className="sm:col-span-3">
-                            <SelectValue placeholder={requiresClassroom(formData.role) ? "教室を選択 (必須)" : "教室を選択 (任意)"} />
+                            <SelectValue placeholder={requiresClassroom(formData.role) ? t('classroomRequiredPlaceholder') : t('classroomOptionalPlaceholder')} />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value={NONE_SELECTION_VALUE}>なし</SelectItem>
+                            <SelectItem value={NONE_SELECTION_VALUE}>{t('none')}</SelectItem>
                             {classrooms.map((c) => (
                                 <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                             ))}
@@ -187,16 +189,16 @@ function UserFormDialogContent({
                     </Select>
                 </div>
                 <div className="grid grid-cols-1 items-center gap-2 sm:grid-cols-4 sm:gap-4">
-                    <Label htmlFor="groupId" className="text-left sm:text-right">グループ</Label>
+                    <Label htmlFor="groupId" className="text-left sm:text-right">{t('groupLabel')}</Label>
                     <Select
                         value={formData.groupId}
                         onValueChange={(value) => setFormData({ ...formData, groupId: value })}
                     >
                         <SelectTrigger className="sm:col-span-3">
-                            <SelectValue placeholder="グループを選択 (任意)" />
+                            <SelectValue placeholder={t('groupPlaceholder')} />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value={NONE_SELECTION_VALUE}>なし</SelectItem>
+                            <SelectItem value={NONE_SELECTION_VALUE}>{t('none')}</SelectItem>
                             {groups.map((group) => (
                                 <SelectItem key={group.id} value={group.id}>{group.name}</SelectItem>
                             ))}
@@ -205,10 +207,10 @@ function UserFormDialogContent({
                 </div>
             </div>
             <DialogFooter>
-                <Button variant="outline" onClick={() => onOpenChange(false)} className="min-h-11 sm:min-h-10">キャンセル</Button>
+                <Button variant="outline" onClick={() => onOpenChange(false)} className="min-h-11 sm:min-h-10">{t('cancel')}</Button>
                 <Button onClick={handleSubmit} disabled={isPending} className="min-h-11 sm:min-h-10">
                     {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    {isEdit ? '更新' : '作成'}
+                    {isEdit ? t('update') : t('create')}
                 </Button>
             </DialogFooter>
         </DialogContent>

@@ -3,12 +3,15 @@
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { Prisma, Role } from '@prisma/client';
+import { getTranslations } from 'next-intl/server';
 import { requireAdmin } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { roleRequiresClassroom } from '@/lib/authorization';
+import { z } from 'zod';
 
 export async function resetPassword(userId: string, password: string) {
     await requireAdmin();
+    const t = await getTranslations('AdminUserActions');
     try {
         const supabase = createAdminClient();
 
@@ -28,7 +31,7 @@ export async function resetPassword(userId: string, password: string) {
         });
 
         if (!prismaUser) {
-            return { success: false, error: 'ユーザーが見つかりません' };
+            return { success: false, error: t('userNotFound') };
         }
 
         // Find Supabase user by email (mapped from loginId)
@@ -41,7 +44,7 @@ export async function resetPassword(userId: string, password: string) {
         });
 
         if (!supabaseUser) {
-            return { success: false, error: 'Supabaseユーザーが見つかりません' };
+            return { success: false, error: t('supabaseUserNotFound') };
         }
 
         const { error: updateError } = await supabase.auth.admin.updateUserById(
@@ -54,13 +57,13 @@ export async function resetPassword(userId: string, password: string) {
 
         if (updateError) {
             console.error(updateError);
-            return { success: false, error: 'パスワードの更新に失敗しました' };
+            return { success: false, error: t('passwordUpdateFailed') };
         }
 
         return { success: true };
     } catch (error) {
         console.error(error);
-        return { success: false, error: 'システムエラーが発生しました' };
+        return { success: false, error: t('systemError') };
     }
 }
 
@@ -74,6 +77,7 @@ export async function getUsers(
     classroomFilter?: string
 ) {
     await requireAdmin();
+    const t = await getTranslations('AdminUserActions');
     try {
         const where: Prisma.UserWhereInput = {};
 
@@ -125,32 +129,35 @@ export async function getUsers(
         return { success: true, users, total, page, limit };
     } catch (error) {
         console.error('Failed to fetch users:', error);
-        return { error: 'ユーザーの取得に失敗しました' };
+        return { error: t('usersLoadFailed') };
     }
 }
 
-import { z } from 'zod';
+type AdminUserActionsTranslator = Awaited<ReturnType<typeof getTranslations>>;
 
-const createUserSchema = z.object({
-    name: z.string().min(1, '名前を入力してください'),
-    role: z.nativeEnum(Role),
-    password: z.string().optional(),
-    group: z.string().optional(),
-    classroomId: z.string().optional(),
-}).superRefine((value, ctx) => {
-    if (roleRequiresClassroom(value.role) && !value.classroomId) {
-        ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: 'この役割では教室選択が必須です',
-            path: ['classroomId'],
-        });
-    }
-});
+function buildCreateUserSchema(t: AdminUserActionsTranslator) {
+    return z.object({
+        name: z.string().min(1, t('nameRequired')),
+        role: z.nativeEnum(Role),
+        password: z.string().optional(),
+        group: z.string().optional(),
+        classroomId: z.string().optional(),
+    }).superRefine((value, ctx) => {
+        if (roleRequiresClassroom(value.role) && !value.classroomId) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: t('classroomRequired'),
+                path: ['classroomId'],
+            });
+        }
+    });
+}
 
 
 export async function createUser(data: { name: string; role: Role; password?: string; group?: string; classroomId?: string }) {
     await requireAdmin();
-    const result = createUserSchema.safeParse(data);
+    const t = await getTranslations('AdminUserActions');
+    const result = buildCreateUserSchema(t).safeParse(data);
 
     if (!result.success) {
         return { error: result.error.errors[0].message };
@@ -174,7 +181,7 @@ export async function createUser(data: { name: string; role: Role; password?: st
         return { success: true, user: regResult.user };
     } catch (error) {
         console.error('Failed to create user:', error);
-        return { error: 'ユーザーの作成に失敗しました' };
+        return { error: t('userCreateFailed') };
     }
 }
 
@@ -183,6 +190,7 @@ export async function updateUser(
     data: { name?: string; role?: Role; group?: string | null; classroomId?: string | null }
 ) {
     await requireAdmin();
+    const t = await getTranslations('AdminUserActions');
     try {
         const currentUser = await prisma.user.findUnique({
             where: { id },
@@ -195,13 +203,13 @@ export async function updateUser(
             },
         });
         if (!currentUser) {
-            return { error: 'ユーザーが見つかりません' };
+            return { error: t('userNotFound') };
         }
 
         const nextRole = data.role ?? currentUser.role;
         const nextClassroomId = data.classroomId !== undefined ? data.classroomId : currentUser.classroomId;
         if (roleRequiresClassroom(nextRole) && !nextClassroomId) {
-            return { error: 'この役割では教室選択が必須です' };
+            return { error: t('classroomRequired') };
         }
 
         const updateData: Prisma.UserUpdateInput = {};
@@ -232,7 +240,7 @@ export async function updateUser(
             return {
                 success: true,
                 user,
-                warning: 'ユーザーは更新しましたが、Supabaseの権限同期に失敗しました。再実行してください。',
+                warning: t('supabaseSyncWarning'),
             };
         }
 
@@ -240,12 +248,13 @@ export async function updateUser(
         return { success: true, user };
     } catch (error) {
         console.error('Failed to update user:', error);
-        return { error: 'ユーザーの更新に失敗しました' };
+        return { error: t('userUpdateFailed') };
     }
 }
 
 export async function deleteUser(id: string) {
     await requireAdmin();
+    const t = await getTranslations('AdminUserActions');
     try {
         await prisma.user.delete({
             where: { id },
@@ -255,12 +264,13 @@ export async function deleteUser(id: string) {
         return { success: true };
     } catch (error) {
         console.error('Failed to delete user:', error);
-        return { error: 'ユーザーの削除に失敗しました' };
+        return { error: t('userDeleteFailed') };
     }
 }
 
 export async function getUserManagementMeta() {
     await requireAdmin();
+    const t = await getTranslations('AdminUserActions');
     try {
         const classrooms = await prisma.classroom.findMany({
             select: { id: true, name: true, plan: true, groups: true },
@@ -291,6 +301,6 @@ export async function getUserManagementMeta() {
         };
     } catch (error) {
         console.error('Failed to fetch user management metadata:', error);
-        return { error: 'ユーザー管理メタデータの取得に失敗しました' };
+        return { error: t('metadataLoadFailed') };
     }
 }

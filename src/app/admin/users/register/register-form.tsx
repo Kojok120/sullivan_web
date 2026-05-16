@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState, useState, useMemo } from 'react';
+import { useTranslations } from 'next-intl';
 import { signupAction } from './actions';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft } from 'lucide-react';
@@ -15,6 +16,7 @@ interface RegisterFormProps {
 }
 
 export function RegisterForm({ classrooms, allGroups }: RegisterFormProps) {
+    const t = useTranslations('AdminRegisterForm');
     const [state, action, pending] = useActionState(signupAction, undefined);
 
     // Form state for dependent dropdowns
@@ -45,13 +47,13 @@ export function RegisterForm({ classrooms, allGroups }: RegisterFormProps) {
                 <div>
                     <Link href="/admin/users" className="flex items-center text-sm text-muted-foreground hover:text-foreground mb-4">
                         <ChevronLeft className="h-4 w-4 mr-1" />
-                        ユーザー一覧に戻る
+                        {t('backToUsers')}
                     </Link>
                     <h2 className="mt-6 text-center text-3xl font-bold text-foreground">
-                        新規ユーザー登録
+                        {t('title')}
                     </h2>
                     <p className="mt-2 text-center text-sm text-muted-foreground">
-                        Sullivan で利用する各種アカウントを作成します
+                        {t('description')}
                     </p>
                 </div>
 
@@ -59,24 +61,24 @@ export function RegisterForm({ classrooms, allGroups }: RegisterFormProps) {
                     {state?.success ? (
                         <div className="text-center">
                             <div className="mb-4 rounded-md bg-green-50 p-4 text-green-700">
-                                <p className="font-bold">登録が完了しました！</p>
-                                <p className="mt-2">発行されたログインID:</p>
+                                <p className="font-bold">{t('successTitle')}</p>
+                                <p className="mt-2">{t('issuedLoginId')}</p>
                                 <p className="text-2xl font-mono font-bold">{state.loginId}</p>
                             </div>
                             <p className="mb-6 text-sm text-muted-foreground">
-                                このIDをユーザーに伝えてください。<br />
-                                初期パスワードは <code>{DEFAULT_INITIAL_PASSWORD}</code> です（初回ログイン時に変更）。
+                                {t('shareLoginId')}<br />
+                                {t('initialPasswordPrefix')} <code>{DEFAULT_INITIAL_PASSWORD}</code> {t('initialPasswordSuffix')}
                             </p>
                             <div className="flex flex-col gap-3">
                                 <Button
                                     onClick={() => window.location.reload()}
                                     className="w-full"
                                 >
-                                    続けて登録する
+                                    {t('continueRegistering')}
                                 </Button>
                                 <Link href="/admin/users" className="w-full">
                                     <Button variant="outline" className="w-full">
-                                        ユーザー一覧へ戻る
+                                        {t('returnToUsers')}
                                     </Button>
                                 </Link>
                             </div>
@@ -84,7 +86,7 @@ export function RegisterForm({ classrooms, allGroups }: RegisterFormProps) {
                     ) : (
                         <form action={action} className="space-y-6" autoComplete="off">
                             <div>
-                                <label className="block text-sm font-medium text-foreground">お名前</label>
+                                <label className="block text-sm font-medium text-foreground">{t('nameLabel')}</label>
                                 <input
                                     name="name"
                                     type="text"
@@ -94,11 +96,11 @@ export function RegisterForm({ classrooms, allGroups }: RegisterFormProps) {
                             </div>
                             <div>
                                 <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
-                                    初期パスワードは <code>{DEFAULT_INITIAL_PASSWORD}</code> で固定です（初回ログイン時に変更必須）
+                                    {t('fixedPasswordPrefix')} <code>{DEFAULT_INITIAL_PASSWORD}</code> {t('fixedPasswordSuffix')}
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-foreground">役割</label>
+                                <label className="block text-sm font-medium text-foreground">{t('roleLabel')}</label>
                                 <select
                                     name="role"
                                     value={selectedRole}
@@ -114,7 +116,7 @@ export function RegisterForm({ classrooms, allGroups }: RegisterFormProps) {
                             {(selectedRole === 'STUDENT' || selectedRole === 'TEACHER' || selectedRole === 'HEAD_TEACHER') && (
                                 <>
                                     <div>
-                                        <label className="block text-sm font-medium text-foreground">所属教室 (必須)</label>
+                                        <label className="block text-sm font-medium text-foreground">{t('classroomLabel')}</label>
                                         <select
                                             name="classroomId"
                                             value={selectedClassroomId}
@@ -122,7 +124,7 @@ export function RegisterForm({ classrooms, allGroups }: RegisterFormProps) {
                                             required
                                             className="mt-1 block w-full rounded-md border px-3 py-2 focus:border-ring focus:outline-none focus:ring-ring sm:text-sm"
                                         >
-                                            <option value="">選択してください</option>
+                                            <option value="">{t('selectPlaceholder')}</option>
                                             {classrooms.map((c) => (
                                                 <option key={c.id} value={c.id}>
                                                     {c.name}
@@ -133,12 +135,12 @@ export function RegisterForm({ classrooms, allGroups }: RegisterFormProps) {
 
                                     {selectedRole === 'STUDENT' && (
                                         <div>
-                                            <label className="block text-sm font-medium text-foreground">グループ (任意)</label>
+                                            <label className="block text-sm font-medium text-foreground">{t('groupLabel')}</label>
                                             <select
                                                 name="group"
                                                 className="mt-1 block w-full rounded-md border px-3 py-2 focus:border-ring focus:outline-none focus:ring-ring sm:text-sm"
                                             >
-                                                <option value="">未選択</option>
+                                                <option value="">{t('unselected')}</option>
                                                 {availableGroups.map((g) => (
                                                     <option key={g.id} value={g.name}>
                                                         {g.name}
@@ -156,7 +158,7 @@ export function RegisterForm({ classrooms, allGroups }: RegisterFormProps) {
                                 disabled={pending}
                                 className="w-full"
                             >
-                                {pending ? '作成中...' : 'ユーザーを作成'}
+                                {pending ? t('creating') : t('submit')}
                             </Button>
                         </form>
                     )}
