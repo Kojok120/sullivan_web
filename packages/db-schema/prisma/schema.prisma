@@ -23,7 +23,7 @@ model ContentPack {
 
 model Subject {
   id           String        @id @default(cuid())
-  packId       String        @default("jp-juken")
+  packId       String
   pack         ContentPack   @relation(fields: [packId], references: [id])
   name         String
   icon         String?
@@ -309,7 +309,7 @@ model StudentGoalMilestone {
 
 model Classroom {
   id        String        @id @default(cuid())
-  packId    String        @default("jp-juken")
+  packId    String
   pack      ContentPack   @relation(fields: [packId], references: [id])
   name      String
   plan      ClassroomPlan @default(STANDARD)
@@ -430,7 +430,7 @@ model UserCoreProblemState {
 
 model Achievement {
   id          String      @id @default(cuid())
-  packId      String      @default("jp-juken")
+  packId      String
   pack        ContentPack @relation(fields: [packId], references: [id])
   slug        String // e.g., "streak-7"
   name        String
