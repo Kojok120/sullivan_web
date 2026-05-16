@@ -1,18 +1,15 @@
 import { prisma } from '@/lib/prisma';
+import {
+    DEFAULT_PROGRESSION_RULES,
+    UNLOCK_ANSWER_RATE,
+    UNLOCK_CORRECT_RATE,
+    type ProgressionRules,
+} from '@sullivan/config';
 
-// 進行判定（アンロック）しきい値
-export const UNLOCK_ANSWER_RATE = 0.4; // 40%
-export const UNLOCK_CORRECT_RATE = 0.5; // 50%
-
-export type ProgressionRules = {
-    unlockAnswerRate: number;
-    unlockCorrectRate: number;
-};
-
-export const DEFAULT_PROGRESSION_RULES: ProgressionRules = {
-    unlockAnswerRate: UNLOCK_ANSWER_RATE,
-    unlockCorrectRate: UNLOCK_CORRECT_RATE,
-};
+// 進行判定（アンロック）しきい値は @sullivan/config 由来。
+// 既存の @/lib/progression からの import を壊さないため再エクスポートする。
+export { DEFAULT_PROGRESSION_RULES, UNLOCK_ANSWER_RATE, UNLOCK_CORRECT_RATE };
+export type { ProgressionRules };
 
 // CoreProblem 単位の進行状態
 export type CoreProblemStatus = {
