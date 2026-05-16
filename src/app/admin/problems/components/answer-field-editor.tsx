@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 import { TableEditor } from '@/components/problem-authoring/table-editor';
 import { Input } from '@/components/ui/input';
@@ -159,6 +160,7 @@ export function AnswerFieldEditor({
     answerTemplate,
     onAnswerTemplateChange,
 }: AnswerFieldEditorProps) {
+    const t = useTranslations('AnswerFieldEditor');
     const [kind, setKind] = useState<AnswerTemplateKind>(() => detectKind(answerTemplate));
     const [numberLine, setNumberLine] = useState<NumberLineState>(() => parseExistingNumberLine(answerTemplate) ?? DEFAULT_NUMBERLINE);
     const [coordPlane, setCoordPlane] = useState<CoordPlaneState>(() => parseExistingCoordPlane(answerTemplate) ?? DEFAULT_COORDPLANE);
@@ -248,14 +250,14 @@ export function AnswerFieldEditor({
     return (
         <div className="space-y-6">
             <div className="space-y-2 max-w-sm">
-                <Label>形式</Label>
+                <Label>{t('typeLabel')}</Label>
                 <Select value={kind} onValueChange={(value) => handleKindChange(value as AnswerTemplateKind)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="none">短い記述</SelectItem>
-                        <SelectItem value="numberline">数直線</SelectItem>
-                        <SelectItem value="table">表</SelectItem>
-                        <SelectItem value="coordplane">座標平面</SelectItem>
+                        <SelectItem value="none">{t('typeShortText')}</SelectItem>
+                        <SelectItem value="numberline">{t('typeNumberline')}</SelectItem>
+                        <SelectItem value="table">{t('typeTable')}</SelectItem>
+                        <SelectItem value="coordplane">{t('typeCoordplane')}</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
@@ -264,7 +266,7 @@ export function AnswerFieldEditor({
                 <div className="space-y-3 rounded-md border p-4">
                     <div className="grid gap-3 md:grid-cols-3">
                         <div className="space-y-1">
-                            <Label className="text-xs">最小値</Label>
+                            <Label className="text-xs">{t('minLabel')}</Label>
                             <Input
                                 value={numberLine.min}
                                 onChange={(event) => handleNumberLineChange({ min: event.target.value })}
@@ -272,7 +274,7 @@ export function AnswerFieldEditor({
                             />
                         </div>
                         <div className="space-y-1">
-                            <Label className="text-xs">最大値</Label>
+                            <Label className="text-xs">{t('maxLabel')}</Label>
                             <Input
                                 value={numberLine.max}
                                 onChange={(event) => handleNumberLineChange({ max: event.target.value })}
@@ -280,11 +282,11 @@ export function AnswerFieldEditor({
                             />
                         </div>
                         <div className="space-y-1">
-                            <Label className="text-xs">マーク（任意）</Label>
+                            <Label className="text-xs">{t('marksLabel')}</Label>
                             <Input
                                 value={numberLine.marks}
                                 onChange={(event) => handleNumberLineChange({ marks: event.target.value })}
-                                placeholder="例: A:-3,B:2,C:4.5"
+                                placeholder={t('marksPlaceholder')}
                             />
                         </div>
                     </div>
@@ -294,7 +296,7 @@ export function AnswerFieldEditor({
             {kind === 'table' && (
                 <div className="space-y-3 rounded-md border p-4">
                     <p className="text-xs text-muted-foreground">
-                        セルを空にすると生徒が手書きで埋める空欄になります。値を入力するとプリント時にそのまま表示されます。
+                        {t('tableHelp')}
                     </p>
                     <TableEditor
                         value={{ headers: tableValue.headers, rows: tableValue.cells }}
@@ -318,27 +320,27 @@ export function AnswerFieldEditor({
                         ))}
                     </div>
                     <div className="space-y-1">
-                        <Label className="text-xs">点（任意 / セミコロン区切り）</Label>
+                        <Label className="text-xs">{t('pointsLabel')}</Label>
                         <Input
                             value={coordPlane.points}
                             onChange={(event) => handleCoordPlaneChange({ points: event.target.value })}
-                            placeholder='例: P:4,3;Q:-2,1'
+                            placeholder={t('pointsPlaceholder')}
                         />
                     </div>
                     <div className="space-y-1">
-                        <Label className="text-xs">曲線（任意 / y=式 をセミコロン区切り）</Label>
+                        <Label className="text-xs">{t('curvesLabel')}</Label>
                         <Input
                             value={coordPlane.curves}
                             onChange={(event) => handleCoordPlaneChange({ curves: event.target.value })}
-                            placeholder='例: y=x^2;y=6/x'
+                            placeholder={t('curvesPlaceholder')}
                         />
                     </div>
                     <div className="space-y-1">
-                        <Label className="text-xs">直線（任意 / x=数値 または y=数値）</Label>
+                        <Label className="text-xs">{t('linesLabel')}</Label>
                         <Input
                             value={coordPlane.lines}
                             onChange={(event) => handleCoordPlaneChange({ lines: event.target.value })}
-                            placeholder='例: x=2;y=-1'
+                            placeholder={t('linesPlaceholder')}
                         />
                     </div>
                 </div>
@@ -346,10 +348,10 @@ export function AnswerFieldEditor({
 
             {kind !== 'none' && (
                 <div className="space-y-2">
-                    <Label>解答欄プレビュー</Label>
+                    <Label>{t('previewLabel')}</Label>
                     <ProblemTextPreview
                         text={answerTemplate}
-                        emptyMessage="解答欄テンプレートを設定するとプレビューが出ます。"
+                        emptyMessage={t('previewEmpty')}
                     />
                 </div>
             )}
