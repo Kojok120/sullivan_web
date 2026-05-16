@@ -1,0 +1,6 @@
+{
+  "name": "sullivan-jp",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Sullivan 日本5教科受験対策アプリ. Phase 1.7 で root から本ディレクトリに移管予定 (現状は scaffold のみで実体は root にある)"
+}
