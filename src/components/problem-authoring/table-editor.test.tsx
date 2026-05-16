@@ -1,12 +1,27 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { NextIntlClientProvider } from 'next-intl';
+import type { ReactNode } from 'react';
 
+import jaMessages from '@/messages/ja.json';
 import { TableEditor } from './table-editor';
+
+function IntlWrapper({ children }: { children: ReactNode }) {
+    return (
+        <NextIntlClientProvider locale="ja" messages={jaMessages}>
+            {children}
+        </NextIntlClientProvider>
+    );
+}
+
+function renderWithIntl(ui: ReactNode) {
+    return render(ui, { wrapper: IntlWrapper });
+}
 
 describe('TableEditor', () => {
     it('ヘッダーが空のときは作成ボタンを表示する', () => {
         const onChange = vi.fn();
-        render(<TableEditor value={{ headers: [], rows: [] }} onChange={onChange} />);
+        renderWithIntl(<TableEditor value={{ headers: [], rows: [] }} onChange={onChange} />);
 
         const button = screen.getByRole('button', { name: '表を作成' });
         fireEvent.click(button);
@@ -19,7 +34,7 @@ describe('TableEditor', () => {
 
     it('ヘッダーセルの編集で onChange が呼ばれる', () => {
         const onChange = vi.fn();
-        render(
+        renderWithIntl(
             <TableEditor
                 value={{ headers: ['a', 'b'], rows: [['1', '2']] }}
                 onChange={onChange}
@@ -37,7 +52,7 @@ describe('TableEditor', () => {
 
     it('セルの編集で行は不変、編集セルだけ書き換わる', () => {
         const onChange = vi.fn();
-        render(
+        renderWithIntl(
             <TableEditor
                 value={{ headers: ['x', 'y'], rows: [['1', '2'], ['3', '4']] }}
                 onChange={onChange}
@@ -55,7 +70,7 @@ describe('TableEditor', () => {
 
     it('行を追加で 1 行が末尾に増える', () => {
         const onChange = vi.fn();
-        render(
+        renderWithIntl(
             <TableEditor
                 value={{ headers: ['x', 'y'], rows: [['1', '2']] }}
                 onChange={onChange}
@@ -72,7 +87,7 @@ describe('TableEditor', () => {
 
     it('列を追加で 1 列が末尾に増え、既存行も補完される', () => {
         const onChange = vi.fn();
-        render(
+        renderWithIntl(
             <TableEditor
                 value={{ headers: ['x', 'y'], rows: [['1', '2']] }}
                 onChange={onChange}
@@ -89,7 +104,7 @@ describe('TableEditor', () => {
 
     it('列を削除すると当該列が消える', () => {
         const onChange = vi.fn();
-        render(
+        renderWithIntl(
             <TableEditor
                 value={{ headers: ['x', 'y', 'z'], rows: [['1', '2', '3']] }}
                 onChange={onChange}
@@ -106,7 +121,7 @@ describe('TableEditor', () => {
 
     it('最後の列を削除すると空状態に戻る', () => {
         const onChange = vi.fn();
-        render(
+        renderWithIntl(
             <TableEditor
                 value={{ headers: ['x'], rows: [['1']] }}
                 onChange={onChange}
@@ -120,7 +135,7 @@ describe('TableEditor', () => {
 
     it('行を削除すると当該行が消える', () => {
         const onChange = vi.fn();
-        render(
+        renderWithIntl(
             <TableEditor
                 value={{ headers: ['x'], rows: [['1'], ['2'], ['3']] }}
                 onChange={onChange}
@@ -137,7 +152,7 @@ describe('TableEditor', () => {
 
     it('列数上限 8 を超えると追加ボタンが disabled になる', () => {
         const headers = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
-        render(
+        renderWithIntl(
             <TableEditor
                 value={{ headers, rows: [headers.map(() => '')] }}
                 onChange={() => {}}
@@ -149,7 +164,7 @@ describe('TableEditor', () => {
 
     it('行数上限 20 を超えると追加ボタンが disabled になる', () => {
         const rows = Array.from({ length: 20 }, () => ['']);
-        render(
+        renderWithIntl(
             <TableEditor
                 value={{ headers: ['x'], rows }}
                 onChange={() => {}}

@@ -1,6 +1,11 @@
+'use client';
+
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 
 export function TeXHelpLink() {
+    const t = useTranslations('TexHelpLink');
+
     return (
         <Link
             href="/problem-authoring/tex-help"
@@ -8,7 +13,7 @@ export function TeXHelpLink() {
             rel="noreferrer"
             className="text-sm font-medium text-blue-600 underline underline-offset-4"
         >
-            TeX数式の書き方ヘルプ
+            {t('label')}
         </Link>
     );
 }

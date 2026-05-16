@@ -1,100 +1,119 @@
 export type TexHelpExample = {
-    title: string;
-    description: string;
-    tex: string;
+    key: string;
+    titleKey: string;
+    descriptionKey: string;
+    texKey: string;
 };
 
 export const TEX_HELP_SECTIONS: Array<{
-    title: string;
-    description: string;
+    key: string;
+    titleKey: string;
+    descriptionKey: string;
     examples: TexHelpExample[];
 }> = [
     {
-        title: '基本ルール',
-        description: '本文中では `$...$`、独立した大きい数式では `$$...$$` を使います。',
+        key: 'basicRules',
+        titleKey: 'sections.basicRules.title',
+        descriptionKey: 'sections.basicRules.description',
         examples: [
             {
-                title: '文中数式',
-                description: '文章の途中に短い数式を入れたいときの基本形です。',
-                tex: '点Aの座標は $(-2, 3)$ です。',
+                key: 'inlineFormula',
+                titleKey: 'sections.basicRules.examples.inlineFormula.title',
+                descriptionKey: 'sections.basicRules.examples.inlineFormula.description',
+                texKey: 'sections.basicRules.examples.inlineFormula.tex',
             },
             {
-                title: '独立数式',
-                description: '式変形や公式を1行で大きく見せたいときに使います。',
-                tex: '$$y = x^2 - 4x + 3$$',
+                key: 'displayFormula',
+                titleKey: 'sections.basicRules.examples.displayFormula.title',
+                descriptionKey: 'sections.basicRules.examples.displayFormula.description',
+                texKey: 'sections.basicRules.examples.displayFormula.tex',
             },
         ],
     },
     {
-        title: 'よく使う記法',
-        description: '分数、累乗、下付き、平方根など、問題文でよく使う形です。',
+        key: 'commonSyntax',
+        titleKey: 'sections.commonSyntax.title',
+        descriptionKey: 'sections.commonSyntax.description',
         examples: [
             {
-                title: '分数',
-                description: '分数は `\\frac{分子}{分母}` です。',
-                tex: '$$x = \\frac{3}{4}$$',
+                key: 'fraction',
+                titleKey: 'sections.commonSyntax.examples.fraction.title',
+                descriptionKey: 'sections.commonSyntax.examples.fraction.description',
+                texKey: 'sections.commonSyntax.examples.fraction.tex',
             },
             {
-                title: '累乗と下付き',
-                description: '累乗は `^`、下付きは `_` を使います。',
-                tex: '$$a_n = 2^n + 1$$',
+                key: 'powersSubscripts',
+                titleKey: 'sections.commonSyntax.examples.powersSubscripts.title',
+                descriptionKey: 'sections.commonSyntax.examples.powersSubscripts.description',
+                texKey: 'sections.commonSyntax.examples.powersSubscripts.tex',
             },
             {
-                title: '平方根',
-                description: '平方根は `\\sqrt{...}` で書きます。',
-                tex: '$$x = \\sqrt{5} + \\sqrt{2}$$',
+                key: 'squareRoot',
+                titleKey: 'sections.commonSyntax.examples.squareRoot.title',
+                descriptionKey: 'sections.commonSyntax.examples.squareRoot.description',
+                texKey: 'sections.commonSyntax.examples.squareRoot.tex',
             },
         ],
     },
     {
-        title: '記号と定型表現',
-        description: '角度、ギリシャ文字、場合分け、連立方程式などのコピペ用例です。',
+        key: 'symbolsPatterns',
+        titleKey: 'sections.symbolsPatterns.title',
+        descriptionKey: 'sections.symbolsPatterns.description',
         examples: [
             {
-                title: '角度とギリシャ文字',
-                description: '図形や三角比でよく使います。',
-                tex: '$$\\angle ABC = 45^\\circ,\\ \\theta = 30^\\circ$$',
+                key: 'anglesGreek',
+                titleKey: 'sections.symbolsPatterns.examples.anglesGreek.title',
+                descriptionKey: 'sections.symbolsPatterns.examples.anglesGreek.description',
+                texKey: 'sections.symbolsPatterns.examples.anglesGreek.tex',
             },
             {
-                title: '不等号と ±',
-                description: '条件整理や解の公式で使う記号です。',
-                tex: '$$x \\neq 3,\\ x = 2 \\pm \\sqrt{5}$$',
+                key: 'inequalityPlusMinus',
+                titleKey: 'sections.symbolsPatterns.examples.inequalityPlusMinus.title',
+                descriptionKey: 'sections.symbolsPatterns.examples.inequalityPlusMinus.description',
+                texKey: 'sections.symbolsPatterns.examples.inequalityPlusMinus.tex',
             },
             {
-                title: '場合分け',
-                description: '場合分けは `cases` 環境を使います。',
-                tex: '$$f(x)=\\begin{cases}x+1 & (x \\ge 0) \\\\ -x & (x < 0)\\end{cases}$$',
+                key: 'cases',
+                titleKey: 'sections.symbolsPatterns.examples.cases.title',
+                descriptionKey: 'sections.symbolsPatterns.examples.cases.description',
+                texKey: 'sections.symbolsPatterns.examples.cases.tex',
             },
             {
-                title: '連立方程式',
-                description: '連立方程式も `cases` でまとめて書けます。',
-                tex: '$$\\begin{cases}x+y=5 \\\\ x-y=1\\end{cases}$$',
+                key: 'simultaneous',
+                titleKey: 'sections.symbolsPatterns.examples.simultaneous.title',
+                descriptionKey: 'sections.symbolsPatterns.examples.simultaneous.description',
+                texKey: 'sections.symbolsPatterns.examples.simultaneous.tex',
             },
             {
-                title: 'ベクトル',
-                description: 'ベクトルや座標の定型例です。',
-                tex: '$$\\vec{AB} = (3, -2)$$',
+                key: 'vector',
+                titleKey: 'sections.symbolsPatterns.examples.vector.title',
+                descriptionKey: 'sections.symbolsPatterns.examples.vector.description',
+                texKey: 'sections.symbolsPatterns.examples.vector.tex',
             },
         ],
     },
     {
-        title: 'コピペ用サンプル集',
-        description: '問題文でそのまま使いやすい形を集めています。',
+        key: 'sampleSet',
+        titleKey: 'sections.sampleSet.title',
+        descriptionKey: 'sections.sampleSet.description',
         examples: [
             {
-                title: '二次関数',
-                description: '放物線や頂点の問題で使いやすい例です。',
-                tex: '二次関数 $y=x^2-4x+3$ のグラフについて、頂点の座標を答えなさい。',
+                key: 'quadratic',
+                titleKey: 'sections.sampleSet.examples.quadratic.title',
+                descriptionKey: 'sections.sampleSet.examples.quadratic.description',
+                texKey: 'sections.sampleSet.examples.quadratic.tex',
             },
             {
-                title: '比例式',
-                description: '比例・反比例や一次関数の本文用です。',
-                tex: '比例定数が $a$ のとき、$y=ax$ に $x=3$ を代入した値を求めなさい。',
+                key: 'proportion',
+                titleKey: 'sections.sampleSet.examples.proportion.title',
+                descriptionKey: 'sections.sampleSet.examples.proportion.description',
+                texKey: 'sections.sampleSet.examples.proportion.tex',
             },
             {
-                title: '解の公式',
-                description: '公式を独立表示したいときに使えます。',
-                tex: '$$x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$$',
+                key: 'quadraticFormula',
+                titleKey: 'sections.sampleSet.examples.quadraticFormula.title',
+                descriptionKey: 'sections.sampleSet.examples.quadraticFormula.description',
+                texKey: 'sections.sampleSet.examples.quadraticFormula.tex',
             },
         ],
     },
