@@ -219,5 +219,48 @@
     "submitting": "変更中...",
     "submit": "パスワードを変更して利用開始",
     "logout": "今はログアウトする"
+  },
+  "UnitFocus": {
+    "title": "単元集中学習",
+    "description": "苦手な単元や復習したい単元を選んで、講義動画の視聴や問題演習ができます。",
+    "notFound": "単元が見つかりません"
+  },
+  "UnitFocusList": {
+    "unlocked": "学習可能",
+    "locked": "ロック中",
+    "hasVideo": "動画あり",
+    "practiceOnly": "演習のみ",
+    "emptySubject": "この科目の単元はまだ登録されていません。"
+  },
+  "UnitFocusDetail": {
+    "backToList": "単元一覧に戻る",
+    "watchAlertTitle": "講義動画を視聴してください",
+    "watchAlertDescriptionLine1": "単元集中では未解放でも講義動画を視聴できます。",
+    "watchAlertDescriptionLine2": "ただし、ここでの視聴はアンロック判定や視聴済み状態には反映されません。",
+    "lockedAlertTitle": "通常演習ではこの単元はロック中です",
+    "lockedAlertDescriptionLine1": "単元集中では印刷と講義視聴ができますが、進行状態は更新されません。",
+    "lockedAlertDescriptionLine2": "アンロックは通常演習（coreProblemId なし）の採点結果でのみ判定されます。",
+    "printAlertTitle": "単元集中の問題はいつでも印刷できます",
+    "printAlertDescription": "必要に応じて講義動画を確認したうえで、印刷画面へ戻ってください。",
+    "returnToPrint": "印刷画面へ戻る",
+    "watchedAlertTitle": "講義動画視聴済み",
+    "watchedAlertDescription": "この単元の講義動画は視聴済みです。復習のため再度視聴することもできます。",
+    "lectureCardTitle": "講義動画を視聴",
+    "requiredBadge": "通常演習に必要",
+    "lectureDescriptionLockedNeedsWatching": "単元集中では視聴できますが、進行状態は更新されません",
+    "lectureDescriptionUnlockedNeedsWatching": "通常演習で出題するには講義動画の視聴が必要です",
+    "lectureDescriptionDefault": "ポイントを動画で確認して理解を深めましょう",
+    "playNow": "今すぐ視聴する",
+    "play": "再生する",
+    "processing": "処理中...",
+    "watchLectureButton": "講義動画を見る",
+    "watchLectureButtonWithCount": "講義動画を見る ({count})",
+    "selectVideo": "動画を選んで再生:",
+    "lectureVideoFallbackTitle": "講義動画 {number}",
+    "videoNumberLabel": "No. {number}",
+    "noLectureVideo": "この単元には講義動画が設定されていません。",
+    "printCardTitle": "問題を印刷する",
+    "printCardDescription": "単元集中はいつでも印刷できます。アンロック判定は通常演習の採点結果で行われます。",
+    "printThisUnit": "この単元を印刷する"
   }
 }
