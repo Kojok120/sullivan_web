@@ -14,6 +14,7 @@
     "./authorization": "./src/authorization.ts",
     "./classroom-service": "./src/classroom-service.ts",
     "./internal-api-auth": "./src/internal-api-auth.ts",
+    "./pack-access": "./src/pack-access.ts",
     "./password-service": "./src/password-service.ts",
     "./user-service": "./src/user-service.ts",
     "./supabase/admin": "./src/supabase/admin.ts",

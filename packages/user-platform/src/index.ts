@@ -5,5 +5,6 @@ export * from './auth-mobile';
 export * from './authorization';
 export * from './classroom-service';
 export * from './internal-api-auth';
+export * from './pack-access';
 export * from './password-service';
 export * from './user-service';
