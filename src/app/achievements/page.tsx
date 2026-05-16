@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Trophy, CheckCircle } from 'lucide-react';
@@ -8,10 +9,11 @@ import { Trophy, CheckCircle } from 'lucide-react';
 export default async function AchievementsPage() {
     const session = await getSession();
     if (!session) redirect('/login');
+    const t = await getTranslations('Achievements');
 
     // Fetch all achievements
     const allAchievements = await prisma.achievement.findMany({
-        where: { isHidden: false },
+        where: { isHidden: false, packId: session.defaultPackId },
         orderBy: { xpReward: 'asc' }
     });
 
@@ -28,7 +30,7 @@ export default async function AchievementsPage() {
         <div className="container mx-auto py-8 px-4">
             <h1 className="text-3xl font-bold mb-8 flex items-center gap-2">
                 <Trophy className="h-8 w-8 text-yellow-500" />
-                実績・トロフィー
+                {t('title')}
             </h1>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -58,9 +60,9 @@ export default async function AchievementsPage() {
                             </CardHeader>
                             <CardContent>
                                 <div className="text-xs text-muted-foreground mt-2">
-                                    {isUnlocked
-                                        ? `獲得日: ${unlockedAt?.toLocaleDateString()}`
-                                        : '未獲得'}
+                                    {isUnlocked && unlockedAt
+                                        ? t('unlockedAt', { date: unlockedAt.toLocaleDateString() })
+                                        : t('locked')}
                                 </div>
                             </CardContent>
                         </Card>

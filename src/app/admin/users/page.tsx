@@ -1,6 +1,7 @@
 import { getUsers, getUserManagementMeta } from '../actions';
 import { UserList } from './user-list';
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 import { Button } from '@/components/ui/button';
 import { Role } from '@prisma/client';
 
@@ -17,6 +18,7 @@ export default async function UsersPage({
         groupId?: string;
     }>;
 }) {
+    const t = await getTranslations('AdminUsersPage');
     const { q, page, sortBy, sortOrder, role, classroomId, groupId } = await searchParams;
     const currentPage = Number(page) || 1;
     const query = q || '';
@@ -41,7 +43,7 @@ export default async function UsersPage({
     if (error || !users || metadataError) {
         return (
             <div className="p-8 text-center text-red-600">
-                エラーが発生しました: {error || metadataError}
+                {t('error', { message: error ?? metadataError ?? t('unknownError') })}
             </div>
         );
     }
@@ -50,10 +52,10 @@ export default async function UsersPage({
         <div className="min-h-screen bg-background">
             <div className="container mx-auto px-4 py-6 sm:py-8">
                 <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <h1 className="text-2xl font-bold text-foreground">ユーザー管理</h1>
+                    <h1 className="text-2xl font-bold text-foreground">{t('title')}</h1>
                     <Link href="/admin/users/register">
                         <Button className="min-h-11 w-full sm:min-h-10 sm:w-auto">
-                            + 新規ユーザー登録
+                            {t('newUser')}
                         </Button>
                     </Link>
                 </div>

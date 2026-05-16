@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { CoreProblem, Subject } from '@prisma/client';
+import { useTranslations } from 'next-intl';
 
 import { CoreProblemBulkImport } from '@/app/admin/curriculum/components/core-problem-bulk-import';
 import { CoreProblemList } from '@/app/admin/curriculum/components/core-problem-list';
@@ -21,6 +22,7 @@ type MaterialsCoreProblemManagerProps = {
 const buildEditHref = (problemId: string) => `/materials/problems/${problemId}`;
 
 export function MaterialsCoreProblemManager({ initialSubjects }: MaterialsCoreProblemManagerProps) {
+    const t = useTranslations('MaterialsCoreProblemManager');
     const [rawSelectedSubjectId, setRawSelectedSubjectId] = useState<string | null>(initialSubjects[0]?.id ?? null);
     const [rawSelectedCoreProblemId, setRawSelectedCoreProblemId] = useState<string | null>(null);
     const [rawMobilePane, setRawMobilePane] = useState<'core' | 'problems'>('core');
@@ -43,7 +45,7 @@ export function MaterialsCoreProblemManager({ initialSubjects }: MaterialsCorePr
     return (
         <div className="flex min-h-[calc(100dvh-8rem)] flex-col gap-4 md:h-[calc(100vh-10rem)]">
             <div className="z-10 flex flex-col gap-2 bg-background py-2 sm:flex-row sm:items-center sm:gap-4">
-                <h2 className="whitespace-nowrap font-semibold">科目選択:</h2>
+                <h2 className="whitespace-nowrap font-semibold">{t('subjectSelection')}</h2>
                 <Tabs
                     value={selectedSubjectId ?? ''}
                     onValueChange={handleSubjectChange}
@@ -67,7 +69,7 @@ export function MaterialsCoreProblemManager({ initialSubjects }: MaterialsCorePr
                     className="min-h-11 flex-1"
                     onClick={() => setRawMobilePane('core')}
                 >
-                    CoreProblem一覧
+                    {t('coreProblemList')}
                 </Button>
                 <Button
                     variant={mobilePane === 'problems' ? 'default' : 'outline'}
@@ -75,7 +77,7 @@ export function MaterialsCoreProblemManager({ initialSubjects }: MaterialsCorePr
                     onClick={() => setRawMobilePane('problems')}
                     disabled={!selectedCoreProblemId}
                 >
-                    問題一覧
+                    {t('problemList')}
                 </Button>
             </div>
 
@@ -84,11 +86,11 @@ export function MaterialsCoreProblemManager({ initialSubjects }: MaterialsCorePr
                     <div className="flex h-full flex-col rounded-lg border bg-muted/10">
                         <div className="flex items-center justify-between border-b bg-muted/20 p-3 text-sm font-semibold">
                             <div className="flex items-center gap-2">
-                                <span>CoreProblem一覧</span>
+                                <span>{t('coreProblemList')}</span>
                                 {selectedSubject && <CoreProblemBulkImport subjectId={selectedSubject.id} />}
                             </div>
                             <span className="text-xs font-normal text-muted-foreground">
-                                {selectedSubject?.coreProblems.length ?? 0}件
+                                {t('count', { count: selectedSubject?.coreProblems.length ?? 0 })}
                             </span>
                         </div>
                         <div className="min-h-0 flex-1 overflow-y-auto p-2">
@@ -104,7 +106,7 @@ export function MaterialsCoreProblemManager({ initialSubjects }: MaterialsCorePr
                                 />
                             ) : (
                                 <div className="p-4 text-center text-sm text-muted-foreground">
-                                    科目を選択してください
+                                    {t('selectSubject')}
                                 </div>
                             )}
                         </div>
@@ -118,7 +120,7 @@ export function MaterialsCoreProblemManager({ initialSubjects }: MaterialsCorePr
                             />
                         ) : (
                             <div className="flex h-full flex-col items-center justify-center text-muted-foreground">
-                                <p>CoreProblemを選択してください</p>
+                                <p>{t('selectCoreProblem')}</p>
                             </div>
                         )}
                     </div>
@@ -135,11 +137,11 @@ export function MaterialsCoreProblemManager({ initialSubjects }: MaterialsCorePr
                         <div className="border rounded-lg bg-muted/10 flex h-full flex-col overflow-hidden">
                             <div className="p-3 border-b bg-muted/20 font-semibold text-sm flex justify-between items-center">
                                 <div className="flex items-center gap-2">
-                                    <span>CoreProblem一覧</span>
+                                    <span>{t('coreProblemList')}</span>
                                     {selectedSubject && <CoreProblemBulkImport subjectId={selectedSubject.id} />}
                                 </div>
                                 <span className="text-xs font-normal text-muted-foreground">
-                                    {selectedSubject?.coreProblems.length ?? 0}件
+                                    {t('count', { count: selectedSubject?.coreProblems.length ?? 0 })}
                                 </span>
                             </div>
                             <div className="flex-1 overflow-y-auto p-2">
@@ -152,7 +154,7 @@ export function MaterialsCoreProblemManager({ initialSubjects }: MaterialsCorePr
                                     />
                                 ) : (
                                     <div className="p-4 text-center text-muted-foreground text-sm">
-                                        科目を選択してください
+                                        {t('selectSubject')}
                                     </div>
                                 )}
                             </div>
@@ -167,7 +169,7 @@ export function MaterialsCoreProblemManager({ initialSubjects }: MaterialsCorePr
                                 />
                             ) : (
                                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                                    <p>左側のリストからCoreProblemを選択して、問題を表示・編集してください</p>
+                                    <p>{t('selectCoreProblemFromList')}</p>
                                 </div>
                             )}
                         </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useTranslations } from 'next-intl';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -51,6 +52,7 @@ function ProblemDialogForm({
     onOpenChange,
     onSuccess,
 }: Omit<ProblemDialogProps, 'open'>) {
+    const t = useTranslations('ProblemDialog');
     const [isPending, startTransition] = useTransition();
     const [initialFormData] = useState<ProblemFormState>(() => createInitialFormState(problem));
     const [formData, setFormData] = useState<ProblemFormState>(initialFormData);
@@ -84,10 +86,10 @@ function ProblemDialogForm({
 
                 const result = await updateStandaloneProblem(problem.id, data);
                 if (result.success) {
-                    toast.success('問題を更新しました');
+                    toast.success(t('updateSuccess'));
                     onSuccess();
                 } else {
-                    toast.error(result.error || '保存に失敗しました');
+                    toast.error(result.error || t('saveFailed'));
                 }
                 return;
             }
@@ -104,10 +106,10 @@ function ProblemDialogForm({
             const result = await createStandaloneProblem(data);
 
             if (result.success) {
-                toast.success('問題を作成しました');
+                toast.success(t('createSuccess'));
                 onSuccess();
             } else {
-                toast.error(result.error || '保存に失敗しました');
+                toast.error(result.error || t('saveFailed'));
             }
         });
     };
@@ -115,46 +117,46 @@ function ProblemDialogForm({
     return (
         <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
             <DialogHeader>
-                <DialogTitle>{problem ? '問題の編集' : '新規問題作成'}</DialogTitle>
+                <DialogTitle>{problem ? t('editTitle') : t('createTitle')}</DialogTitle>
                 <DialogDescription>
-                    問題の内容と紐付けを設定します。
+                    {t('description')}
                 </DialogDescription>
             </DialogHeader>
 
             <form onSubmit={handleSubmit} className="space-y-6 py-4">
                 <div className="space-y-2">
-                    <Label>問題文</Label>
+                    <Label>{t('questionLabel')}</Label>
                     <Textarea
                         required
                         value={formData.question}
                         onChange={(e) => setFormData((prev) => ({ ...prev, question: e.target.value }))}
-                        placeholder="問題文を入力してください"
+                        placeholder={t('questionPlaceholder')}
                         rows={3}
                     />
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
-                        <Label>解答 (任意)</Label>
+                        <Label>{t('answerLabel')}</Label>
                         <Input
                             value={formData.answer}
                             onChange={(e) => setFormData((prev) => ({ ...prev, answer: e.target.value }))}
-                            placeholder="解答 (空欄可)"
+                            placeholder={t('answerPlaceholder')}
                         />
                     </div>
                     <div className="space-y-2">
-                        <Label>学年 (任意)</Label>
+                        <Label>{t('gradeLabel')}</Label>
                         <Input
                             value={formData.grade}
                             onChange={(e) => setFormData((prev) => ({ ...prev, grade: e.target.value }))}
-                            placeholder="例: 中1"
+                            placeholder={t('gradePlaceholder')}
                         />
                     </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_180px]">
                     <div className="space-y-2">
-                        <Label>解説動画URL (任意)</Label>
+                        <Label>{t('videoUrlLabel')}</Label>
                         <Input
                             value={formData.videoUrl}
                             onChange={(e) => setFormData((prev) => ({ ...prev, videoUrl: e.target.value }))}
@@ -162,7 +164,7 @@ function ProblemDialogForm({
                         />
                     </div>
                     <div className="space-y-2">
-                        <Label>動画ステータス</Label>
+                        <Label>{t('videoStatusLabel')}</Label>
                         <Select
                             value={resolveVideoStatusFromUrl(formData.videoStatus, formData.videoUrl)}
                             onValueChange={(value) => setFormData((prev) => ({ ...prev, videoStatus: value as VideoStatusValue }))}
@@ -173,18 +175,18 @@ function ProblemDialogForm({
                             </SelectTrigger>
                             <SelectContent>
                                 {VIDEO_STATUS_OPTIONS.map((option) => (
-                                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                                    <SelectItem key={option.value} value={option.value}>{t(option.labelKey)}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
                         {!!formData.videoUrl.trim() && (
-                            <p className="text-xs text-muted-foreground">URL設定済みのため自動的に「設定済み」になります</p>
+                            <p className="text-xs text-muted-foreground">{t('videoUrlAutoStatus')}</p>
                         )}
                     </div>
                 </div>
 
                 <div className="space-y-3 pt-4 border-t">
-                    <Label>紐付け（コア問題・単元）</Label>
+                    <Label>{t('coreProblemsLabel')}</Label>
                     <CoreProblemSelector
                         selected={formData.coreProblems}
                         onChange={(coreProblems) => setFormData((prev) => ({ ...prev, coreProblems }))}
@@ -193,10 +195,10 @@ function ProblemDialogForm({
                 </div>
 
                 <DialogFooter>
-                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="min-h-11 sm:min-h-10">キャンセル</Button>
+                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="min-h-11 sm:min-h-10">{t('cancel')}</Button>
                     <Button type="submit" disabled={isPending} className="min-h-11 sm:min-h-10">
                         {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                        保存
+                        {t('save')}
                     </Button>
                 </DialogFooter>
             </form>

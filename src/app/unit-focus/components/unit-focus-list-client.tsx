@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,6 +27,7 @@ interface UnitFocusListClientProps {
 }
 
 export function UnitFocusListClient({ subjects }: UnitFocusListClientProps) {
+    const t = useTranslations('UnitFocusList');
     // Default to the first subject if available
     const initialSubjectId = subjects.length > 0 ? subjects[0].id : "";
 
@@ -69,7 +71,7 @@ export function UnitFocusListClient({ subjects }: UnitFocusListClientProps) {
                                             <CardHeader className="pb-3">
                                                 <div className="flex justify-between items-start gap-2">
                                                     <Badge variant={isUnlocked ? "secondary" : "outline"} className="mb-2">
-                                                        {isUnlocked ? "学習可能" : "ロック中"}
+                                                        {isUnlocked ? t('unlocked') : t('locked')}
                                                     </Badge>
                                                     {isUnlocked ? (
                                                         <Unlock className="w-5 h-5 text-green-500" />
@@ -86,12 +88,12 @@ export function UnitFocusListClient({ subjects }: UnitFocusListClientProps) {
                                                     {coreProblem.lectureVideos.length > 0 ? (
                                                         <div className="flex items-center gap-1 text-blue-600">
                                                             <PlayCircle className="w-4 h-4" />
-                                                            <span>動画あり</span>
+                                                            <span>{t('hasVideo')}</span>
                                                         </div>
                                                     ) : (
                                                         <div className="flex items-center gap-1">
                                                             <BookOpen className="w-4 h-4" />
-                                                            <span>演習のみ</span>
+                                                            <span>{t('practiceOnly')}</span>
                                                         </div>
                                                     )}
                                                 </div>
@@ -103,7 +105,7 @@ export function UnitFocusListClient({ subjects }: UnitFocusListClientProps) {
                         </div>
                         {subject.coreProblems.length === 0 && (
                             <div className="text-center py-12 text-muted-foreground bg-muted/10 rounded-lg border border-dashed">
-                                この科目の単元はまだ登録されていません。
+                                {t('emptySubject')}
                             </div>
                         )}
                     </TabsContent>

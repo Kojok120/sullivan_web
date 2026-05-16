@@ -2,6 +2,7 @@
 
 import { LearningSession } from '@/lib/analytics';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowRight, CheckCircle, AlertCircle, Filter } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ type SessionListClientProps = {
 const PAGE_SIZE = 10;
 
 export function SessionListClient({ initialSessions, userId, basePath }: SessionListClientProps) {
+    const t = useTranslations('SessionList');
     // 初期表示は全件前提で受け取り、フィルタ変更時のみ再取得する。
     const [sessions, setSessions] = useState<LearningSession[]>(initialSessions);
     const [offset, setOffset] = useState(initialSessions.length);
@@ -111,7 +113,7 @@ export function SessionListClient({ initialSessions, userId, basePath }: Session
     };
 
     if (sessions.length === 0 && !loading && !showPendingVideoReviewOnly) {
-        return <div className="text-muted-foreground text-sm">まだ学習履歴がありません</div>;
+        return <div className="text-muted-foreground text-sm">{t('emptyHistory')}</div>;
     }
 
     return (
@@ -124,14 +126,14 @@ export function SessionListClient({ initialSessions, userId, basePath }: Session
                 />
                 <Label htmlFor="pending-video-review-filter" className="text-sm cursor-pointer flex items-center gap-1.5 font-medium text-muted-foreground">
                     <Filter className="h-4 w-4" />
-                    解説動画未視聴のみ表示
+                    {t('pendingVideoReviewOnly')}
                 </Label>
             </div>
 
             {sessions.length === 0 && !loading && showPendingVideoReviewOnly && (
                 <div className="text-muted-foreground text-sm py-8 text-center bg-muted rounded-lg border border-dashed text-muted-foreground">
                     <CheckCircle className="h-8 w-8 mx-auto mb-2 text-green-400/50" />
-                    解説動画未視聴のセッションはありません。<br />素晴らしい！
+                    {t('pendingVideoReviewEmptyLine1')}<br />{t('pendingVideoReviewEmptyLine2')}
                 </div>
             )}
 
@@ -166,7 +168,7 @@ export function SessionListClient({ initialSessions, userId, basePath }: Session
                                                 {session.subjectName}
                                             </CardTitle>
                                             {session.hasUnread && (
-                                                <Badge className="bg-orange-500 hover:bg-orange-600 text-[10px] h-5 px-1.5">NEW</Badge>
+                                                <Badge className="bg-orange-500 hover:bg-orange-600 text-[10px] h-5 px-1.5">{t('newBadge')}</Badge>
                                             )}
                                         </div>
                                         <div className="text-sm text-muted-foreground mt-1">
@@ -177,21 +179,21 @@ export function SessionListClient({ initialSessions, userId, basePath }: Session
                                 <div className="flex items-center space-x-4">
                                     <div className="text-right">
                                         <div className={`text-lg font-bold ${hasPendingVideoReview ? 'text-red-700' : 'text-blue-700'}`}>
-                                            {session.correctCount} / {session.totalProblems} 問正解
+                                            {t('correctCount', { correct: session.correctCount, total: session.totalProblems })}
                                         </div>
                                         {hasPendingVideoReview && (
                                             <div className="text-xs text-red-600 font-bold">
-                                                解説動画未視聴: {session.unwatchedMistakeCount}
+                                                {t('unwatchedMistakes', { count: session.unwatchedMistakeCount })}
                                             </div>
                                         )}
                                         {isCompleted && session.correctCount < session.totalProblems && (
                                             <div className="text-xs text-blue-600 font-bold">
-                                                復習完了！
+                                                {t('reviewComplete')}
                                             </div>
                                         )}
                                         {isCompleted && session.correctCount === session.totalProblems && (
                                             <div className="text-xs text-blue-600 font-bold">
-                                                全問正解！
+                                                {t('allCorrect')}
                                             </div>
                                         )}
                                     </div>
@@ -206,7 +208,7 @@ export function SessionListClient({ initialSessions, userId, basePath }: Session
             {hasMore && sessions.length > 0 && (
                 <div className="text-center pt-4">
                     <Button onClick={loadMore} disabled={loading} variant="outline" className="w-full md:w-auto">
-                        {loading ? "読み込み中..." : "さらに読み込む"}
+                        {loading ? t('loading') : t('loadMore')}
                     </Button>
                 </div>
             )}

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,8 @@ import { getProblemsByCoreProblem } from '../actions';
 import { LinkIcon, GraduationCap, Hash, KeyRound, BookOpen, Pencil } from 'lucide-react';
 import { ProblemTextPreview } from '@/app/admin/problems/components/problem-text-preview';
 import { getDisplayQuestionFromStructuredContent } from '@/lib/structured-problem';
+
+type ProblemEditorTranslator = ReturnType<typeof useTranslations>;
 
 interface ProblemEditorProps {
     coreProblemId: string;
@@ -88,7 +91,7 @@ function getSafeExternalHref(rawUrl: string | null | undefined) {
     return null;
 }
 
-function ProblemItem({ problem, editHref }: { problem: ProblemEditorProblem; editHref?: string }) {
+function ProblemItem({ problem, editHref, t }: { problem: ProblemEditorProblem; editHref?: string; t: ProblemEditorTranslator }) {
     const safeVideoUrl = getSafeExternalHref(problem.videoUrl);
     // publishedRevision が無い DRAFT 問題では最新リビジョンの structuredContent を表示する。
     const sourceRevision = problem.publishedRevision ?? problem.revisions[0] ?? null;
@@ -113,7 +116,7 @@ function ProblemItem({ problem, editHref }: { problem: ProblemEditorProblem; edi
                             <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
                                 <Link href={editHref}>
                                     <Pencil className="mr-1 h-3.5 w-3.5" />
-                                    編集
+                                    {t('edit')}
                                 </Link>
                             </Button>
                         </div>
@@ -123,28 +126,28 @@ function ProblemItem({ problem, editHref }: { problem: ProblemEditorProblem; edi
                 <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
                     <MetaField
                         icon={<Hash className="h-3 w-3" />}
-                        label="マスタNo"
+                        label={t('masterNumberLabel')}
                     >
                         <span className="font-mono">{problem.masterNumber ?? '-'}</span>
                     </MetaField>
 
                     <MetaField
                         icon={<KeyRound className="h-3 w-3" />}
-                        label="ID"
+                        label={t('idLabel')}
                     >
                         <span className="font-mono">{problem.customId}</span>
                     </MetaField>
 
                     <MetaField
                         icon={<GraduationCap className="h-3 w-3" />}
-                        label="学年"
+                        label={t('gradeLabel')}
                     >
                         {problem.grade || '-'}
                     </MetaField>
 
                     <MetaField
                         icon={<BookOpen className="h-3 w-3" />}
-                        label="紐付けCoreProblem"
+                        label={t('linkedCoreProblemLabel')}
                         className="sm:col-span-2 xl:col-span-2"
                     >
                         {problem.coreProblems.length > 0 ? (
@@ -162,7 +165,7 @@ function ProblemItem({ problem, editHref }: { problem: ProblemEditorProblem; edi
 
                     <MetaField
                         icon={<LinkIcon className="h-3 w-3" />}
-                        label="解説動画URL"
+                        label={t('videoUrlLabel')}
                         className="sm:col-span-2 xl:col-span-3"
                     >
                         {safeVideoUrl ? (
@@ -187,6 +190,7 @@ function ProblemItem({ problem, editHref }: { problem: ProblemEditorProblem; edi
 }
 
 export function ProblemEditor({ coreProblemId, editHrefBuilder }: ProblemEditorProps) {
+    const t = useTranslations('AdminCurriculumProblemEditor');
     const [problems, setProblems] = useState<ProblemEditorProblem[]>([]);
     const [loading, setLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
@@ -211,14 +215,14 @@ export function ProblemEditor({ coreProblemId, editHrefBuilder }: ProblemEditorP
                     return;
                 }
 
-                setErrorMessage(res.error ?? '問題の取得に失敗しました。');
+                setErrorMessage(res.error ?? t('fetchFailed'));
                 setProblems([]);
             } catch {
                 if (requestIdRef.current !== requestId) {
                     return;
                 }
 
-                setErrorMessage('問題の取得に失敗しました。');
+                setErrorMessage(t('fetchFailed'));
                 setProblems([]);
             } finally {
                 if (requestIdRef.current === requestId) {
@@ -228,16 +232,16 @@ export function ProblemEditor({ coreProblemId, editHrefBuilder }: ProblemEditorP
         };
 
         void fetchProblems();
-    }, [coreProblemId]);
+    }, [coreProblemId, t]);
 
     return (
         <div className="flex flex-col h-full bg-slate-50/50">
             {/* Header */}
             <div className="sticky top-0 z-10 flex flex-col items-start justify-between gap-2 border-b bg-card p-2 px-4 sm:flex-row sm:items-center">
-                <h3 className="text-sm font-semibold">問題一覧 ({problems.length})</h3>
+                <h3 className="text-sm font-semibold">{t('problemListHeading', { count: problems.length })}</h3>
                 {!editHrefBuilder ? (
                     <div className="rounded border border-yellow-200 bg-yellow-50 px-2 py-1 text-xs text-muted-foreground text-yellow-700">
-                        ※ここでの編集はできません。「問題管理」を使用してください
+                        {t('readOnlyNotice')}
                     </div>
                 ) : null}
             </div>
@@ -249,10 +253,10 @@ export function ProblemEditor({ coreProblemId, editHrefBuilder }: ProblemEditorP
                         {errorMessage}
                     </div>
                 ) : loading ? (
-                    <div className="p-4 text-muted-foreground text-sm">読み込み中...</div>
+                    <div className="p-4 text-muted-foreground text-sm">{t('loading')}</div>
                 ) : problems.length === 0 ? (
                     <div className="p-8 text-center text-muted-foreground text-sm">
-                        問題がありません。
+                        {t('emptyProblems')}
                     </div>
                 ) : (
                     problems.map((problem) => (
@@ -260,6 +264,7 @@ export function ProblemEditor({ coreProblemId, editHrefBuilder }: ProblemEditorP
                             key={problem.id}
                             problem={problem}
                             editHref={editHrefBuilder?.(problem.id)}
+                            t={t}
                         />
                     ))
                 )}

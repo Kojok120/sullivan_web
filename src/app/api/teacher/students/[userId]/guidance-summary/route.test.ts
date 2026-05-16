@@ -87,6 +87,8 @@ describe('guidance summary route', () => {
             userId: 'teacher-1',
             role: 'TEACHER',
             name: '先生',
+            defaultPackId: 'jp-juken',
+            allowedPackIds: ['jp-juken'],
         });
         canAccessUserWithinClassroomScopeMock.mockResolvedValue(true);
         prismaMock.user.findUnique.mockResolvedValue({

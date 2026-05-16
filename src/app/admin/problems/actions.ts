@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { Prisma, ProblemAuthoringTool, VideoStatus } from '@prisma/client';
+import { getTranslations } from 'next-intl/server';
 
 import { requireAdmin, requireProblemAuthor } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
@@ -28,6 +29,8 @@ import {
 import { createProblemAssetSignedUrl, removeProblemAssetFromStorage, uploadProblemAssetToStorage } from '@/lib/problem-assets';
 import { SENT_BACK_REASON_MAX } from './constants';
 import { problemAdminInclude } from './types';
+
+type ProblemActionTranslations = Awaited<ReturnType<typeof getTranslations>>;
 
 type ProblemFilters = {
     grade?: string;
@@ -169,14 +172,14 @@ function buildProblemWhere(filters: ProblemFilters, search?: string): Prisma.Pro
     return conditionsToPrismaWhere(conditions);
 }
 
-async function getSubjectNameById(subjectId: string) {
+async function getSubjectNameById(subjectId: string, t: ProblemActionTranslations) {
     const subject = await prisma.subject.findUnique({
         where: { id: subjectId },
         select: { name: true },
     });
 
     if (!subject) {
-        throw new Error('教科が見つかりません');
+        throw new Error(t('subjectNotFound'));
     }
 
     return subject.name;
@@ -186,9 +189,9 @@ function shouldPreserveProblemMasterNumber(subjectName: string) {
     return subjectName === '英語';
 }
 
-async function resolveSubjectIdFromCoreProblemIds(coreProblemIds: string[]) {
+async function resolveSubjectIdFromCoreProblemIds(coreProblemIds: string[], t: ProblemActionTranslations) {
     if (coreProblemIds.length === 0) {
-        throw new Error('CoreProblemは最低1件必要です');
+        throw new Error(t('coreProblemRequired'));
     }
 
     const coreProblems = await prisma.coreProblem.findMany({
@@ -197,12 +200,12 @@ async function resolveSubjectIdFromCoreProblemIds(coreProblemIds: string[]) {
     });
 
     if (coreProblems.length !== coreProblemIds.length) {
-        throw new Error('存在しないCoreProblemが含まれています');
+        throw new Error(t('coreProblemMissing'));
     }
 
     const subjectIds = new Set(coreProblems.map((coreProblem) => coreProblem.subjectId));
     if (subjectIds.size > 1) {
-        throw new Error('複数教科のCoreProblemは紐付けできません');
+        throw new Error(t('multipleSubjectCoreProblems'));
     }
 
     return Array.from(subjectIds)[0]!;
@@ -282,6 +285,7 @@ export async function getProblems(
     sortOrder: 'asc' | 'desc' = 'desc',
 ) {
     await requireProblemAuthor();
+    const t = await getTranslations('AdminProblemActions');
     try {
         const normalizedSearch = search.trim();
         const where = buildProblemWhere(filters, normalizedSearch || undefined);
@@ -376,15 +380,17 @@ export async function getProblems(
         };
     } catch (error) {
         console.error('Failed to get problems:', error);
-        return { error: '問題の取得に失敗しました' };
+        return { error: t('getProblemsFailed') };
     }
 }
 
 export async function getProblemSubjects() {
-    await requireProblemAuthor();
+    const session = await requireProblemAuthor();
+    const t = await getTranslations('AdminProblemActions');
 
     try {
         const subjects = await prisma.subject.findMany({
+            where: { packId: session.defaultPackId },
             orderBy: [{ order: 'asc' }, { name: 'asc' }],
             select: {
                 id: true,
@@ -406,15 +412,17 @@ export async function getProblemSubjects() {
         };
     } catch (error) {
         console.error('Failed to get problem subjects:', error);
-        return { error: '科目一覧の取得に失敗しました' };
+        return { error: t('getSubjectsFailed') };
     }
 }
 
 export async function getProblemNavSubjects() {
-    await requireProblemAuthor();
+    const session = await requireProblemAuthor();
+    const t = await getTranslations('AdminProblemActions');
 
     try {
         const subjects = await prisma.subject.findMany({
+            where: { packId: session.defaultPackId },
             orderBy: [{ order: 'asc' }, { name: 'asc' }],
             select: {
                 id: true,
@@ -429,15 +437,16 @@ export async function getProblemNavSubjects() {
         };
     } catch (error) {
         console.error('Failed to get problem nav subjects:', error);
-        return { error: '科目ナビゲーションの取得に失敗しました' };
+        return { error: t('getNavSubjectsFailed') };
     }
 }
 
 export async function getProblemEditorContext(problemId?: string) {
-    await requireProblemAuthor();
+    const session = await requireProblemAuthor();
 
     const [subjects, coreProblems, problem] = await Promise.all([
         prisma.subject.findMany({
+            where: { packId: session.defaultPackId },
             orderBy: [{ order: 'asc' }, { name: 'asc' }],
             select: { id: true, name: true },
         }),
@@ -461,12 +470,13 @@ export async function createStandaloneProblem(data: {
     coreProblemIds: string[];
 }) {
     await requireAdmin();
+    const t = await getTranslations('AdminProblemActions');
     // Server Action 引数は runtime に null/非 object も入りうるため payload 形状から検証する。
     if (data == null || typeof data !== 'object') {
-        return { error: '不正なリクエストです' };
+        return { error: t('invalidRequest') };
     }
     if (typeof data.question !== 'string' || !data.question.trim()) {
-        return { error: '問題文を入力してください' };
+        return { error: t('questionRequired') };
     }
     try {
         const resolvedVideoStatus = resolveVideoStatusFromUrl(data.videoStatus, data.videoUrl);
@@ -485,7 +495,7 @@ export async function createStandaloneProblem(data: {
         return { success: true, problem };
     } catch (error) {
         console.error('Failed to create problem:', error);
-        return { error: '問題の作成に失敗しました' };
+        return { error: t('createFailed') };
     }
 }
 
@@ -499,14 +509,15 @@ export async function updateStandaloneProblem(id: string, data: {
     coreProblemIds?: string[];
 }) {
     await requireAdmin();
+    const t = await getTranslations('AdminProblemActions');
     // Server Action 引数は runtime に null/非 object も入りうるため payload 形状から検証する。
     if (data == null || typeof data !== 'object') {
-        return { error: '不正なリクエストです' };
+        return { error: t('invalidRequest') };
     }
     // 空白のみの question で revision を作ると paragraphBlockSchema (text.min(1)) を
     // 違反する structuredContent が保存され、以後の parseStructuredDocument が壊れる。
     if (data.question !== undefined && (typeof data.question !== 'string' || !data.question.trim())) {
-        return { error: '問題文を入力してください' };
+        return { error: t('questionRequired') };
     }
     try {
         const updateData: Prisma.ProblemUpdateInput = {
@@ -541,7 +552,7 @@ export async function updateStandaloneProblem(id: string, data: {
             },
         });
         if (!existing) {
-            return { error: '問題が見つかりません' };
+            return { error: t('problemNotFound') };
         }
 
         const shouldUpdateRevision =
@@ -554,7 +565,7 @@ export async function updateStandaloneProblem(id: string, data: {
         const guardSource = existing.publishedRevision?.structuredContent
             ?? existing.revisions[0]?.structuredContent;
         if (shouldUpdateRevision && wouldFlattenLoseStructuredContent(guardSource)) {
-            return { error: '構造化ブロックを含む問題はこの画面から編集できません。問題編集画面をご利用ください。' };
+            return { error: t('structuredContentEditBlocked') };
         }
 
         if (data.videoUrl !== undefined || data.videoStatus !== undefined) {
@@ -564,8 +575,8 @@ export async function updateStandaloneProblem(id: string, data: {
         }
 
         if (data.coreProblemIds) {
-            const subjectId = await resolveSubjectIdFromCoreProblemIds(data.coreProblemIds);
-            const subjectName = await getSubjectNameById(subjectId);
+            const subjectId = await resolveSubjectIdFromCoreProblemIds(data.coreProblemIds, t);
+            const subjectName = await getSubjectNameById(subjectId, t);
             updateData.coreProblems = {
                 set: data.coreProblemIds.map((cid) => ({ id: cid })),
             };
@@ -651,7 +662,7 @@ export async function updateStandaloneProblem(id: string, data: {
         return { success: true, problem };
     } catch (error) {
         console.error('Failed to update problem:', error);
-        return { error: '問題の更新に失敗しました' };
+        return { error: t('updateFailed') };
     }
 }
 
@@ -677,6 +688,7 @@ export async function createProblemDraft(data: {
     acceptedAnswers?: string[];
 }) {
     await requireProblemAuthor();
+    const t = await getTranslations('AdminProblemActions');
 
     try {
         const normalized = normalizeStructuredDraftInput({
@@ -686,8 +698,8 @@ export async function createProblemDraft(data: {
             correctAnswer: data.correctAnswer,
             acceptedAnswers: data.acceptedAnswers,
         });
-        const subjectId = await resolveSubjectIdFromCoreProblemIds(data.coreProblemIds);
-        const subjectName = await getSubjectNameById(subjectId);
+        const subjectId = await resolveSubjectIdFromCoreProblemIds(data.coreProblemIds, t);
+        const subjectName = await getSubjectNameById(subjectId, t);
 
         const nextCorrectAnswer = normalized.answer.correctAnswer || null;
         const nextAcceptedAnswers = normalized.answer.acceptedAnswers;
@@ -810,12 +822,13 @@ export async function createProblemDraft(data: {
         };
     } catch (error) {
         console.error('Failed to save structured draft:', error);
-        return { error: '構造化問題の保存に失敗しました' };
+        return { error: t('structuredDraftSaveFailed') };
     }
 }
 
 export async function publishProblemRevision(problemId: string) {
     await requireProblemAuthor();
+    const t = await getTranslations('AdminProblemActions');
 
     try {
         const problem = await prisma.problem.findUnique({
@@ -828,12 +841,12 @@ export async function publishProblemRevision(problemId: string) {
         });
 
         if (!problem) {
-            return { error: '問題が見つかりません' };
+            return { error: t('problemNotFound') };
         }
 
         const draftRevision = problem.revisions.find((revision) => revision.status === 'DRAFT');
         if (!draftRevision) {
-            return { error: '公開可能な下書きがありません' };
+            return { error: t('noPublishableDraft') };
         }
 
         // Phase C: 正解情報は ProblemRevision の専用カラム (correctAnswer / acceptedAnswers) のみが真のソース。
@@ -872,7 +885,7 @@ export async function publishProblemRevision(problemId: string) {
         return { success: true };
     } catch (error) {
         console.error('Failed to publish problem revision:', error);
-        return { error: '問題の公開に失敗しました' };
+        return { error: t('publishFailed') };
     }
 }
 
@@ -892,6 +905,7 @@ export async function previewProblemPrint(params: {
 
 export async function uploadProblemAsset(formData: FormData) {
     await requireProblemAuthor();
+    const t = await getTranslations('AdminProblemActions');
 
     try {
         const problemId = String(formData.get('problemId') || '');
@@ -902,7 +916,7 @@ export async function uploadProblemAsset(formData: FormData) {
         const file = formData.get('file');
 
         if (!problemId || !revisionId) {
-            return { error: 'problemId と revisionId が必要です' };
+            return { error: t('assetIdentityRequired') };
         }
 
         let storageKey: string | undefined;
@@ -921,7 +935,7 @@ export async function uploadProblemAsset(formData: FormData) {
             mimeType = uploaded.mimeType;
             fileName = file.name;
         } else if (!inlineContent) {
-            return { error: 'ファイルまたは inlineContent が必要です' };
+            return { error: t('fileOrInlineContentRequired') };
         }
 
         const asset = await prisma.problemAsset.create({
@@ -941,12 +955,13 @@ export async function uploadProblemAsset(formData: FormData) {
         return { success: true, asset };
     } catch (error) {
         console.error('Failed to upload problem asset:', error);
-        return { error: 'アセットの保存に失敗しました' };
+        return { error: t('assetSaveFailed') };
     }
 }
 
 export async function deleteProblemAsset(assetId: string) {
     await requireAdmin();
+    const t = await getTranslations('AdminProblemActions');
 
     try {
         const asset = await prisma.problemAsset.findUnique({
@@ -955,7 +970,7 @@ export async function deleteProblemAsset(assetId: string) {
         });
 
         if (!asset) {
-            return { error: 'アセットが見つかりません' };
+            return { error: t('assetNotFound') };
         }
 
         await prisma.problemAsset.delete({
@@ -967,20 +982,21 @@ export async function deleteProblemAsset(assetId: string) {
         return { success: true };
     } catch (error) {
         console.error('Failed to delete problem asset:', error);
-        return { error: 'アセットの削除に失敗しました' };
+        return { error: t('assetDeleteFailed') };
     }
 }
 
 export async function updateProblemStatus(id: string, status: ProblemStatusValue) {
     await requireProblemAuthor();
+    const t = await getTranslations('AdminProblemActions');
 
     try {
         if (!isProblemStatusValue(status)) {
-            return { error: '不正なステータスです' };
+            return { error: t('invalidStatus') };
         }
 
         if (status === 'SENT_BACK') {
-            return { error: '差し戻しは sendBackProblem を使ってください' };
+            return { error: t('useSendBack') };
         }
 
         const problem = await prisma.problem.update({
@@ -996,19 +1012,20 @@ export async function updateProblemStatus(id: string, status: ProblemStatusValue
         return { success: true, status: problem.status as ProblemStatusValue };
     } catch (error) {
         console.error('Failed to update problem status:', error);
-        return { error: 'ステータスの更新に失敗しました' };
+        return { error: t('statusUpdateFailed') };
     }
 }
 
 export async function sendBackProblem(id: string, reason: string) {
     await requireProblemAuthor();
+    const t = await getTranslations('AdminProblemActions');
 
     const trimmed = typeof reason === 'string' ? reason.trim() : '';
     if (trimmed.length === 0) {
-        return { error: '差し戻し理由を入力してください' };
+        return { error: t('sendBackReasonRequired') };
     }
     if (trimmed.length > SENT_BACK_REASON_MAX) {
-        return { error: `差し戻し理由は${SENT_BACK_REASON_MAX}文字以内で入力してください` };
+        return { error: t('sendBackReasonTooLong', { max: SENT_BACK_REASON_MAX }) };
     }
 
     try {
@@ -1025,16 +1042,17 @@ export async function sendBackProblem(id: string, reason: string) {
         return { success: true, status: problem.status as ProblemStatusValue, sentBackReason: problem.sentBackReason };
     } catch (error) {
         console.error('Failed to send back problem:', error);
-        return { error: '差し戻しに失敗しました' };
+        return { error: t('sendBackFailed') };
     }
 }
 
 export async function updateProblemVideoStatus(id: string, videoStatus: VideoStatusValue) {
     await requireProblemAuthor();
+    const t = await getTranslations('AdminProblemActions');
 
     try {
         if (!isVideoStatusValue(videoStatus)) {
-            return { error: '不正な動画ステータスです' };
+            return { error: t('invalidVideoStatus') };
         }
 
         const existing = await prisma.problem.findUnique({
@@ -1043,7 +1061,7 @@ export async function updateProblemVideoStatus(id: string, videoStatus: VideoSta
         });
 
         if (!existing) {
-            return { error: '問題が見つかりません' };
+            return { error: t('problemNotFound') };
         }
 
         const resolved = resolveVideoStatusFromUrl(videoStatus, existing.videoUrl);
@@ -1058,12 +1076,13 @@ export async function updateProblemVideoStatus(id: string, videoStatus: VideoSta
         return { success: true, videoStatus: problem.videoStatus as VideoStatusValue };
     } catch (error) {
         console.error('Failed to update problem video status:', error);
-        return { error: '動画ステータスの更新に失敗しました' };
+        return { error: t('videoStatusUpdateFailed') };
     }
 }
 
 export async function deleteStandaloneProblem(id: string) {
     await requireAdmin();
+    const t = await getTranslations('AdminProblemActions');
     try {
         await deleteProblemsWithRelations([id]);
 
@@ -1071,12 +1090,13 @@ export async function deleteStandaloneProblem(id: string) {
         return { success: true };
     } catch (error) {
         console.error('Failed to delete problem:', error);
-        return { error: '問題の削除に失敗しました' };
+        return { error: t('deleteFailed') };
     }
 }
 
 export async function bulkDeleteProblems(ids: string[]) {
     await requireAdmin();
+    const t = await getTranslations('AdminProblemActions');
     try {
         if (ids.length === 0) return { success: true, count: 0 };
 
@@ -1086,12 +1106,13 @@ export async function bulkDeleteProblems(ids: string[]) {
         return { success: true, count: deletedCount };
     } catch (error) {
         console.error('Failed to bulk delete problems:', error);
-        return { error: '問題の一括削除に失敗しました' };
+        return { error: t('bulkDeleteFailed') };
     }
 }
 
 export async function bulkSearchCoreProblems(names: string[]) {
     await requireProblemAuthor();
+    const t = await getTranslations('AdminProblemActions');
     try {
         const uniqueNames = [...new Set(names.map((name) => name.trim()))].filter(Boolean);
         if (uniqueNames.length === 0) {
@@ -1157,7 +1178,7 @@ export async function bulkSearchCoreProblems(names: string[]) {
         return { success: true, coreProblemsMap: resultMap };
     } catch (error) {
         console.error('Failed to bulk search core problems:', error);
-        return { error: 'CoreProblemの一括検索に失敗しました' };
+        return { error: t('bulkSearchCoreProblemsFailed') };
     }
 }
 
@@ -1172,6 +1193,7 @@ export async function bulkUpsertStandaloneProblems(problems: {
     coreProblemIds: string[];
 }[], options?: { subjectId?: string }) {
     await requireProblemAuthor();
+    const t = await getTranslations('AdminProblemActions');
     try {
         const { createdCount, updatedCount, warnings } = await bulkUpsertProblemsCore(
             problems,
@@ -1182,12 +1204,13 @@ export async function bulkUpsertStandaloneProblems(problems: {
         return { success: true, createdCount, updatedCount, warnings };
     } catch (error) {
         console.error('Failed to bulk upsert problems:', error);
-        return { error: '一括登録・更新に失敗しました' };
+        return { error: t('bulkUpsertFailed') };
     }
 }
 
 export async function searchProblemsByMasterNumbers(targets: { masterNumber: number; subjectId: string }[]) {
     await requireProblemAuthor();
+    const t = await getTranslations('AdminProblemActions');
     try {
         if (targets.length === 0) return { success: true, problems: [] };
 
@@ -1208,6 +1231,6 @@ export async function searchProblemsByMasterNumbers(targets: { masterNumber: num
         return { success: true, problems };
     } catch (error) {
         console.error('Failed to search problems by master numbers:', error);
-        return { error: '既存問題の検索に失敗しました' };
+        return { error: t('searchByMasterNumbersFailed') };
     }
 }

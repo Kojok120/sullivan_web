@@ -2,41 +2,42 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 
 import { cn } from '@/lib/utils';
 
 type StudentDetailTab = {
     href: (userId: string) => string;
     isActive: (pathname: string, basePath: string) => boolean;
-    label: string;
+    labelKey: 'dashboard' | 'goals' | 'history' | 'guidance' | 'profile';
 };
 
 const STUDENT_DETAIL_TABS: StudentDetailTab[] = [
     {
         href: (userId) => `/teacher/students/${userId}`,
         isActive: (pathname, basePath) => pathname === basePath,
-        label: '学習状況',
+        labelKey: 'dashboard',
     },
     {
         href: (userId) => `/teacher/students/${userId}/goals`,
         isActive: (pathname, basePath) => pathname === `${basePath}/goals`,
-        label: '目標設定',
+        labelKey: 'goals',
     },
     {
         href: (userId) => `/teacher/students/${userId}/history`,
         isActive: (pathname, basePath) =>
             pathname === `${basePath}/history` || pathname.startsWith(`${basePath}/history/`),
-        label: '学習履歴ログ',
+        labelKey: 'history',
     },
     {
         href: (userId) => `/teacher/students/${userId}/guidance`,
         isActive: (pathname, basePath) => pathname === `${basePath}/guidance`,
-        label: '面談記録',
+        labelKey: 'guidance',
     },
     {
         href: (userId) => `/teacher/students/${userId}/profile`,
         isActive: (pathname, basePath) => pathname === `${basePath}/profile`,
-        label: '生徒情報',
+        labelKey: 'profile',
     },
 ];
 
@@ -49,6 +50,7 @@ function trimTrailingSlash(pathname: string) {
 }
 
 export function StudentDetailTabs({ userId }: { userId: string }) {
+    const t = useTranslations('StudentDetailTabs');
     const pathname = trimTrailingSlash(usePathname());
     const basePath = `/teacher/students/${userId}`;
 
@@ -72,7 +74,7 @@ export function StudentDetailTabs({ userId }: { userId: string }) {
                                     : 'text-muted-foreground hover:text-foreground',
                             )}
                         >
-                            {tab.label}
+                            {t(tab.labelKey)}
                         </Link>
                     );
                 })}

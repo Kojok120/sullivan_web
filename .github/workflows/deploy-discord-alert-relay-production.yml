@@ -33,17 +33,22 @@ jobs:
       - name: チェックアウト
         uses: actions/checkout@v4
 
+      - name: pnpm セットアップ
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+
       - name: Node.js セットアップ
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
+          cache: pnpm
 
       - name: 依存関係インストール
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: relay テスト
-        run: npx vitest run tests/discord-alert-relay.test.ts
+        run: pnpm exec vitest run tests/discord-alert-relay.test.ts
 
       - name: GCP 認証 (Workload Identity Federation)
         uses: google-github-actions/auth@v2

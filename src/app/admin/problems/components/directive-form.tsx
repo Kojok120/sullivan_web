@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -46,6 +47,7 @@ const DEFAULT_SOLID_SOURCE = '[[solid kind="cube" size=4]]';
  * 入力中の値が valid な solid DSL であれば onSourceChange に流す。
  */
 function SolidForm({ source, onSourceChange }: FormProps) {
+    const t = useTranslations('DirectiveForm');
     const [draft, setDraft] = useState(() => source || DEFAULT_SOLID_SOURCE);
     const [prevSource, setPrevSource] = useState(source);
     if (source !== prevSource) {
@@ -66,11 +68,11 @@ function SolidForm({ source, onSourceChange }: FormProps) {
 
     return (
         <div className="space-y-2 rounded-md border p-4">
-            <Label className="text-xs">立体 DSL（[[solid kind=&quot;...&quot; ...]]）</Label>
+            <Label className="text-xs">{t('solidDslLabel')}</Label>
             <Input
                 value={draft}
                 onChange={(event) => update(event.target.value)}
-                placeholder='例: [[solid kind="cube" size=4 diagonal=true]]'
+                placeholder={t('solidPlaceholder')}
             />
             <p className="text-xs text-muted-foreground">
                 kind: rect-prism / cube / cylinder / cone / sphere / hemisphere / square-pyramid / tri-prism / rotation
@@ -93,6 +95,7 @@ type NumberLineState = {
 const DEFAULT_NUMBERLINE: NumberLineState = { min: '-5', max: '5', marks: '' };
 
 function NumberLineForm({ source, onSourceChange }: FormProps) {
+    const t = useTranslations('DirectiveForm');
     // 親の source は常に valid な DSL である前提で、ローカル draft（編集中の生文字列）
     // を別途保持する。これがないと「-」だけ入力した瞬間に buildNumberLineDsl('') が
     // 返って source が空になり、再 parse 時に DEFAULT_NUMBERLINE に戻ってしまう。
@@ -118,7 +121,7 @@ function NumberLineForm({ source, onSourceChange }: FormProps) {
         <div className="space-y-3 rounded-md border p-4">
             <div className="grid gap-3 md:grid-cols-3">
                 <div className="space-y-1">
-                    <Label className="text-xs">最小値</Label>
+                    <Label className="text-xs">{t('minLabel')}</Label>
                     <Input
                         value={state.min}
                         onChange={(event) => update({ min: event.target.value })}
@@ -126,7 +129,7 @@ function NumberLineForm({ source, onSourceChange }: FormProps) {
                     />
                 </div>
                 <div className="space-y-1">
-                    <Label className="text-xs">最大値</Label>
+                    <Label className="text-xs">{t('maxLabel')}</Label>
                     <Input
                         value={state.max}
                         onChange={(event) => update({ max: event.target.value })}
@@ -134,11 +137,11 @@ function NumberLineForm({ source, onSourceChange }: FormProps) {
                     />
                 </div>
                 <div className="space-y-1">
-                    <Label className="text-xs">マーク（任意）</Label>
+                    <Label className="text-xs">{t('marksLabel')}</Label>
                     <Input
                         value={state.marks}
                         onChange={(event) => update({ marks: event.target.value })}
-                        placeholder="例: A:-3,B:2,C:4.5"
+                        placeholder={t('marksPlaceholder')}
                     />
                 </div>
             </div>
@@ -162,6 +165,7 @@ const DEFAULT_COORDPLANE: CoordPlaneState = {
 };
 
 function CoordPlaneForm({ source, onSourceChange }: FormProps) {
+    const t = useTranslations('DirectiveForm');
     const [draft, setDraft] = useState<CoordPlaneState>(() => parseExistingCoordPlane(source) ?? DEFAULT_COORDPLANE);
     const [prevSource, setPrevSource] = useState(source);
     if (source !== prevSource) {
@@ -193,27 +197,27 @@ function CoordPlaneForm({ source, onSourceChange }: FormProps) {
                 ))}
             </div>
             <div className="space-y-1">
-                <Label className="text-xs">点（任意 / セミコロン区切り）</Label>
+                <Label className="text-xs">{t('pointsLabel')}</Label>
                 <Input
                     value={state.points}
                     onChange={(event) => update({ points: event.target.value })}
-                    placeholder='例: P:4,3;Q:-2,1'
+                    placeholder={t('pointsPlaceholder')}
                 />
             </div>
             <div className="space-y-1">
-                <Label className="text-xs">曲線（任意 / y=式 をセミコロン区切り）</Label>
+                <Label className="text-xs">{t('curvesLabel')}</Label>
                 <Input
                     value={state.curves}
                     onChange={(event) => update({ curves: event.target.value })}
-                    placeholder='例: y=x^2;y=6/x'
+                    placeholder={t('curvesPlaceholder')}
                 />
             </div>
             <div className="space-y-1">
-                <Label className="text-xs">直線（任意 / x=数値 または y=数値）</Label>
+                <Label className="text-xs">{t('linesLabel')}</Label>
                 <Input
                     value={state.lines}
                     onChange={(event) => update({ lines: event.target.value })}
-                    placeholder='例: x=2;y=-1'
+                    placeholder={t('linesPlaceholder')}
                 />
             </div>
         </div>
@@ -235,6 +239,7 @@ const DEFAULT_GEOMETRY: GeometryState = {
 };
 
 function GeometryForm({ source, onSourceChange }: FormProps) {
+    const t = useTranslations('DirectiveForm');
     const [draft, setDraft] = useState<GeometryState>(() => parseExistingGeometry(source) ?? DEFAULT_GEOMETRY);
     const [prevSource, setPrevSource] = useState(source);
     if (source !== prevSource) {
@@ -254,35 +259,35 @@ function GeometryForm({ source, onSourceChange }: FormProps) {
     return (
         <div className="space-y-3 rounded-md border p-4">
             <div className="space-y-1">
-                <Label className="text-xs">頂点（label:x,y をセミコロン区切り）</Label>
+                <Label className="text-xs">{t('verticesLabel')}</Label>
                 <Input
                     value={state.vertices}
                     onChange={(event) => update({ vertices: event.target.value })}
-                    placeholder="例: A:0,0;B:4,0;C:2,3"
+                    placeholder={t('verticesPlaceholder')}
                 />
             </div>
             <div className="space-y-1">
-                <Label className="text-xs">線分（label-label[:辺ラベル] をセミコロン区切り）</Label>
+                <Label className="text-xs">{t('segmentsLabel')}</Label>
                 <Input
                     value={state.segments}
                     onChange={(event) => update({ segments: event.target.value })}
-                    placeholder="例: A-B:5;B-C:4;C-A:3"
+                    placeholder={t('segmentsPlaceholder')}
                 />
             </div>
             <div className="space-y-1">
-                <Label className="text-xs">角度（任意 / 頂点[/from-to][:right|:角ラベル] をセミコロン区切り）</Label>
+                <Label className="text-xs">{t('anglesLabel')}</Label>
                 <Input
                     value={state.angles}
                     onChange={(event) => update({ angles: event.target.value })}
-                    placeholder="例: A:right;B:60°;O/A-B:30°"
+                    placeholder={t('anglesPlaceholder')}
                 />
             </div>
             <div className="space-y-1">
-                <Label className="text-xs">円（任意 / label:cx,cy,r をセミコロン区切り）</Label>
+                <Label className="text-xs">{t('circlesLabel')}</Label>
                 <Input
                     value={state.circles}
                     onChange={(event) => update({ circles: event.target.value })}
-                    placeholder="例: O:0,0,2"
+                    placeholder={t('circlesPlaceholder')}
                 />
             </div>
         </div>

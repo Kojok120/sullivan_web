@@ -1,4 +1,5 @@
 import { isProblemStatusValue, isVideoStatusValue } from '@/lib/problem-ui';
+import { getTranslations } from 'next-intl/server';
 
 import { getProblems, getProblemSubjects } from './actions';
 import { ProblemManager } from './problem-manager';
@@ -12,6 +13,7 @@ export default async function ProblemsPage({
 }: {
     searchParams: Promise<{ page?: string; q?: string; grade?: string; coreProblemId?: string; subjectId?: string; sortBy?: string; sortOrder?: string; videoStatus?: string; problemType?: string; status?: string }>;
 }) {
+    const t = await getTranslations('AdminProblemsPage');
     // Next.js 15 以降では searchParams は Promise
     const params = await searchParams;
     const page = Number(params.page) || 1;
@@ -37,7 +39,7 @@ export default async function ProblemsPage({
     if (!subjectId || !currentSubject) {
         return (
             <div className="container mx-auto px-4 py-6 sm:py-8">
-                <h1 className="mb-6 text-2xl font-bold">問題一覧</h1>
+                <h1 className="mb-6 text-2xl font-bold">{t('title')}</h1>
                 <ProblemSubjectRequiredState routeBase="/admin/problems" subjects={subjects} />
             </div>
         );
@@ -63,12 +65,12 @@ export default async function ProblemsPage({
     );
 
     if (!result || 'error' in result) {
-        return <div className="p-8 text-red-500">{result?.error || 'Unknown error'}</div>;
+        return <div className="p-8 text-red-500">{result?.error || t('unknownError')}</div>;
     }
 
     return (
         <div className="container mx-auto px-4 py-6 sm:py-8">
-            <h1 className="mb-6 text-2xl font-bold">{`問題一覧 - ${currentSubject.name}`}</h1>
+            <h1 className="mb-6 text-2xl font-bold">{t('subjectTitle', { subjectName: currentSubject.name })}</h1>
             <ProblemManager
                 initialProblems={result.problems}
                 totalCount={result.total || 0}
@@ -80,7 +82,7 @@ export default async function ProblemsPage({
                 currentSubject={currentSubject}
                 showMasterNumber={policy.showMasterNumber}
                 showBulkImport={policy.showBulkImport}
-                bulkImportLabel={policy.bulkImportLabel}
+                bulkImportLabelKey={policy.bulkImportLabelKey}
                 bulkImportConfig={policy.bulkImportConfig}
             />
         </div>

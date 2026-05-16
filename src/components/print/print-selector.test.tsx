@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useRouter } from 'next/navigation';
+import { NextIntlClientProvider } from 'next-intl';
 
 import { PrintSelector } from './print-selector';
 import { getPreferredPrintView } from '@/lib/print-view';
+import jaMessages from '@/messages/ja.json';
 
 const { markLectureAsWatchedMock } = vi.hoisted(() => ({
     markLectureAsWatchedMock: vi.fn(),
@@ -53,6 +55,14 @@ vi.mock('@/components/full-screen-video-player', () => ({
         ) : null
     ),
 }));
+
+function renderPrintSelector(subjects = [{ subjectId: 'subject-1', subjectName: '英語' }]) {
+    return render(
+        <NextIntlClientProvider locale="ja" messages={jaMessages}>
+            <PrintSelector subjects={subjects} />
+        </NextIntlClientProvider>
+    );
+}
 
 describe('印刷セレクター', () => {
     const mockRouter = {
@@ -104,11 +114,7 @@ describe('印刷セレクター', () => {
             json: async () => ({ blocked: false }),
         });
 
-        render(
-            <PrintSelector
-                subjects={[{ subjectId: 'subject-1', subjectName: '英語' }]}
-            />
-        );
+        renderPrintSelector();
 
         fireEvent.click(screen.getByText('English'));
         fireEvent.click(screen.getByRole('button', { name: '印刷する' }));
@@ -137,11 +143,7 @@ describe('印刷セレクター', () => {
             json: async () => ({ blocked: false }),
         });
 
-        render(
-            <PrintSelector
-                subjects={[{ subjectId: 'subject-1', subjectName: '英語' }]}
-            />
-        );
+        renderPrintSelector();
 
         fireEvent.click(screen.getByText('English'));
         fireEvent.click(screen.getByRole('button', { name: '印刷する' }));
@@ -173,11 +175,7 @@ describe('印刷セレクター', () => {
             }),
         });
 
-        render(
-            <PrintSelector
-                subjects={[{ subjectId: 'subject-1', subjectName: '英語' }]}
-            />
-        );
+        renderPrintSelector();
 
         fireEvent.click(screen.getByText('English'));
         fireEvent.click(screen.getByRole('button', { name: '印刷する' }));
@@ -206,11 +204,7 @@ describe('印刷セレクター', () => {
             }),
         });
 
-        render(
-            <PrintSelector
-                subjects={[{ subjectId: 'subject-1', subjectName: '英語' }]}
-            />
-        );
+        renderPrintSelector();
 
         fireEvent.click(screen.getByText('English'));
         fireEvent.click(screen.getByRole('button', { name: '印刷する' }));
@@ -239,11 +233,7 @@ describe('印刷セレクター', () => {
             }),
         });
 
-        render(
-            <PrintSelector
-                subjects={[{ subjectId: 'subject-1', subjectName: '英語' }]}
-            />
-        );
+        renderPrintSelector();
 
         fireEvent.click(screen.getByText('English'));
         fireEvent.click(screen.getByRole('button', { name: '印刷する' }));
@@ -283,11 +273,7 @@ describe('印刷セレクター', () => {
                 json: async () => ({ blocked: false }),
             });
 
-        render(
-            <PrintSelector
-                subjects={[{ subjectId: 'subject-1', subjectName: '英語' }]}
-            />
-        );
+        renderPrintSelector();
 
         fireEvent.click(screen.getByText('English'));
         fireEvent.click(screen.getByText('English'));
@@ -336,11 +322,7 @@ describe('印刷セレクター', () => {
             json: async () => ({ blocked: false }),
         });
 
-        render(
-            <PrintSelector
-                subjects={[{ subjectId: 'subject-1', subjectName: '英語' }]}
-            />
-        );
+        renderPrintSelector();
 
         fireEvent.click(screen.getByText('English'));
         fireEvent.click(screen.getByRole('button', { name: '印刷する' }));
@@ -355,11 +337,7 @@ describe('印刷セレクター', () => {
         const gateCheck = createDeferred<{ ok: boolean; json: () => Promise<{ blocked: boolean }> }>();
         mockFetch.mockReturnValue(gateCheck.promise);
 
-        render(
-            <PrintSelector
-                subjects={[{ subjectId: 'subject-1', subjectName: '英語' }]}
-            />
-        );
+        renderPrintSelector();
 
         fireEvent.click(screen.getByText('English'));
         fireEvent.click(screen.getByRole('button', { name: '印刷する' }));
@@ -401,11 +379,7 @@ describe('印刷セレクター', () => {
         });
         markLectureAsWatchedMock.mockReturnValue(watchSave.promise);
 
-        render(
-            <PrintSelector
-                subjects={[{ subjectId: 'subject-1', subjectName: '英語' }]}
-            />
-        );
+        renderPrintSelector();
 
         fireEvent.click(screen.getByText('English'));
         fireEvent.click(screen.getByRole('button', { name: '印刷する' }));
@@ -453,11 +427,7 @@ describe('印刷セレクター', () => {
             });
             markLectureAsWatchedMock.mockRejectedValue(new Error('network error'));
 
-            render(
-                <PrintSelector
-                    subjects={[{ subjectId: 'subject-1', subjectName: '英語' }]}
-                />
-            );
+            renderPrintSelector();
 
             fireEvent.click(screen.getByText('English'));
             fireEvent.click(screen.getByRole('button', { name: '印刷する' }));
@@ -488,11 +458,7 @@ describe('印刷セレクター', () => {
             status: 500,
         });
 
-        render(
-            <PrintSelector
-                subjects={[{ subjectId: 'subject-1', subjectName: '英語' }]}
-            />
-        );
+        renderPrintSelector();
 
         fireEvent.click(screen.getByText('English'));
         fireEvent.click(screen.getByRole('button', { name: '印刷する' }));
@@ -505,11 +471,7 @@ describe('印刷セレクター', () => {
     });
 
     it('科目選択後のモーダル外をタップするとモーダルが閉じる', async () => {
-        render(
-            <PrintSelector
-                subjects={[{ subjectId: 'subject-1', subjectName: '英語' }]}
-            />
-        );
+        renderPrintSelector();
 
         fireEvent.click(screen.getByText('English'));
         expect(screen.getByRole('button', { name: '印刷する' })).toBeInTheDocument();
@@ -522,11 +484,7 @@ describe('印刷セレクター', () => {
     });
 
     it('同じ科目を再タップするとセット数が増える', async () => {
-        render(
-            <PrintSelector
-                subjects={[{ subjectId: 'subject-1', subjectName: '英語' }]}
-            />
-        );
+        renderPrintSelector();
 
         fireEvent.click(screen.getByText('English'));
         expect(screen.getByText('10問 / 1セット')).toBeInTheDocument();

@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+
 import { renderProblemTextHtml } from '@/lib/problem-text';
 
 const DEFAULT_CLASSNAME =
@@ -7,7 +9,7 @@ const DEFAULT_CLASSNAME =
 
 export function ProblemTextPreview({
     text,
-    emptyMessage = '本文を入力すると、ここに表示確認が出ます。',
+    emptyMessage,
     className,
 }: {
     text: string;
@@ -18,8 +20,10 @@ export function ProblemTextPreview({
      */
     className?: string;
 }) {
+    const t = useTranslations('ProblemTextPreview');
+
     if (!text.trim()) {
-        return <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">{emptyMessage}</div>;
+        return <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">{emptyMessage ?? t('defaultEmpty')}</div>;
     }
 
     return (

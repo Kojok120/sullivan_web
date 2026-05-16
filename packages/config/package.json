@@ -1,0 +1,17 @@
+{
+  "name": "@sullivan/config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./env": "./src/env.ts",
+    "./print-config": "./src/print-config.ts",
+    "./progression-rules": "./src/progression-rules.ts"
+  },
+  "dependencies": {
+    "zod": "^3.25.76"
+  }
+}

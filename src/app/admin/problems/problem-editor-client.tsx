@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState, useTransition } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import {
     ChevronDown,
@@ -97,6 +98,23 @@ type EditorState = {
 const ASSET_SOURCE_TOOLS = ['MANUAL', 'SVG', 'UPLOAD'] as const;
 const ASSET_KINDS = ['IMAGE', 'SVG', 'PDF', 'JSON', 'THUMBNAIL'] as const;
 
+type ProblemEditorTranslator = ReturnType<typeof useTranslations>;
+
+function getVideoStatusText(t: ProblemEditorTranslator, value: string | null | undefined) {
+    switch (value) {
+        case 'NONE':
+            return t('videoStatus.NONE');
+        case 'SHOT':
+            return t('videoStatus.SHOT');
+        case 'UPLOADED':
+            return t('videoStatus.UPLOADED');
+        case 'CONFIGURED':
+            return t('videoStatus.CONFIGURED');
+        default:
+            return value || t('fallback');
+    }
+}
+
 function getCardUploadAssetSpec(file: File): { assetKind: 'IMAGE' | 'SVG'; attachmentBlockType: 'image' | 'svg' } | null {
     const normalizedName = file.name.toLowerCase();
 
@@ -149,17 +167,20 @@ function buildInitialState(problem: RenderableProblemWithRelations | null, initi
     };
 }
 
-function validateEditorState(state: Pick<EditorState, 'subjectId' | 'coreProblems'>) {
+function validateEditorState(
+    state: Pick<EditorState, 'subjectId' | 'coreProblems'>,
+    t: ProblemEditorTranslator,
+) {
     if (!state.subjectId) {
-        return '科目を選択してください';
+        return t('validationSubjectRequired');
     }
 
     if (state.coreProblems.length === 0) {
-        return '単元を選択してください';
+        return t('validationUnitRequired');
     }
 
     if (state.coreProblems.some((coreProblem) => coreProblem.subjectId && coreProblem.subjectId !== state.subjectId)) {
-        return '選択した科目と異なる単元が含まれています';
+        return t('validationUnitSubjectMismatch');
     }
 
     return null;
@@ -173,6 +194,7 @@ export function ProblemEditorClient({
     initialSubjectId = null,
     variant = 'admin',
 }: ProblemEditorClientProps) {
+    const t = useTranslations('ProblemEditorClient');
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
     const [state, setState] = useState(() => buildInitialState(problem, initialSubjectId));
@@ -184,11 +206,11 @@ export function ProblemEditorClient({
     const [sendBackOpen, setSendBackOpen] = useState(false);
     const isAuthorView = variant === 'author';
     const title = isAuthorView
-        ? (problem ? '問題を編集' : '新しい問題を作成')
-        : '構造化問題エディタ';
+        ? (problem ? t('titleAuthorEdit') : t('titleAuthorCreate'))
+        : t('titleAdmin');
     const description = isAuthorView
-        ? '問題文、解答、図形・グラフをまとめて設定できます。'
-        : '理科・数学向けの revision / asset 一体型エディタです。';
+        ? t('descriptionAuthor')
+        : t('descriptionAdmin');
 
     const activeRevision = useMemo(() => {
         if (!problem) return null;
@@ -223,12 +245,12 @@ export function ProblemEditorClient({
     ) => {
         const uploadSpec = getCardUploadAssetSpec(file);
         if (!uploadSpec) {
-            toast.error('アップロードできるのは SVG / PNG / JPG / JPEG のみです');
+            toast.error(t('uploadInvalidFile'));
             return;
         }
 
         if (!state.problemId || !state.revisionId) {
-            toast.error('先に下書きを保存してください');
+            toast.error(t('draftRequired'));
             return;
         }
 
@@ -243,7 +265,7 @@ export function ProblemEditorClient({
 
             const result = await uploadProblemAsset(formData);
             if (!result.success || !result.asset) {
-                toast.error(result.error || '図版のアップロードに失敗しました');
+                toast.error(result.error || t('cardAssetUploadFailed'));
                 return;
             }
 
@@ -256,7 +278,7 @@ export function ProblemEditorClient({
                     assetId: result.asset?.id ?? '',
                 })),
             }));
-            toast.success('図版をアップロードしました');
+            toast.success(t('cardAssetUploadSuccess'));
             router.refresh();
         } finally {
             setUploadingCardId(null);
@@ -274,14 +296,14 @@ export function ProblemEditorClient({
 
     const persistDraftState = async ({ showSuccessToast }: { showSuccessToast: boolean }) => {
         try {
-            const validationError = validateEditorState(state);
+            const validationError = validateEditorState(state, t);
             if (validationError) {
                 toast.error(validationError);
                 return null;
             }
 
             if (hasEmptyProblemBodyCard(bodyCards)) {
-                toast.error('空の問題文カードがあります。本文を入力するか削除してください');
+                toast.error(t('emptyBodyCard'));
                 return null;
             }
 
@@ -303,7 +325,7 @@ export function ProblemEditorClient({
             });
 
             if (!result.success) {
-                toast.error(result.error || '保存に失敗しました');
+                toast.error(result.error || t('saveFailed'));
                 return null;
             }
 
@@ -311,7 +333,7 @@ export function ProblemEditorClient({
             const revisionId = result.revisionId || state.revisionId;
 
             if (showSuccessToast) {
-                toast.success('下書きを保存しました');
+                toast.success(t('draftSaveSuccess'));
             }
 
             setState((current) => ({
@@ -333,7 +355,7 @@ export function ProblemEditorClient({
                 revisionId,
             };
         } catch (error) {
-            toast.error(error instanceof Error ? error.message : '保存に失敗しました');
+            toast.error(error instanceof Error ? error.message : t('saveFailed'));
             return null;
         }
     };
@@ -347,17 +369,17 @@ export function ProblemEditorClient({
 
             const result = await publishProblemRevision(persisted.problemId);
             if (result.success) {
-                toast.success('公開しました');
+                toast.success(t('publishSuccess'));
                 router.refresh();
             } else {
-                toast.error(result.error || '公開に失敗しました');
+                toast.error(result.error || t('publishFailed'));
             }
         });
     };
 
     const openSendBack = () => {
         if (!state.problemId) {
-            toast.error('先に下書きを保存してください');
+            toast.error(t('draftRequired'));
             return;
         }
         setSendBackOpen(true);
@@ -368,11 +390,11 @@ export function ProblemEditorClient({
         startTransition(async () => {
             const result = await sendBackProblem(state.problemId, reason);
             if (result.success) {
-                toast.success('差し戻しに変更しました');
+                toast.success(t('sendBackSuccess'));
                 setSendBackOpen(false);
                 router.refresh();
             } else {
-                toast.error(result.error || '差し戻しに失敗しました');
+                toast.error(result.error || t('sendBackFailed'));
             }
         });
     };
@@ -394,7 +416,7 @@ export function ProblemEditorClient({
 
     const handleAssetUpload = () => {
         if (!state.problemId || !state.revisionId) {
-            toast.error('先に下書きを保存してください');
+            toast.error(t('draftRequired'));
             return;
         }
 
@@ -413,12 +435,12 @@ export function ProblemEditorClient({
 
             const result = await uploadProblemAsset(formData);
             if (result.success) {
-                toast.success('アセットを保存しました');
+                toast.success(t('assetSaveSuccess'));
                 setAssetFile(null);
                 setAssetInlineContent('');
                 router.refresh();
             } else {
-                toast.error(result.error || 'アセット保存に失敗しました');
+                toast.error(result.error || t('assetSaveFailed'));
             }
         });
     };
@@ -427,10 +449,10 @@ export function ProblemEditorClient({
         startTransition(async () => {
             const result = await deleteProblemAsset(assetId);
             if (result.success) {
-                toast.success('アセットを削除しました');
+                toast.success(t('assetDeleteSuccess'));
                 router.refresh();
             } else {
-                toast.error(result.error || 'アセット削除に失敗しました');
+                toast.error(result.error || t('assetDeleteFailed'));
             }
         });
     };
@@ -451,43 +473,43 @@ export function ProblemEditorClient({
                 </div>
                 <div className="flex flex-wrap gap-2">
                     <Button variant="outline" asChild>
-                        <Link href={state.subjectId ? `${routeBase}?subjectId=${state.subjectId}` : routeBase}>一覧へ戻る</Link>
+                        <Link href={state.subjectId ? `${routeBase}?subjectId=${state.subjectId}` : routeBase}>{t('backToList')}</Link>
                     </Button>
                     <Button variant="outline" onClick={handlePreview} disabled={isPending || !state.problemId}>
-                        プレビュー
+                        {t('preview')}
                     </Button>
                     <Button variant="outline" onClick={handleSave} disabled={isPending}>
-                        下書き保存
+                        {t('saveDraft')}
                     </Button>
                     <Button variant="destructive" onClick={openSendBack} disabled={isPending || !state.problemId}>
-                        差し戻し
+                        {t('sendBack')}
                     </Button>
                     <Button onClick={handlePublish} disabled={isPending}>
-                        公開
+                        {t('publish')}
                     </Button>
                 </div>
             </div>
 
             <Tabs defaultValue="basic" className="space-y-4">
                 <TabsList className="flex h-auto w-full flex-wrap justify-start gap-2 bg-transparent p-0">
-                    <TabsTrigger value="basic">{isAuthorView ? '基本設定' : '基本情報'}</TabsTrigger>
-                    <TabsTrigger value="body">{isAuthorView ? '問題文' : '本文'}</TabsTrigger>
-                    <TabsTrigger value="answer">{isAuthorView ? '答え' : '解答仕様'}</TabsTrigger>
-                    <TabsTrigger value="answer-field">解答欄</TabsTrigger>
-                    {!isAuthorView && <TabsTrigger value="assets">アセット</TabsTrigger>}
-                    {!isAuthorView && <TabsTrigger value="history">改訂履歴</TabsTrigger>}
+                    <TabsTrigger value="basic">{isAuthorView ? t('tabBasicAuthor') : t('tabBasicAdmin')}</TabsTrigger>
+                    <TabsTrigger value="body">{isAuthorView ? t('tabBodyAuthor') : t('tabBodyAdmin')}</TabsTrigger>
+                    <TabsTrigger value="answer">{isAuthorView ? t('tabAnswerAuthor') : t('tabAnswerAdmin')}</TabsTrigger>
+                    <TabsTrigger value="answer-field">{t('tabAnswerField')}</TabsTrigger>
+                    {!isAuthorView && <TabsTrigger value="assets">{t('tabAssets')}</TabsTrigger>}
+                    {!isAuthorView && <TabsTrigger value="history">{t('tabHistory')}</TabsTrigger>}
                 </TabsList>
 
                 <TabsContent value="basic">
                     <Card>
                         <CardHeader>
-                            <CardTitle>基本情報</CardTitle>
-                            <CardDescription>問題の識別情報と紐付けを設定します。</CardDescription>
+                            <CardTitle>{t('basicTitle')}</CardTitle>
+                            <CardDescription>{t('basicDescription')}</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="grid gap-4 md:grid-cols-3">
                                 <div className="space-y-2">
-                                    <Label>科目</Label>
+                                    <Label>{t('subjectLabel')}</Label>
                                     <Select
                                         value={state.subjectId ?? undefined}
                                         onValueChange={(value) => setState((current) => ({
@@ -496,7 +518,7 @@ export function ProblemEditorClient({
                                             coreProblems: current.subjectId === value ? current.coreProblems : [],
                                         }))}
                                     >
-                                        <SelectTrigger><SelectValue placeholder="科目を選択" /></SelectTrigger>
+                                        <SelectTrigger><SelectValue placeholder={t('subjectPlaceholder')} /></SelectTrigger>
                                         <SelectContent>
                                             {subjects.map((subject) => (
                                                 <SelectItem key={subject.id} value={subject.id}>{subject.name}</SelectItem>
@@ -505,18 +527,18 @@ export function ProblemEditorClient({
                                     </Select>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label>学年</Label>
-                                    <Input value={state.grade} onChange={(event) => setState((current) => ({ ...current, grade: event.target.value }))} placeholder="中2" />
+                                    <Label>{t('gradeLabel')}</Label>
+                                    <Input value={state.grade} onChange={(event) => setState((current) => ({ ...current, grade: event.target.value }))} placeholder={t('gradePlaceholder')} />
                                 </div>
                             </div>
 
                             <div className="grid gap-4 md:grid-cols-[1fr_220px]">
                                 <div className="space-y-2">
-                                    <Label>解説動画 URL</Label>
+                                    <Label>{t('videoUrlLabel')}</Label>
                                     <Input value={state.videoUrl} onChange={(event) => setState((current) => ({ ...current, videoUrl: event.target.value }))} placeholder="https://..." />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label>動画ステータス</Label>
+                                    <Label>{t('videoStatusLabel')}</Label>
                                     <Select
                                         value={resolveVideoStatusFromUrl(state.videoStatus, state.videoUrl)}
                                         onValueChange={(value) => setState((current) => ({ ...current, videoStatus: value as VideoStatusValue }))}
@@ -525,18 +547,18 @@ export function ProblemEditorClient({
                                         <SelectTrigger><SelectValue /></SelectTrigger>
                                         <SelectContent>
                                             {VIDEO_STATUS_OPTIONS.map((option) => (
-                                                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                                                <SelectItem key={option.value} value={option.value}>{getVideoStatusText(t, option.value)}</SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
                                     {!!state.videoUrl.trim() && (
-                                        <p className="text-xs text-muted-foreground">URL設定済みのため自動的に「設定済み」になります</p>
+                                        <p className="text-xs text-muted-foreground">{t('videoUrlAutoStatus')}</p>
                                     )}
                                 </div>
                             </div>
 
                             <div className="space-y-2">
-                                <Label>単元</Label>
+                                <Label>{t('unitLabel')}</Label>
                                 <CoreProblemSelector
                                     selected={state.coreProblems}
                                     onChange={(next) => setState((current) => ({
@@ -558,8 +580,8 @@ export function ProblemEditorClient({
                 <TabsContent value="body">
                     <Card>
                         <CardHeader>
-                            <CardTitle>本文</CardTitle>
-                            <CardDescription>問題文カードを積み上げて編集します。科目によって本文確認や図版操作の内容が変わります。</CardDescription>
+                            <CardTitle>{t('bodyTitle')}</CardTitle>
+                            <CardDescription>{t('bodyDescription')}</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="space-y-4">
@@ -568,21 +590,23 @@ export function ProblemEditorClient({
                                         <CardHeader>
                                             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                                                 <CardTitle className="text-base">
-                                                    {segment.kind === 'card' ? `問題文カード ${index + 1}` : `旧仕様ブロック ${index + 1}`}
+                                                    {segment.kind === 'card'
+                                                        ? t('bodyCardTitle', { index: index + 1 })
+                                                        : t('legacyBlockTitle', { index: index + 1 })}
                                                 </CardTitle>
                                                 <div className="flex gap-2">
                                                     <Button type="button" variant="outline" size="icon" onClick={() => setState((current) => ({
                                                         ...current,
                                                         document: moveProblemBodySegment(current.document, index, -1),
-                                                    }))}><ChevronUp className="h-4 w-4" /></Button>
+                                                    }))} aria-label={t('moveUp')}><ChevronUp className="h-4 w-4" /></Button>
                                                     <Button type="button" variant="outline" size="icon" onClick={() => setState((current) => ({
                                                         ...current,
                                                         document: moveProblemBodySegment(current.document, index, 1),
-                                                    }))}><ChevronDown className="h-4 w-4" /></Button>
+                                                    }))} aria-label={t('moveDown')}><ChevronDown className="h-4 w-4" /></Button>
                                                     <Button type="button" variant="outline" size="icon" onClick={() => setState((current) => ({
                                                         ...current,
                                                         document: deleteProblemBodySegment(current.document, index),
-                                                    }))}><Trash2 className="h-4 w-4" /></Button>
+                                                    }))} aria-label={t('deleteSegment')}><Trash2 className="h-4 w-4" /></Button>
                                                 </div>
                                             </div>
                                         </CardHeader>
@@ -607,7 +631,7 @@ export function ProblemEditorClient({
                                             ) : (
                                                 <div className="space-y-3">
                                                     <div className="rounded-md border border-dashed bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-                                                        旧仕様ブロックです。互換表示のみ残しており、新規追加はできません。
+                                                        {t('legacyBlockNotice')}
                                                     </div>
                                                     <BlockEditor
                                                         block={segment.block}
@@ -628,7 +652,7 @@ export function ProblemEditorClient({
                                     }))}
                                 >
                                     <Plus className="mr-2 h-4 w-4" />
-                                    問題文を追加
+                                    {t('addBody')}
                                 </Button>
                             </div>
                         </CardContent>
@@ -638,8 +662,8 @@ export function ProblemEditorClient({
                 <TabsContent value="answer">
                     <Card>
                         <CardHeader>
-                            <CardTitle>解答仕様</CardTitle>
-                            <CardDescription>AI採点の基準になる正解と別解を設定します。</CardDescription>
+                            <CardTitle>{t('answerTitle')}</CardTitle>
+                            <CardDescription>{t('answerDescription')}</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <AnswerSpecEditor
@@ -655,8 +679,8 @@ export function ProblemEditorClient({
                 <TabsContent value="answer-field">
                     <Card>
                         <CardHeader>
-                            <CardTitle>解答欄</CardTitle>
-                            <CardDescription>解答欄の形式（短い記述・数直線・表・座標平面）を設定します。</CardDescription>
+                            <CardTitle>{t('answerFieldTitle')}</CardTitle>
+                            <CardDescription>{t('answerFieldDescription')}</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <AnswerFieldEditor
@@ -675,13 +699,13 @@ export function ProblemEditorClient({
                     <TabsContent value="assets">
                         <Card>
                             <CardHeader>
-                                <CardTitle>アセット</CardTitle>
-                                <CardDescription>SVG / 画像 / state を revision に紐付けて保存します。</CardDescription>
+                                <CardTitle>{t('assetsTitle')}</CardTitle>
+                                <CardDescription>{t('assetsDescription')}</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-6">
                                 <div className="grid gap-4 md:grid-cols-3">
                                     <div className="space-y-2">
-                                        <Label>種別</Label>
+                                        <Label>{t('assetKindLabel')}</Label>
                                         <EnumSelect value={assetKind} values={ASSET_KINDS as unknown as string[]} onChange={(value) => setAssetKind(value as (typeof ASSET_KINDS)[number])} />
                                     </div>
                                     <div className="space-y-2">
@@ -689,22 +713,22 @@ export function ProblemEditorClient({
                                         <EnumSelect value={assetSourceTool} values={ASSET_SOURCE_TOOLS as unknown as string[]} onChange={(value) => setAssetSourceTool(value as (typeof ASSET_SOURCE_TOOLS)[number])} />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label>ファイル</Label>
+                                        <Label>{t('fileLabel')}</Label>
                                         <Input type="file" onChange={(event) => setAssetFile(event.target.files?.[0] ?? null)} />
                                     </div>
                                 </div>
                                 <div className="space-y-2">
                                     <Label>inlineContent</Label>
-                                    <Textarea value={assetInlineContent} onChange={(event) => setAssetInlineContent(event.target.value)} rows={6} placeholder="SVG や JSON を直接保存できます" />
+                                    <Textarea value={assetInlineContent} onChange={(event) => setAssetInlineContent(event.target.value)} rows={6} placeholder={t('inlineContentPlaceholder')} />
                                 </div>
                                 <Button variant="outline" onClick={handleAssetUpload} disabled={isPending}>
                                     <FileUp className="mr-2 h-4 w-4" />
-                                    アセット保存
+                                    {t('assetSave')}
                                 </Button>
 
                                 <div className="space-y-3">
                                     {assetOptions.length === 0 ? (
-                                        <div className="text-sm text-muted-foreground">保存済みアセットはありません。</div>
+                                        <div className="text-sm text-muted-foreground">{t('noAssets')}</div>
                                     ) : assetOptions.map((asset) => (
                                         <div key={asset.id} className="rounded-lg border p-4">
                                             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -716,12 +740,12 @@ export function ProblemEditorClient({
                                                     <div className="text-sm text-muted-foreground">{asset.mimeType}</div>
                                                     {asset.signedUrl && (
                                                         <a className="text-sm text-blue-600 underline" href={asset.signedUrl} target="_blank" rel="noreferrer">
-                                                            アセットを開く
+                                                            {t('openAsset')}
                                                         </a>
                                                     )}
                                                 </div>
                                                 <Button variant="outline" onClick={() => handleDeleteAsset(asset.id)} disabled={isPending}>
-                                                    削除
+                                                    {t('delete')}
                                                 </Button>
                                             </div>
                                         </div>
@@ -736,8 +760,8 @@ export function ProblemEditorClient({
                     <TabsContent value="history">
                         <Card>
                             <CardHeader>
-                                <CardTitle>改訂履歴</CardTitle>
-                                <CardDescription>draft / published / superseded の revision を確認します。</CardDescription>
+                                <CardTitle>{t('historyTitle')}</CardTitle>
+                                <CardDescription>{t('historyDescription')}</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-3">
                                 {problem?.revisions.length ? problem.revisions.map((revision) => (
@@ -745,14 +769,14 @@ export function ProblemEditorClient({
                                         <div className="flex flex-wrap items-center gap-2">
                                             <Badge>{revision.status}</Badge>
                                             <Badge variant="secondary">rev.{revision.revisionNumber}</Badge>
-                                            {revision.id === state.revisionId && <Badge variant="outline">編集中</Badge>}
+                                            {revision.id === state.revisionId && <Badge variant="outline">{t('editing')}</Badge>}
                                         </div>
                                         <div className="mt-2 text-sm text-muted-foreground">
                                             {new Date(revision.updatedAt).toLocaleString('ja-JP')}
                                         </div>
                                     </div>
                                 )) : (
-                                    <div className="text-sm text-muted-foreground">revision はまだありません。</div>
+                                    <div className="text-sm text-muted-foreground">{t('noRevisions')}</div>
                                 )}
                             </CardContent>
                         </Card>
@@ -800,6 +824,7 @@ function BlockEditor({
     assetOptions: RenderableProblemAsset[];
     onChange: (block: ProblemBlock) => void;
 }) {
+    const t = useTranslations('ProblemEditorClient');
     const type = block.type;
     const update = (patch: Partial<ProblemBlock>) => onChange({ ...block, ...patch } as ProblemBlock);
 
@@ -832,9 +857,9 @@ function BlockEditor({
                             assetId: value === '__NONE__' ? '' : value,
                         })}
                     >
-                        <SelectTrigger><SelectValue placeholder="asset を選択" /></SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder={t('assetPlaceholder')} /></SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="__NONE__">未選択</SelectItem>
+                            <SelectItem value="__NONE__">{t('unselected')}</SelectItem>
                             {assetOptions.map((asset) => (
                                 <SelectItem key={asset.id} value={asset.id}>{asset.kind} / {asset.fileName}</SelectItem>
                             ))}
@@ -874,9 +899,9 @@ function BlockEditor({
         return (
             <Textarea
                 value={JSON.stringify(block.options ?? [], null, 2)}
-                onChange={(event) => update({ options: safeJsonArrayOfObjects(event.target.value, [{ id: 'A', label: '選択肢A' }]) })}
+                onChange={(event) => update({ options: safeJsonArrayOfObjects(event.target.value, [{ id: 'A', label: t('choiceExampleLabel') }]) })}
                 rows={6}
-                placeholder='[{"id":"A","label":"選択肢A"}]'
+                placeholder={t('choicesPlaceholder')}
             />
         );
     }
@@ -885,9 +910,9 @@ function BlockEditor({
         return (
             <Textarea
                 value={JSON.stringify(block.blanks ?? [], null, 2)}
-                onChange={(event) => update({ blanks: safeJsonArrayOfObjects(event.target.value, [{ id: 'blank-1', label: '空欄1' }]) })}
+                onChange={(event) => update({ blanks: safeJsonArrayOfObjects(event.target.value, [{ id: 'blank-1', label: t('blankExampleLabel') }]) })}
                 rows={6}
-                placeholder='[{"id":"blank-1","label":"空欄1"}]'
+                placeholder={t('blanksPlaceholder')}
             />
         );
     }
@@ -895,7 +920,7 @@ function BlockEditor({
     if (type === 'answerLines') {
         return (
             <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
-                旧仕様の解答欄ブロックです。現在の印刷では無視されるため、必要なら削除するか別の block に変更してください。
+                {t('legacyAnswerBlockNotice')}
             </div>
         );
     }
@@ -925,6 +950,7 @@ function parseAcceptedAnswersJson(value: string): AcceptedAnswersJsonState {
 }
 
 function AcceptedAnswersPreview({ jsonText }: { jsonText: string }) {
+    const t = useTranslations('ProblemEditorClient');
     const state = parseAcceptedAnswersJson(jsonText);
 
     if (state.kind === 'invalid') {
@@ -933,14 +959,14 @@ function AcceptedAnswersPreview({ jsonText }: { jsonText: string }) {
                 className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive"
                 data-testid="answer-spec-accepted-preview-error"
             >
-                JSON 形式が不正です。配列で記述してください。
+                {t('acceptedJsonInvalid')}
             </div>
         );
     }
 
     if (state.values.length === 0) {
         return (
-            <p className="text-sm text-muted-foreground">別解はありません。</p>
+            <p className="text-sm text-muted-foreground">{t('noAcceptedAnswers')}</p>
         );
     }
 
@@ -950,7 +976,7 @@ function AcceptedAnswersPreview({ jsonText }: { jsonText: string }) {
                 <ProblemTextPreview
                     key={index}
                     text={item}
-                    emptyMessage="（空の別解）"
+                    emptyMessage={t('emptyAcceptedAnswer')}
                 />
             ))}
         </div>
@@ -972,6 +998,7 @@ function AnswerSpecEditor({
     onCorrectAnswerChange: (next: string) => void;
     onAcceptedAnswersChange: (next: string[]) => void;
 }) {
+    const t = useTranslations('ProblemEditorClient');
     const [acceptedAnswersJson, setAcceptedAnswersJson] = useState(() =>
         stringifyAcceptedAnswers(acceptedAnswers),
     );
@@ -998,34 +1025,34 @@ function AnswerSpecEditor({
         <div className="space-y-6">
             <div className="space-y-2 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
                 <div className="space-y-2">
-                    <Label>正解</Label>
+                    <Label>{t('correctAnswerLabel')}</Label>
                     <Textarea
                         value={correctAnswer}
                         onChange={(event) => onCorrectAnswerChange(event.target.value)}
                         rows={4}
-                        placeholder="数式は $...$ / $$...$$ で書けます。"
+                        placeholder={t('correctAnswerPlaceholder')}
                     />
                 </div>
                 <div className="space-y-2">
-                    <Label>正解プレビュー</Label>
+                    <Label>{t('correctPreviewLabel')}</Label>
                     <ProblemTextPreview
                         text={correctAnswer}
-                        emptyMessage="正解を入力するとプレビューが出ます。"
+                        emptyMessage={t('correctPreviewEmpty')}
                     />
                 </div>
             </div>
             <div className="space-y-2 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
                 <div className="space-y-2">
-                    <Label>別解(JSON)</Label>
+                    <Label>{t('acceptedAnswersLabel')}</Label>
                     <Textarea
                         value={acceptedAnswersJson}
                         onChange={(event) => handleAcceptedAnswersChange(event.target.value)}
                         rows={6}
-                        placeholder='["別解1", "別解2"]'
+                        placeholder={t('acceptedAnswersPlaceholder')}
                     />
                 </div>
                 <div className="space-y-2">
-                    <Label>別解プレビュー</Label>
+                    <Label>{t('acceptedPreviewLabel')}</Label>
                     <AcceptedAnswersPreview jsonText={acceptedAnswersJson} />
                 </div>
             </div>

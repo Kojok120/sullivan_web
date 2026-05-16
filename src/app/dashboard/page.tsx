@@ -1,5 +1,6 @@
 import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { Sparkles, Target, Trophy, Zap } from 'lucide-react';
 
 import { getSession } from '@/lib/auth';
@@ -16,6 +17,14 @@ import { DashboardHeatmapSection, DashboardHeatmapSectionFallback } from './dash
 export default async function DashboardPage() {
     const session = await getSession();
     if (!session) redirect('/login');
+    const [t, heatmapT] = await Promise.all([
+        getTranslations('Dashboard'),
+        getTranslations('DashboardHeatmap'),
+    ]);
+    const heatmapTitles = {
+        heatmapTitle: heatmapT('heatmapTitle'),
+        subjectProgressTitle: heatmapT('subjectProgressTitle'),
+    };
 
     // 上部 KPI と目標パネルは初回描画に必要なので同期取得する。
     // 重い fetch（heatmap = dailyActivity 365日分 + 教科別進捗）と、
@@ -38,20 +47,20 @@ export default async function DashboardPage() {
             <section className="rounded-lg border border-primary/25 bg-accent p-5 sm:p-6">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold sm:text-3xl">学習ダッシュボード</h1>
-                        <p className="mt-1 text-sm text-muted-foreground">今日やることを先に確認してから学習を始めましょう</p>
+                        <h1 className="text-2xl font-bold sm:text-3xl">{t('title')}</h1>
+                        <p className="mt-1 text-sm text-muted-foreground">{t('subtitle')}</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                         <Badge variant="outline" className="bg-background text-base">
-                            Lv.{level}
+                            {t('levelBadge', { level })}
                         </Badge>
-                        <Badge variant="secondary">今日の目標 {todayGoalCount}件</Badge>
+                        <Badge variant="secondary">{t('todayGoalCount', { count: todayGoalCount })}</Badge>
                     </div>
                 </div>
                 <div className="mt-4 w-full max-w-xl space-y-1">
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>XP {currentXp}</span>
-                        <span>Next {nextLevelXp}</span>
+                        <span>{t('currentXp', { xp: currentXp })}</span>
+                        <span>{t('nextXp', { xp: nextLevelXp })}</span>
                     </div>
                     <Progress value={progressPercent} className="h-2" />
                 </div>
@@ -72,51 +81,51 @@ export default async function DashboardPage() {
             <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">総学習数</CardTitle>
+                        <CardTitle className="text-sm font-medium">{t('totalProblemsTitle')}</CardTitle>
                         <Sparkles className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{stats.totalProblemsSolved}問</div>
-                        <p className="text-xs text-muted-foreground">これまでの累計</p>
+                        <div className="text-2xl font-bold">{t('problemCount', { count: stats.totalProblemsSolved })}</div>
+                        <p className="text-xs text-muted-foreground">{t('totalProblemsDescription')}</p>
                     </CardContent>
                 </Card>
 
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">正答率</CardTitle>
+                        <CardTitle className="text-sm font-medium">{t('accuracyTitle')}</CardTitle>
                         <Target className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{stats.accuracy}%</div>
-                        <p className="text-xs text-muted-foreground">平均正答率</p>
+                        <p className="text-xs text-muted-foreground">{t('accuracyDescription')}</p>
                     </CardContent>
                 </Card>
 
                 <Card className="border-blue-200 bg-blue-50/70">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-blue-800">連続学習</CardTitle>
+                        <CardTitle className="text-sm font-medium text-blue-800">{t('streakTitle')}</CardTitle>
                         <Zap className="h-4 w-4 fill-blue-500 text-blue-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-blue-700">{stats.currentStreak}日</div>
-                        <p className="text-xs text-blue-700">連続達成中</p>
+                        <div className="text-2xl font-bold text-blue-700">{t('streakDays', { days: stats.currentStreak })}</div>
+                        <p className="text-xs text-blue-700">{t('streakDescription')}</p>
                     </CardContent>
                 </Card>
 
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">レベル</CardTitle>
+                        <CardTitle className="text-sm font-medium">{t('levelTitle')}</CardTitle>
                         <Trophy className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">Lv.{level}</div>
-                        <p className="text-xs text-muted-foreground">次レベルまで {Math.max(0, nextLevelXp - currentXp)} XP</p>
+                        <div className="text-2xl font-bold">{t('levelBadge', { level })}</div>
+                        <p className="text-xs text-muted-foreground">{t('nextLevelXp', { xp: Math.max(0, nextLevelXp - currentXp) })}</p>
                     </CardContent>
                 </Card>
             </section>
 
-            <Suspense fallback={<DashboardHeatmapSectionFallback />}>
-                <DashboardHeatmapSection userId={session.userId} />
+            <Suspense fallback={<DashboardHeatmapSectionFallback titles={heatmapTitles} />}>
+                <DashboardHeatmapSection userId={session.userId} packId={session.defaultPackId} />
             </Suspense>
         </div>
     );

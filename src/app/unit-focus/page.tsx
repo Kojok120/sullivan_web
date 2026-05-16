@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { UnitFocusListClient } from "./components/unit-focus-list-client";
 import { normalizeLectureVideos } from "@/lib/lecture-videos";
 import { getUnlockedCoreProblemIdsBySubject } from "@/lib/progression";
@@ -8,9 +9,11 @@ import { getUnlockedCoreProblemIdsBySubject } from "@/lib/progression";
 export default async function UnitFocusPage() {
     const session = await getSession();
     if (!session) redirect("/login");
+    const t = await getTranslations('UnitFocus');
 
     // 教科と CoreProblem を取得
     const subjectsRaw = await prisma.subject.findMany({
+        where: { packId: session.defaultPackId },
         orderBy: { order: 'asc' },
         include: {
             coreProblems: {
@@ -43,10 +46,10 @@ export default async function UnitFocusPage() {
         <div className="container mx-auto px-4 py-8 max-w-5xl">
             <div className="mb-8 space-y-2">
                 <h1 className="text-3xl font-bold tracking-tight text-foreground">
-                    単元集中学習
+                    {t('title')}
                 </h1>
                 <p className="text-muted-foreground text-lg">
-                    苦手な単元や復習したい単元を選んで、講義動画の視聴や問題演習ができます。
+                    {t('description')}
                 </p>
             </div>
 

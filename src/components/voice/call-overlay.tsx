@@ -1,6 +1,9 @@
+"use client";
+
 import { X, Mic, MicOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useEffect, useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error';
 
@@ -41,6 +44,7 @@ function CallOverlayContent({
     isTalking,
     connectionState,
 }: Omit<CallOverlayProps, 'isOpen'>) {
+    const t = useTranslations('CallOverlay');
     const [duration, setDuration] = useState(0);
 
     useEffect(() => {
@@ -58,12 +62,12 @@ function CallOverlayContent({
     };
 
     const statusText = (() => {
-        if (connectionState === 'disconnected') return '通話が切断されました';
-        if (connectionState === 'connecting') return '接続中...';
-        if (connectionState === 'error') return 'マイクまたは接続で問題が発生しました';
-        if (isMicMuted) return 'マイクはオフです';
-        if (isTalking) return 'お話し中...';
-        return '聞き取り中...';
+        if (connectionState === 'disconnected') return t('disconnected');
+        if (connectionState === 'connecting') return t('connecting');
+        if (connectionState === 'error') return t('error');
+        if (isMicMuted) return t('micMuted');
+        if (isTalking) return t('talking');
+        return t('listening');
     })();
 
     const statusClassName = connectionState === 'disconnected'
@@ -84,7 +88,7 @@ function CallOverlayContent({
 
                 {/* Header */}
                 <div className="text-center space-y-2">
-                    <h2 className="text-2xl font-bold tracking-tight">AI家庭教師と通話中</h2>
+                    <h2 className="text-2xl font-bold tracking-tight">{t('title')}</h2>
                     <p className="text-muted-foreground font-mono">{formatTime(duration)}</p>
                 </div>
 
@@ -111,7 +115,8 @@ function CallOverlayContent({
                         className={`h-12 w-12 rounded-full ${isMicMuted ? 'border-amber-400 bg-amber-50' : 'border-muted-foreground/20'}`}
                         onClick={onToggleMic}
                         disabled={connectionState !== 'connected'}
-                        title={isMicMuted ? 'マイクをオンにする' : 'マイクをオフにする'}
+                        aria-label={isMicMuted ? t('micOn') : t('micOff')}
+                        title={isMicMuted ? t('micOn') : t('micOff')}
                     >
                         {isMicMuted ? (
                             <MicOff className="h-5 w-5 text-amber-600" />
@@ -126,6 +131,8 @@ function CallOverlayContent({
                         size="icon"
                         className="h-16 w-16 rounded-full shadow-lg hover:bg-red-600 hover:scale-105 transition-all"
                         onClick={onClose}
+                        aria-label={t('endCall')}
+                        title={t('endCall')}
                     >
                         <X className="h-8 w-8" />
                     </Button>

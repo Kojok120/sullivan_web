@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
@@ -12,6 +13,7 @@ type FilterProps = {
 };
 
 export function HistoryFilter({ subjects }: FilterProps) {
+    const t = useTranslations('HistoryFilter');
     const router = useRouter();
     const searchParams = useSearchParams();
 
@@ -44,13 +46,13 @@ export function HistoryFilter({ subjects }: FilterProps) {
     return (
         <div className="bg-card p-4 rounded-lg mb-6 space-y-4 md:space-y-0 md:flex md:items-end md:gap-4">
             <div className="space-y-2">
-                <label className="text-sm font-medium">科目</label>
+                <label className="text-sm font-medium">{t('subject')}</label>
                 <Select value={subjectId} onValueChange={setSubjectId}>
                     <SelectTrigger className="w-[150px]">
-                        <SelectValue placeholder="全科目" />
+                        <SelectValue placeholder={t('allSubjects')} />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="all">全科目</SelectItem>
+                        <SelectItem value="all">{t('allSubjects')}</SelectItem>
                         {subjects.map(s => (
                             <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                         ))}
@@ -59,20 +61,20 @@ export function HistoryFilter({ subjects }: FilterProps) {
             </div>
 
             <div className="space-y-2">
-                <label className="text-sm font-medium">並び順</label>
+                <label className="text-sm font-medium">{t('sort')}</label>
                 <Select value={sort} onValueChange={setSort}>
                     <SelectTrigger className="w-[120px]">
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="desc">新しい順</SelectItem>
-                        <SelectItem value="asc">古い順</SelectItem>
+                        <SelectItem value="desc">{t('newest')}</SelectItem>
+                        <SelectItem value="asc">{t('oldest')}</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
 
             <div className="space-y-2">
-                <label className="text-sm font-medium">開始日</label>
+                <label className="text-sm font-medium">{t('startDate')}</label>
                 <Input
                     type="date"
                     value={startDate}
@@ -82,7 +84,7 @@ export function HistoryFilter({ subjects }: FilterProps) {
             </div>
 
             <div className="space-y-2">
-                <label className="text-sm font-medium">終了日</label>
+                <label className="text-sm font-medium">{t('endDate')}</label>
                 <Input
                     type="date"
                     value={endDate}
@@ -92,8 +94,8 @@ export function HistoryFilter({ subjects }: FilterProps) {
             </div>
 
             <div className="flex gap-2">
-                <Button onClick={handleApply}>検索</Button>
-                <Button variant="outline" onClick={handleReset}>クリア</Button>
+                <Button onClick={handleApply}>{t('search')}</Button>
+                <Button variant="outline" onClick={handleReset}>{t('clear')}</Button>
             </div>
         </div>
     );

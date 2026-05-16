@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,6 +18,7 @@ export function TexHelpExampleCard({
     description,
     tex,
 }: TexHelpExampleCardProps) {
+    const t = useTranslations('TexHelp.exampleCard');
     const [copyState, setCopyState] = useState<'idle' | 'success' | 'error'>('idle');
 
     useEffect(() => {
@@ -46,19 +48,19 @@ export function TexHelpExampleCard({
                         <CardDescription>{description}</CardDescription>
                     </div>
                     <Button type="button" variant="outline" onClick={handleCopy}>
-                        {copyState === 'success' ? 'コピー済み' : copyState === 'error' ? 'コピー失敗' : 'コピー'}
+                        {copyState === 'success' ? t('copySuccess') : copyState === 'error' ? t('copyError') : t('copyIdle')}
                     </Button>
                 </div>
             </CardHeader>
             <CardContent className="space-y-4">
                 <div className="space-y-2">
-                    <div className="text-xs font-medium text-muted-foreground">入力する TeX</div>
+                    <div className="text-xs font-medium text-muted-foreground">{t('inputLabel')}</div>
                     <pre className="overflow-x-auto rounded-md border bg-muted/40 p-3 text-sm whitespace-pre-wrap">
                         <code>{tex}</code>
                     </pre>
                 </div>
                 <div className="space-y-2">
-                    <div className="text-xs font-medium text-muted-foreground">表示イメージ</div>
+                    <div className="text-xs font-medium text-muted-foreground">{t('previewLabel')}</div>
                     <div
                         className="rounded-md border bg-white p-3 text-sm leading-7 [&_.katex-display]:overflow-x-auto [&_.katex-display]:py-2"
                         dangerouslySetInnerHTML={{ __html: renderProblemTextHtml(tex) }}

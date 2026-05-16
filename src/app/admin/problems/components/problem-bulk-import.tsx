@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState, useTransition } from 'react';
+import { useTranslations } from 'next-intl';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -205,6 +206,7 @@ export function BulkImportDialog({
     lockSubjectSelection = false,
     variant = 'default',
 }: BulkImportDialogProps) {
+    const t = useTranslations('ProblemBulkImport');
     const [step, setStep] = useState<'input' | 'preview'>('input');
     const [rawInput, setRawInput] = useState('');
     const [parsedData, setParsedData] = useState<ParsedProblem[]>([]);
@@ -258,17 +260,15 @@ export function BulkImportDialog({
         [defaultSubjectId, subjects],
     );
     const isEnglishSheetVariant = variant === 'english-sheet';
-    const dialogTitle = isEnglishSheetVariant ? '英語シート一括登録' : '問題の一括登録・更新';
+    const dialogTitle = isEnglishSheetVariant ? t('englishSheetTitle') : t('defaultTitle');
     const dialogDescription = isEnglishSheetVariant
-        ? '元の英語スプレッドシートからコピー＆ペーストで一括登録・更新できます。'
-        : 'Excelやスプレッドシートからコピー＆ペーストで一括登録・更新できます。';
-    const subjectLabel = lockSubjectSelection ? 'ID採番用の科目（固定）' : 'ID採番用の科目（任意）';
+        ? t('englishSheetDescription')
+        : t('defaultDescription');
+    const subjectLabel = lockSubjectSelection ? t('subjectLabelFixed') : t('subjectLabelOptional');
     const subjectDescription = lockSubjectSelection
-        ? `${fixedSubject?.name ?? '指定科目'}で固定しています。CoreProblemから科目が判定できない行にのみ、この科目をID採番のフォールバックとして使います。`
-        : 'CoreProblemから科目が判定できない行にのみ、この科目をID採番のフォールバックとして使います。';
-    const textareaPlaceholder = isEnglishSheetVariant
-        ? '例:\n1001\t中1\tbe動詞の文_肯定文\t私は新入生です I (A) a new student.\tA: am\t\thttps://youtube.com/...'
-        : '例:\n1001\t中1\tbe動詞の文_肯定文\t私は新入生です I (A) a new student.\tA: am\t\thttps://youtube.com/...';
+        ? t('subjectDescriptionFixed', { subject: fixedSubject?.name ?? t('specifiedSubject') })
+        : t('subjectDescriptionOptional');
+    const textareaPlaceholder = t('textareaPlaceholder');
 
     // parseTSV is now imported from @/lib/tsv-parser
 
@@ -282,7 +282,7 @@ export function BulkImportDialog({
 
         const parsed = rows.map(row => {
             const isValid = !!row.question;
-            const error = !isValid ? '問題文は必須です' : undefined;
+            const error = !isValid ? t('problemRequiredError') : undefined;
 
             // Collect all CoreProblem names for bulk resolution
             for (const name of row.coreProblemNames) {
@@ -411,13 +411,13 @@ export function BulkImportDialog({
             const result = await bulkUpsertStandaloneProblems(problems, { subjectId: fallbackSubjectId });
 
             if (result.success) {
-                toast.success(`${result.createdCount}件作成、${result.updatedCount}件更新しました`, {
+                toast.success(t('successToast', { createdCount: result.createdCount, updatedCount: result.updatedCount }), {
                     style: { background: '#3b82f6', color: 'white' }
                 });
                 if (result.warnings && result.warnings.length > 0) {
                     setLastWarnings(result.warnings);
                     setShowWarningsDialog(true);
-                    toast(`${result.warnings.length}件の警告があります`, {
+                    toast(t('warningsToast', { count: result.warnings.length }), {
                         style: { background: '#f59e0b', color: 'white' },
                         duration: 5000,
                     });
@@ -432,7 +432,7 @@ export function BulkImportDialog({
                 setSelectedSubjectId(getInitialSelectedSubjectId(defaultSubjectId));
                 setShowAllResolvedCoreProblems(false);
             } else {
-                toast.error(result.error || '登録に失敗しました', {
+                toast.error(result.error || t('fallbackError'), {
                     style: { background: '#ef4444', color: 'white' }
                 });
             }
@@ -447,27 +447,27 @@ export function BulkImportDialog({
                         <DialogTitle>{dialogTitle}</DialogTitle>
                         <DialogDescription>
                             {dialogDescription}<br />
-                            マスタ内問題番号が既存の場合は更新、新規の場合は作成されます。
+                            {t('upsertHint')}
                         </DialogDescription>
                     </DialogHeader>
 
                     {step === 'input' && (
                         <div className="min-h-0 flex h-full flex-col gap-4 overflow-hidden px-6 py-4">
                             <Alert>
-                                <AlertTitle>フォーマット</AlertTitle>
+                                <AlertTitle>{t('formatTitle')}</AlertTitle>
                                 <AlertDescription>
-                                    タブ区切り: [マスタ内問題番号(任意)] [学年] [CoreProblem名] [問題文] [正解] [別解(任意)] [動画URL(任意)]
+                                    {t('formatDescription')}
                                 </AlertDescription>
                             </Alert>
                             <div className="space-y-2">
                                 <Label htmlFor="bulk-import-subject">{subjectLabel}</Label>
                                 <Select value={selectedSubjectId} onValueChange={setSelectedSubjectId} disabled={lockSubjectSelection}>
                                     <SelectTrigger id="bulk-import-subject" className="w-full sm:w-[320px]">
-                                        <SelectValue placeholder="科目を選択" />
+                                        <SelectValue placeholder={t('subjectPlaceholder')} />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {!lockSubjectSelection && (
-                                            <SelectItem value={AUTO_SUBJECT_VALUE}>自動判定（CoreProblemから）</SelectItem>
+                                            <SelectItem value={AUTO_SUBJECT_VALUE}>{t('autoSubject')}</SelectItem>
                                         )}
                                         {subjects.map((subject) => (
                                             <SelectItem key={subject.id} value={subject.id}>
@@ -497,11 +497,11 @@ export function BulkImportDialog({
                                     <Label htmlFor="bulk-import-subject-preview">{subjectLabel}</Label>
                                     <Select value={selectedSubjectId} onValueChange={setSelectedSubjectId} disabled={lockSubjectSelection}>
                                         <SelectTrigger id="bulk-import-subject-preview" className="w-full sm:w-[320px] bg-background">
-                                            <SelectValue placeholder="科目を選択" />
+                                            <SelectValue placeholder={t('subjectPlaceholder')} />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {!lockSubjectSelection && (
-                                                <SelectItem value={AUTO_SUBJECT_VALUE}>自動判定（CoreProblemから）</SelectItem>
+                                                <SelectItem value={AUTO_SUBJECT_VALUE}>{t('autoSubject')}</SelectItem>
                                             )}
                                             {subjects.map((subject) => (
                                                 <SelectItem key={subject.id} value={subject.id}>
@@ -516,16 +516,15 @@ export function BulkImportDialog({
                                 </div>
                                 {missingCoreProblemCount > 0 && (
                                     <Alert className="border-yellow-300 bg-yellow-50">
-                                        <AlertTitle className="text-yellow-800">CoreProblem未設定の行があります</AlertTitle>
+                                        <AlertTitle className="text-yellow-800">{t('missingCoreProblemTitle')}</AlertTitle>
                                         <AlertDescription className="text-yellow-800">
-                                            CoreProblem未解決の行が{missingCoreProblemCount}件あります。
-                                            これらの行は実行時に警告され、作成・更新対象から自動でスキップされます。
+                                            {t('missingCoreProblemDescription', { count: missingCoreProblemCount })}
                                         </AlertDescription>
                                     </Alert>
                                 )}
-                                <Label>追加の紐付け設定 (一括)</Label>
+                                <Label>{t('additionalLinkLabel')}</Label>
                                 <div className="text-sm text-muted-foreground mb-2">
-                                    ペーストしたデータのCoreProblem列から自動で紐付けされます。追加で紐付けしたい場合は下で選択してください。
+                                    {t('additionalLinkDescription')}
                                 </div>
 
                                 {/* Auto-resolved CoreProblems */}
@@ -533,7 +532,7 @@ export function BulkImportDialog({
                                     <div className="mb-2">
                                         <div className="flex items-center justify-between gap-2">
                                             <span className="text-xs text-muted-foreground">
-                                                自動検出されたコア問題: {resolvedCoreProblemItems.length}件
+                                                {t('autoDetectedCoreProblems', { count: resolvedCoreProblemItems.length })}
                                             </span>
                                             {resolvedCoreProblemItems.length > RESOLVED_CORE_PROBLEM_PREVIEW_LIMIT && (
                                                 <Button
@@ -544,8 +543,8 @@ export function BulkImportDialog({
                                                     onClick={() => setShowAllResolvedCoreProblems((prev) => !prev)}
                                                 >
                                                     {showAllResolvedCoreProblems
-                                                        ? '折りたたむ'
-                                                        : `すべて表示 (+${hiddenResolvedCoreProblemCount})`}
+                                                        ? t('collapseCoreProblems')
+                                                        : t('showAllCoreProblems', { count: hiddenResolvedCoreProblemCount })}
                                                 </Button>
                                             )}
                                         </div>
@@ -563,8 +562,8 @@ export function BulkImportDialog({
                                     selected={coreProblems}
                                     onChange={setCoreProblems}
                                     active={open && step === 'preview'}
-                                    emptyText="追加の紐付けなし"
-                                    placeholder="単元・コア問題を選択して追加"
+                                    emptyText={t('noAdditionalLinks')}
+                                    placeholder={t('coreProblemSelectorPlaceholder')}
                                 />
                             </div>
 
@@ -572,15 +571,15 @@ export function BulkImportDialog({
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead className="w-[50px]">状態</TableHead>
-                                            <TableHead>タイプ</TableHead>
-                                            <TableHead>マスタNo</TableHead>
-                                            <TableHead>学年</TableHead>
-                                            <TableHead>コア問題</TableHead>
-                                            <TableHead>問題文</TableHead>
-                                            <TableHead>解答(任意)</TableHead>
-                                            <TableHead>別解</TableHead>
-                                            <TableHead>動画URL</TableHead>
+                                            <TableHead className="w-[50px]">{t('table.status')}</TableHead>
+                                            <TableHead>{t('table.type')}</TableHead>
+                                            <TableHead>{t('table.masterNumber')}</TableHead>
+                                            <TableHead>{t('table.grade')}</TableHead>
+                                            <TableHead>{t('table.coreProblem')}</TableHead>
+                                            <TableHead>{t('table.question')}</TableHead>
+                                            <TableHead>{t('table.answer')}</TableHead>
+                                            <TableHead>{t('table.acceptedAnswers')}</TableHead>
+                                            <TableHead>{t('table.videoUrl')}</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -607,9 +606,9 @@ export function BulkImportDialog({
                                                     </TableCell>
                                                     <TableCell>
                                                         {isUpdate ? (
-                                                            <Badge variant="secondary" className="bg-orange-100 text-orange-800 hover:bg-orange-100">更新</Badge>
+                                                            <Badge variant="secondary" className="bg-orange-100 text-orange-800 hover:bg-orange-100">{t('updateBadge')}</Badge>
                                                         ) : (
-                                                            <Badge variant="outline" className="bg-blue-50 text-blue-800 hover:bg-blue-50">新規</Badge>
+                                                            <Badge variant="outline" className="bg-blue-50 text-blue-800 hover:bg-blue-50">{t('newBadge')}</Badge>
                                                         )}
                                                     </TableCell>
                                                     <TableCell className="font-mono">{row.masterNumber || '-'}</TableCell>
@@ -647,14 +646,14 @@ export function BulkImportDialog({
                     <DialogFooter className="shrink-0 border-t bg-background px-6 py-3 z-10">
                         {step === 'input' ? (
                             <Button onClick={handleParse} disabled={!rawInput.trim()}>
-                                プレビュー
+                                {t('previewButton')}
                             </Button>
                         ) : (
                             <>
-                                <Button variant="ghost" onClick={() => setStep('input')}>戻る</Button>
+                                <Button variant="ghost" onClick={() => setStep('input')}>{t('backButton')}</Button>
                                 <Button onClick={handleExecute} disabled={isPending || validCount === 0}>
                                     {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                                    登録実行 ({validCount}件)
+                                    {t('executeButton', { count: validCount })}
                                 </Button>
                             </>
                         )}
@@ -666,7 +665,7 @@ export function BulkImportDialog({
             <Dialog open={showWarningsDialog} onOpenChange={setShowWarningsDialog}>
                 <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
                     <DialogHeader>
-                        <DialogTitle>登録時の警告 ({lastWarnings.length}件)</DialogTitle>
+                        <DialogTitle>{t('warningsTitle', { count: lastWarnings.length })}</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-2 max-h-[60vh] overflow-y-auto">
                         {lastWarnings.map((warning, i) => (
@@ -676,7 +675,7 @@ export function BulkImportDialog({
                         ))}
                     </div>
                     <DialogFooter>
-                        <Button onClick={() => setShowWarningsDialog(false)}>閉じる</Button>
+                        <Button onClick={() => setShowWarningsDialog(false)}>{t('closeButton')}</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

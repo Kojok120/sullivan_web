@@ -17,6 +17,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
+import { useTranslations } from 'next-intl';
 
 type ChatTutorButtonProps = {
     targetStudentId: string;
@@ -29,7 +30,6 @@ type ChatTutorButtonProps = {
     systemPrompt: string;
 };
 
-const INITIAL_ASSISTANT_MESSAGE = 'あなたのわからないところを教えてください。';
 const STORAGE_NAMESPACE = 'chat-tutor:messages';
 const MAX_STORED_MESSAGES = 40;
 
@@ -43,11 +43,13 @@ function toBase64Utf8(value: string) {
 }
 
 export function ChatTutorButton({ targetStudentId, problemContext, systemPrompt }: ChatTutorButtonProps) {
+    const t = useTranslations('ChatTutorButton');
+    const initialAssistantMessage = t('initialAssistantMessage');
     const [isOpen, setIsOpen] = useState(false);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [messages, setMessages] = useState<TutorChatMessage[]>([
-        { role: 'assistant', content: INITIAL_ASSISTANT_MESSAGE },
+        { role: 'assistant', content: initialAssistantMessage },
     ]);
     const messagesViewportRef = useRef<HTMLDivElement | null>(null);
     const storageKey = useMemo(() => {
@@ -82,14 +84,14 @@ export function ChatTutorButton({ targetStudentId, problemContext, systemPrompt 
     useEffect(() => {
         const stored = window.sessionStorage.getItem(storageKey);
         if (!stored) {
-            setMessages([{ role: 'assistant', content: INITIAL_ASSISTANT_MESSAGE }]);
+            setMessages([{ role: 'assistant', content: initialAssistantMessage }]);
             return;
         }
 
         try {
             const parsed = JSON.parse(stored) as unknown;
             if (!Array.isArray(parsed)) {
-                setMessages([{ role: 'assistant', content: INITIAL_ASSISTANT_MESSAGE }]);
+                setMessages([{ role: 'assistant', content: initialAssistantMessage }]);
                 return;
             }
 
@@ -98,15 +100,15 @@ export function ChatTutorButton({ targetStudentId, problemContext, systemPrompt 
                 maxMessageChars: 1000,
             });
             if (sanitized.length === 0) {
-                setMessages([{ role: 'assistant', content: INITIAL_ASSISTANT_MESSAGE }]);
+                setMessages([{ role: 'assistant', content: initialAssistantMessage }]);
                 return;
             }
 
             setMessages(sanitized);
         } catch {
-            setMessages([{ role: 'assistant', content: INITIAL_ASSISTANT_MESSAGE }]);
+            setMessages([{ role: 'assistant', content: initialAssistantMessage }]);
         }
-    }, [storageKey]);
+    }, [initialAssistantMessage, storageKey]);
 
     useEffect(() => {
         if (messages.length === 0) return;
@@ -155,7 +157,7 @@ export function ChatTutorButton({ targetStudentId, problemContext, systemPrompt 
                 ...prev,
                 {
                     role: 'assistant',
-                    content: 'ごめんなさい、応答に失敗しました。もう一度送ってみてください。',
+                    content: t('sendFailedMessage'),
                 },
             ]);
         } finally {
@@ -170,14 +172,15 @@ export function ChatTutorButton({ targetStudentId, problemContext, systemPrompt 
                     variant="ghost"
                     size="icon"
                     className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                    title="AI先生にチャットで相談する"
+                    aria-label={t('title')}
+                    title={t('title')}
                 >
                     <MessageCircle className="h-5 w-5" />
                 </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl p-0 overflow-hidden">
                 <DialogHeader className="px-6 pt-6 pb-3 border-b">
-                    <DialogTitle>AI家庭教師にチャット相談</DialogTitle>
+                    <DialogTitle>{t('dialogTitle')}</DialogTitle>
                     <DialogDescription className="line-clamp-2">
                         {headerQuestion}
                     </DialogDescription>
@@ -208,7 +211,7 @@ export function ChatTutorButton({ targetStudentId, problemContext, systemPrompt 
                             <div className="flex justify-start">
                                 <div className="max-w-[80%] rounded-lg bg-white border px-3 py-2 text-sm flex items-center gap-2">
                                     <Loader2 className="h-4 w-4 animate-spin" />
-                                    考え中...
+                                    {t('thinking')}
                                 </div>
                             </div>
                         )}
@@ -224,11 +227,17 @@ export function ChatTutorButton({ targetStudentId, problemContext, systemPrompt 
                                     void sendMessage();
                                 }
                             }}
-                            placeholder="わからないところを入力してください（Enterで送信、Shift+Enterで改行）"
+                            placeholder={t('placeholder')}
                             className="min-h-20"
                             disabled={isLoading}
                         />
-                        <Button onClick={() => void sendMessage()} disabled={!canSend} className="h-10 shrink-0">
+                        <Button
+                            onClick={() => void sendMessage()}
+                            disabled={!canSend}
+                            className="h-10 shrink-0"
+                            aria-label={t('send')}
+                            title={t('send')}
+                        >
                             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                         </Button>
                     </div>

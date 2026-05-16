@@ -1,6 +1,9 @@
+import type { ReactNode } from 'react';
 import { render, screen } from '@testing-library/react';
+import { NextIntlClientProvider } from 'next-intl';
 import { describe, expect, it, vi } from 'vitest';
 
+import jaMessages from '@/messages/ja.json';
 import { ProblemBodyCardEditorShared } from './problem-body-card-editor-shared';
 
 vi.mock('./problem-text-preview', () => ({
@@ -19,24 +22,34 @@ type CardOverrides = Partial<{
 
 function renderEditor(subjectName: string, overrides: CardOverrides = {}) {
     return render(
-        <ProblemBodyCardEditorShared
-            subjectName={subjectName}
-            card={{
-                id: 'card-1',
-                text: 'テスト本文',
-                attachmentKind: overrides.attachmentKind ?? 'none',
-                attachmentBlockType: overrides.attachmentBlockType ?? null,
-                assetId: '',
-                tableData: { headers: [], rows: [] },
-                directiveSource: overrides.directiveSource ?? '',
-            }}
-            problemId=""
-            revisionId=""
-            isUploadingAsset={false}
-            isPending={false}
-            onCardChange={() => {}}
-            onUploadAsset={() => {}}
-        />,
+        <IntlWrapper>
+            <ProblemBodyCardEditorShared
+                subjectName={subjectName}
+                card={{
+                    id: 'card-1',
+                    text: 'テスト本文',
+                    attachmentKind: overrides.attachmentKind ?? 'none',
+                    attachmentBlockType: overrides.attachmentBlockType ?? null,
+                    assetId: '',
+                    tableData: { headers: [], rows: [] },
+                    directiveSource: overrides.directiveSource ?? '',
+                }}
+                problemId=""
+                revisionId=""
+                isUploadingAsset={false}
+                isPending={false}
+                onCardChange={() => {}}
+                onUploadAsset={() => {}}
+            />
+        </IntlWrapper>,
+    );
+}
+
+function IntlWrapper({ children }: { children: ReactNode }) {
+    return (
+        <NextIntlClientProvider locale="ja" messages={jaMessages}>
+            {children}
+        </NextIntlClientProvider>
     );
 }
 

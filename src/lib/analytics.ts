@@ -251,9 +251,10 @@ export async function getStudentsWithStats(
     }));
 }
 
-export async function getSubjectProgress(userId: string): Promise<SubjectProgress[]> {
+export async function getSubjectProgress(userId: string, packId: string = 'jp-juken'): Promise<SubjectProgress[]> {
     // Get all subjects and their core problem counts
     const subjects = await prisma.subject.findMany({
+        where: { packId },
         include: {
             coreProblems: {
                 select: { id: true },
@@ -534,8 +535,9 @@ export async function getLearningHistory(
     return { items, total, totalPages: Math.ceil(total / limit) };
 }
 
-export async function getAllSubjects() {
+export async function getAllSubjects(packId: string = 'jp-juken') {
     return await prisma.subject.findMany({
+        where: { packId },
         orderBy: { order: 'asc' }
     });
 }
@@ -670,10 +672,10 @@ export async function getSessionDetails(groupId: string, userId?: string) {
     });
 }
 
-export async function getStudentOverviewData(userId: string) {
+export async function getStudentOverviewData(userId: string, packId: string = 'jp-juken') {
     const [stats, subjectProgress, weaknesses] = await Promise.all([
         getStudentStats(userId),
-        getSubjectProgress(userId),
+        getSubjectProgress(userId, packId),
         getStudentWeaknesses(userId),
     ]);
 

@@ -2,9 +2,11 @@ import type { ReactNode } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useRouter } from 'next/navigation';
+import { NextIntlClientProvider } from 'next-intl';
 
 import { PrintProblemCard } from './print-problem-card';
 import { getPreferredPrintView } from '@/lib/print-view';
+import jaMessages from '@/messages/ja.json';
 
 const { getCoreProblemsForSubjectMock } = vi.hoisted(() => ({
     getCoreProblemsForSubjectMock: vi.fn(),
@@ -84,6 +86,14 @@ vi.mock('@/components/ui/select', async () => {
     };
 });
 
+function renderWithIntl(ui: ReactNode) {
+    return render(
+        <NextIntlClientProvider locale="ja" messages={jaMessages}>
+            {ui}
+        </NextIntlClientProvider>
+    );
+}
+
 describe('講師用問題印刷カード', () => {
     const mockRouter = {
         push: vi.fn(),
@@ -110,7 +120,7 @@ describe('講師用問題印刷カード', () => {
     it('デスクトップでは PDF プレビュー付き URL を開く', async () => {
         mockOpen.mockReturnValue({ closed: false });
 
-        render(
+        renderWithIntl(
             <PrintProblemCard
                 userId="student-1"
                 subjects={[{ id: 'subject-1', name: '英語' }]}
@@ -135,7 +145,7 @@ describe('講師用問題印刷カード', () => {
         mockOpen.mockReturnValue({ closed: false });
         vi.mocked(getPreferredPrintView).mockReturnValue('assist');
 
-        render(
+        renderWithIntl(
             <PrintProblemCard
                 userId="student-1"
                 subjects={[{ id: 'subject-1', name: '英語' }]}

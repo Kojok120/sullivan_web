@@ -680,11 +680,21 @@ function getReferencedFigureAssets(problem: ProblemForGrading) {
     }
 }
 
+export type GradingPromptProfile = {
+    feedbackLanguage: string;
+    subjectRubricFiles: Record<string, string>;
+};
+
 // 教科ごとに追加で読み込む採点ガイドラインのファイル名。
 // fullName は subject-config の SubjectConfig.fullName に対応する。
-const SUBJECT_RUBRIC_FILES: Record<string, string> = {
+const DEFAULT_SUBJECT_RUBRIC_FILES: Record<string, string> = {
     Math: 'grading-rubric-math.md',
     Science: 'grading-rubric-science.md',
+};
+
+export const DEFAULT_GRADING_PROMPT_PROFILE: GradingPromptProfile = {
+    feedbackLanguage: '日本語',
+    subjectRubricFiles: DEFAULT_SUBJECT_RUBRIC_FILES,
 };
 
 /**
@@ -692,19 +702,22 @@ const SUBJECT_RUBRIC_FILES: Record<string, string> = {
  * 該当教科がない場合は空文字を返し、プロンプトの該当箇所は空行になる。
  * 並び順は問題の入力順に依存しないよう fullName でソートし、プロンプトの安定性を確保する。
  */
-export function buildSubjectSpecificGuidelines(problems: ProblemForGrading[]): string {
+export function buildSubjectSpecificGuidelines(
+    problems: ProblemForGrading[],
+    profile: GradingPromptProfile = DEFAULT_GRADING_PROMPT_PROFILE
+): string {
     const matchedFullNames = new Set<string>();
 
     for (const problem of problems) {
         const fullName = getSubjectConfig(problem.subjectName).fullName;
-        if (SUBJECT_RUBRIC_FILES[fullName]) {
+        if (profile.subjectRubricFiles[fullName]) {
             matchedFullNames.add(fullName);
         }
     }
 
     const sections: string[] = [];
     for (const fullName of [...matchedFullNames].sort()) {
-        const file = SUBJECT_RUBRIC_FILES[fullName];
+        const file = profile.subjectRubricFiles[fullName];
         try {
             sections.push(loadPrompt(file).trim());
         } catch (error) {
@@ -800,6 +813,46 @@ export function buildGeminiGradingContents(input: {
     }
 
     return contents;
+}
+
+export function buildGradingResponseSchema(
+    profile: GradingPromptProfile = DEFAULT_GRADING_PROMPT_PROFILE
+) {
+    return {
+        type: 'array',
+        items: {
+            type: 'object',
+            properties: {
+                problemIndex: {
+                    type: 'integer',
+                    description: "問題のインデックス（0始まり、問題リストの順序に対応）"
+                },
+                studentAnswer: {
+                    type: 'string',
+                    description: "生徒の解答をそのまま転記"
+                },
+                evaluation: {
+                    type: 'string',
+                    enum: ["A", "B", "C", "D"],
+                    description: "A=完璧, B=ほぼ正解, C=部分的に正解, D=不正解"
+                },
+                confidence: {
+                    type: 'number',
+                    description: '0 から 1 の信頼度'
+                },
+                reason: {
+                    type: 'string',
+                    description: '採点理由の要約'
+                },
+                feedback: {
+                    type: 'string',
+                    description: `${profile.feedbackLanguage}でのフィードバック`
+                }
+            },
+            required: ["problemIndex", "studentAnswer", "evaluation", "confidence", "reason", "feedback"],
+            additionalProperties: false,
+        }
+    };
 }
 
 export function validateGradingResponse(
@@ -1171,41 +1224,8 @@ async function gradeWithGemini(
     const problemContexts = problemsForGrading.map((problem, index) => buildProblemContextForGemini(problem, index));
     const referenceFigures = await loadReferenceFiguresForGemini(problemsForGrading);
 
-    const gradingResponseSchema = {
-        type: 'array',
-        items: {
-            type: 'object',
-            properties: {
-                problemIndex: {
-                    type: 'integer',
-                    description: "問題のインデックス（0始まり、問題リストの順序に対応）"
-                },
-                studentAnswer: {
-                    type: 'string',
-                    description: "生徒の解答をそのまま転記"
-                },
-                evaluation: {
-                    type: 'string',
-                    enum: ["A", "B", "C", "D"],
-                    description: "A=完璧, B=ほぼ正解, C=部分的に正解, D=不正解"
-                },
-                confidence: {
-                    type: 'number',
-                    description: '0 から 1 の信頼度'
-                },
-                reason: {
-                    type: 'string',
-                    description: '採点理由の要約'
-                },
-                feedback: {
-                    type: 'string',
-                    description: "日本語でのフィードバック"
-                }
-            },
-            required: ["problemIndex", "studentAnswer", "evaluation", "confidence", "reason", "feedback"],
-            additionalProperties: false,
-        }
-    };
+    const gradingPromptProfile = DEFAULT_GRADING_PROMPT_PROFILE;
+    const gradingResponseSchema = buildGradingResponseSchema(gradingPromptProfile);
 
     const numberLineInstruction = problemContexts.some((context) => context.hasNumberLine)
         ? [
@@ -1226,7 +1246,8 @@ async function gradeWithGemini(
         problemCount: problemContexts.length,
         problemContexts: JSON.stringify(problemContexts, null, 2),
         maxIndex: problemContexts.length - 1,
-        subjectSpecificGuidelines: buildSubjectSpecificGuidelines(problemsForGrading),
+        subjectSpecificGuidelines: buildSubjectSpecificGuidelines(problemsForGrading, gradingPromptProfile),
+        feedbackLanguage: gradingPromptProfile.feedbackLanguage,
         numberLineInstruction,
     });
 

@@ -41,31 +41,36 @@ jobs:
             fi
           fi
 
+      - name: pnpm セットアップ
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+
       - name: Node.js セットアップ
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
+          cache: pnpm
 
       - name: 依存関係インストール
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Prisma クライアント生成
-        run: npx prisma generate
+        run: pnpm exec prisma generate
 
       - name: ユニットテスト
-        run: npm test
+        run: pnpm test
 
       - name: ESLint
         # TODO: 既存のlintエラー修正後に continue-on-error を削除する
         continue-on-error: true
-        run: npx eslint src/
+        run: pnpm exec eslint src/
 
       - name: TypeScript 型チェック
-        run: npx tsc --noEmit
+        run: pnpm exec tsc --noEmit
 
       - name: Next.js ビルド
-        run: npm run build
+        run: pnpm run build
         env:
           NODE_OPTIONS: "--max-old-space-size=4096"
           # CIではビルドが通ることのみ検証（ダミー値）

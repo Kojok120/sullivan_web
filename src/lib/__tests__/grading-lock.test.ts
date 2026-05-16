@@ -10,7 +10,7 @@ const { prismaMock } = vi.hoisted(() => ({
     },
 }));
 
-vi.mock('@/lib/prisma', () => ({
+vi.mock('@sullivan/db-schema', () => ({
     prisma: prismaMock,
 }));
 

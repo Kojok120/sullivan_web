@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { CheckSquare, Pencil, Square, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -30,9 +31,6 @@ import {
 import {
     PROBLEM_STATUS_OPTIONS,
     VIDEO_STATUS_OPTIONS,
-    getProblemStatusLabel,
-    getProblemTypeLabel,
-    getVideoStatusLabel,
     type ProblemEditorViewMode,
     type ProblemStatusValue,
     type VideoStatusValue,
@@ -64,7 +62,51 @@ const PROBLEM_STATUS_BADGE_CLASS: Record<ProblemStatusValue, string> = {
     SENT_BACK: 'bg-amber-100 text-amber-700 hover:bg-amber-100',
 };
 
+type ProblemListTranslator = ReturnType<typeof useTranslations>;
+
+function getProblemTypeText(t: ProblemListTranslator, value: string | null | undefined) {
+    switch (value) {
+        case 'SHORT_TEXT':
+            return t('problemType.SHORT_TEXT');
+        case 'GRAPH_DRAW':
+            return t('problemType.GRAPH_DRAW');
+        case 'GEOMETRY':
+            return t('problemType.GEOMETRY');
+        default:
+            return value || t('fallback');
+    }
+}
+
+function getProblemStatusText(t: ProblemListTranslator, value: string | null | undefined) {
+    switch (value) {
+        case 'DRAFT':
+            return t('status.DRAFT');
+        case 'PUBLISHED':
+            return t('status.PUBLISHED');
+        case 'SENT_BACK':
+            return t('status.SENT_BACK');
+        default:
+            return value || t('fallback');
+    }
+}
+
+function getVideoStatusText(t: ProblemListTranslator, value: string | null | undefined) {
+    switch (value) {
+        case 'NONE':
+            return t('videoStatus.NONE');
+        case 'SHOT':
+            return t('videoStatus.SHOT');
+        case 'UPLOADED':
+            return t('videoStatus.UPLOADED');
+        case 'CONFIGURED':
+            return t('videoStatus.CONFIGURED');
+        default:
+            return value || t('fallback');
+    }
+}
+
 function ProblemStatusCell({ problem }: { problem: ProblemWithRelations }) {
+    const t = useTranslations('ProblemList');
     const [isPending, startTransition] = useTransition();
     const [sendBackOpen, setSendBackOpen] = useState(false);
     const router = useRouter();
@@ -81,20 +123,20 @@ function ProblemStatusCell({ problem }: { problem: ProblemWithRelations }) {
             if (nextStatus === 'PUBLISHED') {
                 const result = await publishProblemRevision(problem.id);
                 if (result.success) {
-                    toast.success('公開しました');
+                    toast.success(t('publishSuccess'));
                     router.refresh();
                 } else {
-                    toast.error(result.error || '公開に失敗しました');
+                    toast.error(result.error || t('publishFailed'));
                 }
                 return;
             }
 
             const result = await updateProblemStatus(problem.id, nextStatus);
             if (result.success) {
-                toast.success('ステータスを更新しました');
+                toast.success(t('statusUpdateSuccess'));
                 router.refresh();
             } else {
-                toast.error(result.error || 'ステータスの更新に失敗しました');
+                toast.error(result.error || t('statusUpdateFailed'));
             }
         });
     };
@@ -103,11 +145,11 @@ function ProblemStatusCell({ problem }: { problem: ProblemWithRelations }) {
         startTransition(async () => {
             const result = await sendBackProblem(problem.id, reason);
             if (result.success) {
-                toast.success('差し戻しに変更しました');
+                toast.success(t('sendBackSuccess'));
                 setSendBackOpen(false);
                 router.refresh();
             } else {
-                toast.error(result.error || '差し戻しに失敗しました');
+                toast.error(result.error || t('sendBackFailed'));
             }
         });
     };
@@ -121,11 +163,11 @@ function ProblemStatusCell({ problem }: { problem: ProblemWithRelations }) {
                 size="sm"
                 className={`h-8 w-[120px] border-none px-2 text-xs font-medium ${PROBLEM_STATUS_BADGE_CLASS[currentStatus]}`}
             >
-                <SelectValue>{getProblemStatusLabel(currentStatus)}</SelectValue>
+                <SelectValue>{getProblemStatusText(t, currentStatus)}</SelectValue>
             </SelectTrigger>
             <SelectContent>
                 {PROBLEM_STATUS_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                    <SelectItem key={option.value} value={option.value}>{getProblemStatusText(t, option.value)}</SelectItem>
                 ))}
             </SelectContent>
         </Select>
@@ -157,6 +199,7 @@ function ProblemStatusCell({ problem }: { problem: ProblemWithRelations }) {
 }
 
 function VideoStatusCell({ problem }: { problem: ProblemWithRelations }) {
+    const t = useTranslations('ProblemList');
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
     const currentStatus = problem.videoStatus as VideoStatusValue;
@@ -168,10 +211,10 @@ function VideoStatusCell({ problem }: { problem: ProblemWithRelations }) {
         startTransition(async () => {
             const result = await updateProblemVideoStatus(problem.id, value as VideoStatusValue);
             if (result.success) {
-                toast.success('動画ステータスを更新しました');
+                toast.success(t('videoStatusUpdateSuccess'));
                 router.refresh();
             } else {
-                toast.error(result.error || 'ステータスの更新に失敗しました');
+                toast.error(result.error || t('statusUpdateFailed'));
             }
         });
     };
@@ -183,11 +226,11 @@ function VideoStatusCell({ problem }: { problem: ProblemWithRelations }) {
                     size="sm"
                     className={`h-8 w-[120px] border-none px-2 text-xs font-medium ${VIDEO_STATUS_BADGE_CLASS[currentStatus]}`}
                 >
-                    <SelectValue>{getVideoStatusLabel(currentStatus)}</SelectValue>
+                    <SelectValue>{getVideoStatusText(t, currentStatus)}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                     {VIDEO_STATUS_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                        <SelectItem key={option.value} value={option.value}>{getVideoStatusText(t, option.value)}</SelectItem>
                     ))}
                 </SelectContent>
             </Select>
@@ -202,7 +245,7 @@ function VideoStatusCell({ problem }: { problem: ProblemWithRelations }) {
                     <span className="flex h-4 w-4 items-center justify-center rounded-full border border-current">
                         <span className="ml-0.5 h-0 w-0 border-y-[3px] border-l-[5px] border-y-transparent border-l-current" />
                     </span>
-                    動画を開く
+                    {t('openVideo')}
                 </a>
             )}
         </div>
@@ -249,6 +292,7 @@ export function ProblemList({
     viewMode = 'admin',
     showMasterNumber = true,
 }: ProblemListProps) {
+    const t = useTranslations('ProblemList');
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
     const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -266,10 +310,10 @@ export function ProblemList({
         startTransition(async () => {
             const result = await deleteStandaloneProblem(id);
             if (result.success) {
-                toast.success('問題を削除しました');
+                toast.success(t('deleteSuccess'));
                 router.refresh();
             } else {
-                toast.error(result.error || '削除に失敗しました');
+                toast.error(result.error || t('deleteFailed'));
             }
         });
     };
@@ -281,11 +325,11 @@ export function ProblemList({
         startTransition(async () => {
             const result = await bulkDeleteProblems(idsToDelete);
             if (result.success) {
-                toast.success(`${result.count}件の問題を削除しました`);
+                toast.success(t('bulkDeleteSuccess', { count: result.count }));
                 setCheckedIds(new Set());
                 router.refresh();
             } else {
-                toast.error(result.error || '一括削除に失敗しました');
+                toast.error(result.error || t('bulkDeleteFailed'));
             }
         });
     };
@@ -318,12 +362,12 @@ export function ProblemList({
                         {checkedIds.size === problems.length ? (
                             <>
                                 <CheckSquare className="mr-2 h-4 w-4" />
-                                全解除
+                                {t('clearAll')}
                             </>
                         ) : (
                             <>
                                 <Square className="mr-2 h-4 w-4" />
-                                全選択
+                                {t('selectAll')}
                             </>
                         )}
                     </Button>
@@ -336,7 +380,7 @@ export function ProblemList({
                             className="min-h-11"
                         >
                             <Trash2 className="mr-2 h-4 w-4" />
-                            {checkedIds.size}件削除
+                            {t('bulkDelete', { count: checkedIds.size })}
                         </Button>
                     )}
                 </div>
@@ -345,7 +389,7 @@ export function ProblemList({
             <div className="space-y-3 md:hidden">
                 {problems.length === 0 ? (
                     <div className="rounded-md border bg-card py-8 text-center text-sm text-muted-foreground">
-                        問題が見つかりませんでした
+                        {t('empty')}
                     </div>
                 ) : (
                     problems.map((problem) => {
@@ -374,7 +418,7 @@ export function ProblemList({
                                 <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
                                     <Button variant="outline" size="sm" className="min-h-11" onClick={() => onEdit(problem)}>
                                         <Pencil className="mr-1 h-4 w-4" />
-                                        {isAuthorView ? '開く' : '編集'}
+                                        {isAuthorView ? t('open') : t('edit')}
                                     </Button>
                                     {!isAuthorView && (
                                         <Button
@@ -385,32 +429,32 @@ export function ProblemList({
                                             onClick={() => setDeleteTarget(problem.id)}
                                         >
                                             <Trash2 className="mr-1 h-4 w-4" />
-                                            削除
+                                            {t('delete')}
                                         </Button>
                                     )}
                                 </div>
                             </div>
                             <div className="space-y-2 text-sm">
                                 <div className="flex flex-wrap gap-2">
-                                    <Badge>{getProblemTypeLabel(problem.problemType)}</Badge>
+                                    <Badge>{getProblemTypeText(t, problem.problemType)}</Badge>
                                     <ProblemStatusCell problem={problem} />
                                 </div>
                                 <div>
-                                    <p className="text-xs text-muted-foreground">問題文</p>
+                                    <p className="text-xs text-muted-foreground">{t('question')}</p>
                                     <RenderedProblemText
                                         text={displayQuestion}
                                         className="whitespace-pre-wrap text-sm leading-7 [&_.katex-display]:overflow-x-auto [&_.katex-display]:py-1"
                                     />
                                 </div>
                                 <div>
-                                    <p className="text-xs text-muted-foreground">解答</p>
+                                    <p className="text-xs text-muted-foreground">{t('answer')}</p>
                                     <RenderedProblemText
                                         text={displayAnswer}
                                         className="whitespace-pre-wrap text-sm leading-7 [&_.katex-display]:overflow-x-auto [&_.katex-display]:py-1"
                                     />
                                 </div>
                                 <div>
-                                    <p className="text-xs text-muted-foreground">所属単元</p>
+                                    <p className="text-xs text-muted-foreground">{t('units')}</p>
                                     <div className="mt-1 flex flex-wrap gap-1">
                                         {problem.coreProblems.map((cp) => (
                                             <Badge key={cp.id} variant="secondary" className="text-xs">
@@ -423,7 +467,7 @@ export function ProblemList({
                                     </div>
                                 </div>
                                 <div>
-                                    <p className="text-xs text-muted-foreground">動画</p>
+                                    <p className="text-xs text-muted-foreground">{t('video')}</p>
                                     <div className="mt-1">
                                         <VideoStatusCell problem={problem} />
                                     </div>
@@ -443,7 +487,7 @@ export function ProblemList({
                             {showMasterNumber && (
                                 <TableHead className="w-[100px] cursor-pointer hover:bg-muted/50" onClick={() => onSort('masterNumber')}>
                                     <div className="flex items-center">
-                                        マスタNo
+                                        {t('masterNumber')}
                                         <SortIcon active={sortBy === 'masterNumber'} sortOrder={sortOrder} />
                                     </div>
                                 </TableHead>
@@ -454,20 +498,20 @@ export function ProblemList({
                                     <SortIcon active={sortBy === 'customId'} sortOrder={sortOrder} />
                                 </div>
                             </TableHead>
-                            <TableHead className="w-[320px]">問題文</TableHead>
-                            <TableHead className="w-[130px]">形式</TableHead>
-                            <TableHead className="w-[120px]">公開状況</TableHead>
-                            <TableHead className="w-[220px]">解答</TableHead>
-                            <TableHead className="w-[180px]">所属単元</TableHead>
-                            <TableHead className="w-[140px]">動画</TableHead>
-                            <TableHead className="w-[120px]">操作</TableHead>
+                            <TableHead className="w-[320px]">{t('question')}</TableHead>
+                            <TableHead className="w-[130px]">{t('type')}</TableHead>
+                            <TableHead className="w-[120px]">{t('statusHeader')}</TableHead>
+                            <TableHead className="w-[220px]">{t('answer')}</TableHead>
+                            <TableHead className="w-[180px]">{t('units')}</TableHead>
+                            <TableHead className="w-[140px]">{t('video')}</TableHead>
+                            <TableHead className="w-[120px]">{t('actions')}</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {problems.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={emptyTableColSpan} className="py-8 text-center text-muted-foreground">
-                                    問題が見つかりませんでした
+                                    {t('empty')}
                                 </TableCell>
                             </TableRow>
                         ) : (
@@ -497,7 +541,7 @@ export function ProblemList({
                                             className="whitespace-pre-wrap break-words text-sm leading-7 [&_.katex-display]:overflow-x-auto [&_.katex-display]:py-1"
                                         />
                                     </TableCell>
-                                    <TableCell className="text-xs">{getProblemTypeLabel(problem.problemType)}</TableCell>
+                                    <TableCell className="text-xs">{getProblemTypeText(t, problem.problemType)}</TableCell>
                                     <TableCell><ProblemStatusCell problem={problem} /></TableCell>
                                     <TableCell className="max-w-[220px] align-top" title={displayAnswer}>
                                         <RenderedProblemText
@@ -524,7 +568,7 @@ export function ProblemList({
                                         <div className="flex items-center gap-2">
                                             <Button variant="ghost" size="sm" onClick={() => onEdit(problem)}>
                                                 <Pencil className="mr-1 h-4 w-4" />
-                                                {isAuthorView ? '開く' : '編集'}
+                                                {isAuthorView ? t('open') : t('edit')}
                                             </Button>
                                             {!isAuthorView && (
                                                 <Button
@@ -533,6 +577,7 @@ export function ProblemList({
                                                     className="text-red-500 hover:bg-red-50 hover:text-red-600"
                                                     disabled={isPending}
                                                     onClick={() => setDeleteTarget(problem.id)}
+                                                    aria-label={t('delete')}
                                                 >
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
@@ -552,19 +597,19 @@ export function ProblemList({
                     <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
                         <AlertDialogContent>
                             <AlertDialogHeader>
-                                <AlertDialogTitle>問題を削除しますか？</AlertDialogTitle>
+                                <AlertDialogTitle>{t('deleteTitle')}</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                    この操作は取り消せません。学習履歴なども削除されます。
+                                    {t('deleteDescription')}
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
-                                <AlertDialogCancel disabled={isPending}>キャンセル</AlertDialogCancel>
+                                <AlertDialogCancel disabled={isPending}>{t('cancel')}</AlertDialogCancel>
                                 <AlertDialogAction
                                     onClick={handleDeleteConfirm}
                                     className="bg-red-500 hover:bg-red-600"
                                     disabled={isPending}
                                 >
-                                    削除
+                                    {t('delete')}
                                 </AlertDialogAction>
                             </AlertDialogFooter>
                         </AlertDialogContent>
@@ -573,19 +618,19 @@ export function ProblemList({
                     <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
                         <AlertDialogContent>
                             <AlertDialogHeader>
-                                <AlertDialogTitle>{checkedIds.size}件の問題を削除しますか？</AlertDialogTitle>
+                                <AlertDialogTitle>{t('bulkDeleteTitle', { count: checkedIds.size })}</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                    選択した問題と関連する学習履歴が削除されます。この操作は取り消せません。
+                                    {t('bulkDeleteDescription')}
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
-                                <AlertDialogCancel disabled={isPending}>キャンセル</AlertDialogCancel>
+                                <AlertDialogCancel disabled={isPending}>{t('cancel')}</AlertDialogCancel>
                                 <AlertDialogAction
                                     onClick={handleBulkDeleteConfirm}
                                     className="bg-red-500 hover:bg-red-600"
                                     disabled={isPending}
                                 >
-                                    {checkedIds.size}件削除
+                                    {t('bulkDelete', { count: checkedIds.size })}
                                 </AlertDialogAction>
                             </AlertDialogFooter>
                         </AlertDialogContent>

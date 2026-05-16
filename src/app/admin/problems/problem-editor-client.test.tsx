@@ -1,6 +1,9 @@
+import type { ReactNode } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { NextIntlClientProvider } from 'next-intl';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import jaMessages from '@/messages/ja.json';
 import { ProblemEditorClient } from './problem-editor-client';
 
 const { pushMock, refreshMock } = vi.hoisted(() => ({
@@ -92,13 +95,21 @@ const mathProblem = {
     coreProblems: [{ id: 'core-1', name: '一次方程式', subjectId: 'subject-math', subject: { name: '数学' } }],
 } as const;
 
+function renderWithIntl(ui: ReactNode) {
+    return render(
+        <NextIntlClientProvider locale="ja" messages={jaMessages}>
+            {ui}
+        </NextIntlClientProvider>,
+    );
+}
+
 describe('ProblemEditorClient', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
     it('問題作成画面にマスタNo入力欄を表示しない', () => {
-        render(
+        renderWithIntl(
             <ProblemEditorClient
                 problem={null}
                 subjects={[{ id: 'subject-1', name: '英語' }]}
@@ -112,7 +123,7 @@ describe('ProblemEditorClient', () => {
     });
 
     it('既存問題編集ではタイトル横に customId バッジを表示する', () => {
-        render(
+        renderWithIntl(
             <ProblemEditorClient
                 problem={baseProblem as never}
                 subjects={[{ id: 'subject-1', name: '英語' }]}
@@ -125,7 +136,7 @@ describe('ProblemEditorClient', () => {
     });
 
     it('新規作成画面では customId バッジを表示しない', () => {
-        render(
+        renderWithIntl(
             <ProblemEditorClient
                 problem={null}
                 subjects={[{ id: 'subject-1', name: '英語' }]}
@@ -138,7 +149,7 @@ describe('ProblemEditorClient', () => {
     });
 
     it('本文タブで preview 系 UI を表示しない', () => {
-        render(
+        renderWithIntl(
             <ProblemEditorClient
                 problem={baseProblem as never}
                 subjects={[{ id: 'subject-1', name: '英語' }]}
@@ -157,7 +168,7 @@ describe('ProblemEditorClient', () => {
     });
 
     it('英語では本文確認と図・画像UIを表示しない', () => {
-        render(
+        renderWithIntl(
             <ProblemEditorClient
                 problem={baseProblem as never}
                 subjects={[{ id: 'subject-1', name: '英語' }]}
@@ -173,7 +184,7 @@ describe('ProblemEditorClient', () => {
     });
 
     it('数学では本文確認を右配置で表示する', () => {
-        render(
+        renderWithIntl(
             <ProblemEditorClient
                 problem={mathProblem as never}
                 subjects={[{ id: 'subject-math', name: '数学' }]}
@@ -190,7 +201,7 @@ describe('ProblemEditorClient', () => {
     });
 
     it('採点タブを表示せず、解答仕様だけを編集できる', () => {
-        render(
+        renderWithIntl(
             <ProblemEditorClient
                 problem={baseProblem as never}
                 subjects={[{ id: 'subject-1', name: '英語' }]}
@@ -207,7 +218,7 @@ describe('ProblemEditorClient', () => {
     });
 
     it('解答仕様タブに正解/別解のプレビュー欄を表示する', () => {
-        render(
+        renderWithIntl(
             <ProblemEditorClient
                 problem={baseProblem as never}
                 subjects={[{ id: 'subject-1', name: '英語' }]}
@@ -223,7 +234,7 @@ describe('ProblemEditorClient', () => {
     });
 
     it('別解JSONが不正なときはエラー表示が出る', () => {
-        render(
+        renderWithIntl(
             <ProblemEditorClient
                 problem={baseProblem as never}
                 subjects={[{ id: 'subject-1', name: '英語' }]}
@@ -242,7 +253,7 @@ describe('ProblemEditorClient', () => {
     });
 
     it('一覧へ戻るリンクは編集中科目の subjectId をクエリで保持する', () => {
-        render(
+        renderWithIntl(
             <ProblemEditorClient
                 problem={mathProblem as never}
                 subjects={[{ id: 'subject-math', name: '数学' }]}
@@ -259,7 +270,7 @@ describe('ProblemEditorClient', () => {
     });
 
     it('解説動画URLを入力すると動画ステータスの表示が「設定済み」になる', () => {
-        render(
+        renderWithIntl(
             <ProblemEditorClient
                 problem={null}
                 subjects={[{ id: 'subject-1', name: '英語' }]}
@@ -298,7 +309,7 @@ describe('ProblemEditorClient', () => {
     it('差し戻しボタンを押すとダイアログが開き、理由入力後に sendBackProblem を呼ぶ', async () => {
         sendBackProblemMock.mockResolvedValueOnce({ success: true, status: 'SENT_BACK', sentBackReason: '答えが違います' });
 
-        render(
+        renderWithIntl(
             <ProblemEditorClient
                 problem={baseProblem as never}
                 subjects={[{ id: 'subject-1', name: '英語' }]}
@@ -342,7 +353,7 @@ describe('ProblemEditorClient', () => {
         });
         publishProblemRevisionMock.mockResolvedValueOnce({ success: true });
 
-        render(
+        renderWithIntl(
             <ProblemEditorClient
                 problem={simpleProblem as never}
                 subjects={[{ id: 'subject-1', name: '英語' }]}

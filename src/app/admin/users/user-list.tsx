@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useTranslations } from 'next-intl';
 import { User, Role } from '@prisma/client';
 import { deleteUser } from '../actions';
 import { Button } from '@/components/ui/button';
@@ -81,6 +82,7 @@ export function UserList({
     groups,
     classrooms
 }: UserListProps) {
+    const t = useTranslations('AdminUserList');
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
 
@@ -149,7 +151,7 @@ export function UserList({
                 setSelectedUser(null);
                 router.refresh();
             } else {
-                alert(result.error);
+                alert(result.error || t('deleteFailed'));
             }
         });
     };
@@ -178,9 +180,9 @@ export function UserList({
             <div className="flex flex-col space-y-4 mb-6">
                 <div className="flex justify-between items-center">
                     <div>
-                        <h2 className="text-2xl font-bold tracking-tight">ユーザー一覧</h2>
+                        <h2 className="text-2xl font-bold tracking-tight">{t('title')}</h2>
                         <p className="text-sm text-muted-foreground mt-1">
-                            {total > 0 ? `${start}〜${end} / ${total}名表示中` : 'ユーザーが見つかりません'}
+                            {total > 0 ? t('range', { start, end, total }) : t('empty')}
                         </p>
                     </div>
                 </div>
@@ -188,12 +190,12 @@ export function UserList({
                 <div className="flex flex-col gap-4 rounded-lg bg-muted/30 p-4 sm:flex-row sm:items-center">
                     <form onSubmit={handleSearch} className="flex w-full gap-2 sm:w-auto">
                         <Input
-                            placeholder="名前またはIDで検索"
+                            placeholder={t('searchPlaceholder')}
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             className="w-full sm:w-64 bg-background"
                         />
-                        <Button type="submit" variant="secondary">検索</Button>
+                        <Button type="submit" variant="secondary">{t('search')}</Button>
                     </form>
 
                     <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
@@ -203,10 +205,10 @@ export function UserList({
                             onValueChange={handleRoleFilter}
                         >
                             <SelectTrigger className="w-full bg-background sm:w-[150px]">
-                                <SelectValue placeholder="役割" />
+                                <SelectValue placeholder={t('rolePlaceholder')} />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="ALL">全ての役割</SelectItem>
+                                <SelectItem value="ALL">{t('allRoles')}</SelectItem>
                                 {ROLE_OPTIONS.map((option) => (
                                     <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                                 ))}
@@ -218,10 +220,10 @@ export function UserList({
                             onValueChange={handleClassroomFilter}
                         >
                             <SelectTrigger className="w-full bg-background sm:w-[150px]">
-                                <SelectValue placeholder="教室" />
+                                <SelectValue placeholder={t('classroomPlaceholder')} />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="ALL">全ての教室</SelectItem>
+                                <SelectItem value="ALL">{t('allClassrooms')}</SelectItem>
                                 {classrooms.map((classroom) => (
                                     <SelectItem key={classroom.id} value={classroom.id}>
                                         {classroom.name}
@@ -236,7 +238,7 @@ export function UserList({
             <div className="space-y-3 md:hidden">
                 {initialUsers.length === 0 ? (
                     <div className="rounded-lg border bg-white p-6 text-center text-sm text-muted-foreground">
-                        ユーザーが見つかりません
+                        {t('empty')}
                     </div>
                 ) : (
                     initialUsers.map((user) => (
@@ -250,18 +252,18 @@ export function UserList({
                             </div>
                             <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
                                 <div>
-                                    <p className="text-xs text-muted-foreground">教室</p>
+                                    <p className="text-xs text-muted-foreground">{t('classroomHeader')}</p>
                                     <p>{user.classroom?.name || '-'}</p>
                                 </div>
                                 <div>
-                                    <p className="text-xs text-muted-foreground">作成日</p>
+                                    <p className="text-xs text-muted-foreground">{t('createdAtHeader')}</p>
                                     <p><DateDisplay date={user.createdAt} /></p>
                                 </div>
                             </div>
                             <div className="mt-3 grid grid-cols-2 gap-2">
                                 <Button variant="outline" size="sm" className="min-h-11" onClick={() => openEdit(user)}>
                                     <Pencil className="mr-1 h-4 w-4" />
-                                    編集
+                                    {t('edit')}
                                 </Button>
                                 <Button variant="outline" size="sm" className="min-h-11" onClick={() => openPasswordReset(user)}>
                                     <KeyRound className="mr-1 h-4 w-4" />
@@ -274,7 +276,7 @@ export function UserList({
                                     onClick={() => openDelete(user)}
                                 >
                                     <Trash2 className="mr-1 h-4 w-4" />
-                                    削除
+                                    {t('delete')}
                                 </Button>
                             </div>
                         </div>
@@ -288,35 +290,35 @@ export function UserList({
                         <TableRow>
                             <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('loginId')}>
                                 <div className="flex items-center">
-                                    ログインID
+                                    {t('loginIdHeader')}
                                     <SortIcon active={sortBy === 'loginId'} sortOrder={sortOrder} />
                                 </div>
                             </TableHead>
                             <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('name')}>
                                 <div className="flex items-center">
-                                    名前
+                                    {t('nameHeader')}
                                     <SortIcon active={sortBy === 'name'} sortOrder={sortOrder} />
                                 </div>
                             </TableHead>
                             <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('role')}>
                                 <div className="flex items-center">
-                                    役割
+                                    {t('roleHeader')}
                                     <SortIcon active={sortBy === 'role'} sortOrder={sortOrder} />
                                 </div>
                             </TableHead>
                             <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('classroom')}>
                                 <div className="flex items-center">
-                                    教室
+                                    {t('classroomHeader')}
                                     <SortIcon active={sortBy === 'classroom'} sortOrder={sortOrder} />
                                 </div>
                             </TableHead>
                             <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('createdAt')}>
                                 <div className="flex items-center">
-                                    作成日
+                                    {t('createdAtHeader')}
                                     <SortIcon active={sortBy === 'createdAt'} sortOrder={sortOrder} />
                                 </div>
                             </TableHead>
-                            <TableHead className="text-right">操作</TableHead>
+                            <TableHead className="text-right">{t('actions')}</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -335,21 +337,21 @@ export function UserList({
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
                                             <Button variant="ghost" className="h-8 w-8 p-0">
-                                                <span className="sr-only">メニューを開く</span>
+                                                <span className="sr-only">{t('openMenu')}</span>
                                                 <MoreHorizontal className="h-4 w-4" />
                                             </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
-                                            <DropdownMenuLabel>操作</DropdownMenuLabel>
+                                            <DropdownMenuLabel>{t('actions')}</DropdownMenuLabel>
                                             <DropdownMenuItem onClick={() => openEdit(user)}>
-                                                <Pencil className="mr-2 h-4 w-4" /> 編集
+                                                <Pencil className="mr-2 h-4 w-4" /> {t('edit')}
                                             </DropdownMenuItem>
                                             <DropdownMenuItem onClick={() => openPasswordReset(user)}>
-                                                <KeyRound className="mr-2 h-4 w-4" /> パスワード変更
+                                                <KeyRound className="mr-2 h-4 w-4" /> {t('passwordChange')}
                                             </DropdownMenuItem>
                                             <DropdownMenuSeparator />
                                             <DropdownMenuItem onClick={() => openDelete(user)} className="text-red-600">
-                                                <Trash2 className="mr-2 h-4 w-4" /> 削除
+                                                <Trash2 className="mr-2 h-4 w-4" /> {t('delete')}
                                             </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
@@ -369,7 +371,7 @@ export function UserList({
                         onClick={() => handlePageChange(currentPage - 1)}
                         disabled={currentPage <= 1}
                     >
-                        前へ
+                        {t('previous')}
                     </Button>
                     <div className="flex items-center px-4 text-sm">
                         {currentPage} / {totalPages}
@@ -380,7 +382,7 @@ export function UserList({
                         onClick={() => handlePageChange(currentPage + 1)}
                         disabled={currentPage >= totalPages}
                     >
-                        次へ
+                        {t('next')}
                     </Button>
                 </div>
             )}
@@ -410,16 +412,16 @@ export function UserList({
             <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>本当に削除しますか？</AlertDialogTitle>
+                        <AlertDialogTitle>{t('deleteDialogTitle')}</AlertDialogTitle>
                         <AlertDialogDescription>
-                            この操作は取り消せません。ユーザー <b>{selectedUser?.name}</b> ({selectedUser?.loginId}) を完全に削除します。
+                            {t('deleteDialogDescriptionPrefix')} <b>{selectedUser?.name}</b> ({selectedUser?.loginId}) {t('deleteDialogDescriptionSuffix')}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>キャンセル</AlertDialogCancel>
+                        <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
                         <AlertDialogAction onClick={handleDeleteUser} className="bg-red-600 hover:bg-red-700">
                             {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            削除
+                            {t('delete')}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

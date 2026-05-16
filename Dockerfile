@@ -4,9 +4,17 @@ FROM ${WEB_BASE_IMAGE} AS base
 
 FROM base AS deps
 WORKDIR /app
-COPY package.json package-lock.json ./
-COPY prisma ./prisma
-RUN npm ci
+RUN npm install -g pnpm@10.11.0
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml prisma.config.ts ./
+COPY packages/ai-clients/package.json ./packages/ai-clients/package.json
+COPY packages/config/package.json ./packages/config/package.json
+COPY packages/content-schema/package.json ./packages/content-schema/package.json
+COPY packages/core-engine/package.json ./packages/core-engine/package.json
+COPY packages/db-schema/package.json ./packages/db-schema/package.json
+COPY packages/db-schema/prisma ./packages/db-schema/prisma
+COPY packages/ui-kit/package.json ./packages/ui-kit/package.json
+COPY packages/user-platform/package.json ./packages/user-platform/package.json
+RUN pnpm install --frozen-lockfile
 
 FROM base AS builder
 WORKDIR /app
@@ -26,7 +34,7 @@ ENV NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS=$NEXT_PUBLIC_GEMINI_SILENCE_HOLD_MS
 
 # Next.js standalone 出力 (.next/standalone) と custom server bundle (dist/server.js) を生成
 # build-server.mjs に `web` を渡し、worker bundle が image に紛れ込まないようにする
-RUN npm run build && node scripts/build-server.mjs web
+RUN pnpm run build && node scripts/build-server.mjs web
 
 FROM base AS runner
 WORKDIR /app

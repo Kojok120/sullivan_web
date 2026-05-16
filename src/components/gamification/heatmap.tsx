@@ -1,6 +1,7 @@
 type Props = {
     data: { date: string; count: number }[];
     days?: number;
+    problemCountUnit?: string;
 };
 
 type HeatmapCell = {
@@ -11,7 +12,11 @@ type HeatmapCell = {
 const DEFAULT_HEATMAP_DAYS = 365;
 const MAX_HEATMAP_DAYS = 3650;
 
-export function Heatmap({ data, days = 365 }: Props) {
+export function Heatmap({
+    data,
+    days = 365,
+    problemCountUnit = '',
+}: Props) {
     const normalizedDays = Number.isFinite(days) ? Math.floor(days) : DEFAULT_HEATMAP_DAYS;
     const totalDays = Math.min(MAX_HEATMAP_DAYS, Math.max(1, normalizedDays));
     const today = new Date();
@@ -67,7 +72,7 @@ export function Heatmap({ data, days = 365 }: Props) {
                         {week.map((day, dIndex) => (
                             <div
                                 key={dIndex}
-                                title={day ? `${day.date}: ${day.count}問` : ''}
+                                title={day ? `${day.date}: ${day.count}${problemCountUnit}` : ''}
                                 className={`h-2.5 w-2.5 rounded-[2px] sm:h-3 sm:w-3 sm:rounded-sm ${day ? getColor(day.count) : 'bg-transparent'}`}
                             />
                         ))}

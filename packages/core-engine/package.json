@@ -1,0 +1,37 @@
+{
+  "name": "@sullivan/core-engine",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./progression": "./src/progression.ts",
+    "./print-types": "./src/print-types.ts",
+    "./print-algo": "./src/print-algo.ts",
+    "./structured-problem": "./src/structured-problem.ts",
+    "./problem-text": "./src/problem-text.ts",
+    "./problem-svg": "./src/problem-svg.ts",
+    "./problem-body-card-ui-policy": "./src/problem-body-card-ui-policy.ts",
+    "./problem-editor-model": "./src/problem-editor-model.ts",
+    "./problem-ui": "./src/problem-ui.ts",
+    "./core-problem-entry-state": "./src/core-problem-entry-state.ts",
+    "./grading-temp-path": "./src/grading-temp-path.ts",
+    "./grading-progression-scope": "./src/grading-progression-scope.ts",
+    "./grading-lock": "./src/grading-lock.ts",
+    "./grading-job": "./src/grading-job.ts",
+    "./realtime-events": "./src/realtime-events.ts",
+    "./guidance-audio-transcoder": "./src/guidance-audio-transcoder.ts",
+    "./guidance-recording": "./src/guidance-recording.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "7.4.1",
+    "@sullivan/ai-clients": "workspace:*",
+    "@sullivan/config": "workspace:*",
+    "@sullivan/db-schema": "workspace:*",
+    "@sullivan/ui-kit": "workspace:*",
+    "katex": "^0.16.44",
+    "zod": "^3.25.76"
+  }
+}

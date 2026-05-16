@@ -1,11 +1,18 @@
+import { redirect } from 'next/navigation';
+
+import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { RegisterForm } from './register-form';
 
 export const dynamic = 'force-dynamic';
 
 export default async function RegisterUserPage() {
+    const session = await getSession();
+    if (!session) redirect('/login');
+
     // Fetch all classrooms with their groups
     const classrooms = await prisma.classroom.findMany({
+        where: { packId: session.defaultPackId },
         select: {
             id: true,
             name: true,

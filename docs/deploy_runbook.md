@@ -248,9 +248,12 @@ gcloud secrets versions destroy <OLD_VERSION_NUMBER> --secret=internal-api-secre
 ## 4. DBマイグレーション
 Realtime用テーブル・GradingJob（冪等性）用テーブルが追加されているため、デプロイ後にマイグレーションが必要です。
 
+**注意:** Phase 1 で npm → pnpm に切替済。Phase 2 で Prisma schema は `packages/db-schema/prisma/schema.prisma` に移動済。  
+コマンドは `pnpm` 経由で実行する：
+
 ```bash
-npx prisma migrate deploy
-npx prisma generate
+pnpm prisma migrate deploy
+pnpm prisma generate
 ```
 
 ### 4.1 DEV/PRODUCTION それぞれの実行例（.env.* を読み込む）
@@ -274,9 +277,19 @@ npx prisma db seed
 
 新しく作成したSupabase DBに対して、以下を実行してください。
 ```bash
-npx prisma migrate deploy
-npx prisma db seed
+pnpm prisma migrate deploy
+pnpm prisma db seed
 ```
+
+### 4.3 ContentPack / packId バックフィル運用（Phase 2 移行後の初回のみ）
+Phase 2 で `Subject` / `Classroom` / `Achievement` に `packId` カラムが追加され、  
+初期データは ContentPack `jp-juken` 配下にバックフィルされる。  
+Supabase の既存ユーザーの `app_metadata` には `defaultPackId` / `allowedPackIds` を  
+明示しないと SessionPayload が default 値（`jp-juken`）にフォールバックする。
+
+複数 ContentPack（nihongo / bd 等）を併存させるタイミングでは、各ユーザーの  
+`app_metadata.defaultPackId` / `allowedPackIds` を Supabase Dashboard or admin API で  
+セットすること。jp 単独運用のうちは default 動作で問題なし。
 
 ---
 

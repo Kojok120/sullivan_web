@@ -182,9 +182,9 @@ async function main() {
 
     for (const achievement of achievements) {
         await prisma.achievement.upsert({
-            where: { slug: achievement.slug },
+            where: { packId_slug: { packId: 'jp-juken', slug: achievement.slug } },
             update: achievement,
-            create: achievement,
+            create: { packId: 'jp-juken', ...achievement },
         });
     }
 

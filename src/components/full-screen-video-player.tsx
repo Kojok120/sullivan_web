@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import YouTube, { YouTubeEvent } from "react-youtube";
+import { useTranslations } from "next-intl";
 import { ArrowLeft, Loader2, RotateCcw, SkipForward, X } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -56,10 +57,11 @@ function FullScreenVideoPlayerContent({
     onNext,
     autoCloseOnLastVideoEnd = false,
     showNextButton = true,
-    nextButtonLabel = "次の動画へ",
-    closeButtonLabel = "閉じる",
+    nextButtonLabel,
+    closeButtonLabel,
     requiresTrackedCompletion = false,
 }: PlayerContentProps) {
+    const t = useTranslations('FullScreenVideoPlayer');
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
     const [videoEnded, setVideoEnded] = useState(false);
     const [showButton, setShowButton] = useState(false);
@@ -101,6 +103,8 @@ function FullScreenVideoPlayerContent({
     const embedUrl = getEmbedUrl(currentVideo.url);
     const isLastVideo = currentIndex >= playlist.length - 1;
     const isTrackedCompletionUnavailable = requiresTrackedCompletion && !youTubeId;
+    const resolvedNextButtonLabel = nextButtonLabel ?? t('nextButton');
+    const resolvedCloseButtonLabel = closeButtonLabel ?? t('closeButton');
 
     const closePlayer = () => {
         resetTracking();
@@ -147,18 +151,18 @@ function FullScreenVideoPlayerContent({
             <Button
                 type="button"
                 onClick={closePlayer}
-                aria-label="戻る"
-                title="戻る"
+                aria-label={t('back')}
+                title={t('back')}
                 className="absolute top-4 left-4 z-[7] h-10 px-3 bg-black/60 text-white hover:bg-black/75 border border-white/20"
             >
                 <ArrowLeft className="h-4 w-4 mr-1" />
-                戻る
+                {t('back')}
             </Button>
             <DialogHeader className="absolute top-4 left-20 right-4 z-10 bg-black/50 p-2 rounded text-white overflow-hidden flex flex-row justify-between items-start pointer-events-none">
                 <div className="flex flex-col overflow-hidden mr-2">
                     <DialogTitle className="text-white truncate text-left">{currentVideo.title}</DialogTitle>
                     <DialogDescription className="text-white/60 text-left">
-                        {playlist.length > 1 ? `${currentIndex + 1} / ${playlist.length}` : "動画を見て理解を深めましょう。"}
+                        {playlist.length > 1 ? `${currentIndex + 1} / ${playlist.length}` : t('singleVideoDescription')}
                     </DialogDescription>
                 </div>
             </DialogHeader>
@@ -193,7 +197,7 @@ function FullScreenVideoPlayerContent({
                         role="alert"
                         className="flex h-full w-full items-center justify-center bg-slate-950 px-6 text-center text-sm text-slate-200"
                     >
-                        この動画 URL では視聴完了を自動判定できません。管理者に YouTube URL の設定をご確認ください。
+                        {t('unsupportedTrackedUrl')}
                     </div>
                 ) : (
                     <iframe
@@ -220,8 +224,8 @@ function FullScreenVideoPlayerContent({
                                 <Button
                                     type="button"
                                     onClick={replayCurrentVideo}
-                                    aria-label="もう一度再生"
-                                    title="もう一度再生"
+                                    aria-label={t('replay')}
+                                    title={t('replay')}
                                     className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-20 w-20 rounded-full bg-white/90 text-black hover:bg-white transition-colors flex items-center justify-center shadow-lg"
                                 >
                                     <RotateCcw className="h-9 w-9" />
@@ -229,8 +233,8 @@ function FullScreenVideoPlayerContent({
                                 <Button
                                     type="button"
                                     onClick={!isLastVideo && showNextButton ? moveNext : closePlayer}
-                                    aria-label={!isLastVideo && showNextButton ? nextButtonLabel : closeButtonLabel}
-                                    title={!isLastVideo && showNextButton ? nextButtonLabel : closeButtonLabel}
+                                    aria-label={!isLastVideo && showNextButton ? resolvedNextButtonLabel : resolvedCloseButtonLabel}
+                                    title={!isLastVideo && showNextButton ? resolvedNextButtonLabel : resolvedCloseButtonLabel}
                                     className="absolute bottom-8 right-8 h-14 w-14 rounded-full bg-white/90 text-black hover:bg-white transition-colors flex items-center justify-center shadow-lg"
                                 >
                                     {!isLastVideo && showNextButton ? (
@@ -243,7 +247,7 @@ function FullScreenVideoPlayerContent({
                         ) : (
                             <div
                                 aria-live="polite"
-                                aria-label="操作を表示しています"
+                                aria-label={t('showingControls')}
                                 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center"
                             >
                                 <motion.div
@@ -262,12 +266,12 @@ function FullScreenVideoPlayerContent({
                 <div className="pointer-events-none absolute bottom-6 left-1/2 z-10 w-[min(44rem,calc(100%-2rem))] -translate-x-1/2">
                     <div className="rounded-2xl border border-white/10 bg-black/60 px-4 py-3 backdrop-blur-sm">
                         <div className="mb-2 flex items-center justify-between gap-3 text-xs font-medium text-white/80">
-                            <span>再生進捗</span>
+                            <span>{t('progress')}</span>
                             <span>{formatVideoTime(currentTimeSeconds)} / {formatVideoTime(durationSeconds)}</span>
                         </div>
                         <Progress
                             value={progressPercent}
-                            aria-label="動画の再生進捗"
+                            aria-label={t('progressAria')}
                             className="h-1.5 bg-white/20 [&_[data-slot=progress-indicator]]:bg-white"
                         />
                     </div>
@@ -287,7 +291,7 @@ function FullScreenVideoPlayerContent({
                         className="h-8 px-3 text-sm font-medium transition-colors bg-white/20 text-white/80 hover:bg-white/30 hover:text-white flex items-center gap-1"
                     >
                         <RotateCcw className="h-3.5 w-3.5" />
-                        10秒戻す
+                        {t('seekBackTenSeconds')}
                     </Button>
                     {allowedRates.map((rate) => (
                         <Button

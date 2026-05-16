@@ -1,6 +1,8 @@
 import { render, screen } from '@testing-library/react';
+import { NextIntlClientProvider } from 'next-intl';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import jaMessages from '@/messages/ja.json';
 import { ProblemDialog } from './problem-dialog';
 
 vi.mock('../actions', () => ({
@@ -26,12 +28,14 @@ describe('ProblemDialog', () => {
 
     it('旧 dialog にマスタ内問題番号入力欄を表示しない', () => {
         render(
-            <ProblemDialog
-                open
-                onOpenChange={vi.fn()}
-                problem={null}
-                onSuccess={vi.fn()}
-            />,
+            <NextIntlClientProvider locale="ja" messages={jaMessages}>
+                <ProblemDialog
+                    open
+                    onOpenChange={vi.fn()}
+                    problem={null}
+                    onSuccess={vi.fn()}
+                />
+            </NextIntlClientProvider>,
         );
 
         expect(screen.queryByText('マスタ内問題番号 (任意)')).not.toBeInTheDocument();

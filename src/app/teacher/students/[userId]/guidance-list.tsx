@@ -15,6 +15,7 @@ import {
     Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useTranslations } from 'next-intl';
 
 import { addGuidanceRecord, deleteGuidanceRecord } from './actions';
 import { DateDisplay } from '@/components/ui/date-display';
@@ -55,12 +56,6 @@ function formatElapsedTime(ms: number): string {
     return `${hours}:${minutes}:${seconds}`;
 }
 
-function getGuidanceTypeLabel(type: GuidanceRecord['type']) {
-    if (type === 'INTERVIEW') return '面談';
-    if (type === 'GUIDANCE') return '指導';
-    return 'その他';
-}
-
 function getGuidanceTypeBadgeClass(type: GuidanceRecord['type']) {
     if (type === 'INTERVIEW') {
         return 'bg-blue-50 text-blue-700 border-blue-200';
@@ -71,13 +66,6 @@ function getGuidanceTypeBadgeClass(type: GuidanceRecord['type']) {
     }
 
     return 'bg-muted text-foreground border';
-}
-
-function getGuidanceStatusLabel(status: GuidanceRecordStatus) {
-    if (status === 'PENDING') return '要約待ち';
-    if (status === 'PROCESSING') return '要約中';
-    if (status === 'FAILED') return '要約失敗';
-    return '完了';
 }
 
 function getGuidanceStatusBadgeClass(status: GuidanceRecordStatus) {
@@ -96,24 +84,8 @@ function getGuidanceStatusBadgeClass(status: GuidanceRecordStatus) {
     return 'bg-emerald-50 text-emerald-700 border-emerald-200';
 }
 
-function getGuidanceRecordBody(record: GuidanceRecord) {
-    if (record.status === 'PENDING') {
-        return 'AI要約の準備中です。しばらくすると面談記録が反映されます。';
-    }
-
-    if (record.status === 'PROCESSING') {
-        return 'AI要約を生成中です。完了するとここに面談記録が表示されます。';
-    }
-
-    if (record.status === 'FAILED') {
-        return record.summaryErrorMessage
-            || 'AI要約に失敗しました。右上の新規記録から手動入力をご利用ください。';
-    }
-
-    return record.content;
-}
-
 export function GuidanceList({ userId, records }: GuidanceListProps) {
+    const t = useTranslations('GuidanceList');
     const router = useRouter();
 
     const [isAdding, setIsAdding] = useState(false);
@@ -151,11 +123,40 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
         setHasResolvedRecordingSupport(true);
     }, []);
 
+    const getGuidanceTypeLabel = (type: GuidanceRecord['type']) => {
+        if (type === 'INTERVIEW') return t('typeInterview');
+        if (type === 'GUIDANCE') return t('typeGuidance');
+        return t('typeOther');
+    };
+
+    const getGuidanceStatusLabel = (status: GuidanceRecordStatus) => {
+        if (status === 'PENDING') return t('statusPending');
+        if (status === 'PROCESSING') return t('statusProcessing');
+        if (status === 'FAILED') return t('statusFailed');
+        return t('statusCompleted');
+    };
+
+    const getGuidanceRecordBody = (record: GuidanceRecord) => {
+        if (record.status === 'PENDING') {
+            return t('bodyPending');
+        }
+
+        if (record.status === 'PROCESSING') {
+            return t('bodyProcessing');
+        }
+
+        if (record.status === 'FAILED') {
+            return record.summaryErrorMessage || t('bodyFailed');
+        }
+
+        return record.content;
+    };
+
     const recordingButtonLabel = !hasResolvedRecordingSupport
-        ? '録音機能を確認中'
+        ? t('recordingChecking')
         : supportedRecordingFormat
-            ? '録音開始'
-            : '手動入力を開く';
+            ? t('recordingStart')
+            : t('openManualInput');
 
     function getCurrentElapsedMs(): number {
         if (!sessionRef.current) return 0;
@@ -197,20 +198,20 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
         if (result.error) {
             toast.error(result.error);
         } else {
-            toast.success('記録を追加しました');
+            toast.success(t('addSuccess'));
             setIsAdding(false);
             router.refresh();
         }
     }
 
     async function handleDelete(recordId: string) {
-        if (!confirm('本当に削除しますか？')) return;
+        if (!confirm(t('deleteConfirm'))) return;
 
         const result = await deleteGuidanceRecord(recordId, userId);
         if (result.error) {
             toast.error(result.error);
         } else {
-            toast.success('記録を削除しました');
+            toast.success(t('deleteSuccess'));
             router.refresh();
         }
     }
@@ -220,7 +221,7 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
         const preferredFormat = supportedRecordingFormat || null;
         if (!preferredFormat) {
             setIsAdding(true);
-            toast.error('このブラウザでは録音に対応していません。手動入力をご利用ください。');
+            toast.error(t('unsupportedRecordingToast'));
             return;
         }
 
@@ -283,7 +284,7 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
             cleanupMediaResources();
             setRecordingStatus('idle');
             setIsAdding(true);
-            toast.error('マイクの利用に失敗しました。権限設定をご確認ください。');
+            toast.error(t('micFailed'));
         }
     }
 
@@ -300,7 +301,7 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
                 setRecordingStatus('paused');
             } catch (error) {
                 console.error('[guidance-list] pause failed:', error);
-                toast.error('録音の一時停止に失敗しました');
+                toast.error(t('pauseFailed'));
             }
             return;
         }
@@ -315,7 +316,7 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
                 setRecordingStatus('recording');
             } catch (error) {
                 console.error('[guidance-list] resume failed:', error);
-                toast.error('録音の再開に失敗しました');
+                toast.error(t('resumeFailed'));
             }
         }
     }
@@ -360,7 +361,7 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
 
         const session = sessionRef.current;
         if (!session) {
-            toast.error('録音状態の取得に失敗しました');
+            toast.error(t('recordingStateFailed'));
             cleanupMediaResources();
             setRecordingStatus('idle');
             return;
@@ -416,15 +417,15 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
                 if (payload.recordId) {
                     router.refresh();
                 }
-                throw new Error(payload.error || 'AI要約に失敗しました');
+                throw new Error(payload.error || t('summaryFailed'));
             }
 
             toast.success(
                 limitReason === 'size'
-                    ? `音声サイズが${MAX_GUIDANCE_AUDIO_SIZE_LIMIT_LABEL}に近づいたためAI要約の生成を開始しました`
+                    ? t('summaryStartedSize', { size: MAX_GUIDANCE_AUDIO_SIZE_LIMIT_LABEL })
                     : limitReason === 'time'
-                        ? '録音時間の上限に到達したためAI要約の生成を開始しました'
-                        : 'AI要約の生成を開始しました',
+                        ? t('summaryStartedTime')
+                        : t('summaryStarted'),
             );
             router.refresh();
             setIsAdding(false);
@@ -432,7 +433,7 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
             setRecordingStatus('idle');
         } catch (error) {
             console.error('[guidance-list] summarize failed:', error);
-            toast.error('AI要約に失敗しました。手動入力フォームを開きます。');
+            toast.error(t('summaryFailedOpenManual'));
             setIsAdding(true);
             setRecordingStatus('idle');
         } finally {
@@ -492,10 +493,10 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
                     }
 
                     if (record.type === 'guidance_summary_completed') {
-                        toast.success('AI要約が完了しました');
+                        toast.success(t('summaryCompleted'));
                     } else {
-                        toast.error('AI要約に失敗しました', {
-                            description: payload?.message || '右上の新規記録から手動入力をご利用ください。',
+                        toast.error(t('summaryFailed'), {
+                            description: payload?.message || t('summaryFailedDescription'),
                         });
                     }
 
@@ -507,7 +508,7 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
         return () => {
             unsubscribe();
         };
-    }, [router, userId]);
+    }, [router, t, userId]);
 
     return (
         <Card className="h-full">
@@ -515,17 +516,17 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
                 <div className="space-y-1">
                     <CardTitle className="flex items-center gap-2">
                         <MessageSquare className="h-5 w-5" />
-                        面談・指導記録
+                        {t('title')}
                     </CardTitle>
-                    <CardDescription>生徒との面談や指導の記録</CardDescription>
+                    <CardDescription>{t('description')}</CardDescription>
                 </div>
 
                 <div className="flex items-center gap-2">
                     <Button
                         size="icon"
                         variant="outline"
-                        aria-label="新規記録"
-                        title="新規記録"
+                        aria-label={t('newRecord')}
+                        title={t('newRecord')}
                         onClick={() => setIsAdding((prev) => !prev)}
                         disabled={recordingStatus === 'summarizing'}
                     >
@@ -551,7 +552,7 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
             <CardContent className="space-y-6 pt-4">
                 {hasResolvedRecordingSupport && !supportedRecordingFormat ? (
                     <div className="rounded-lg border border-dashed bg-muted/20 p-3 text-xs text-muted-foreground">
-                        このブラウザでは録音に対応していません。右上の新規記録から手動入力するか、録音対応ブラウザをご利用ください。
+                        {t('unsupportedRecordingInline')}
                     </div>
                 ) : null}
 
@@ -560,10 +561,10 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
                         <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="text-sm font-medium">
                                 {recordingStatus === 'summarizing'
-                                    ? 'AI要約を生成中...'
+                                    ? t('summarizingStatus')
                                     : recordingStatus === 'paused'
-                                        ? '録音一時停止中'
-                                        : '録音中'}
+                                        ? t('recordingPaused')
+                                        : t('recording')}
                             </div>
                             <div className="font-mono text-sm">{formatElapsedTime(elapsedMs)}</div>
                         </div>
@@ -574,8 +575,8 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
                                     type="button"
                                     size="icon"
                                     variant="outline"
-                                    aria-label={recordingStatus === 'recording' ? '一時停止' : '再開'}
-                                    title={recordingStatus === 'recording' ? '一時停止' : '再開'}
+                                    aria-label={recordingStatus === 'recording' ? t('pause') : t('resume')}
+                                    title={recordingStatus === 'recording' ? t('pause') : t('resume')}
                                     onClick={togglePauseResumeRecording}
                                 >
                                     {recordingStatus === 'recording' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
@@ -588,13 +589,15 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
                                 disabled={recordingStatus === 'summarizing'}
                             >
                                 {recordingStatus === 'summarizing' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                終了→AI要約
+                                {t('stopAndSummarize')}
                             </Button>
                         </div>
 
                         <p className="text-xs text-muted-foreground">
-                            録音は {MAX_GUIDANCE_AUDIO_SIZE_LIMIT_LABEL} 以内で保存されます。長時間の録音は
-                            {MAX_GUIDANCE_AUDIO_SIZE_LIMIT_LABEL} 手前で自動終了し、安全のため60分でも終了します。
+                            {t('recordingLimitNote', {
+                                size: MAX_GUIDANCE_AUDIO_SIZE_LIMIT_LABEL,
+                                minutes: 60,
+                            })}
                         </p>
                     </div>
                 ) : null}
@@ -604,7 +607,7 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
                         <form action={handleAdd} className="space-y-4">
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium">日付</label>
+                                    <label className="text-sm font-medium">{t('dateLabel')}</label>
                                     <Input
                                         type="date"
                                         name="date"
@@ -613,34 +616,34 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium">種類</label>
+                                    <label className="text-sm font-medium">{t('typeLabel')}</label>
                                     <Select name="type" defaultValue="GUIDANCE">
                                         <SelectTrigger>
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="INTERVIEW">面談</SelectItem>
-                                            <SelectItem value="GUIDANCE">指導</SelectItem>
-                                            <SelectItem value="OTHER">その他</SelectItem>
+                                            <SelectItem value="INTERVIEW">{t('typeInterview')}</SelectItem>
+                                            <SelectItem value="GUIDANCE">{t('typeGuidance')}</SelectItem>
+                                            <SelectItem value="OTHER">{t('typeOther')}</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
                             </div>
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">内容</label>
+                                <label className="text-sm font-medium">{t('contentLabel')}</label>
                                 <Textarea
                                     name="content"
                                     required
-                                    placeholder="指導内容や面談の記録を入力..."
+                                    placeholder={t('contentPlaceholder')}
                                     className="min-h-[100px]"
                                 />
                             </div>
                             <div className="flex flex-col-reverse justify-end gap-2 sm:flex-row">
                                 <Button type="button" variant="ghost" size="sm" className="min-h-11 sm:min-h-10" onClick={() => setIsAdding(false)}>
-                                    キャンセル
+                                    {t('cancel')}
                                 </Button>
                                 <Button type="submit" size="sm" className="min-h-11 sm:min-h-10" disabled={isSaving}>
-                                    {isSaving ? '保存中...' : '保存'}
+                                    {isSaving ? t('saving') : t('save')}
                                 </Button>
                             </div>
                         </form>
@@ -668,13 +671,15 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <span className="text-xs text-muted-foreground">
-                                            記入者: {record.teacher.name || '不明'}
+                                            {t('teacherLabel')} {record.teacher.name || t('unknownTeacher')}
                                         </span>
                                         <Button
                                             variant="ghost"
                                             size="icon"
                                             className="h-6 w-6 text-muted-foreground hover:text-destructive"
                                             onClick={() => void handleDelete(record.id)}
+                                            aria-label={t('deleteRecord')}
+                                            title={t('deleteRecord')}
                                         >
                                             <Trash2 className="h-3 w-3" />
                                         </Button>
@@ -687,7 +692,7 @@ export function GuidanceList({ userId, records }: GuidanceListProps) {
                         ))
                     ) : (
                         <div className="py-8 text-center text-sm text-muted-foreground">
-                            記録はまだありません
+                            {t('empty')}
                         </div>
                     )}
                 </div>

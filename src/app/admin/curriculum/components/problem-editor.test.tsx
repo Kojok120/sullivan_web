@@ -1,5 +1,8 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
+import { NextIntlClientProvider } from 'next-intl';
+import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import jaMessages from '@/messages/ja.json';
 import { ProblemEditor } from './problem-editor';
 
 const { getProblemsByCoreProblemMock } = vi.hoisted(() => ({
@@ -68,6 +71,18 @@ function createDeferred<T>() {
     return { promise, resolve, reject };
 }
 
+function IntlWrapper({ children }: { children: ReactNode }) {
+    return (
+        <NextIntlClientProvider locale="ja" messages={jaMessages}>
+            {children}
+        </NextIntlClientProvider>
+    );
+}
+
+function renderWithIntl(ui: ReactNode) {
+    return render(ui, { wrapper: IntlWrapper });
+}
+
 describe('ProblemEditor', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -115,7 +130,7 @@ describe('ProblemEditor', () => {
             ],
         });
 
-        render(<ProblemEditor coreProblemId="cp-1" />);
+        renderWithIntl(<ProblemEditor coreProblemId="cp-1" />);
 
         await waitFor(() => {
             expect(getProblemsByCoreProblemMock).toHaveBeenCalledWith('cp-1');
@@ -155,7 +170,7 @@ describe('ProblemEditor', () => {
             ],
         });
 
-        render(<ProblemEditor coreProblemId="cp-draft" />);
+        renderWithIntl(<ProblemEditor coreProblemId="cp-draft" />);
 
         expect(await screen.findByText('DRAFTの問題文')).toBeInTheDocument();
         expect(screen.getByText('x=9')).toBeInTheDocument();
@@ -178,7 +193,7 @@ describe('ProblemEditor', () => {
             ],
         });
 
-        render(<ProblemEditor coreProblemId="cp-unsafe" />);
+        renderWithIntl(<ProblemEditor coreProblemId="cp-unsafe" />);
 
         await waitFor(() => {
             expect(getProblemsByCoreProblemMock).toHaveBeenCalledWith('cp-unsafe');
@@ -207,7 +222,7 @@ describe('ProblemEditor', () => {
             return secondRequest.promise;
         });
 
-        const { rerender } = render(<ProblemEditor coreProblemId="cp-1" />);
+        const { rerender } = renderWithIntl(<ProblemEditor coreProblemId="cp-1" />);
 
         await waitFor(() => {
             expect(getProblemsByCoreProblemMock).toHaveBeenCalledWith('cp-1');
@@ -285,7 +300,7 @@ describe('ProblemEditor', () => {
                 error: '取得に失敗しました',
             });
 
-        const { rerender } = render(<ProblemEditor coreProblemId="cp-1" />);
+        const { rerender } = renderWithIntl(<ProblemEditor coreProblemId="cp-1" />);
 
         expect(await screen.findByText('表示中の問題')).toBeInTheDocument();
 
@@ -313,7 +328,7 @@ describe('ProblemEditor', () => {
             return secondRequest.promise;
         });
 
-        const { rerender } = render(<ProblemEditor coreProblemId="cp-1" />);
+        const { rerender } = renderWithIntl(<ProblemEditor coreProblemId="cp-1" />);
 
         await act(async () => {
             firstRequest.resolve({

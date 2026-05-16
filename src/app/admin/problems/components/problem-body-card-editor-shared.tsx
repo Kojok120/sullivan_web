@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+
 import { TableEditor } from '@/components/problem-authoring/table-editor';
 import { TeXHelpLink } from '@/components/problem-authoring/tex-help-link';
 import { Button } from '@/components/ui/button';
@@ -33,16 +35,18 @@ function AttachmentKindSelect({
     value: ProblemBodyAttachmentKind;
     onChange: (value: ProblemBodyAttachmentKind) => void;
 }) {
+    const t = useTranslations('ProblemBodyCardEditor');
+
     return (
         <Select value={value === 'none' ? undefined : value} onValueChange={(next) => onChange(next as ProblemBodyAttachmentKind)}>
-            <SelectTrigger><SelectValue placeholder="図・画像などを追加" /></SelectTrigger>
+            <SelectTrigger><SelectValue placeholder={t('attachmentPlaceholder')} /></SelectTrigger>
             <SelectContent>
-                <SelectItem value="upload">アップロード</SelectItem>
-                <SelectItem value="table">表</SelectItem>
-                <SelectItem value="numberline">数直線</SelectItem>
-                <SelectItem value="coordplane">座標平面</SelectItem>
-                <SelectItem value="geometry">図形</SelectItem>
-                <SelectItem value="solid">立体</SelectItem>
+                <SelectItem value="upload">{t('attachmentUpload')}</SelectItem>
+                <SelectItem value="table">{t('attachmentTable')}</SelectItem>
+                <SelectItem value="numberline">{t('attachmentNumberline')}</SelectItem>
+                <SelectItem value="coordplane">{t('attachmentCoordplane')}</SelectItem>
+                <SelectItem value="geometry">{t('attachmentGeometry')}</SelectItem>
+                <SelectItem value="solid">{t('attachmentSolid')}</SelectItem>
             </SelectContent>
         </Select>
     );
@@ -67,6 +71,7 @@ export function ProblemBodyCardEditorShared({
     onCardChange: (updater: (card: ProblemBodyCard) => ProblemBodyCard) => void;
     onUploadAsset: (file: File) => Promise<void> | void;
 }) {
+    const t = useTranslations('ProblemBodyCardEditor');
     const uiPolicy = getProblemBodyCardUiPolicy(subjectName);
     const isUploadCard = card.attachmentKind === 'upload';
     const isTableCard = card.attachmentKind === 'table';
@@ -85,19 +90,19 @@ export function ProblemBodyCardEditorShared({
             >
                 <div className="space-y-2">
                     <div className="flex items-center justify-between gap-3">
-                        <Label>本文</Label>
+                        <Label>{t('bodyLabel')}</Label>
                         <TeXHelpLink />
                     </div>
                     <Textarea
                         value={card.text}
                         onChange={(event) => onCardChange((current) => ({ ...current, text: event.target.value }))}
                         rows={5}
-                        placeholder="問題文を入力してください。数式は $...$ / $$...$$ で書けます。"
+                        placeholder={t('bodyPlaceholder')}
                     />
                 </div>
                 {uiPolicy.showTextPreview && (
                     <div className="space-y-2">
-                        <Label>本文確認</Label>
+                        <Label>{t('bodyPreviewLabel')}</Label>
                         <ProblemTextPreview text={card.text} />
                     </div>
                 )}
@@ -107,7 +112,7 @@ export function ProblemBodyCardEditorShared({
                 <>
                     <div className="grid gap-4 md:grid-cols-2">
                         <div className="space-y-2">
-                            <Label>図・画像など</Label>
+                            <Label>{t('attachmentLabel')}</Label>
                             <AttachmentKindSelect
                                 value={card.attachmentKind}
                                 onChange={(nextKind) => onCardChange((current) => {
@@ -159,7 +164,7 @@ export function ProblemBodyCardEditorShared({
                                         directiveSource: '',
                                     }))}
                                 >
-                                    添付を外す
+                                    {t('removeAttachment')}
                                 </Button>
                             </div>
                         )}
@@ -167,7 +172,7 @@ export function ProblemBodyCardEditorShared({
 
                     {isTableCard && (
                         <div className="space-y-2">
-                            <Label>表</Label>
+                            <Label>{t('tableLabel')}</Label>
                             <TableEditor
                                 value={card.tableData}
                                 onChange={(next) => onCardChange((current) => ({ ...current, tableData: next }))}
@@ -178,14 +183,14 @@ export function ProblemBodyCardEditorShared({
 
                     {isDirectiveCard && (
                         <div className="space-y-2">
-                            <Label>図版設定</Label>
+                            <Label>{t('directiveSettingsLabel')}</Label>
                             <DirectiveForm
                                 kind={card.attachmentKind as ProblemBodyDirectiveKind}
                                 source={card.directiveSource}
                                 onSourceChange={(next) => onCardChange((current) => ({ ...current, directiveSource: next }))}
                             />
                             <div className="space-y-2">
-                                <Label>プレビュー</Label>
+                                <Label>{t('previewLabel')}</Label>
                                 <ProblemTextPreview text={card.directiveSource} />
                             </div>
                         </div>
@@ -193,7 +198,7 @@ export function ProblemBodyCardEditorShared({
 
                     {isUploadCard && (
                         <div className="space-y-2">
-                            <Label>アップロード</Label>
+                            <Label>{t('uploadLabel')}</Label>
                             <Input
                                 type="file"
                                 accept={CARD_UPLOAD_ACCEPT}
@@ -209,7 +214,7 @@ export function ProblemBodyCardEditorShared({
                                 }}
                             />
                             {!canUploadAsset && (
-                                <p className="text-xs text-muted-foreground">先に下書き保存するとアップロードできます。</p>
+                                <p className="text-xs text-muted-foreground">{t('uploadRequiresDraft')}</p>
                             )}
                         </div>
                     )}

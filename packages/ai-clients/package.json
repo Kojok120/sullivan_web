@@ -1,0 +1,25 @@
+{
+  "name": "@sullivan/ai-clients",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./cloud-tasks": "./src/cloud-tasks.ts",
+    "./cloud-run-service-scaling": "./src/cloud-run-service-scaling.ts",
+    "./drive-client": "./src/drive-client.ts",
+    "./gemini-live-session-token": "./src/gemini-live-session-token.ts",
+    "./gemini-media-resolution": "./src/gemini-media-resolution.ts",
+    "./gemini-socket-proxy": "./src/gemini-socket-proxy.ts"
+  },
+  "dependencies": {
+    "@google/genai": "^1.41.0",
+    "googleapis": "^168.0.0",
+    "ws": "^8.19.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.1"
+  }
+}

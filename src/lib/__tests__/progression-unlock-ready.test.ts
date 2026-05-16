@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { prisma } from '@/lib/prisma'
 import { getReadyCoreProblemIds, getUnlockedCoreProblemIds } from '@/lib/progression'
 
-vi.mock('@/lib/prisma', () => ({
+vi.mock('@sullivan/db-schema', () => ({
     prisma: {
         coreProblem: {
             findMany: vi.fn(),

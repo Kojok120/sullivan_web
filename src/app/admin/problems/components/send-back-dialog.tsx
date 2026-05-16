@@ -1,6 +1,7 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useTranslations } from 'next-intl';
 import { useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 
@@ -16,15 +17,19 @@ import { Textarea } from '@/components/ui/textarea';
 
 import { SENT_BACK_REASON_MAX } from '../constants';
 
-const sendBackFormSchema = z.object({
-    reason: z
-        .string()
-        .trim()
-        .min(1, '差し戻し理由を入力してください')
-        .max(SENT_BACK_REASON_MAX, `差し戻し理由は${SENT_BACK_REASON_MAX}文字以内で入力してください`),
-});
+type SendBackFormValues = {
+    reason: string;
+};
 
-type SendBackFormValues = z.infer<typeof sendBackFormSchema>;
+function buildSendBackFormSchema(t: ReturnType<typeof useTranslations>) {
+    return z.object({
+        reason: z
+            .string()
+            .trim()
+            .min(1, t('reasonRequired'))
+            .max(SENT_BACK_REASON_MAX, t('reasonTooLong', { max: SENT_BACK_REASON_MAX })),
+    });
+}
 
 interface Props {
     open: boolean;
@@ -35,11 +40,13 @@ interface Props {
 }
 
 export function SendBackDialog({ open, onOpenChange, onConfirm, pending = false, initialReason = '' }: Props) {
+    const t = useTranslations('SendBackDialog');
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>差し戻し理由</DialogTitle>
+                    <DialogTitle>{t('title')}</DialogTitle>
                 </DialogHeader>
                 {open && (
                     <SendBackDialogBody
@@ -63,8 +70,9 @@ interface BodyProps {
 }
 
 function SendBackDialogBody({ initialReason, pending, onCancel, onConfirm }: BodyProps) {
+    const t = useTranslations('SendBackDialog');
     const form = useForm<SendBackFormValues>({
-        resolver: zodResolver(sendBackFormSchema),
+        resolver: zodResolver(buildSendBackFormSchema(t)),
         defaultValues: { reason: initialReason },
         mode: 'onChange',
     });
@@ -83,17 +91,17 @@ function SendBackDialogBody({ initialReason, pending, onCancel, onConfirm }: Bod
                 autoFocus
                 rows={6}
                 maxLength={SENT_BACK_REASON_MAX}
-                placeholder="どこを直してほしいかを書いてください"
+                placeholder={t('placeholder')}
                 disabled={pending}
                 {...form.register('reason')}
             />
-            <p className={`text-xs ${remaining < 0 ? 'text-red-600' : 'text-gray-500'}`}>残り {remaining} 文字</p>
+            <p className={`text-xs ${remaining < 0 ? 'text-red-600' : 'text-gray-500'}`}>{t('remaining', { remaining })}</p>
             <DialogFooter>
                 <Button type="button" variant="outline" onClick={onCancel} disabled={pending}>
-                    キャンセル
+                    {t('cancel')}
                 </Button>
                 <Button type="submit" variant="destructive" disabled={!canSubmit}>
-                    差し戻す
+                    {t('submit')}
                 </Button>
             </DialogFooter>
         </form>

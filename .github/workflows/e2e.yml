@@ -30,23 +30,28 @@ jobs:
       - name: チェックアウト
         uses: actions/checkout@v4
 
+      - name: pnpm セットアップ
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+
       - name: Node.js セットアップ
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
+          cache: pnpm
 
       - name: 依存関係インストール
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Prisma クライアント生成
-        run: npx prisma generate
+        run: pnpm exec prisma generate
 
       - name: Playwright ブラウザインストール
-        run: npx playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
 
       - name: E2E テスト実行
-        run: npx playwright test
+        run: pnpm exec playwright test
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}

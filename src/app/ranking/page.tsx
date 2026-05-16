@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 
 import { RankingPageClient } from '@/components/ranking/ranking-page-client';
 import { getSession } from '@/lib/auth';
@@ -8,6 +9,7 @@ export default async function StudentRankingPage() {
     if (!session) {
         redirect('/login');
     }
+    const t = await getTranslations('StudentRanking');
 
     const role = session.role;
     switch (role) {
@@ -27,8 +29,8 @@ export default async function StudentRankingPage() {
         <div className="container mx-auto space-y-6 px-4 py-6 sm:py-8">
             <RankingPageClient
                 apiPath="/api/rankings"
-                heading="教室ランキング"
-                description="同じ教室の生徒ランキングです。問題数・英単語スコア・正答率の上位10人を、今月・3ヶ月・1年・自由指定で表示します。"
+                heading={t('heading')}
+                description={t('description')}
             />
         </div>
     );

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { NextIntlClientProvider } from 'next-intl'
 import { SessionDetail } from '../session-detail'
 import * as analytics from '@/lib/analytics'
 import * as surveyActions from '@/actions/survey'
@@ -7,6 +8,7 @@ import * as auth from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import fs from 'fs'
 import type { MouseEventHandler, ReactNode } from 'react'
+import jaMessages from '@/messages/ja.json'
 
 type LinkProps = {
     children?: ReactNode
@@ -98,11 +100,46 @@ function buildPublishedRevisionFromMock(problem: SessionDetailMock['problem']): 
 
 type SessionDetailsResult = Awaited<ReturnType<typeof analytics.getSessionDetails>>
 
+function IntlWrapper({ children }: { children: ReactNode }) {
+    return (
+        <NextIntlClientProvider locale="ja" messages={jaMessages}>
+            {children}
+        </NextIntlClientProvider>
+    )
+}
+
+function renderWithIntl(ui: ReactNode) {
+    return render(ui, { wrapper: IntlWrapper })
+}
+
 // Mock external dependencies
 vi.mock('@/lib/analytics', () => ({
     getSessionDetails: vi.fn(),
     markSessionAsReviewed: vi.fn(),
 }))
+
+vi.mock('next-intl/server', async () => {
+    const messages = (await import('@/messages/ja.json')).default as unknown as Record<string, Record<string, string>>
+
+    return {
+        getTranslations: vi.fn(async (namespace: string) => {
+            const namespaceMessages = messages[namespace]
+
+            return (key: string, values?: Record<string, string | number>) => {
+                const message = namespaceMessages[key]
+
+                if (!values) {
+                    return message
+                }
+
+                return Object.entries(values).reduce(
+                    (current, [name, value]) => current.replaceAll(`{${name}}`, String(value)),
+                    message
+                )
+            }
+        }),
+    }
+})
 
 vi.mock('@/actions/survey', () => ({
     checkSurveyEligibility: vi.fn(),
@@ -195,6 +232,8 @@ describe('SessionDetail', () => {
             userId: 'user1',
             role: 'STUDENT',
             name: '生徒1',
+            defaultPackId: 'jp-juken',
+            allowedPackIds: ['jp-juken'],
         })
         vi.mocked(prisma.user.findUnique).mockResolvedValue({
             classroom: {
@@ -253,7 +292,7 @@ describe('SessionDetail', () => {
         it('履歴がない場合、メッセージを表示する', async () => {
             mockSessionDetails([])
 
-            const { container } = render(
+            const { container } = renderWithIntl(
                 await SessionDetail({ groupId: 'group1', userId: 'user1' })
             )
 
@@ -263,7 +302,7 @@ describe('SessionDetail', () => {
         it('履歴がnullの場合、メッセージを表示する', async () => {
             mockSessionDetails(null)
 
-            const { container } = render(
+            const { container } = renderWithIntl(
                 await SessionDetail({ groupId: 'group1', userId: 'user1' })
             )
 
@@ -275,7 +314,7 @@ describe('SessionDetail', () => {
             mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
-            const { container } = render(
+            const { container } = renderWithIntl(
                 await SessionDetail({ groupId: 'group1', userId: 'user1' })
             )
 
@@ -291,7 +330,7 @@ describe('SessionDetail', () => {
             mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
-            const { container } = render(
+            const { container } = renderWithIntl(
                 await SessionDetail({ groupId: 'group1', userId: 'user1' })
             )
 
@@ -306,7 +345,7 @@ describe('SessionDetail', () => {
             mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
-            const { container } = render(
+            const { container } = renderWithIntl(
                 await SessionDetail({ groupId: 'group1', userId: 'user1' })
             )
 
@@ -320,7 +359,7 @@ describe('SessionDetail', () => {
             mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
-            const { container } = render(
+            const { container } = renderWithIntl(
                 await SessionDetail({ groupId: 'group1', userId: 'user1' })
             )
 
@@ -334,7 +373,7 @@ describe('SessionDetail', () => {
             mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
-            const { container } = render(
+            const { container } = renderWithIntl(
                 await SessionDetail({ groupId: 'group1', userId: 'user1' })
             )
 
@@ -348,7 +387,7 @@ describe('SessionDetail', () => {
             mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
-            const { container } = render(
+            const { container } = renderWithIntl(
                 await SessionDetail({ groupId: 'group1', userId: 'user1' })
             )
 
@@ -364,7 +403,7 @@ describe('SessionDetail', () => {
             mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
-            const { container } = render(
+            const { container } = renderWithIntl(
                 await SessionDetail({ groupId: 'group1', userId: 'user1' })
             )
 
@@ -376,7 +415,7 @@ describe('SessionDetail', () => {
             mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
-            const { container } = render(
+            const { container } = renderWithIntl(
                 await SessionDetail({ groupId: 'group1', userId: 'user1' })
             )
 
@@ -388,7 +427,7 @@ describe('SessionDetail', () => {
             mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
-            const { container } = render(
+            const { container } = renderWithIntl(
                 await SessionDetail({ groupId: 'group1', userId: 'user1' })
             )
 
@@ -400,7 +439,7 @@ describe('SessionDetail', () => {
             mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
-            const { container } = render(
+            const { container } = renderWithIntl(
                 await SessionDetail({ groupId: 'group1', userId: 'user1' })
             )
 
@@ -412,7 +451,7 @@ describe('SessionDetail', () => {
             mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
-            const { container } = render(
+            const { container } = renderWithIntl(
                 await SessionDetail({ groupId: 'group1', userId: 'user1' })
             )
 
@@ -426,7 +465,7 @@ describe('SessionDetail', () => {
             mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
-            render(await SessionDetail({ groupId: 'group1', userId: 'user1' }))
+            renderWithIntl(await SessionDetail({ groupId: 'group1', userId: 'user1' }))
 
             const videoPlayer = screen.getByTestId('video-player')
             expect(videoPlayer).toBeTruthy()
@@ -438,7 +477,7 @@ describe('SessionDetail', () => {
             mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
-            render(await SessionDetail({ groupId: 'group1', userId: 'user1' }))
+            renderWithIntl(await SessionDetail({ groupId: 'group1', userId: 'user1' }))
 
             const lectureVideo = screen.getByTestId('lecture-video')
             expect(lectureVideo).toBeTruthy()
@@ -455,7 +494,7 @@ describe('SessionDetail', () => {
             mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
-            render(await SessionDetail({ groupId: 'group1', userId: 'user1' }))
+            renderWithIntl(await SessionDetail({ groupId: 'group1', userId: 'user1' }))
 
             const videoPlayers = screen.queryAllByTestId('video-player')
             expect(videoPlayers).toHaveLength(0)
@@ -468,7 +507,7 @@ describe('SessionDetail', () => {
             mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
-            render(await SessionDetail({ groupId: 'group1', userId: 'user1', isTeacherView: false }))
+            renderWithIntl(await SessionDetail({ groupId: 'group1', userId: 'user1', isTeacherView: false }))
 
             const tracker = screen.getByTestId('session-review-tracker')
             expect(tracker).toBeTruthy()
@@ -479,7 +518,7 @@ describe('SessionDetail', () => {
             const mockDetails = [createMockSessionDetail()]
             mockSessionDetails(mockDetails)
 
-            render(await SessionDetail({ groupId: 'group1', userId: 'user1', isTeacherView: true }))
+            renderWithIntl(await SessionDetail({ groupId: 'group1', userId: 'user1', isTeacherView: true }))
 
             expect(screen.queryByTestId('session-review-tracker')).toBeFalsy()
         })
@@ -491,10 +530,12 @@ describe('SessionDetail', () => {
                 userId: 'other-user',
                 role: 'STUDENT',
                 name: '別の生徒',
+                defaultPackId: 'jp-juken',
+                allowedPackIds: ['jp-juken'],
             })
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
-            render(await SessionDetail({ groupId: 'group1', userId: 'user1', isTeacherView: false }))
+            renderWithIntl(await SessionDetail({ groupId: 'group1', userId: 'user1', isTeacherView: false }))
 
             expect(screen.queryByTestId('session-review-tracker')).toBeFalsy()
         })
@@ -506,7 +547,7 @@ describe('SessionDetail', () => {
             mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(true)
 
-            render(await SessionDetail({ groupId: 'group1', userId: 'user1', isTeacherView: false }))
+            renderWithIntl(await SessionDetail({ groupId: 'group1', userId: 'user1', isTeacherView: false }))
 
             const surveyModal = screen.getByTestId('survey-modal')
             expect(surveyModal).toBeTruthy()
@@ -518,7 +559,7 @@ describe('SessionDetail', () => {
             mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
-            render(await SessionDetail({ groupId: 'group1', userId: 'user1', isTeacherView: false }))
+            renderWithIntl(await SessionDetail({ groupId: 'group1', userId: 'user1', isTeacherView: false }))
 
             const surveyModal = screen.queryByTestId('survey-modal')
             expect(surveyModal).toBeFalsy()
@@ -528,7 +569,7 @@ describe('SessionDetail', () => {
             const mockDetails = [createMockSessionDetail()]
             mockSessionDetails(mockDetails)
 
-            render(await SessionDetail({ groupId: 'group1', userId: 'user1', isTeacherView: true }))
+            renderWithIntl(await SessionDetail({ groupId: 'group1', userId: 'user1', isTeacherView: true }))
 
             const surveyModal = screen.queryByTestId('survey-modal')
             expect(surveyModal).toBeFalsy()
@@ -550,7 +591,7 @@ describe('SessionDetail', () => {
             mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
-            const { container } = render(
+            const { container } = renderWithIntl(
                 await SessionDetail({ groupId: 'group1', userId: 'user1' })
             )
 
@@ -563,7 +604,7 @@ describe('SessionDetail', () => {
             mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
-            const { container } = render(
+            const { container } = renderWithIntl(
                 await SessionDetail({ groupId: 'group1', userId: 'user1', backUrl: '/custom-back' })
             )
 
@@ -578,7 +619,7 @@ describe('SessionDetail', () => {
             mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
-            const { container } = render(
+            const { container } = renderWithIntl(
                 await SessionDetail({ groupId: 'group1', userId: 'user1' })
             )
 
@@ -617,7 +658,7 @@ describe('SessionDetail', () => {
             mockSessionDetails(mockDetails)
             vi.mocked(surveyActions.checkSurveyEligibility).mockResolvedValue(false)
 
-            const { container } = render(
+            const { container } = renderWithIntl(
                 await SessionDetail({ groupId: 'group1', userId: 'user1' })
             )
 

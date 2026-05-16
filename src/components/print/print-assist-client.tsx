@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { ArrowLeft, ExternalLink, Loader2, Printer } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -20,6 +21,7 @@ type PreparedPdfFile = {
 const DEFAULT_PDF_FILENAME = 'sullivan-print.pdf';
 
 export function PrintAssistClient({ backFallbackPath, pdfUrl }: PrintAssistClientProps) {
+    const t = useTranslations('PrintAssist');
     const { handleBack } = usePrintNavigation(backFallbackPath);
     const [preparedFile, setPreparedFile] = useState<PreparedPdfFile | null>(null);
     const [isPreparing, setIsPreparing] = useState(true);
@@ -101,12 +103,12 @@ export function PrintAssistClient({ backFallbackPath, pdfUrl }: PrintAssistClien
             ? preparedFile.file
             : await runPreparePdf();
         if (!file) {
-            toast.error('PDFの準備に失敗しました。');
+            toast.error(t('pdfPrepareFailed'));
             return;
         }
 
         if (typeof navigator.share !== 'function' || typeof navigator.canShare !== 'function') {
-            toast.error('この端末では共有メニューを開けません。PDFを開いて印刷してください。');
+            toast.error(t('shareUnsupported'));
             return;
         }
 
@@ -118,7 +120,7 @@ export function PrintAssistClient({ backFallbackPath, pdfUrl }: PrintAssistClien
         }
 
         if (!canShareFiles) {
-            toast.error('この端末では共有メニューを開けません。PDFを開いて印刷してください。');
+            toast.error(t('shareUnsupported'));
             return;
         }
 
@@ -132,9 +134,9 @@ export function PrintAssistClient({ backFallbackPath, pdfUrl }: PrintAssistClien
                 return;
             }
 
-            toast.error('共有メニューを開けませんでした。');
+            toast.error(t('shareFailed'));
         }
-    }, [isPreparing, pdfUrl, preparedFile, runPreparePdf]);
+    }, [isPreparing, pdfUrl, preparedFile, runPreparePdf, t]);
 
     return (
         <div className="min-h-screen bg-muted px-4 py-4 md:px-6 md:py-6">
@@ -144,17 +146,17 @@ export function PrintAssistClient({ backFallbackPath, pdfUrl }: PrintAssistClien
                         <div className="flex items-center justify-between gap-3">
                             <Button variant="outline" onClick={handleBack}>
                                 <ArrowLeft className="mr-2 h-4 w-4" />
-                                戻る
+                                {t('back')}
                             </Button>
                         </div>
 
                         <div className="space-y-2">
-                            <h1 className="text-xl font-semibold">このプリントを印刷</h1>
+                            <h1 className="text-xl font-semibold">{t('title')}</h1>
                             <p className="text-sm text-muted-foreground">
-                                ボタンを押すと共有メニューが開きます。「プリント」を選んでください。
+                                {t('descriptionShare')}
                             </p>
                             <p className="text-sm text-muted-foreground">
-                                共有メニューが使えない場合は、下の「PDFを開く」から印刷してください。
+                                {t('descriptionFallback')}
                             </p>
                         </div>
 
@@ -170,12 +172,12 @@ export function PrintAssistClient({ backFallbackPath, pdfUrl }: PrintAssistClien
                                 {isPreparing ? (
                                     <>
                                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        印刷メニューを準備中...
+                                        {t('preparing')}
                                     </>
                                 ) : (
                                     <>
                                         <Printer className="mr-2 h-4 w-4" />
-                                        印刷メニューを開く
+                                        {t('openPrintMenu')}
                                     </>
                                 )}
                             </Button>
@@ -183,7 +185,7 @@ export function PrintAssistClient({ backFallbackPath, pdfUrl }: PrintAssistClien
                             <Button variant="outline" asChild className="sm:flex-1">
                                 <a href={pdfUrl}>
                                     <ExternalLink className="mr-2 h-4 w-4" />
-                                    PDFを開く
+                                    {t('openPdf')}
                                 </a>
                             </Button>
                         </div>

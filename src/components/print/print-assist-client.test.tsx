@@ -1,7 +1,10 @@
+import type { ReactNode } from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { NextIntlClientProvider } from 'next-intl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useRouter } from 'next/navigation';
 
+import jaMessages from '@/messages/ja.json';
 import { PrintAssistClient } from './print-assist-client';
 
 const { toastErrorMock } = vi.hoisted(() => ({
@@ -17,6 +20,22 @@ vi.mock('sonner', () => ({
         error: toastErrorMock,
     },
 }));
+
+function renderWithIntl(ui: ReactNode) {
+    const result = render(
+        <NextIntlClientProvider locale="ja" messages={jaMessages}>
+            {ui}
+        </NextIntlClientProvider>
+    );
+    return {
+        ...result,
+        rerender: (nextUi: ReactNode) => result.rerender(
+            <NextIntlClientProvider locale="ja" messages={jaMessages}>
+                {nextUi}
+            </NextIntlClientProvider>
+        ),
+    };
+}
 
 describe('印刷アシストクライアント', () => {
     let originalOpenerDescriptor: PropertyDescriptor | undefined;
@@ -115,7 +134,7 @@ describe('印刷アシストクライアント', () => {
         const deferred = createDeferred<Response>();
         vi.stubGlobal('fetch', vi.fn().mockReturnValue(deferred.promise));
 
-        render(
+        renderWithIntl(
             <PrintAssistClient
                 backFallbackPath="/dashboard"
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
@@ -145,7 +164,7 @@ describe('印刷アシストクライアント', () => {
             value: canShareMock,
         });
 
-        render(
+        renderWithIntl(
             <PrintAssistClient
                 backFallbackPath="/dashboard"
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
@@ -202,7 +221,7 @@ describe('印刷アシストクライアント', () => {
             value: canShareMock,
         });
 
-        const { rerender } = render(
+        const { rerender } = renderWithIntl(
             <PrintAssistClient
                 backFallbackPath="/dashboard"
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
@@ -262,7 +281,7 @@ describe('印刷アシストクライアント', () => {
             value: shareMock,
         });
 
-        render(
+        renderWithIntl(
             <PrintAssistClient
                 backFallbackPath="/dashboard"
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
@@ -297,7 +316,7 @@ describe('印刷アシストクライアント', () => {
             value: shareMock,
         });
 
-        render(
+        renderWithIntl(
             <PrintAssistClient
                 backFallbackPath="/dashboard"
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
@@ -325,7 +344,7 @@ describe('印刷アシストクライアント', () => {
             value: shareMock,
         });
 
-        render(
+        renderWithIntl(
             <PrintAssistClient
                 backFallbackPath="/dashboard"
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
@@ -356,7 +375,7 @@ describe('印刷アシストクライアント', () => {
             value: canShareMock,
         });
 
-        render(
+        renderWithIntl(
             <PrintAssistClient
                 backFallbackPath="/dashboard"
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
@@ -386,7 +405,7 @@ describe('印刷アシストクライアント', () => {
             value: { focus: openerFocus, closed: false },
         });
 
-        render(
+        renderWithIntl(
             <PrintAssistClient
                 backFallbackPath="/dashboard"
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
@@ -405,7 +424,7 @@ describe('印刷アシストクライアント', () => {
         const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {});
         vi.spyOn(window.history, 'length', 'get').mockReturnValue(1);
 
-        render(
+        renderWithIntl(
             <PrintAssistClient
                 backFallbackPath="/dashboard"
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"

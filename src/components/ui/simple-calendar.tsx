@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 import { cn } from '@/lib/utils';
 import { isValidDateKey, parseDateKeyAsUTC } from '@/lib/date-key';
@@ -12,8 +13,6 @@ type SimpleCalendarProps = {
     className?: string;
 };
 
-const WEEK_DAYS = ['日', '月', '火', '水', '木', '金', '土'];
-
 function toMonthStart(dateKey: string): Date {
     const date = isValidDateKey(dateKey) ? parseDateKeyAsUTC(dateKey) : new Date();
     return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
@@ -24,10 +23,6 @@ function formatDateKey(date: Date): string {
     const month = String(date.getUTCMonth() + 1).padStart(2, '0');
     const day = String(date.getUTCDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
-}
-
-function getMonthLabel(date: Date) {
-    return `${date.getUTCFullYear()}年${date.getUTCMonth() + 1}月`;
 }
 
 function getCalendarDateKeys(monthStart: Date): string[] {
@@ -43,10 +38,12 @@ function getCalendarDateKeys(monthStart: Date): string[] {
 }
 
 export function SimpleCalendar({ value, onChange, minDateKey, className }: SimpleCalendarProps) {
+    const t = useTranslations('SimpleCalendar');
     const [visibleMonth, setVisibleMonth] = useState<Date>(() => toMonthStart(value));
 
     const dateKeys = useMemo(() => getCalendarDateKeys(visibleMonth), [visibleMonth]);
     const currentMonth = visibleMonth.getUTCMonth();
+    const weekDays = [t('weekDay.sun'), t('weekDay.mon'), t('weekDay.tue'), t('weekDay.wed'), t('weekDay.thu'), t('weekDay.fri'), t('weekDay.sat')];
 
     return (
         <div className={cn('rounded-md border bg-background p-3', className)}>
@@ -58,9 +55,9 @@ export function SimpleCalendar({ value, onChange, minDateKey, className }: Simpl
                         setVisibleMonth((prev) => new Date(Date.UTC(prev.getUTCFullYear(), prev.getUTCMonth() - 1, 1)));
                     }}
                 >
-                    前月
+                    {t('prevMonth')}
                 </button>
-                <div className="text-sm font-medium">{getMonthLabel(visibleMonth)}</div>
+                <div className="text-sm font-medium">{t('monthLabel', { year: visibleMonth.getUTCFullYear(), month: visibleMonth.getUTCMonth() + 1 })}</div>
                 <button
                     type="button"
                     className="rounded-md border px-2 py-1 text-sm hover:bg-accent"
@@ -68,13 +65,13 @@ export function SimpleCalendar({ value, onChange, minDateKey, className }: Simpl
                         setVisibleMonth((prev) => new Date(Date.UTC(prev.getUTCFullYear(), prev.getUTCMonth() + 1, 1)));
                     }}
                 >
-                    次月
+                    {t('nextMonth')}
                 </button>
             </div>
 
             <div className="grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground">
-                {WEEK_DAYS.map((day) => (
-                    <div key={day} className="py-1">
+                {weekDays.map((day, index) => (
+                    <div key={index} className="py-1">
                         {day}
                     </div>
                 ))}
@@ -108,7 +105,7 @@ export function SimpleCalendar({ value, onChange, minDateKey, className }: Simpl
 
             {minDateKey && (
                 <div className="mt-2 text-xs text-muted-foreground">
-                    {minDateKey} 以前は選択できません
+                    {t('minDateNotice', { minDate: minDateKey })}
                 </div>
             )}
         </div>

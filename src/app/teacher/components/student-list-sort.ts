@@ -14,11 +14,11 @@ export const DEFAULT_STUDENT_SORT_ORDER: Record<StudentSortKey, StudentSortOrder
     lastActivity: 'desc',
 };
 
-export const STUDENT_SORT_OPTIONS: Array<{ value: StudentSortKey; label: string }> = [
-    { value: 'loginId', label: '生徒ID' },
-    { value: 'totalProblemsSolved', label: '総回答数' },
-    { value: 'currentStreak', label: '連続学習' },
-    { value: 'lastActivity', label: '最終学習日' },
+export const STUDENT_SORT_OPTIONS: Array<{ value: StudentSortKey }> = [
+    { value: 'loginId' },
+    { value: 'totalProblemsSolved' },
+    { value: 'currentStreak' },
+    { value: 'lastActivity' },
 ];
 
 const loginIdCollator = new Intl.Collator('ja', {

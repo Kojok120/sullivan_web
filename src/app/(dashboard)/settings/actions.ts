@@ -1,32 +1,46 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { getTranslations } from 'next-intl/server';
 import {
-    passwordFieldsSchema,
+    createPasswordFieldsSchema,
+    type PasswordServiceMessages,
     updateUserPassword,
     verifyCurrentPassword
 } from '@/lib/password-service';
 import { getSession } from '@/lib/auth';
 import { z } from 'zod';
 
-// 設定ページ用スキーマ（現在のパスワード必須）
-const settingsPasswordSchema = z.object({
-    currentPassword: z.string().min(1, '現在のパスワードを入力してください'),
-}).merge(passwordFieldsSchema).refine((data) => data.newPassword === data.confirmPassword, {
-    message: '新しいパスワードが一致しません',
-    path: ['confirmPassword'],
-});
+function createSettingsPasswordSchema(messages: PasswordServiceMessages) {
+    return z.object({
+        currentPassword: z.string().min(1, messages.currentPasswordRequired),
+    }).merge(createPasswordFieldsSchema(messages)).refine((data) => data.newPassword === data.confirmPassword, {
+        message: messages.passwordsMismatch,
+        path: ['confirmPassword'],
+    });
+}
 
 export async function updatePassword(_prevState: unknown, formData: FormData) {
+    const t = await getTranslations('PasswordErrors');
+    const passwordMessages: PasswordServiceMessages = {
+        currentPasswordRequired: t('currentPasswordRequired'),
+        newPasswordTooShort: t('newPasswordTooShort'),
+        confirmPasswordRequired: t('confirmPasswordRequired'),
+        passwordsMismatch: t('passwordsMismatch'),
+        updateFailed: t('passwordUpdateFailed'),
+        userLoadFailed: t('userLoadFailed'),
+        currentPasswordIncorrect: t('currentPasswordIncorrect'),
+    };
+
     try {
         const session = await getSession();
         if (!session) {
-            return { error: 'ログインが必要です' };
+            return { error: t('loginRequired') };
         }
 
         const allowedRoles = new Set(['STUDENT', 'TEACHER', 'HEAD_TEACHER', 'PARENT', 'ADMIN']);
         if (!allowedRoles.has(session.role)) {
-            return { error: '権限がありません' };
+            return { error: t('permissionDenied') };
         }
 
         const rawData = {
@@ -35,7 +49,7 @@ export async function updatePassword(_prevState: unknown, formData: FormData) {
             confirmPassword: formData.get('confirmPassword') as string,
         };
 
-        const result = settingsPasswordSchema.safeParse(rawData);
+        const result = createSettingsPasswordSchema(passwordMessages).safeParse(rawData);
 
         if (!result.success) {
             return { error: result.error.errors[0].message };
@@ -44,13 +58,13 @@ export async function updatePassword(_prevState: unknown, formData: FormData) {
         const { currentPassword, newPassword } = result.data;
 
         // 現在のパスワードを検証
-        const verifyResult = await verifyCurrentPassword(currentPassword);
+        const verifyResult = await verifyCurrentPassword(currentPassword, passwordMessages);
         if (!verifyResult.success) {
             return { error: verifyResult.error };
         }
 
         // 新しいパスワードで更新
-        const updateResult = await updateUserPassword(newPassword);
+        const updateResult = await updateUserPassword(newPassword, passwordMessages);
         if (!updateResult.success) {
             return { error: updateResult.error };
         }
@@ -59,6 +73,6 @@ export async function updatePassword(_prevState: unknown, formData: FormData) {
         return { success: true };
     } catch (error) {
         console.error('Failed to update password in settings action:', error);
-        return { error: 'パスワード更新に失敗しました' };
+        return { error: t('passwordUpdateFailed') };
     }
 }

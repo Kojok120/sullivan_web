@@ -5,6 +5,7 @@ import { DateDisplay } from '@/components/ui/date-display';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { getStudentOverviewData } from '@/lib/analytics';
+import { getTranslations } from 'next-intl/server';
 
 import { PrintProblemCard } from './print-problem-card';
 
@@ -47,7 +48,10 @@ export default async function TeacherStudentOverviewPage({
         redirect(legacyTab);
     }
 
-    const { stats, subjectProgress, weaknesses, subjects } = await getStudentOverviewData(userId);
+    const [{ stats, subjectProgress, weaknesses, subjects }, t] = await Promise.all([
+        getStudentOverviewData(userId),
+        getTranslations('TeacherStudentOverview'),
+    ]);
 
     return (
         <div className="space-y-4">
@@ -55,29 +59,29 @@ export default async function TeacherStudentOverviewPage({
                 <PrintProblemCard userId={userId} subjects={subjects} />
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">正答率</CardTitle>
+                        <CardTitle className="text-sm font-medium">{t('accuracy')}</CardTitle>
                         <Target className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                         <div className={`text-2xl font-bold ${stats.accuracy < 50 ? 'text-red-500' : 'text-green-600'}`}>
                             {stats.accuracy}%
                         </div>
-                        <p className="text-xs text-muted-foreground">正解数: {stats.totalCorrect}</p>
+                        <p className="text-xs text-muted-foreground">{t('correctCount', { count: stats.totalCorrect })}</p>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">連続学習</CardTitle>
+                        <CardTitle className="text-sm font-medium">{t('currentStreak')}</CardTitle>
                         <Trophy className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{stats.currentStreak}日</div>
-                        <p className="text-xs text-muted-foreground">継続は力なり</p>
+                        <div className="text-2xl font-bold">{t('streakDays', { count: stats.currentStreak })}</div>
+                        <p className="text-xs text-muted-foreground">{t('streakCaption')}</p>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">最終学習</CardTitle>
+                        <CardTitle className="text-sm font-medium">{t('lastActivity')}</CardTitle>
                         <Clock className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
@@ -96,9 +100,9 @@ export default async function TeacherStudentOverviewPage({
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <AlertTriangle className="h-5 w-5 text-amber-500" />
-                            弱点分析 (正答率ワースト)
+                            {t('weaknessTitle')}
                         </CardTitle>
-                        <CardDescription>正答率が低く、重点的な復習が必要な単元</CardDescription>
+                        <CardDescription>{t('weaknessDescription')}</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
@@ -114,12 +118,12 @@ export default async function TeacherStudentOverviewPage({
                                         </div>
                                         <div className="text-right">
                                             <span className="text-lg font-bold text-red-500">{weakness.accuracy}%</span>
-                                            <p className="text-xs text-muted-foreground">{weakness.totalAttempts}回実施</p>
+                                            <p className="text-xs text-muted-foreground">{t('attemptCount', { count: weakness.totalAttempts })}</p>
                                         </div>
                                     </div>
                                 ))
                             ) : (
-                                <div className="py-8 text-center text-muted-foreground">顕著な弱点は見つかりませんでした</div>
+                                <div className="py-8 text-center text-muted-foreground">{t('noWeakness')}</div>
                             )}
                         </div>
                     </CardContent>
@@ -128,7 +132,7 @@ export default async function TeacherStudentOverviewPage({
 
             <Card>
                 <CardHeader>
-                    <CardTitle>科目別進捗状況</CardTitle>
+                    <CardTitle>{t('subjectProgressTitle')}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-8">
                     {subjectProgress.map((subject) => (
@@ -138,7 +142,10 @@ export default async function TeacherStudentOverviewPage({
                                     <div className="font-medium">{subject.subjectName}</div>
                                 </div>
                                 <div className="text-sm text-muted-foreground">
-                                    {subject.clearedCoreProblems} / {subject.totalCoreProblems} クリア
+                                    {t('clearedCount', {
+                                        cleared: subject.clearedCoreProblems,
+                                        total: subject.totalCoreProblems,
+                                    })}
                                 </div>
                             </div>
                             <Progress value={subject.progressPercentage} className="h-2" />

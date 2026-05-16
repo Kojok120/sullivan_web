@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { parse as parseEnv } from "dotenv";
 import type { NextConfig } from "next";
+import createNextIntlPlugin from "next-intl/plugin";
 
 const buildEnvPath = path.resolve(process.cwd(), ".env.build");
 const hasBuildEnv = fs.existsSync(buildEnvPath);
@@ -113,4 +114,6 @@ const nextConfig: NextConfig = {
   ],
 };
 
-export default nextConfig;
+const withNextIntl = createNextIntlPlugin();
+
+export default withNextIntl(nextConfig);

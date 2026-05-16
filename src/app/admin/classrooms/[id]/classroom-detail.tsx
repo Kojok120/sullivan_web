@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -35,6 +36,7 @@ export function ClassroomDetail({
     classroom: ClassroomWithUsers;
     canEditPlan: boolean;
 }) {
+    const t = useTranslations('AdminClassroomDetail');
     const router = useRouter();
     const [groups, setGroups] = useState<string[]>(classroom.groups || []);
     const [newGroup, setNewGroup] = useState('');
@@ -50,7 +52,7 @@ export function ClassroomDetail({
         if (result.error) {
             toast.error(result.error);
         } else {
-            toast.success('グループを更新しました');
+            toast.success(t('groupsUpdateSuccess'));
             router.refresh();
         }
     }
@@ -63,7 +65,7 @@ export function ClassroomDetail({
         if (result.error) {
             toast.error(result.error);
         } else {
-            toast.success('プランを更新しました');
+            toast.success(t('planUpdateSuccess'));
             router.refresh();
         }
     }
@@ -71,7 +73,7 @@ export function ClassroomDetail({
     function addGroup() {
         if (!newGroup.trim()) return;
         if (groups.includes(newGroup.trim())) {
-            toast.error('このグループは既に追加されています');
+            toast.error(t('duplicateGroup'));
             return;
         }
         setGroups([...groups, newGroup.trim()]);
@@ -92,7 +94,7 @@ export function ClassroomDetail({
                 </Link>
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{classroom.name}</h1>
-                    <p className="text-muted-foreground">教室の詳細情報と所属生徒の管理</p>
+                    <p className="text-muted-foreground">{t('description')}</p>
                 </div>
             </div>
 
@@ -100,17 +102,17 @@ export function ClassroomDetail({
                 {/* Group Management */}
                 <Card className="md:col-span-1">
                     <CardHeader>
-                        <CardTitle>グループ管理</CardTitle>
+                        <CardTitle>{t('groupManagementTitle')}</CardTitle>
                         <CardDescription>
-                            この教室のグループ（曜日など）を管理します。
+                            {t('groupManagementDescription')}
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="space-y-2 border rounded-md p-3 bg-muted/30">
                             <div className="flex items-center justify-between">
-                                <span className="text-sm font-medium">教室プラン</span>
+                                <span className="text-sm font-medium">{t('planLabel')}</span>
                                 <Badge variant={plan === 'PREMIUM' ? 'default' : 'secondary'}>
-                                    {plan === 'PREMIUM' ? 'プレミアム' : 'スタンダード'}
+                                    {plan === 'PREMIUM' ? t('premiumPlan') : t('standardPlan')}
                                 </Badge>
                             </div>
                             <Select
@@ -119,11 +121,11 @@ export function ClassroomDetail({
                                 disabled={!canEditPlan}
                             >
                                 <SelectTrigger>
-                                    <SelectValue placeholder="プランを選択" />
+                                    <SelectValue placeholder={t('planPlaceholder')} />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="STANDARD">スタンダード</SelectItem>
-                                    <SelectItem value="PREMIUM">プレミアム</SelectItem>
+                                    <SelectItem value="STANDARD">{t('standardPlan')}</SelectItem>
+                                    <SelectItem value="PREMIUM">{t('premiumPlan')}</SelectItem>
                                 </SelectContent>
                             </Select>
                             {canEditPlan && (
@@ -134,14 +136,14 @@ export function ClassroomDetail({
                                     className="min-h-11 w-full sm:min-h-10"
                                 >
                                     <Save className="mr-2 h-4 w-4" />
-                                    プランを保存
+                                    {t('savePlan')}
                                 </Button>
                             )}
                         </div>
 
                         <div className="flex gap-2">
                             <Input
-                                placeholder="新しいグループ名"
+                                placeholder={t('newGroupPlaceholder')}
                                 value={newGroup}
                                 onChange={(e) => setNewGroup(e.target.value)}
                                 onKeyDown={(e) => {
@@ -172,7 +174,7 @@ export function ClassroomDetail({
                                 </div>
                             ))}
                             {groups.length === 0 && (
-                                <span className="text-sm text-muted-foreground">グループがありません</span>
+                                <span className="text-sm text-muted-foreground">{t('noGroups')}</span>
                             )}
                         </div>
 
@@ -182,7 +184,7 @@ export function ClassroomDetail({
                             className="min-h-11 w-full sm:min-h-10"
                         >
                             <Save className="mr-2 h-4 w-4" />
-                            変更を保存
+                            {t('saveChanges')}
                         </Button>
                     </CardContent>
                 </Card>
@@ -192,16 +194,16 @@ export function ClassroomDetail({
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <Users className="h-5 w-5" />
-                            所属生徒 ({classroom.users.length}名)
+                            {t('studentsTitle', { count: classroom.users.length })}
                         </CardTitle>
                         <CardDescription>
-                            この教室に所属している生徒の一覧です。
+                            {t('studentsDescription')}
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
                         {classroom.users.length === 0 ? (
                             <div className="text-center py-8 text-muted-foreground">
-                                所属している生徒はいません
+                                {t('noStudents')}
                             </div>
                         ) : (
                             <>
@@ -216,7 +218,7 @@ export function ClassroomDetail({
                                                 <RoleBadge role={user.role} />
                                             </div>
                                             <div className="mb-3 text-sm">
-                                                <p className="text-xs text-muted-foreground">グループ</p>
+                                                <p className="text-xs text-muted-foreground">{t('groupLabel')}</p>
                                                 {user.group ? (
                                                     <span className="mt-1 inline-flex items-center rounded bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                                                         {user.group}
@@ -227,7 +229,7 @@ export function ClassroomDetail({
                                             </div>
                                             <Button asChild variant="outline" size="sm" className="min-h-11 w-full">
                                                 <Link href={`/teacher/students/${user.id}`}>
-                                                    詳細
+                                                    {t('detail')}
                                                 </Link>
                                             </Button>
                                         </div>
@@ -238,11 +240,11 @@ export function ClassroomDetail({
                                     <Table>
                                         <TableHeader>
                                             <TableRow>
-                                                <TableHead>ログインID</TableHead>
-                                                <TableHead>名前</TableHead>
-                                                <TableHead>役割</TableHead>
-                                                <TableHead>グループ</TableHead>
-                                                <TableHead className="text-right">操作</TableHead>
+                                                <TableHead>{t('loginIdHeader')}</TableHead>
+                                                <TableHead>{t('nameHeader')}</TableHead>
+                                                <TableHead>{t('roleHeader')}</TableHead>
+                                                <TableHead>{t('groupHeader')}</TableHead>
+                                                <TableHead className="text-right">{t('actionsHeader')}</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
@@ -265,7 +267,7 @@ export function ClassroomDetail({
                                                     <TableCell className="text-right">
                                                         <Link href={`/teacher/students/${user.id}`}>
                                                             <Button variant="ghost" size="sm">
-                                                                詳細
+                                                                {t('detail')}
                                                             </Button>
                                                         </Link>
                                                     </TableCell>

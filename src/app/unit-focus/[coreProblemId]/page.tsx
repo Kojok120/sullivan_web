@@ -2,6 +2,7 @@ import { UnitFocusDetailClient } from "./components/unit-focus-detail-client";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { normalizeLectureVideos } from "@/lib/lecture-videos";
 import { getUnlockedCoreProblemIds } from "@/lib/progression";
 
@@ -14,6 +15,7 @@ export default async function UnitFocusDetailPage({
 }) {
     const session = await getSession();
     if (!session) redirect("/login");
+    const t = await getTranslations('UnitFocus');
 
     const { coreProblemId } = await params;
     const query = await searchParams;
@@ -29,7 +31,7 @@ export default async function UnitFocusDetailPage({
     });
 
     if (!coreProblem) {
-        return <div>Core Problem not found</div>;
+        return <div>{t('notFound')}</div>;
     }
 
     const unlockedCoreProblemIds = await getUnlockedCoreProblemIds(session.userId, coreProblem.subjectId);

@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { NextIntlClientProvider } from 'next-intl';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import jaMessages from '@/messages/ja.json';
 import { ProblemManager } from './problem-manager';
 
 const { pushMock, useSearchParamsMock } = vi.hoisted(() => ({
@@ -101,6 +103,14 @@ function createSearchParams(value: string) {
     };
 }
 
+function renderWithIntl(ui: ReactNode) {
+    return render(
+        <NextIntlClientProvider locale="ja" messages={jaMessages}>
+            {ui}
+        </NextIntlClientProvider>,
+    );
+}
+
 describe('ProblemManager', () => {
     const subjects = [
         {
@@ -127,7 +137,7 @@ describe('ProblemManager', () => {
     });
 
     it('科目プルダウンを表示せず現在教科の単元だけを候補表示する', () => {
-        render(
+        renderWithIntl(
             <ProblemManager
                 initialProblems={[]}
                 totalCount={0}
@@ -148,7 +158,7 @@ describe('ProblemManager', () => {
 
     it('単元変更時はcoreProblemIdを更新して1ページ目へ戻す', () => {
         useSearchParamsMock.mockReturnValue(createSearchParams('subjectId=subject-math&page=3'));
-        render(
+        renderWithIntl(
             <ProblemManager
                 initialProblems={[]}
                 totalCount={0}
@@ -169,7 +179,7 @@ describe('ProblemManager', () => {
     });
 
     it('新規作成リンクに現在教科のsubjectIdを引き継ぐ', () => {
-        render(
+        renderWithIntl(
             <ProblemManager
                 initialProblems={[]}
                 totalCount={0}
@@ -191,7 +201,7 @@ describe('ProblemManager', () => {
     it('問題作成者向け画面でも動画ステータスでフィルターできる', () => {
         useSearchParamsMock.mockReturnValue(createSearchParams('subjectId=subject-math'));
 
-        render(
+        renderWithIntl(
             <ProblemManager
                 initialProblems={[]}
                 totalCount={0}
@@ -212,7 +222,7 @@ describe('ProblemManager', () => {
     });
 
     it('英語の管理画面では英語シート一括登録ボタンを表示する', () => {
-        render(
+        renderWithIntl(
             <ProblemManager
                 initialProblems={[]}
                 totalCount={0}
@@ -231,7 +241,7 @@ describe('ProblemManager', () => {
     });
 
     it('英語の作成者画面でも英語シート一括登録ボタンを表示する', () => {
-        render(
+        renderWithIntl(
             <ProblemManager
                 initialProblems={[]}
                 totalCount={0}
@@ -252,7 +262,7 @@ describe('ProblemManager', () => {
     });
 
     it('英語以外の作成者画面では一括登録ボタンを表示しない', () => {
-        render(
+        renderWithIntl(
             <ProblemManager
                 initialProblems={[]}
                 totalCount={0}
@@ -273,7 +283,7 @@ describe('ProblemManager', () => {
     });
 
     it('マスタNo非表示時は検索プレースホルダからマスタNoを除外する', () => {
-        render(
+        renderWithIntl(
             <ProblemManager
                 initialProblems={[]}
                 totalCount={0}

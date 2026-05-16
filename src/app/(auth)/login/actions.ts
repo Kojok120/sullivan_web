@@ -2,15 +2,17 @@
 
 // Removed unused imports
 import { redirect } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 
 import { z } from 'zod';
 
-const loginSchema = z.object({
-    loginId: z.string().min(1, 'IDを入力してください'),
-    password: z.string().min(1, 'パスワードを入力してください'),
-});
-
 export async function loginAction(_prevState: unknown, formData: FormData) {
+    const t = await getTranslations('Login');
+    const loginSchema = z.object({
+        loginId: z.string().min(1, t('errors.loginIdRequired')),
+        password: z.string().min(1, t('errors.passwordRequired')),
+    });
+
     const rawData = {
         loginId: formData.get('loginId') as string,
         password: formData.get('password') as string,
@@ -34,7 +36,7 @@ export async function loginAction(_prevState: unknown, formData: FormData) {
     });
 
     if (error) {
-        return { error: 'IDまたはパスワードが間違っています' };
+        return { error: t('errors.invalidCredentials') };
     }
 
     // signInWithPasswordの戻り値からuserを取得（二重呼び出し削減）

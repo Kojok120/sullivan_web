@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { DateDisplay } from '@/components/ui/date-display';
 import { NONE_SELECTION_VALUE } from '@/lib/form-selection';
 import type { ClassroomWithGroups } from '@/lib/types/classroom';
+import { useTranslations } from 'next-intl';
 
 interface ProfileCardProps {
     userId: string;
@@ -38,6 +39,7 @@ export function ProfileCard({
     initialEmail,
     classrooms,
 }: ProfileCardProps) {
+    const t = useTranslations('TeacherProfileCard');
     const [isEditing, setIsEditing] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
@@ -51,14 +53,14 @@ export function ProfileCard({
         if (result.error) {
             toast.error(result.error);
         } else {
-            toast.success('プロフィールを更新しました');
+            toast.success(t('updateSuccess'));
             setIsEditing(false);
         }
     }
 
     const currentClassroom = classrooms.find(c => c.id === initialClassroomId);
-    const currentClassroomName = currentClassroom?.name || '未設定';
-    const currentGroupName = initialGroupId || '未設定';
+    const currentClassroomName = currentClassroom?.name || t('unset');
+    const currentGroupName = initialGroupId || t('unset');
 
     // Get groups for the currently selected classroom in the form
     const selectedClassroom = classrooms.find(c => c.id === selectedClassroomId);
@@ -70,14 +72,14 @@ export function ProfileCard({
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                         <User className="h-5 w-5" />
-                        プロフィール編集
+                        {t('editTitle')}
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
                     <form action={handleSubmit} className="space-y-4">
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">生年月日</label>
+                                <label className="text-sm font-medium">{t('birthdayLabel')}</label>
                                 <Input
                                     type="date"
                                     name="birthday"
@@ -85,17 +87,17 @@ export function ProfileCard({
                                 />
                             </div>
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">教室</label>
+                                <label className="text-sm font-medium">{t('classroomLabel')}</label>
                                 <Select
                                     name="classroomId"
                                     defaultValue={initialClassroomId || NONE_SELECTION_VALUE}
                                     onValueChange={(value) => setSelectedClassroomId(value)}
                                 >
                                     <SelectTrigger>
-                                        <SelectValue placeholder="教室を選択" />
+                                        <SelectValue placeholder={t('classroomPlaceholder')} />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value={NONE_SELECTION_VALUE}>未設定</SelectItem>
+                                        <SelectItem value={NONE_SELECTION_VALUE}>{t('unset')}</SelectItem>
                                         {classrooms.map((c) => (
                                             <SelectItem key={c.id} value={c.id}>
                                                 {c.name}
@@ -105,17 +107,17 @@ export function ProfileCard({
                                 </Select>
                             </div>
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">グループ</label>
+                                <label className="text-sm font-medium">{t('groupLabel')}</label>
                                 <Select
                                     name="groupId"
                                     defaultValue={initialGroupId || NONE_SELECTION_VALUE}
                                     disabled={availableGroups.length === 0}
                                 >
                                     <SelectTrigger>
-                                        <SelectValue placeholder="グループを選択" />
+                                        <SelectValue placeholder={t('groupPlaceholder')} />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value={NONE_SELECTION_VALUE}>未設定</SelectItem>
+                                        <SelectItem value={NONE_SELECTION_VALUE}>{t('unset')}</SelectItem>
                                         {availableGroups.map((g) => (
                                             <SelectItem key={g} value={g}>
                                                 {g}
@@ -125,56 +127,56 @@ export function ProfileCard({
                                 </Select>
                             </div>
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">学校</label>
+                                <label className="text-sm font-medium">{t('schoolLabel')}</label>
                                 <Input
                                     name="school"
                                     defaultValue={initialSchool || ''}
-                                    placeholder="例: 〇〇中学校"
+                                    placeholder={t('schoolPlaceholder')}
                                 />
                             </div>
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">電話番号</label>
+                                <label className="text-sm font-medium">{t('phoneLabel')}</label>
                                 <Input
                                     name="phoneNumber"
                                     defaultValue={initialPhoneNumber || ''}
-                                    placeholder="例: 090-1234-5678"
+                                    placeholder={t('phonePlaceholder')}
                                 />
                             </div>
                             <div className="space-y-2 sm:col-span-2">
-                                <label className="text-sm font-medium">メールアドレス</label>
+                                <label className="text-sm font-medium">{t('emailLabel')}</label>
                                 <Input
                                     name="email"
                                     type="email"
                                     defaultValue={initialEmail || ''}
-                                    placeholder="例: student@example.com"
+                                    placeholder={t('emailPlaceholder')}
                                 />
                             </div>
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">生徒プロフィール (部活、志望校など)</label>
+                            <label className="text-sm font-medium">{t('bioLabel')}</label>
                             <Textarea
                                 name="bio"
                                 defaultValue={initialBio || ''}
-                                placeholder="例: サッカー部、〇〇高校志望"
+                                placeholder={t('bioPlaceholder')}
                                 className="min-h-[100px]"
                             />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">講師用メモ (性格、特記事項など)</label>
+                            <label className="text-sm font-medium">{t('notesLabel')}</label>
                             <Textarea
                                 name="notes"
                                 defaultValue={initialNotes || ''}
-                                placeholder="例: 英語が苦手、計算ミスが多い"
+                                placeholder={t('notesPlaceholder')}
                                 className="min-h-[100px]"
                             />
                         </div>
                         <div className="flex flex-col-reverse justify-end gap-2 sm:flex-row">
                             <Button type="button" variant="outline" onClick={() => setIsEditing(false)} disabled={isSaving} className="min-h-11 sm:min-h-10">
-                                キャンセル
+                                {t('cancel')}
                             </Button>
                             <Button type="submit" disabled={isSaving} className="min-h-11 sm:min-h-10">
-                                {isSaving ? '保存中...' : '保存'}
+                                {isSaving ? t('saving') : t('save')}
                             </Button>
                         </div>
                     </form>
@@ -189,58 +191,58 @@ export function ProfileCard({
                 <div className="space-y-1">
                     <CardTitle className="flex items-center gap-2">
                         <User className="h-5 w-5" />
-                        プロフィール & メモ
+                        {t('title')}
                     </CardTitle>
-                    <CardDescription>生徒の情報と講師用メモ</CardDescription>
+                    <CardDescription>{t('description')}</CardDescription>
                 </div>
                 <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
-                    編集
+                    {t('edit')}
                 </Button>
             </CardHeader>
             <CardContent className="space-y-6 pt-4">
                 <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 sm:gap-4">
                     <div className="flex items-center gap-2">
                         <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">生年月日:</span>
-                        <span>{initialBirthday ? <DateDisplay date={initialBirthday} /> : '未設定'}</span>
+                        <span className="text-muted-foreground">{t('birthdayLabel')}:</span>
+                        <span>{initialBirthday ? <DateDisplay date={initialBirthday} /> : t('unset')}</span>
                     </div>
                     <div className="flex items-center gap-2">
                         <MapPin className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">教室:</span>
+                        <span className="text-muted-foreground">{t('classroomLabel')}:</span>
                         <span>{currentClassroomName}</span>
                     </div>
                     <div className="flex items-center gap-2">
                         <Users className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">グループ:</span>
+                        <span className="text-muted-foreground">{t('groupLabel')}:</span>
                         <span>{currentGroupName}</span>
                     </div>
                     <div className="flex items-center gap-2">
                         <School className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">学校:</span>
-                        <span>{initialSchool || '未設定'}</span>
+                        <span className="text-muted-foreground">{t('schoolLabel')}:</span>
+                        <span>{initialSchool || t('unset')}</span>
                     </div>
                     <div className="flex items-center gap-2">
                         <Phone className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">電話:</span>
-                        <span>{initialPhoneNumber || '未設定'}</span>
+                        <span className="text-muted-foreground">{t('phoneDisplayLabel')}</span>
+                        <span>{initialPhoneNumber || t('unset')}</span>
                     </div>
                     <div className="flex items-center gap-2 sm:col-span-2">
                         <Mail className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">Email:</span>
-                        <span>{initialEmail || '未設定'}</span>
+                        <span className="text-muted-foreground">{t('emailDisplayLabel')}</span>
+                        <span>{initialEmail || t('unset')}</span>
                     </div>
                 </div>
 
                 <div className="space-y-1">
-                    <h4 className="text-sm font-medium text-muted-foreground">生徒プロフィール</h4>
+                    <h4 className="text-sm font-medium text-muted-foreground">{t('bioDisplayLabel')}</h4>
                     <div className="text-sm whitespace-pre-wrap bg-muted/30 p-3 rounded-md min-h-[60px]">
-                        {initialBio || '未設定'}
+                        {initialBio || t('unset')}
                     </div>
                 </div>
                 <div className="space-y-1">
-                    <h4 className="text-sm font-medium text-muted-foreground">講師用メモ</h4>
+                    <h4 className="text-sm font-medium text-muted-foreground">{t('notesDisplayLabel')}</h4>
                     <div className="text-sm whitespace-pre-wrap bg-yellow-50/50 p-3 rounded-md min-h-[60px] border border-yellow-100">
-                        {initialNotes || '未設定'}
+                        {initialNotes || t('unset')}
                     </div>
                 </div>
             </CardContent>

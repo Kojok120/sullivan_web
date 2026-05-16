@@ -104,7 +104,7 @@ async function main(): Promise<void> {
     try {
         // 対象ユーザー解決
         let userIds: string[] = [];
-        let userNameMap: Map<string, { name: string; email: string | null }> = new Map();
+        const userNameMap: Map<string, { name: string; email: string | null }> = new Map();
         if (args.userId) {
             const u = await prisma.user.findUnique({
                 where: { id: args.userId },

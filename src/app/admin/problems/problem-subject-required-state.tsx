@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 
 import { Button } from '@/components/ui/button';
 
@@ -10,21 +11,23 @@ type ProblemSubjectRequiredStateProps = {
     }[];
 };
 
-export function ProblemSubjectRequiredState({
+export async function ProblemSubjectRequiredState({
     routeBase,
     subjects,
 }: ProblemSubjectRequiredStateProps) {
+    const t = await getTranslations('ProblemSubjectRequiredState');
+
     return (
         <div className="rounded-lg border bg-card p-6">
-            <h2 className="text-lg font-semibold">教科別の問題一覧を選択してください</h2>
+            <h2 className="text-lg font-semibold">{t('title')}</h2>
             <p className="mt-2 text-sm text-muted-foreground">
-                全教科横断の問題一覧は廃止しました。ナビゲーション、または下の教科別リンクから開いてください。
+                {t('description')}
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
                 {subjects.map((subject) => (
                     <Button key={subject.id} asChild variant="outline">
                         <Link href={`${routeBase}?subjectId=${subject.id}`}>
-                            問題一覧 - {subject.name}
+                            {t('subjectLink', { subjectName: subject.name })}
                         </Link>
                     </Button>
                 ))}

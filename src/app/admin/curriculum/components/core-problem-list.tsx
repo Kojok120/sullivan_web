@@ -19,6 +19,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { reorderCoreProblems, createCoreProblem, deleteCoreProblem, updateCoreProblem, bulkDeleteCoreProblems } from '../actions';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -46,6 +47,8 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 
+type CoreProblemListTranslator = ReturnType<typeof useTranslations>;
+
 interface CoreProblemListProps {
     subjectId: string;
     coreProblems: CoreProblem[];
@@ -60,9 +63,10 @@ interface SortableItemProps {
     onSelect: () => void;
     onDeleteRequest: (id: string) => void;
     onCheckChange: (checked: boolean) => void;
+    t: CoreProblemListTranslator;
 }
 
-function SortableCoreProblemItem({ coreProblem, isSelected, isChecked, onSelect, onDeleteRequest, onCheckChange }: SortableItemProps) {
+function SortableCoreProblemItem({ coreProblem, isSelected, isChecked, onSelect, onDeleteRequest, onCheckChange, t }: SortableItemProps) {
     const {
         attributes,
         listeners,
@@ -97,7 +101,7 @@ function SortableCoreProblemItem({ coreProblem, isSelected, isChecked, onSelect,
             lectureVideos: validVideos.length > 0 ? validVideos : undefined,
         });
         if (result.success) {
-            toast.success('更新しました');
+            toast.success(t('updateSuccess'));
             setIsEditing(false);
         } else {
             toast.error(result.error);
@@ -151,26 +155,26 @@ function SortableCoreProblemItem({ coreProblem, isSelected, isChecked, onSelect,
                                         value={editName}
                                         onChange={e => setEditName(e.target.value)}
                                         className="h-8 text-sm font-medium"
-                                        placeholder="CoreProblem名"
+                                        placeholder={t('namePlaceholder')}
                                         autoFocus
                                     />
                                 </div>
 
                                 <div className="space-y-2 pl-2 border-l-2 border-muted mt-1">
-                                    <div className="text-xs font-semibold text-muted-foreground">講義動画</div>
+                                    <div className="text-xs font-semibold text-muted-foreground">{t('lectureVideosLabel')}</div>
                                     {editVideos.map((video, index) => (
                                         <div key={index} className="flex flex-col gap-1 sm:flex-row sm:items-center">
                                             <Input
                                                 value={video.title}
                                                 onChange={e => updateVideo(index, 'title', e.target.value)}
                                                 className="h-8 text-xs sm:w-1/3"
-                                                placeholder="タイトル (例: 導入編)"
+                                                placeholder={t('videoTitleEditPlaceholder')}
                                             />
                                             <Input
                                                 value={video.url}
                                                 onChange={e => updateVideo(index, 'url', e.target.value)}
                                                 className="h-8 text-xs flex-1"
-                                                placeholder="YouTube URL"
+                                                placeholder={t('videoUrlYoutubePlaceholder')}
                                             />
                                             <Button
                                                 type="button"
@@ -190,16 +194,16 @@ function SortableCoreProblemItem({ coreProblem, isSelected, isChecked, onSelect,
                                         onClick={addVideo}
                                         className="h-6 text-xs w-full"
                                     >
-                                        <Plus className="h-3 w-3 mr-1" /> 動画を追加
+                                        <Plus className="h-3 w-3 mr-1" /> {t('addVideo')}
                                     </Button>
                                 </div>
 
                                 <div className="flex items-center gap-2 justify-end mt-2">
                                     <Button type="button" size="sm" variant="ghost" onClick={() => setIsEditing(false)}>
-                                        キャンセル
+                                        {t('cancel')}
                                     </Button>
                                     <Button type="submit" size="sm" variant="default">
-                                        保存
+                                        {t('save')}
                                     </Button>
                                 </div>
                             </form>
@@ -259,6 +263,7 @@ function SortableCoreProblemItem({ coreProblem, isSelected, isChecked, onSelect,
 }
 
 export function CoreProblemList({ subjectId, coreProblems, selectedId, onSelect }: CoreProblemListProps) {
+    const t = useTranslations('AdminCurriculumCoreProblemList');
     const [items, setItems] = useState(coreProblems);
     const [newName, setNewName] = useState('');
     const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -314,7 +319,7 @@ export function CoreProblemList({ subjectId, coreProblems, selectedId, onSelect 
                 const res = await reorderCoreProblems(updates);
                 if (res.error) toast.error(res.error);
             } catch {
-                toast.error('並び替えに失敗しました');
+                toast.error(t('reorderFailed'));
             }
         }
     };
@@ -334,7 +339,7 @@ export function CoreProblemList({ subjectId, coreProblems, selectedId, onSelect 
         });
 
         if (result.success) {
-            toast.success('作成しました');
+            toast.success(t('createSuccess'));
             setNewName('');
             setNewVideos([]);
             setIsCreateDialogOpen(false);
@@ -368,10 +373,10 @@ export function CoreProblemList({ subjectId, coreProblems, selectedId, onSelect 
         try {
             const result = await deleteCoreProblem(id);
             if (result.success) {
-                toast.success('削除しました');
+                toast.success(t('deleteSuccess'));
                 if (wasSelected) onSelect(null);
             } else {
-                toast.error(result.error || '削除に失敗しました');
+                toast.error(result.error || t('deleteFailed'));
             }
         } finally {
             setIsDeleting(false);
@@ -386,13 +391,13 @@ export function CoreProblemList({ subjectId, coreProblems, selectedId, onSelect 
         try {
             const result = await bulkDeleteCoreProblems(idsToDelete);
             if (result.success) {
-                toast.success(`${result.count}件のコア問題を削除しました`);
+                toast.success(t('bulkDeleteSuccess', { count: result.count ?? 0 }));
                 setCheckedIds(new Set());
                 if (selectedId && idsToDelete.includes(selectedId)) {
                     onSelect(null);
                 }
             } else {
-                toast.error(result.error || '一括削除に失敗しました');
+                toast.error(result.error || t('bulkDeleteFailed'));
             }
         } finally {
             setIsDeleting(false);
@@ -434,12 +439,12 @@ export function CoreProblemList({ subjectId, coreProblems, selectedId, onSelect 
                             {checkedIds.size === items.length ? (
                                 <>
                                     <CheckSquare className="h-3 w-3 mr-1" />
-                                    全解除
+                                    {t('deselectAll')}
                                 </>
                             ) : (
                                 <>
                                     <Square className="h-3 w-3 mr-1" />
-                                    全選択
+                                    {t('selectAll')}
                                 </>
                             )}
                         </Button>
@@ -452,7 +457,7 @@ export function CoreProblemList({ subjectId, coreProblems, selectedId, onSelect 
                                 className="min-h-11 text-xs sm:h-7 sm:min-h-0"
                             >
                                 <Trash2 className="h-3 w-3 mr-1" />
-                                {checkedIds.size}件削除
+                                {t('bulkDeleteButton', { count: checkedIds.size })}
                             </Button>
                         )}
                     </div>
@@ -478,6 +483,7 @@ export function CoreProblemList({ subjectId, coreProblems, selectedId, onSelect 
                                     onSelect={() => onSelect(cp.id)}
                                     onDeleteRequest={setDeleteTarget}
                                     onCheckChange={(checked) => handleCheckChange(cp.id, checked)}
+                                    t={t}
                                 />
                             ))}
                         </SortableContext>
@@ -490,21 +496,21 @@ export function CoreProblemList({ subjectId, coreProblems, selectedId, onSelect 
                         <DialogTrigger asChild>
                             <Button className="flex min-h-11 w-full items-center justify-center gap-2 sm:min-h-10">
                                 <Plus className="h-4 w-4" />
-                                新しいCoreProblemを追加
+                                {t('addNewCoreProblem')}
                             </Button>
                         </DialogTrigger>
                         <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
                             <DialogHeader>
-                                <DialogTitle>新規CoreProblem作成</DialogTitle>
+                                <DialogTitle>{t('createDialogTitle')}</DialogTitle>
                                 <DialogDescription>
-                                    新しい単元を作成します。講義動画の設定も可能です。
+                                    {t('createDialogDescription')}
                                 </DialogDescription>
                             </DialogHeader>
                             <div className="space-y-4 py-2">
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium">CoreProblem名</label>
+                                    <label className="text-sm font-medium">{t('nameFieldLabel')}</label>
                                     <Input
-                                        placeholder="現在完了形など"
+                                        placeholder={t('nameExamplePlaceholder')}
                                         value={newName}
                                         onChange={(e) => setNewName(e.target.value)}
                                     />
@@ -512,7 +518,7 @@ export function CoreProblemList({ subjectId, coreProblems, selectedId, onSelect 
 
                                 <div className="space-y-2">
                                     <div className="flex items-center justify-between">
-                                        <label className="text-sm font-medium">講義動画</label>
+                                        <label className="text-sm font-medium">{t('lectureVideosLabel')}</label>
                                         <Button
                                             type="button"
                                             variant="outline"
@@ -520,13 +526,13 @@ export function CoreProblemList({ subjectId, coreProblems, selectedId, onSelect 
                                             onClick={addNewVideo}
                                             className="h-6 text-xs"
                                         >
-                                            <Plus className="h-3 w-3 mr-1" /> 追加
+                                            <Plus className="h-3 w-3 mr-1" /> {t('addButton')}
                                         </Button>
                                     </div>
                                     <div className="space-y-2 max-h-[200px] overflow-y-auto border rounded-md p-2">
                                         {newVideos.length === 0 && (
                                             <div className="text-xs text-muted-foreground text-center py-2">
-                                                動画は登録されていません
+                                                {t('noVideos')}
                                             </div>
                                         )}
                                         {newVideos.map((video, index) => (
@@ -535,13 +541,13 @@ export function CoreProblemList({ subjectId, coreProblems, selectedId, onSelect 
                                                 value={video.title}
                                                 onChange={e => updateNewVideo(index, 'title', e.target.value)}
                                                     className="h-8 text-xs sm:w-1/3"
-                                                    placeholder="タイトル"
+                                                    placeholder={t('videoTitlePlaceholder')}
                                                 />
                                             <Input
                                                 value={video.url}
                                                 onChange={e => updateNewVideo(index, 'url', e.target.value)}
                                                     className="h-8 text-xs flex-1"
-                                                    placeholder="URL"
+                                                    placeholder={t('videoUrlPlaceholder')}
                                                 />
                                                 <Button
                                                     type="button"
@@ -558,8 +564,8 @@ export function CoreProblemList({ subjectId, coreProblems, selectedId, onSelect 
                                 </div>
                             </div>
                             <DialogFooter>
-                                <Button variant="ghost" className="min-h-11 sm:min-h-10" onClick={() => setIsCreateDialogOpen(false)}>キャンセル</Button>
-                                <Button className="min-h-11 sm:min-h-10" onClick={handleCreate} disabled={!newName.trim()}>作成</Button>
+                                <Button variant="ghost" className="min-h-11 sm:min-h-10" onClick={() => setIsCreateDialogOpen(false)}>{t('cancel')}</Button>
+                                <Button className="min-h-11 sm:min-h-10" onClick={handleCreate} disabled={!newName.trim()}>{t('createButton')}</Button>
                             </DialogFooter>
                         </DialogContent>
                     </Dialog>
@@ -570,19 +576,19 @@ export function CoreProblemList({ subjectId, coreProblems, selectedId, onSelect 
             <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>コア問題を削除しますか？</AlertDialogTitle>
+                        <AlertDialogTitle>{t('deleteDialogTitle')}</AlertDialogTitle>
                         <AlertDialogDescription>
-                            紐づく問題も削除される可能性があります。この操作は取り消せません。
+                            {t('deleteDialogDescription')}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isDeleting}>キャンセル</AlertDialogCancel>
+                        <AlertDialogCancel disabled={isDeleting}>{t('cancel')}</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={handleDeleteConfirm}
                             className="bg-red-500 hover:bg-red-600"
                             disabled={isDeleting}
                         >
-                            削除
+                            {t('deleteButton')}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -592,19 +598,19 @@ export function CoreProblemList({ subjectId, coreProblems, selectedId, onSelect 
             <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>{checkedIds.size}件のコア問題を削除しますか？</AlertDialogTitle>
+                        <AlertDialogTitle>{t('bulkDeleteDialogTitle', { count: checkedIds.size })}</AlertDialogTitle>
                         <AlertDialogDescription>
-                            選択したコア問題と紐づく問題が削除される可能性があります。この操作は取り消せません。
+                            {t('bulkDeleteDialogDescription')}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isDeleting}>キャンセル</AlertDialogCancel>
+                        <AlertDialogCancel disabled={isDeleting}>{t('cancel')}</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={handleBulkDeleteConfirm}
                             className="bg-red-500 hover:bg-red-600"
                             disabled={isDeleting}
                         >
-                            {checkedIds.size}件削除
+                            {t('bulkDeleteButton', { count: checkedIds.size })}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

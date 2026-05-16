@@ -1,26 +1,32 @@
 'use server';
 
 import { Role } from '@prisma/client';
+import { getTranslations } from 'next-intl/server';
 
 import { z } from 'zod';
 
-const signupSchema = z.object({
-    name: z.string().min(1, '名前を入力してください'),
-    role: z.nativeEnum(Role),
-    group: z.string().optional(),
-    classroomId: z.string().optional(),
-}).superRefine((value, ctx) => {
-    const needsClassroom = value.role === 'STUDENT' || value.role === 'TEACHER' || value.role === 'HEAD_TEACHER';
-    if (needsClassroom && !value.classroomId) {
-        ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: 'この役割では所属教室を選択してください',
-            path: ['classroomId'],
-        });
-    }
-});
+type RegisterUserActionsTranslator = Awaited<ReturnType<typeof getTranslations>>;
+
+function buildSignupSchema(t: RegisterUserActionsTranslator) {
+    return z.object({
+        name: z.string().min(1, t('nameRequired')),
+        role: z.nativeEnum(Role),
+        group: z.string().optional(),
+        classroomId: z.string().optional(),
+    }).superRefine((value, ctx) => {
+        const needsClassroom = value.role === 'STUDENT' || value.role === 'TEACHER' || value.role === 'HEAD_TEACHER';
+        if (needsClassroom && !value.classroomId) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: t('classroomRequired'),
+                path: ['classroomId'],
+            });
+        }
+    });
+}
 
 export async function signupAction(_prevState: unknown, formData: FormData) {
+    const t = await getTranslations('AdminRegisterUserActions');
     const rawData = {
         name: formData.get('name') as string,
         role: formData.get('role') as Role,
@@ -28,7 +34,7 @@ export async function signupAction(_prevState: unknown, formData: FormData) {
         classroomId: formData.get('classroomId') as string || undefined,
     };
 
-    const result = signupSchema.safeParse(rawData);
+    const result = buildSignupSchema(t).safeParse(rawData);
 
     if (!result.success) {
         return { error: result.error.errors[0].message };
@@ -53,6 +59,6 @@ export async function signupAction(_prevState: unknown, formData: FormData) {
         return { success: true, loginId: regResult.user.loginId };
     } catch (error) {
         console.error(error);
-        return { error: 'ユーザー作成に失敗しました。もう一度お試しください。' };
+        return { error: t('userCreateFailed') };
     }
 }

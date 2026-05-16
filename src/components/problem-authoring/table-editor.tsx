@@ -1,6 +1,7 @@
 'use client';
 
 import { Plus, Trash2 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,6 +34,7 @@ function normalizeTableData(value: ProblemBodyTableData): ProblemBodyTableData {
 }
 
 export function TableEditor({ value, onChange, disabled }: TableEditorProps) {
+    const t = useTranslations('TableEditor');
     const data = normalizeTableData(value);
     const columnCount = data.headers.length;
     const isEmpty = columnCount === 0;
@@ -85,10 +87,10 @@ export function TableEditor({ value, onChange, disabled }: TableEditorProps) {
     if (isEmpty) {
         return (
             <div className="rounded-md border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
-                <p className="mb-3">表のヘッダーが空です。</p>
+                <p className="mb-3">{t('emptyHeader')}</p>
                 <Button type="button" variant="outline" size="sm" onClick={initializeTable} disabled={disabled}>
                     <Plus className="mr-2 h-4 w-4" />
-                    表を作成
+                    {t('createTable')}
                 </Button>
             </div>
         );
@@ -106,9 +108,9 @@ export function TableEditor({ value, onChange, disabled }: TableEditorProps) {
                                         <Input
                                             value={header}
                                             onChange={(event) => updateHeader(colIndex, event.target.value)}
-                                            placeholder={`列${colIndex + 1}`}
+                                            placeholder={t('columnPlaceholder', { column: colIndex + 1 })}
                                             disabled={disabled}
-                                            aria-label={`ヘッダー${colIndex + 1}`}
+                                            aria-label={t('headerAria', { column: colIndex + 1 })}
                                             data-testid={`table-header-${colIndex}`}
                                         />
                                         <Button
@@ -118,7 +120,7 @@ export function TableEditor({ value, onChange, disabled }: TableEditorProps) {
                                             className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
                                             onClick={() => removeColumn(colIndex)}
                                             disabled={disabled}
-                                            aria-label={`列${colIndex + 1}を削除`}
+                                            aria-label={t('removeColumnAria', { column: colIndex + 1 })}
                                             data-testid={`table-remove-col-${colIndex}`}
                                         >
                                             <Trash2 className="h-4 w-4" />
@@ -133,7 +135,7 @@ export function TableEditor({ value, onChange, disabled }: TableEditorProps) {
                         {data.rows.length === 0 ? (
                             <tr>
                                 <td className="p-3 text-center text-xs text-muted-foreground" colSpan={columnCount + 1}>
-                                    行を追加してください
+                                    {t('emptyRows')}
                                 </td>
                             </tr>
                         ) : (
@@ -144,9 +146,9 @@ export function TableEditor({ value, onChange, disabled }: TableEditorProps) {
                                             <Input
                                                 value={cell}
                                                 onChange={(event) => updateCell(rowIndex, colIndex, event.target.value)}
-                                                placeholder="値"
+                                                placeholder={t('cellPlaceholder')}
                                                 disabled={disabled}
-                                                aria-label={`${rowIndex + 1}行${colIndex + 1}列`}
+                                                aria-label={t('cellAria', { row: rowIndex + 1, column: colIndex + 1 })}
                                                 data-testid={`table-cell-${rowIndex}-${colIndex}`}
                                             />
                                         </td>
@@ -159,7 +161,7 @@ export function TableEditor({ value, onChange, disabled }: TableEditorProps) {
                                             className="h-8 w-8 text-muted-foreground hover:text-destructive"
                                             onClick={() => removeRow(rowIndex)}
                                             disabled={disabled}
-                                            aria-label={`${rowIndex + 1}行目を削除`}
+                                            aria-label={t('removeRowAria', { row: rowIndex + 1 })}
                                             data-testid={`table-remove-row-${rowIndex}`}
                                         >
                                             <Trash2 className="h-4 w-4" />
@@ -182,7 +184,7 @@ export function TableEditor({ value, onChange, disabled }: TableEditorProps) {
                     data-testid="table-add-row"
                 >
                     <Plus className="mr-1 h-4 w-4" />
-                    行を追加
+                    {t('addRow')}
                 </Button>
                 <Button
                     type="button"
@@ -193,11 +195,11 @@ export function TableEditor({ value, onChange, disabled }: TableEditorProps) {
                     data-testid="table-add-col"
                 >
                     <Plus className="mr-1 h-4 w-4" />
-                    列を追加
+                    {t('addColumn')}
                 </Button>
                 <p className="ml-auto text-xs text-muted-foreground">
                     {/* セル中の数式は <code>$x$</code> のように $ で囲って KaTeX が使えます */}
-                    セル内は <code className="rounded bg-muted px-1">$式$</code> で数式が書けます（最大 {MAX_COLS} 列 × {MAX_ROWS} 行）
+                    {t('formulaHelpPrefix')}<code className="rounded bg-muted px-1">{t('formulaExample')}</code>{t('formulaHelpSuffix', { maxCols: MAX_COLS, maxRows: MAX_ROWS })}
                 </p>
             </div>
         </div>

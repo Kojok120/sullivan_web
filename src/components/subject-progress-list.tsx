@@ -15,7 +15,7 @@ type SubjectProgressListProps = {
 export function SubjectProgressList({
     items,
     wrapperClassName = 'space-y-4 sm:space-y-6',
-    emptyMessage = 'まだ学習データがありません',
+    emptyMessage = '',
 }: SubjectProgressListProps) {
     if (items.length === 0) {
         return (

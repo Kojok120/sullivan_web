@@ -2,6 +2,7 @@ import { getSessionDetails } from "@/lib/analytics";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Link from 'next/link';
+import { getTranslations } from "next-intl/server";
 import { ArrowLeft, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VideoPlayerDialog } from "@/components/video-player-dialog";
@@ -33,10 +34,11 @@ export async function SessionDetail({
     isTeacherView = false,
     backUrl = "/"
 }: SessionDetailProps) {
+    const t = await getTranslations('SessionDetail');
     const details = await getSessionDetails(groupId, userId);
 
     if (!details || details.length === 0) {
-        return <div className="text-center py-8 text-muted-foreground">履歴が見つかりません</div>;
+        return <div className="text-center py-8 text-muted-foreground">{t('historyMissing')}</div>;
     }
 
     const currentSession = isTeacherView ? null : await getSession();
@@ -65,7 +67,7 @@ export async function SessionDetail({
     const chatSystemPrompt = fs.readFileSync(chatPromptPath, 'utf-8');
 
     const firstItem = details[0];
-    const subjectName = firstItem.problem.coreProblems[0]?.subject.name || '教科不明';
+    const subjectName = firstItem.problem.coreProblems[0]?.subject.name || t('unknownSubject');
 
     const requiredVideos = details
         .filter(d => (d.evaluation === 'C' || d.evaluation === 'D') && d.problem.videoUrl)
@@ -87,7 +89,7 @@ export async function SessionDetail({
                     </Button>
                 </Link>
                 <div>
-                    <h1 className="text-2xl font-bold">{subjectName} 採点結果</h1>
+                    <h1 className="text-2xl font-bold">{t('resultTitle', { subjectName })}</h1>
                     <p className="text-muted-foreground text-sm"><DateDisplay date={firstItem.answeredAt} showTime /></p>
                 </div>
             </div>
@@ -99,7 +101,7 @@ export async function SessionDetail({
 
                     const coreProblem = item.problem.coreProblems[0];
                     const lectureVideos = (coreProblem?.lectureVideos as { title: string; url: string }[] | null) || [];
-                    const coreProblemName = coreProblem?.name || '単元不明';
+                    const coreProblemName = coreProblem?.name || t('unknownCoreProblem');
                     const displayQuestion = getDisplayQuestionFromStructuredContent(item.problem.publishedRevision?.structuredContent);
                     const correctAnswer = item.problem.publishedRevision?.correctAnswer ?? '';
 
@@ -112,7 +114,7 @@ export async function SessionDetail({
                                             {item.evaluation}
                                         </Badge>
                                         <span className="text-sm font-bold text-muted-foreground">
-                                            {item.problem.customId ? item.problem.customId : `問${index + 1}`}
+                                            {item.problem.customId ? item.problem.customId : t('questionNumber', { number: index + 1 })}
                                         </span>
                                     </div>
                                     <CardTitle className="pt-2">
@@ -150,20 +152,20 @@ export async function SessionDetail({
                             <CardContent className="space-y-4">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm bg-muted/30 p-4 rounded-md">
                                     <div>
-                                        <span className="font-semibold block mb-1">あなたの解答:</span>
+                                        <span className="font-semibold block mb-1">{t('userAnswerLabel')}</span>
                                         <div className="bg-white p-2 rounded border font-handwriting text-lg text-blue-900 min-h-[40px]">
                                             {item.userAnswer}
                                         </div>
                                     </div>
                                     <div>
-                                        <span className="font-semibold block mb-1">正解:</span>
+                                        <span className="font-semibold block mb-1">{t('correctAnswerLabel')}</span>
                                         {correctAnswer ? (
                                             <div className="text-green-700">
                                                 <ProblemTextPreview text={correctAnswer} />
                                             </div>
                                         ) : (
                                             <div className="bg-white p-2 rounded border text-lg min-h-[40px] text-green-700">
-                                                （正答なし）
+                                                {t('noCorrectAnswer')}
                                             </div>
                                         )}
                                     </div>
@@ -172,7 +174,7 @@ export async function SessionDetail({
                                 <div className="bg-blue-50 p-4 rounded-md border border-blue-100">
                                     <h4 className="font-bold text-blue-800 mb-2 flex items-center">
                                         <CheckCircle className="h-4 w-4 mr-2" />
-                                        AIフィードバック
+                                        {t('aiFeedbackTitle')}
                                     </h4>
                                     {item.feedback ? (
                                         <ProblemTextPreview

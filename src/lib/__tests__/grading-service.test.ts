@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
     buildGeminiGradingContents,
+    buildGradingResponseSchema,
     buildProblemContextForGemini,
     buildSubjectSpecificGuidelines,
     validateGradingResponse,
@@ -166,6 +167,15 @@ describe('grading-service helpers', () => {
         ]);
 
         expect(guidelines).toBe('');
+    });
+
+    it('採点レスポンス schema はフィードバック言語を差し替えられる', () => {
+        const schema = buildGradingResponseSchema({
+            feedbackLanguage: 'English',
+            subjectRubricFiles: {},
+        });
+
+        expect(schema.items.properties.feedback.description).toBe('Englishでのフィードバック');
     });
 
     it('confidence が欠けている結果は不正として扱う', () => {

@@ -32,7 +32,7 @@
 
 - problemIndex は 0 から {{maxIndex}} までの整数を使用
 - confidence は 0 から 1 の数値
-- reason は採点理由を日本語で簡潔に記述
-- feedback は必ず日本語で、具体的で励みになる内容にしてください
+- reason は採点理由を{{feedbackLanguage}}で簡潔に記述
+- feedback は必ず{{feedbackLanguage}}で、具体的で励みになる内容にしてください
 - 空欄の場合は studentAnswer に "(空欄)" と記載
 - すべての問題に対して結果を返してください

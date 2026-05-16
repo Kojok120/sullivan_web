@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useGeminiLive } from '@/hooks/use-gemini-live';
 import { CallOverlay } from '@/components/voice/call-overlay';
 import { toast } from 'sonner';
+import { useTranslations } from 'next-intl';
 
 type PhoneTutorButtonProps = {
     targetStudentId: string;
@@ -19,6 +20,7 @@ type PhoneTutorButtonProps = {
 };
 
 export function PhoneTutorButton({ targetStudentId, problemContext, systemPrompt }: PhoneTutorButtonProps) {
+    const t = useTranslations('PhoneTutorButton');
     const { connect, disconnect, connectionState, isTalking, isMicMuted, toggleMic } = useGeminiLive();
     const [isOverlayOpen, setIsOverlayOpen] = useState(false);
 
@@ -32,21 +34,21 @@ export function PhoneTutorButton({ targetStudentId, problemContext, systemPrompt
 ${systemPrompt}
 
 ---
-【生徒が現在解いている問題】
-問題: ${problemContext.question}
-正解: ${problemContext.answer || '（未設定）'}
-生徒の回答: ${problemContext.userAnswer || '（未回答）'}
-解説: ${problemContext.explanation || '（なし）'}
+${t('currentProblemHeading')}
+${t('questionLabel')}: ${problemContext.question}
+${t('answerLabel')}: ${problemContext.answer || t('unset')}
+${t('userAnswerLabel')}: ${problemContext.userAnswer || t('unanswered')}
+${t('explanationLabel')}: ${problemContext.explanation || t('none')}
 
-家庭教師として、生徒の質問に答えてください。
-話すスピードは通常より少し速め（目安1.1倍）で、テンポよく話してください。
-まずは「あなたのわからないところを教えて」と優しく問いかけてください。
+${t('instructionAnswer')}
+${t('instructionSpeed')}
+${t('instructionFirst')}
 `;
 
         setIsOverlayOpen(true);
         void connect(initialContext, targetStudentId).catch((error) => {
             console.error('[PhoneTutorButton] Failed to connect:', error);
-            toast.error('通話の開始に失敗しました');
+            toast.error(t('callStartFailed'));
             setIsOverlayOpen(false);
         });
     };
@@ -63,7 +65,8 @@ ${systemPrompt}
                 size="icon"
                 className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 relative group"
                 onClick={handleStartCall}
-                title="AI先生に電話する"
+                aria-label={t('title')}
+                title={t('title')}
             >
                 <div className="absolute -top-1 -right-1 flex h-3 w-3">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>

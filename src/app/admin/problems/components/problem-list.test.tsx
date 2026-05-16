@@ -1,6 +1,9 @@
+import type { ReactNode } from 'react';
 import { render, screen } from '@testing-library/react';
+import { NextIntlClientProvider } from 'next-intl';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import jaMessages from '@/messages/ja.json';
 import { ProblemList } from './problem-list';
 import type { ProblemWithRelations } from '../types';
 
@@ -25,6 +28,14 @@ vi.mock('sonner', () => ({
         error: vi.fn(),
     },
 }));
+
+function renderWithIntl(ui: ReactNode) {
+    return render(
+        <NextIntlClientProvider locale="ja" messages={jaMessages}>
+            {ui}
+        </NextIntlClientProvider>,
+    );
+}
 
 describe('ProblemList', () => {
     const problems = [
@@ -52,7 +63,7 @@ describe('ProblemList', () => {
     });
 
     it('showMasterNumber=true のときはマスタNo列とモバイルNoを表示する', () => {
-        render(
+        renderWithIntl(
             <ProblemList
                 problems={problems}
                 onEdit={vi.fn()}
@@ -68,7 +79,7 @@ describe('ProblemList', () => {
     });
 
     it('showMasterNumber=false のときはマスタNo列とモバイルNoを表示しない', () => {
-        render(
+        renderWithIntl(
             <ProblemList
                 problems={problems}
                 onEdit={vi.fn()}

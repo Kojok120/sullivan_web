@@ -1,1 +1,1 @@
-export const DEFAULT_INITIAL_PASSWORD = 'password123';
+export * from '@sullivan/user-platform/auth-constants';

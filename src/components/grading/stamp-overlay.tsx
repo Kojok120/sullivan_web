@@ -7,12 +7,14 @@ import { getStampData, markStampsAsSeen } from '@/app/actions/stamp';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
 import { triggerCelebrationConfetti } from '@/lib/confetti';
+import { useTranslations } from 'next-intl';
 
 type StampOverlayProps = {
     initialData?: { total: number; newCount: number } | null;
 };
 
 export function StampOverlay({ initialData }: StampOverlayProps) {
+    const t = useTranslations('StampOverlay');
     const [isOpen, setIsOpen] = useState(() => Boolean(initialData));
     const [data, setData] = useState<{ total: number, newCount: number } | null>(() => initialData ?? null);
 
@@ -77,6 +79,8 @@ export function StampOverlay({ initialData }: StampOverlayProps) {
                                 size="icon"
                                 className="absolute -top-12 right-0 text-white hover:bg-white/20"
                                 onClick={handleClose}
+                                aria-label={t('close')}
+                                title={t('close')}
                             >
                                 <X className="h-6 w-6" />
                             </Button>
@@ -88,7 +92,7 @@ export function StampOverlay({ initialData }: StampOverlayProps) {
                                     transition={{ type: "spring", stiffness: 200, delay: 0.2 }}
                                     className="text-4xl font-extrabold text-white drop-shadow-md"
                                 >
-                                    提出えらい！
+                                    {t('title')}
                                 </motion.h2>
                                 <motion.p
                                     initial={{ opacity: 0 }}
@@ -96,7 +100,7 @@ export function StampOverlay({ initialData }: StampOverlayProps) {
                                     transition={{ delay: 0.5 }}
                                     className="text-xl text-yellow-300 mt-2 font-bold"
                                 >
-                                    スタンプ {data.newCount}個 GET!!
+                                    {t('stampGained', { count: data.newCount })}
                                 </motion.p>
                             </div>
 
@@ -109,7 +113,7 @@ export function StampOverlay({ initialData }: StampOverlayProps) {
                                 className="mt-8 flex justify-center"
                             >
                                 <Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-8 transform transition active:scale-95" onClick={handleClose}>
-                                    あつめる！
+                                    {t('collect')}
                                 </Button>
                             </motion.div>
                         </div>

@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
+import { NextIntlClientProvider } from "next-intl";
 import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from "react";
+import jaMessages from "@/messages/ja.json";
 import { FullScreenVideoPlayer } from "../full-screen-video-player";
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -62,6 +64,14 @@ vi.mock("@/components/ui/dialog", () => ({
     DialogDescription: ({ children, ...props }: DivProps) => <div {...props}>{children}</div>,
 }));
 
+function renderWithIntl(ui: ReactNode) {
+    return render(
+        <NextIntlClientProvider locale="ja" messages={jaMessages}>
+            {ui}
+        </NextIntlClientProvider>
+    );
+}
+
 describe("FullScreenVideoPlayer", () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -86,7 +96,7 @@ describe("FullScreenVideoPlayer", () => {
     });
 
     it("YouTube動画では読み取り専用の進捗バーと時間表示を出す", () => {
-        render(
+        renderWithIntl(
             <FullScreenVideoPlayer
                 isOpen
                 onClose={vi.fn()}
@@ -126,7 +136,7 @@ describe("FullScreenVideoPlayer", () => {
             markPlaybackCompleted: vi.fn(),
         });
 
-        render(
+        renderWithIntl(
             <FullScreenVideoPlayer
                 isOpen
                 onClose={vi.fn()}
@@ -143,7 +153,7 @@ describe("FullScreenVideoPlayer", () => {
     });
 
     it("YouTube以外の動画では進捗バーと速度変更を表示しない", () => {
-        render(
+        renderWithIntl(
             <FullScreenVideoPlayer
                 isOpen
                 onClose={vi.fn()}
@@ -158,7 +168,7 @@ describe("FullScreenVideoPlayer", () => {
     });
 
     it("追跡必須の非YouTube動画では案内メッセージを表示する", () => {
-        render(
+        renderWithIntl(
             <FullScreenVideoPlayer
                 isOpen
                 onClose={vi.fn()}

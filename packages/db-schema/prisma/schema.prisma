@@ -6,9 +6,26 @@ datasource db {
   provider = "postgresql"
 }
 
+model ContentPack {
+  id           String        @id
+  name         String
+  productId    String        @default("jp")
+  locale       String        @default("ja-JP")
+  curriculum   Json          @default("{}")
+  subjects     Subject[]
+  classrooms   Classroom[]
+  achievements Achievement[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([productId])
+}
+
 model Subject {
   id           String        @id @default(cuid())
-  name         String        @unique
+  packId       String
+  pack         ContentPack   @relation(fields: [packId], references: [id])
+  name         String
   icon         String?
   order        Int
   coreProblems CoreProblem[]
@@ -16,6 +33,9 @@ model Subject {
   studentGoals StudentGoal[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
+
+  @@unique([packId, name])
+  @@index([packId])
 }
 
 model CoreProblem {
@@ -289,12 +309,17 @@ model StudentGoalMilestone {
 
 model Classroom {
   id        String        @id @default(cuid())
-  name      String        @unique
+  packId    String
+  pack      ContentPack   @relation(fields: [packId], references: [id])
+  name      String
   plan      ClassroomPlan @default(STANDARD)
   groups    String[]      @default([]) // 教室内のグループ（曜日など）
   users     User[]
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
+
+  @@unique([packId, name])
+  @@index([packId])
 }
 
 enum GuidanceType {
@@ -404,17 +429,22 @@ model UserCoreProblemState {
 }
 
 model Achievement {
-  id          String  @id @default(cuid())
-  slug        String  @unique // e.g., "streak-7"
+  id          String      @id @default(cuid())
+  packId      String
+  pack        ContentPack @relation(fields: [packId], references: [id])
+  slug        String // e.g., "streak-7"
   name        String
   description String
   icon        String
-  xpReward    Int     @default(0)
-  isHidden    Boolean @default(false)
+  xpReward    Int         @default(0)
+  isHidden    Boolean     @default(false)
 
   users     UserAchievement[]
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
+
+  @@unique([packId, slug])
+  @@index([packId])
 }
 
 model UserAchievement {

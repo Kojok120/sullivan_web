@@ -7,27 +7,37 @@ FROM ${WORKER_BASE_IMAGE} AS base
 # ここでは --omit=dev せず full install で行う。後段で prune して prod 依存だけに絞る。
 FROM base AS deps
 WORKDIR /app
-COPY package.json package-lock.json ./
-COPY prisma ./prisma
-RUN npm ci
+RUN npm install -g pnpm@10.11.0
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml prisma.config.ts ./
+COPY packages/ai-clients/package.json ./packages/ai-clients/package.json
+COPY packages/config/package.json ./packages/config/package.json
+COPY packages/content-schema/package.json ./packages/content-schema/package.json
+COPY packages/core-engine/package.json ./packages/core-engine/package.json
+COPY packages/db-schema/package.json ./packages/db-schema/package.json
+COPY packages/db-schema/prisma ./packages/db-schema/prisma
+COPY packages/ui-kit/package.json ./packages/ui-kit/package.json
+COPY packages/user-platform/package.json ./packages/user-platform/package.json
+RUN pnpm install --frozen-lockfile
 
 # esbuild で worker/server.ts を dist/worker.js に bundle する。
 # 依存は packages=external のままなので、runner の node_modules で解決する。
 FROM base AS builder
 WORKDIR /app
+RUN npm install -g pnpm@10.11.0
 COPY --from=deps /app/node_modules ./node_modules
-COPY package.json package-lock.json tsconfig.json ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json tsconfig.base.json ./
+COPY packages ./packages
 COPY scripts/build-server.mjs ./scripts/build-server.mjs
 COPY worker ./worker
 COPY src ./src
 RUN node scripts/build-server.mjs worker
 
 # devDependencies を削ぎ落とした production node_modules を作る。
-# `npm prune --omit=dev` は postinstall を再実行しないため、
+# `pnpm prune --prod` は postinstall を再実行しないため、
 # deps stage で生成済みの Prisma client (node_modules/.prisma, @prisma/client) は維持される。
 FROM deps AS prod-deps
 WORKDIR /app
-RUN npm prune --omit=dev
+RUN pnpm prune --prod
 
 FROM base AS runner
 WORKDIR /app

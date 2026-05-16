@@ -1,8 +1,19 @@
+import type { ReactNode } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { NextIntlClientProvider } from 'next-intl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import jaMessages from '@/messages/ja.json';
 import { RankingPageClient } from '@/components/ranking/ranking-page-client';
 import type { RankingResponse } from '@/lib/types/ranking';
+
+function renderWithIntl(ui: ReactNode) {
+    return render(
+        <NextIntlClientProvider locale="ja" messages={jaMessages}>
+            {ui}
+        </NextIntlClientProvider>
+    );
+}
 
 function createPayload(overrides?: Partial<RankingResponse>): RankingResponse {
     return {
@@ -70,7 +81,7 @@ describe('RankingPageClient', () => {
             }),
         ));
 
-        render(
+        renderWithIntl(
             <RankingPageClient
                 apiPath="/api/rankings"
                 heading="教室ランキング"
@@ -120,7 +131,7 @@ describe('RankingPageClient', () => {
         });
         vi.stubGlobal('fetch', fetchMock);
 
-        render(
+        renderWithIntl(
             <RankingPageClient
                 apiPath="/api/rankings"
                 heading="教室ランキング"
@@ -148,7 +159,7 @@ describe('RankingPageClient', () => {
         );
         vi.stubGlobal('fetch', fetchMock);
 
-        render(
+        renderWithIntl(
             <RankingPageClient
                 apiPath="/api/rankings"
                 heading="教室ランキング"
@@ -194,7 +205,7 @@ describe('RankingPageClient', () => {
         });
         vi.stubGlobal('fetch', fetchMock);
 
-        render(
+        renderWithIntl(
             <RankingPageClient
                 apiPath="/api/rankings"
                 heading="教室ランキング"

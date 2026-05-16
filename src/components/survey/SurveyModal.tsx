@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { fetchSurveyQuestions, submitSurvey } from '@/actions/survey';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 
 type Question = {
     id: string;
@@ -16,6 +17,7 @@ interface SurveyModalProps {
 }
 
 export function SurveyModal({ userId, onComplete }: SurveyModalProps) {
+    const t = useTranslations('SurveyModal');
     const [questions, setQuestions] = useState<Question[]>([]);
     const [answers, setAnswers] = useState<Record<string, number>>({});
     const [loading, setLoading] = useState(true);
@@ -53,7 +55,7 @@ export function SurveyModal({ userId, onComplete }: SurveyModalProps) {
             router.refresh(); // Refresh to update server components if needed
         } catch (error) {
             console.error('Failed to submit survey', error);
-            alert('送信に失敗しました。もう一度お試しください。');
+            alert(t('submitFailed'));
         } finally {
             setSubmitting(false);
         }
@@ -68,10 +70,10 @@ export function SurveyModal({ userId, onComplete }: SurveyModalProps) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 overflow-y-auto">
             <div className="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] flex flex-col">
                 <div className="p-6 border-b border">
-                    <h2 className="text-xl font-bold text-foreground">定期振り返りアンケート</h2>
+                    <h2 className="text-xl font-bold text-foreground">{t('title')}</h2>
                     <p className="mt-2 text-sm text-muted-foreground">
-                        日頃の学習についての振り返りをお願いします。<br />
-                        直感で「とてもあてはまる（5）」〜「まったくあてはまらない（1）」を選んでください。
+                        {t('descriptionLine1')}<br />
+                        {t('descriptionLine2')}
                     </p>
                 </div>
 
@@ -100,8 +102,8 @@ export function SurveyModal({ userId, onComplete }: SurveyModalProps) {
                                 ))}
                             </div>
                             <div className="flex justify-between text-xs text-muted-foreground px-2 sm:w-[300px]">
-                                <span>まったく<br />あてはまらない</span>
-                                <span className="text-right">とても<br />あてはまる</span>
+                                <span>{t('scaleMinLine1')}<br />{t('scaleMinLine2')}</span>
+                                <span className="text-right">{t('scaleMaxLine1')}<br />{t('scaleMaxLine2')}</span>
                             </div>
                         </div>
                     ))}
@@ -116,11 +118,11 @@ export function SurveyModal({ userId, onComplete }: SurveyModalProps) {
                                 ? 'bg-primary hover:bg-primary/90'
                                 : 'bg-muted-foreground cursor-not-allowed'}`}
                     >
-                        {submitting ? '送信中...' : '回答を送信して結果を見る'}
+                        {submitting ? t('submitting') : t('submit')}
                     </button>
                     {!isComplete && (
                         <p className="text-xs text-red-500 mt-2 absolute left-6 bottom-8">
-                            ※ すべての質問に回答してください
+                            {t('incompleteNotice')}
                         </p>
                     )}
                 </div>

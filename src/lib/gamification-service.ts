@@ -6,30 +6,33 @@ export const XP_PER_ANSWER = 10;
 export const XP_BONUS_CORRECT = 5;
 
 // Achievement マスタは seed 由来の静的データなので、採点ごとに findMany を打たず
-// プロセス常駐の TTL キャッシュで共有する。
+// プロセス常駐の TTL キャッシュで共有する。packId 毎にキャッシュを分離する。
 const ACHIEVEMENTS_CACHE_TTL_MS = 5 * 60 * 1000;
-let cachedAchievements: { promise: Promise<Achievement[]>; expiresAt: number } | null = null;
+const cachedAchievementsByPack = new Map<string, { promise: Promise<Achievement[]>; expiresAt: number }>();
 
-function getCachedAchievements(): Promise<Achievement[]> {
+function getCachedAchievements(packId: string = 'jp-juken'): Promise<Achievement[]> {
     const now = Date.now();
-    if (!cachedAchievements || cachedAchievements.expiresAt <= now) {
-        const promise = prisma.achievement.findMany();
+    const cached = cachedAchievementsByPack.get(packId);
+    if (!cached || cached.expiresAt <= now) {
+        const promise = prisma.achievement.findMany({ where: { packId } });
         // 取得失敗時はキャッシュを汚さない
         promise.catch(() => {
-            if (cachedAchievements && cachedAchievements.promise === promise) {
-                cachedAchievements = null;
+            const current = cachedAchievementsByPack.get(packId);
+            if (current && current.promise === promise) {
+                cachedAchievementsByPack.delete(packId);
             }
         });
-        cachedAchievements = {
+        cachedAchievementsByPack.set(packId, {
             promise,
             expiresAt: now + ACHIEVEMENTS_CACHE_TTL_MS,
-        };
+        });
+        return promise;
     }
-    return cachedAchievements.promise;
+    return cached.promise;
 }
 
 export function invalidateAchievementsCache() {
-    cachedAchievements = null;
+    cachedAchievementsByPack.clear();
 }
 
 // Level calculation constant

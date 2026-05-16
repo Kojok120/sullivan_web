@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { Prisma } from '@prisma/client';
+import { getTranslations } from 'next-intl/server';
 
 import { requireProblemAuthor, getSession } from '@/lib/auth';
 import type { LectureVideo } from '@/lib/lecture-videos';
@@ -14,15 +15,16 @@ function revalidateCurriculumPaths() {
 
 // --- Subjects ---
 export async function getSubjects() {
-    await requireProblemAuthor();
+    const session = await requireProblemAuthor();
+    const t = await getTranslations('AdminCurriculumActions');
     try {
         const { fetchSubjects } = await import('@/lib/curriculum-service');
         // Updated fetchSubjects should handle includeCoreProblems correctly without Units
-        const subjects = await fetchSubjects({ includeCoreProblems: true });
+        const subjects = await fetchSubjects({ includeCoreProblems: true, packId: session.defaultPackId });
         return { success: true, subjects };
     } catch (error) {
         console.error('Failed to fetch subjects:', error);
-        return { error: '科目の取得に失敗しました' };
+        return { error: t('subjectsLoadFailed') };
     }
 }
 
@@ -59,7 +61,9 @@ function areLectureVideosEqual(a: LectureVideo[], b: LectureVideo[]): boolean {
     });
 }
 
-function extractUniqueConstraintMessage(error: unknown): string | null {
+type CurriculumActionsTranslator = Awaited<ReturnType<typeof getTranslations>>;
+
+function extractUniqueConstraintMessage(error: unknown, t: CurriculumActionsTranslator): string | null {
     if (!(error instanceof Prisma.PrismaClientKnownRequestError)) {
         return null;
     }
@@ -68,9 +72,9 @@ function extractUniqueConstraintMessage(error: unknown): string | null {
     }
     const target = Array.isArray(error.meta?.target) ? error.meta?.target.join(',') : String(error.meta?.target || '');
     if (target.includes('subjectId') && target.includes('masterNumber')) {
-        return '同じ教科でマスタNoが重複しています';
+        return t('duplicateMasterNumber');
     }
-    return '一意制約に違反しています';
+    return t('uniqueConstraint');
 }
 
 const CORE_PROBLEM_RESEQUENCE_OFFSET = 1_000_000;
@@ -163,8 +167,9 @@ async function resequenceCoreProblemsForSubject(subjectId: string) {
 
 export async function getCoreProblemsForSubject(subjectId: string) {
     const session = await getSession();
+    const t = await getTranslations('AdminCurriculumActions');
     if (!session || (session.role !== 'TEACHER' && session.role !== 'HEAD_TEACHER' && session.role !== 'ADMIN')) {
-        return { error: 'Unauthorized' };
+        return { error: t('unauthorized') };
     }
 
     try {
@@ -176,7 +181,7 @@ export async function getCoreProblemsForSubject(subjectId: string) {
         return { success: true, coreProblems };
     } catch (error) {
         console.error('Failed to get core problems', error);
-        return { error: 'Failed to fetch core problems' };
+        return { error: t('coreProblemsLoadFailed') };
     }
 }
 
@@ -188,6 +193,7 @@ export async function createCoreProblem(data: {
     lectureVideos?: LectureVideo[];
 }) {
     await requireProblemAuthor();
+    const t = await getTranslations('AdminCurriculumActions');
     try {
         const coreProblem = await prisma.$transaction(async (tx) => {
             const lastCoreProblem = await tx.coreProblem.findFirst({
@@ -214,23 +220,24 @@ export async function createCoreProblem(data: {
         return { success: true, coreProblem };
     } catch (error) {
         console.error('Failed to create core problem:', error);
-        const uniqueMessage = extractUniqueConstraintMessage(error);
+        const uniqueMessage = extractUniqueConstraintMessage(error, t);
         if (uniqueMessage) {
             return { error: uniqueMessage };
         }
-        return { error: 'CoreProblemの作成に失敗しました' };
+        return { error: t('coreProblemCreateFailed') };
     }
 }
 
 export async function updateCoreProblem(id: string, data: { name?: string; masterNumber?: number; order?: number; lectureVideos?: LectureVideo[] }) {
     await requireProblemAuthor();
+    const t = await getTranslations('AdminCurriculumActions');
     try {
         const existing = await prisma.coreProblem.findUnique({
             where: { id },
             select: { subjectId: true },
         });
         if (!existing) {
-            return { error: 'CoreProblemが見つかりません' };
+            return { error: t('coreProblemNotFound') };
         }
 
         const updateData: Prisma.CoreProblemUpdateInput = {};
@@ -261,11 +268,11 @@ export async function updateCoreProblem(id: string, data: { name?: string; maste
         return { success: true, coreProblem };
     } catch (error) {
         console.error('Failed to update core problem:', error);
-        const uniqueMessage = extractUniqueConstraintMessage(error);
+        const uniqueMessage = extractUniqueConstraintMessage(error, t);
         if (uniqueMessage) {
             return { error: uniqueMessage };
         }
-        return { error: 'CoreProblemの更新に失敗しました' };
+        return { error: t('coreProblemUpdateFailed') };
     }
 }
 
@@ -275,6 +282,7 @@ export async function searchCoreProblemsForBulkUpsert(
     names: string[]
 ) {
     await requireProblemAuthor();
+    const t = await getTranslations('AdminCurriculumActions');
     try {
         if (masterNumbers.length === 0 && names.length === 0) {
             return { success: true, coreProblems: [] };
@@ -306,19 +314,20 @@ export async function searchCoreProblemsForBulkUpsert(
         return { success: true, coreProblems };
     } catch (error) {
         console.error('Failed to search core problems for bulk upsert:', error);
-        return { error: '既存CoreProblemの検索に失敗しました' };
+        return { error: t('coreProblemSearchFailed') };
     }
 }
 
 export async function deleteCoreProblem(id: string) {
     await requireProblemAuthor();
+    const t = await getTranslations('AdminCurriculumActions');
     try {
         const target = await prisma.coreProblem.findUnique({
             where: { id },
             select: { subjectId: true },
         });
         if (!target) {
-            return { error: 'CoreProblemが見つかりません' };
+            return { error: t('coreProblemNotFound') };
         }
 
         await prisma.$transaction(async (tx) => {
@@ -330,12 +339,13 @@ export async function deleteCoreProblem(id: string) {
         return { success: true };
     } catch (error) {
         console.error('Failed to delete core problem:', error);
-        return { error: 'CoreProblemの削除に失敗しました' };
+        return { error: t('coreProblemDeleteFailed') };
     }
 }
 
 export async function bulkDeleteCoreProblems(ids: string[]) {
     await requireProblemAuthor();
+    const t = await getTranslations('AdminCurriculumActions');
     try {
         if (ids.length === 0) return { success: true, count: 0 };
 
@@ -357,7 +367,7 @@ export async function bulkDeleteCoreProblems(ids: string[]) {
         return { success: true, count: result.count };
     } catch (error) {
         console.error('Failed to bulk delete core problems:', error);
-        return { error: 'コア問題の一括削除に失敗しました' };
+        return { error: t('coreProblemBulkDeleteFailed') };
     }
 }
 
@@ -367,6 +377,7 @@ export async function bulkCreateCoreProblems(subjectId: string, items: {
     lectureVideos?: LectureVideo[];
 }[]) {
     await requireProblemAuthor();
+    const t = await getTranslations('AdminCurriculumActions');
     try {
         const warnings: string[] = [];
         let skippedCount = 0;
@@ -381,11 +392,11 @@ export async function bulkCreateCoreProblems(subjectId: string, items: {
             let skipReason: string | null = null;
 
             if (!Number.isInteger(item.masterNumber) || item.masterNumber <= 0) {
-                skipReason = `行${index + 1}: マスタNoは1以上の整数で指定してください`;
+                skipReason = t('invalidMasterNumberRow', { row: index + 1 });
             } else if (!normalizedName) {
-                skipReason = `行${index + 1}: CoreProblem名は必須です`;
+                skipReason = t('coreProblemNameRequiredRow', { row: index + 1 });
             } else if (seenMasterNumbers.has(item.masterNumber)) {
-                skipReason = `行${index + 1}: 同一TSV内でマスタNo ${item.masterNumber} が重複しています`;
+                skipReason = t('duplicateMasterNumberRow', { row: index + 1, masterNumber: item.masterNumber });
             }
 
             if (!skipReason) {
@@ -454,10 +465,10 @@ export async function bulkCreateCoreProblems(subjectId: string, items: {
                 const byNameCandidates = (existingByName.get(item.name) || []).filter((cp) => !usedExistingIds.has(cp.id));
                 if (byNameCandidates.length === 1) {
                     target = byNameCandidates[0];
-                    warnings.push(`行${item.index + 1}: 同名既存CoreProblemにマスタNo ${item.masterNumber} を割り当てて更新しました`);
+                    warnings.push(t('assignedMasterNumberRow', { row: item.index + 1, masterNumber: item.masterNumber }));
                 } else if (byNameCandidates.length > 1) {
                     skippedCount += 1;
-                    warnings.push(`行${item.index + 1}: 同名候補が複数のため更新先を特定できずスキップしました`);
+                    warnings.push(t('ambiguousNameRow', { row: item.index + 1 }));
                     continue;
                 }
             }
@@ -527,16 +538,17 @@ export async function bulkCreateCoreProblems(subjectId: string, items: {
         };
     } catch (error) {
         console.error('Failed to bulk upsert core problems:', error);
-        const uniqueMessage = extractUniqueConstraintMessage(error);
+        const uniqueMessage = extractUniqueConstraintMessage(error, t);
         if (uniqueMessage) {
             return { error: uniqueMessage };
         }
-        return { error: '一括登録に失敗しました' };
+        return { error: t('bulkImportFailed') };
     }
 }
 
 export async function reorderCoreProblems(items: { id: string, order: number }[]) {
     await requireProblemAuthor();
+    const t = await getTranslations('AdminCurriculumActions');
     try {
         if (items.length === 0) {
             return { success: true };
@@ -548,7 +560,7 @@ export async function reorderCoreProblems(items: { id: string, order: number }[]
         });
         const subjectIds = Array.from(new Set(targets.map((target) => target.subjectId)));
         if (subjectIds.length !== 1) {
-            return { error: '同一教科のCoreProblemのみ並び替えできます' };
+            return { error: t('sameSubjectOnly') };
         }
         const subjectId = subjectIds[0];
 
@@ -561,13 +573,14 @@ export async function reorderCoreProblems(items: { id: string, order: number }[]
         return { success: true };
     } catch (error) {
         console.error('Failed to reorder core problems:', error);
-        return { error: 'CoreProblemの並び替えに失敗しました' };
+        return { error: t('coreProblemReorderFailed') };
     }
 }
 
 // --- Problems ---
 export async function getProblemsByCoreProblem(coreProblemId: string) {
     await requireProblemAuthor();
+    const t = await getTranslations('AdminCurriculumActions');
     try {
         // Problem と CoreProblem は多対多のため、指定 CoreProblem に紐づく問題を取得する。
         const problems = await prisma.problem.findMany({
@@ -615,7 +628,7 @@ export async function getProblemsByCoreProblem(coreProblemId: string) {
         });
         return { success: true, problems };
     } catch (error) {
-        console.error('問題の取得に失敗しました', error);
-        return { success: false, error: '問題の取得に失敗しました' };
+        console.error('Failed to fetch problems by core problem:', error);
+        return { success: false, error: t('problemsLoadFailed') };
     }
 }

@@ -1,4 +1,5 @@
 import { notFound, redirect } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { getProblemSubjects, getProblems } from '@/app/admin/problems/actions';
 import { ProblemManager } from '@/app/admin/problems/problem-manager';
 import { buildProblemListUiPolicy, normalizeProblemSortBy } from '@/app/admin/problems/problem-list-policy';
@@ -11,6 +12,7 @@ export default async function MaterialsProblemsPage({
 }: {
     searchParams: Promise<{ page?: string; q?: string; grade?: string; coreProblemId?: string; subjectId?: string; sortBy?: string; sortOrder?: string; videoStatus?: string; problemType?: string; status?: string }>;
 }) {
+    const t = await getTranslations('MaterialsProblemsPage');
     const params = await searchParams;
     const page = Number(params.page) || 1;
     const query = params.q || '';
@@ -54,6 +56,9 @@ export default async function MaterialsProblemsPage({
         redirect(`/materials/problems?${nextParams.toString()}`);
     }
 
+    const policy = buildProblemListUiPolicy(currentSubject, 'author');
+    const normalizedSortBy = normalizeProblemSortBy(sortBy, currentSubject.name);
+
     const result = await getProblems(
         page,
         20,
@@ -66,20 +71,20 @@ export default async function MaterialsProblemsPage({
             problemType: params.problemType,
             status: isProblemStatusValue(params.status) ? params.status : undefined,
         },
-        normalizeProblemSortBy(sortBy, currentSubject.name),
+        normalizedSortBy,
         sortOrder,
     );
 
     if (!result || 'error' in result) {
-        return <div className="p-8 text-red-500">{result?.error || 'Unknown error'}</div>;
+        return <div className="p-8 text-red-500">{result?.error || t('unknownError')}</div>;
     }
 
     return (
         <div className="container mx-auto px-4 py-6 sm:py-8">
             <div className="mb-6">
-                <h1 className="text-2xl font-bold">{`問題一覧 - ${currentSubject.name}`}</h1>
+                <h1 className="text-2xl font-bold">{t('title', { subjectName: currentSubject.name })}</h1>
                 <p className="mt-1 text-sm text-muted-foreground">
-                    問題の作成、修正、プレビューを行います。
+                    {t('description')}
                 </p>
             </div>
             <ProblemManager
@@ -87,16 +92,16 @@ export default async function MaterialsProblemsPage({
                 totalCount={result.total || 0}
                 currentPage={page}
                 initialQuery={query}
-                sortBy={normalizeProblemSortBy(sortBy, currentSubject.name)}
+                sortBy={normalizedSortBy}
                 sortOrder={sortOrder}
                 subjects={subjects}
                 currentSubject={currentSubject}
                 routeBase="/materials/problems"
                 viewMode="author"
-                showMasterNumber={buildProblemListUiPolicy(currentSubject, 'author').showMasterNumber}
-                showBulkImport={buildProblemListUiPolicy(currentSubject, 'author').showBulkImport}
-                bulkImportLabel={buildProblemListUiPolicy(currentSubject, 'author').bulkImportLabel}
-                bulkImportConfig={buildProblemListUiPolicy(currentSubject, 'author').bulkImportConfig}
+                showMasterNumber={policy.showMasterNumber}
+                showBulkImport={policy.showBulkImport}
+                bulkImportLabelKey={policy.bulkImportLabelKey}
+                bulkImportConfig={policy.bulkImportConfig}
             />
         </div>
     );

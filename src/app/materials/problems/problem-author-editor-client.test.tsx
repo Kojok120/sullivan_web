@@ -1,6 +1,9 @@
+import type { ReactNode } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { NextIntlClientProvider } from 'next-intl';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import jaMessages from '@/messages/ja.json';
 import { ProblemAuthorEditorClient } from './problem-author-editor-client';
 
 const { pushMock, refreshMock } = vi.hoisted(() => ({
@@ -79,13 +82,21 @@ const mathProblem = {
     coreProblems: [{ id: 'core-1', name: '一次方程式', subjectId: 'subject-math', subject: { name: '数学' } }],
 } as const;
 
+function renderWithIntl(ui: ReactNode) {
+    return render(
+        <NextIntlClientProvider locale="ja" messages={jaMessages}>
+            {ui}
+        </NextIntlClientProvider>,
+    );
+}
+
 describe('ProblemAuthorEditorClient', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
     it('教材側の問題作成画面にマスタNo入力欄を表示しない', () => {
-        render(
+        renderWithIntl(
             <ProblemAuthorEditorClient
                 problem={null}
                 subjects={[{ id: 'subject-1', name: '英語' }]}
@@ -99,7 +110,7 @@ describe('ProblemAuthorEditorClient', () => {
     });
 
     it('問題文タブで preview 系 UI を表示しない', () => {
-        render(
+        renderWithIntl(
             <ProblemAuthorEditorClient
                 problem={baseProblem as never}
                 subjects={[{ id: 'subject-1', name: '英語' }]}
@@ -118,7 +129,7 @@ describe('ProblemAuthorEditorClient', () => {
     });
 
     it('英語では本文確認と図・画像UIを表示しない', () => {
-        render(
+        renderWithIntl(
             <ProblemAuthorEditorClient
                 problem={baseProblem as never}
                 subjects={[{ id: 'subject-1', name: '英語' }]}
@@ -134,7 +145,7 @@ describe('ProblemAuthorEditorClient', () => {
     });
 
     it('数学では本文確認を右配置で表示する', () => {
-        render(
+        renderWithIntl(
             <ProblemAuthorEditorClient
                 problem={mathProblem as never}
                 subjects={[{ id: 'subject-math', name: '数学' }]}
@@ -151,7 +162,7 @@ describe('ProblemAuthorEditorClient', () => {
     });
 
     it('採点タブを表示せず、正解と別解だけを扱う', () => {
-        render(
+        renderWithIntl(
             <ProblemAuthorEditorClient
                 problem={baseProblem as never}
                 subjects={[{ id: 'subject-1', name: '英語' }]}
