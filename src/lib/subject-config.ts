@@ -1,6 +1,12 @@
 /**
  * 教科名に対する設定（色、ラベル、頭文字など）を一元管理する共通モジュール
+ *
+ * Phase 2 以降は jp-juken ContentPack の subjects 定義を一次ソースとし、
+ * subject 名（DB の Subject.name）から SubjectConfig を解決する。
+ * pack に無い名前（旧データ、社会など）は DEFAULT_CONFIG にフォールバックする。
  */
+
+import { jpJukenPack } from '../../content/jp-juken/pack';
 
 export type SubjectConfig = {
     letter: string;      // 頭文字: 'E', 'M', 'S', 'N'
@@ -10,48 +16,23 @@ export type SubjectConfig = {
     fullName: string;    // 英語名: 'English'
 };
 
-const SUBJECT_CONFIGS: { pattern: string; config: SubjectConfig }[] = [
-    {
-        pattern: '英語',
-        config: {
-            letter: 'E',
-            bgColor: 'bg-orange-500',
-            hoverColor: 'hover:bg-orange-600',
-            label: '英語',
-            fullName: 'English',
-        },
+const FULL_NAME_MAP: Record<string, string> = {
+    eng: 'English',
+    math: 'Math',
+    sci: 'Science',
+    jpn: 'Japanese',
+};
+
+const SUBJECT_CONFIGS: { pattern: string; config: SubjectConfig }[] = jpJukenPack.subjects.map((subject) => ({
+    pattern: subject.name,
+    config: {
+        letter: subject.letter,
+        bgColor: subject.bgColor,
+        hoverColor: subject.hoverColor,
+        label: subject.localizedName?.['ja-JP'] ?? subject.name,
+        fullName: FULL_NAME_MAP[subject.id] ?? subject.name,
     },
-    {
-        pattern: '数学',
-        config: {
-            letter: 'M',
-            bgColor: 'bg-blue-500',
-            hoverColor: 'hover:bg-blue-600',
-            label: '数学',
-            fullName: 'Math',
-        },
-    },
-    {
-        pattern: '理科',
-        config: {
-            letter: 'S',
-            bgColor: 'bg-cyan-500',
-            hoverColor: 'hover:bg-cyan-600',
-            label: '理科',
-            fullName: 'Science',
-        },
-    },
-    {
-        pattern: '国語',
-        config: {
-            letter: 'N',
-            bgColor: 'bg-green-500',
-            hoverColor: 'hover:bg-green-600',
-            label: '国語',
-            fullName: 'Japanese',
-        },
-    },
-];
+}));
 
 const DEFAULT_CONFIG: SubjectConfig = {
     letter: '?',
