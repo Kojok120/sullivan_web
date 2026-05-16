@@ -1,5 +1,6 @@
 'use server';
 
+import { getTranslations } from 'next-intl/server';
 import { z } from 'zod';
 
 import { getSession } from '@/lib/auth';
@@ -15,21 +16,23 @@ const inputSchema = z.object({
 });
 
 export async function getGoalDailyViewAction(input: unknown) {
+    const t = await getTranslations('StudentGoalActions');
+
     const session = await getSession();
     if (!session) {
-        return { error: 'ログインが必要です' };
+        return { error: t('loginRequired') };
     }
 
     const parsed = inputSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.errors[0]?.message ?? '入力値が不正です' };
+        return { error: parsed.error.errors[0]?.message ?? t('invalidInput') };
     }
 
     const { studentId, timeZone, fromDateKey, toDateKey } = parsed.data;
 
     if (session.userId !== studentId) {
         if (!isTeacherOrAdminRole(session.role)) {
-            return { error: '権限がありません' };
+            return { error: t('forbidden') };
         }
 
         const canAccess = await canAccessUserWithinClassroomScope({
@@ -39,7 +42,7 @@ export async function getGoalDailyViewAction(input: unknown) {
         });
 
         if (!canAccess) {
-            return { error: '担当教室外の生徒にはアクセスできません' };
+            return { error: t('classroomScopeDenied') };
         }
     }
 
@@ -61,6 +64,6 @@ export async function getGoalDailyViewAction(input: unknown) {
         return { success: true, data: payload };
     } catch (error) {
         console.error('[getGoalDailyViewAction] failed:', error);
-        return { error: '目標データの取得に失敗しました' };
+        return { error: t('fetchFailed') };
     }
 }

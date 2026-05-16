@@ -1485,6 +1485,28 @@
     "bulkUpsertFailed": "一括登録・更新に失敗しました",
     "searchByMasterNumbersFailed": "既存問題の検索に失敗しました"
   },
+  "SimpleCalendar": {
+    "prevMonth": "前月",
+    "nextMonth": "次月",
+    "monthLabel": "{year}年{month}月",
+    "minDateNotice": "{minDate} 以前は選択できません",
+    "weekDay": {
+      "sun": "日",
+      "mon": "月",
+      "tue": "火",
+      "wed": "水",
+      "thu": "木",
+      "fri": "金",
+      "sat": "土"
+    }
+  },
+  "StudentGoalActions": {
+    "loginRequired": "ログインが必要です",
+    "invalidInput": "入力値が不正です",
+    "forbidden": "権限がありません",
+    "classroomScopeDenied": "担当教室外の生徒にはアクセスできません",
+    "fetchFailed": "目標データの取得に失敗しました"
+  },
   "TeacherGoalManagementCard": {
     "dashboardTitle": "目標管理ダッシュボード",
     "dashboardDescription": "目標設計と日次編集を分けて操作できます",
