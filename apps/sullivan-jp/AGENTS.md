@@ -11,7 +11,8 @@
 1. **物理移動 (Phase 1.7.b)**
    - `src/` → `apps/sullivan-jp/src/`
    - `server.ts`, `middleware.ts`, `worker/`, `next.config.ts`, `postcss.config.mjs`, `components.json`, `next-env.d.ts` → `apps/sullivan-jp/`
-   - `vitest.config.ts`, `vitest.setup.ts`, `playwright.config.ts`, `playwright.prod.config.ts`, `e2e/` → `apps/sullivan-jp/`
+   - `vitest.config.ts`, `vitest.setup.ts` → `apps/sullivan-jp/` (1.7.b5 で src/ と同時移動)
+   - `playwright.config.ts`, `playwright.prod.config.ts`, `e2e/` → `apps/sullivan-jp/` (1.7.b2 で移動済)
    - `public/`, `instructions/`, `math_problems_originals/` → `apps/sullivan-jp/`
    - `manual_admin/`, `manual_student/`, `manual_teacher/` → `apps/sullivan-jp/` (1.7.b1 で移動済)
 

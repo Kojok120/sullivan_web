@@ -49,7 +49,8 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
 
       - name: E2E テスト実行
-        run: pnpm exec playwright test
+        # playwright config と e2e/ は apps/sullivan-jp/ 配下に移動済 (Phase 1.7.b2)
+        run: pnpm run test:e2e
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
@@ -59,5 +60,5 @@ jobs:
         if: ${{ !cancelled() }}
         with:
           name: playwright-report
-          path: playwright-report/
+          path: apps/sullivan-jp/playwright-report/
           retention-days: 7
