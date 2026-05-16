@@ -27,7 +27,10 @@ export default defineConfig({
         },
     ],
     webServer: {
-        command: 'npm run dev',
+        // playwright を root から `pnpm test:e2e` 経由で起動する前提で、cwd は repo root に固定。
+        // root の package.json の `dev` スクリプトをそのまま叩く。
+        command: 'pnpm run dev',
+        cwd: '../..',
         url: 'http://localhost:3000',
         reuseExistingServer: !process.env.CI,
         timeout: 120 * 1000,

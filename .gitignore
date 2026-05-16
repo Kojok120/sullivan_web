@@ -17,6 +17,9 @@ node_modules/
 /playwright-report/
 /playwright-report-prod/
 /blob-report/
+apps/*/playwright-report/
+apps/*/playwright-report-prod/
+apps/*/test-results/
 
 # next.js
 /.next/
