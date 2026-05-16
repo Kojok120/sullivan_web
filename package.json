@@ -25,6 +25,7 @@
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} packages/db-schema/prisma/seed.ts"
   },
   "dependencies": {
+    "@sullivan/ai-clients": "workspace:*",
     "@sullivan/config": "workspace:*",
     "@sullivan/db-schema": "workspace:*",
     "@dnd-kit/core": "^6.3.1",
