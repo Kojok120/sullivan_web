@@ -1485,6 +1485,19 @@
     "bulkUpsertFailed": "一括登録・更新に失敗しました",
     "searchByMasterNumbersFailed": "既存問題の検索に失敗しました"
   },
+  "AdminCurriculumProblemEditor": {
+    "edit": "編集",
+    "masterNumberLabel": "マスタNo",
+    "idLabel": "ID",
+    "gradeLabel": "学年",
+    "linkedCoreProblemLabel": "紐付けCoreProblem",
+    "videoUrlLabel": "解説動画URL",
+    "problemListHeading": "問題一覧 ({count})",
+    "readOnlyNotice": "※ここでの編集はできません。「問題管理」を使用してください",
+    "loading": "読み込み中...",
+    "emptyProblems": "問題がありません。",
+    "fetchFailed": "問題の取得に失敗しました。"
+  },
   "SimpleCalendar": {
     "prevMonth": "前月",
     "nextMonth": "次月",
