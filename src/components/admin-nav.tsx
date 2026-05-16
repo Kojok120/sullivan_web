@@ -5,6 +5,7 @@ import Image from "next/image";
 import SullivanLogo from "@/assets/Sullivan-Logo.jpg";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,27 +29,27 @@ import {
 
 const navItems = [
     {
-        title: "ダッシュボード",
+        key: "dashboard",
         href: "/admin",
         icon: LayoutDashboard,
     },
     {
-        title: "ユーザー管理",
+        key: "users",
         href: "/admin/users",
         icon: Users,
     },
     {
-        title: "教室管理",
+        key: "classrooms",
         href: "/admin/classrooms",
         icon: School,
     },
     {
-        title: "Core Problem管理",
+        key: "curriculum",
         href: "/admin/curriculum",
         icon: BookOpen,
     },
     {
-        title: "問題作成者画面",
+        key: "materials",
         href: "/materials/core-problems",
         icon: BookOpen,
     },
@@ -68,6 +69,7 @@ export function AdminNav({ isCollapsed = false, onToggle, problemSubjects }: Adm
     const pathname = usePathname();
     const searchParams = useSearchParams();
     const activeSubjectId = searchParams.get("subjectId");
+    const t = useTranslations("AdminNav");
 
     return (
         <div className={cn(
@@ -104,17 +106,17 @@ export function AdminNav({ isCollapsed = false, onToggle, problemSubjects }: Adm
                             pathname === item.href && "bg-accent"
                         )}
                         asChild
-                        title={isCollapsed ? item.title : undefined}
+                        title={isCollapsed ? t(`items.${item.key}`) : undefined}
                     >
                         <Link href={item.href}>
                             <item.icon className={cn("h-4 w-4", !isCollapsed && "mr-2")} />
-                            {!isCollapsed && <span>{item.title}</span>}
+                            {!isCollapsed && <span>{t(`items.${item.key}`)}</span>}
                         </Link>
                     </Button>
                 ))}
                 {problemSubjects.length > 0 && !isCollapsed && (
                     <div className="px-3 pt-3 text-xs font-medium text-muted-foreground">
-                        問題一覧
+                        {t("problemList")}
                     </div>
                 )}
                 {problemSubjects.map((subject) => {
@@ -131,7 +133,7 @@ export function AdminNav({ isCollapsed = false, onToggle, problemSubjects }: Adm
                                 isActive && "bg-accent"
                             )}
                             asChild
-                            title={isCollapsed ? `問題一覧 - ${subject.name}` : undefined}
+                            title={isCollapsed ? t("problemListWithSubject", { subjectName: subject.name }) : undefined}
                         >
                             <Link href={href}>
                                 {isCollapsed ? (
@@ -139,7 +141,7 @@ export function AdminNav({ isCollapsed = false, onToggle, problemSubjects }: Adm
                                 ) : (
                                     <>
                                         <BookOpen className="mr-2 h-4 w-4" />
-                                        <span>{`問題一覧 - ${subject.name}`}</span>
+                                        <span>{t("problemListWithSubject", { subjectName: subject.name })}</span>
                                     </>
                                 )}
                             </Link>
@@ -156,11 +158,11 @@ export function AdminNav({ isCollapsed = false, onToggle, problemSubjects }: Adm
                             "w-full min-h-11 text-red-600 hover:text-red-700 hover:bg-red-50",
                             isCollapsed ? "justify-center px-2" : "justify-start"
                         )}
-                        title={isCollapsed ? "ログアウト" : undefined}
+                        title={isCollapsed ? t("logout") : undefined}
                         data-testid="admin-logout-button"
                     >
                         <LogOut className={cn("h-4 w-4", !isCollapsed && "mr-2")} />
-                        {!isCollapsed && <span>ログアウト</span>}
+                        {!isCollapsed && <span>{t("logout")}</span>}
                     </Button>
                 </form>
             </div>
@@ -180,6 +182,7 @@ export function AdminMobileNav({
     const searchParams = useSearchParams();
     const activeSubjectId = searchParams.get("subjectId");
     const [open, setOpen] = useState(false);
+    const t = useTranslations("AdminNav");
 
     return (
         <Sheet open={open} onOpenChange={setOpen}>
@@ -191,12 +194,12 @@ export function AdminMobileNav({
                     data-testid="admin-mobile-nav-trigger"
                 >
                     <Menu className="h-5 w-5" />
-                    <span className="sr-only">メニューを開く</span>
+                    <span className="sr-only">{t("openMenu")}</span>
                 </Button>
             </SheetTrigger>
             <SheetContent side="left" className="flex h-dvh w-[85vw] max-w-[320px] flex-col p-0">
                 <SheetHeader className="border-b px-4 py-4">
-                    <SheetTitle className="sr-only">管理者メニュー</SheetTitle>
+                    <SheetTitle className="sr-only">{t("menu")}</SheetTitle>
                     <div className="relative h-10 w-36">
                         <Image
                             src={SullivanLogo}
@@ -221,14 +224,14 @@ export function AdminMobileNav({
                             >
                                 <Link href={item.href}>
                                     <Icon className="mr-2 h-4 w-4" />
-                                    {item.title}
+                                    {t(`items.${item.key}`)}
                                 </Link>
                             </Button>
                         );
                     })}
                     {problemSubjects.length > 0 && (
                         <div className="px-3 pt-3 text-xs font-medium text-muted-foreground">
-                            問題一覧
+                            {t("problemList")}
                         </div>
                     )}
                     {problemSubjects.map((subject) => {
@@ -245,7 +248,7 @@ export function AdminMobileNav({
                             >
                                 <Link href={href}>
                                     <BookOpen className="mr-2 h-4 w-4" />
-                                    {`問題一覧 - ${subject.name}`}
+                                    {t("problemListWithSubject", { subjectName: subject.name })}
                                 </Link>
                             </Button>
                         );
@@ -259,7 +262,7 @@ export function AdminMobileNav({
                             data-testid="admin-mobile-logout-button"
                         >
                             <LogOut className="mr-2 h-4 w-4" />
-                            ログアウト
+                            {t("logout")}
                         </Button>
                     </form>
                 </div>

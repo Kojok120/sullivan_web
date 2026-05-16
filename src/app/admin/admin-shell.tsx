@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useTranslations } from 'next-intl';
 import SullivanLogo from '@/assets/Sullivan-Logo.jpg';
 import { LogOut } from 'lucide-react';
 import { AdminNav, AdminMobileNav } from '@/components/admin-nav';
@@ -19,6 +20,7 @@ type AdminShellProps = {
 };
 
 export function AdminShell({ children, problemSubjects }: AdminShellProps) {
+    const t = useTranslations('CommonShell');
     const [isCollapsed, setIsCollapsed] = useState(() => {
         if (typeof window === 'undefined') return false;
         return localStorage.getItem('admin-sidebar-collapsed') === 'true';
@@ -54,7 +56,7 @@ export function AdminShell({ children, problemSubjects }: AdminShellProps) {
                             data-testid="admin-mobile-top-logout-button"
                         >
                             <LogOut className="h-5 w-5" />
-                            <span className="sr-only">ログアウト</span>
+                            <span className="sr-only">{t('logout')}</span>
                         </Button>
                     </form>
                 </div>

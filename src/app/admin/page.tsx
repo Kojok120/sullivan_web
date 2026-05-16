@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Users, BookOpen, School } from "lucide-react";
 
@@ -9,33 +10,34 @@ export const dynamic = 'force-dynamic';
 export default async function AdminDashboard() {
     const session = await getSession();
     if (!session || session.role !== 'ADMIN') redirect('/');
+    const t = await getTranslations("AdminDashboard");
 
     const adminCards = [
         {
-            title: 'ユーザー管理',
-            description: 'アカウントとグループの管理',
+            title: t('cards.users.title'),
+            description: t('cards.users.description'),
             icon: Users,
             href: '/admin/users',
             color: 'text-primary',
         },
         {
-            title: '教室管理',
-            description: '教室の追加・削除',
+            title: t('cards.classrooms.title'),
+            description: t('cards.classrooms.description'),
             icon: School,
             href: '/admin/classrooms',
             color: 'text-primary',
         },
 
         {
-            title: 'カリキュラム管理',
-            description: 'Unit、CoreProblem、Problemの管理',
+            title: t('cards.curriculum.title'),
+            description: t('cards.curriculum.description'),
             icon: BookOpen,
             href: '/admin/curriculum',
             color: 'text-primary',
         },
         {
-            title: '問題管理',
-            description: '問題の単独管理・一括登録',
+            title: t('cards.problems.title'),
+            description: t('cards.problems.description'),
             icon: BookOpen,
             href: '/admin/problems',
             color: 'text-primary',
@@ -47,10 +49,10 @@ export default async function AdminDashboard() {
             <div className="container mx-auto px-4 py-6 sm:py-10">
                 <header className="mb-6 sm:mb-10">
                     <h1 className="text-2xl font-bold text-foreground sm:text-4xl">
-                        管理者ダッシュボード
+                        {t('title')}
                     </h1>
                     <p className="mt-2 text-sm text-muted-foreground sm:text-base">
-                        ようこそ、{session.name}さん（管理者）
+                        {t('welcome', { name: session.name })}
                     </p>
                 </header>
 
@@ -76,7 +78,7 @@ export default async function AdminDashboard() {
                                         </div>
                                     </CardHeader>
                                     <CardContent>
-                                        <p className="text-sm text-muted-foreground">クリックして管理</p>
+                                        <p className="text-sm text-muted-foreground">{t('manageHint')}</p>
                                     </CardContent>
                                 </Card>
                             </Link>

@@ -1,7 +1,9 @@
 import type { ComponentProps } from 'react';
 import { render, screen } from '@testing-library/react';
+import { NextIntlClientProvider } from 'next-intl';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import jaMessages from '@/messages/ja.json';
 import { MaterialsShell } from './materials-shell';
 
 const { usePathnameMock, useSearchParamsMock } = vi.hoisted(() => ({
@@ -47,9 +49,11 @@ describe('MaterialsShell', () => {
 
     it('管理画面と同じ構成でログアウト導線を表示する', () => {
         render(
-            <MaterialsShell problemSubjects={[{ id: 'subject-1', name: '数学' }]}>
-                <div>content</div>
-            </MaterialsShell>,
+            <NextIntlClientProvider locale="ja" messages={jaMessages}>
+                <MaterialsShell problemSubjects={[{ id: 'subject-1', name: '数学' }]}>
+                    <div>content</div>
+                </MaterialsShell>
+            </NextIntlClientProvider>,
         );
 
         expect(screen.getByTestId('materials-mobile-nav-trigger')).toBeInTheDocument();

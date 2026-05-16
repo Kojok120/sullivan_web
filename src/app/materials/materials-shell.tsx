@@ -4,6 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { FileText, FolderTree, LogOut, Menu } from 'lucide-react';
 
 import SullivanLogo from '@/assets/Sullivan-Logo.jpg';
@@ -19,7 +20,7 @@ import {
 import { cn } from '@/lib/utils';
 
 const baseNavItems = [
-    { href: '/materials/core-problems', label: 'CoreProblem一覧', icon: FolderTree },
+    { href: '/materials/core-problems', labelKey: 'coreProblems', icon: FolderTree },
 ];
 
 type ProblemSubject = {
@@ -43,6 +44,8 @@ function MaterialsNavContent({
     problemSubjects: ProblemSubject[];
     onNavigate?: () => void;
 }) {
+    const t = useTranslations('MaterialsShell');
+
     return (
         <>
             {baseNavItems.map((item) => (
@@ -55,13 +58,13 @@ function MaterialsNavContent({
                 >
                     <Link href={item.href}>
                         <item.icon className="mr-2 h-4 w-4" />
-                        {item.label}
+                        {t(`nav.${item.labelKey}`)}
                     </Link>
                 </Button>
             ))}
             {problemSubjects.length > 0 && (
                 <div className="px-3 pt-3 text-xs font-medium text-muted-foreground">
-                    問題一覧
+                    {t('problemList')}
                 </div>
             )}
             {problemSubjects.map((subject) => {
@@ -78,7 +81,7 @@ function MaterialsNavContent({
                     >
                         <Link href={href}>
                             <FileText className="mr-2 h-4 w-4" />
-                            {`問題一覧 - ${subject.name}`}
+                            {t('problemListWithSubject', { subjectName: subject.name })}
                         </Link>
                     </Button>
                 );
@@ -96,6 +99,8 @@ function MaterialsDesktopNav({
     activeSubjectId: string | null;
     problemSubjects: ProblemSubject[];
 }) {
+    const t = useTranslations('MaterialsShell');
+
     return (
         <div className="flex h-screen w-64 flex-col border-r bg-muted/40">
             <div className="border-b px-4 py-5">
@@ -111,7 +116,7 @@ function MaterialsDesktopNav({
                     </div>
                 </Link>
                 <div className="mt-3 text-sm text-muted-foreground">
-                    問題作成者向けの作問画面です。
+                    {t('description')}
                 </div>
             </div>
 
@@ -131,7 +136,7 @@ function MaterialsDesktopNav({
                         data-testid="materials-logout-button"
                     >
                         <LogOut className="mr-2 h-4 w-4" />
-                        ログアウト
+                        {t('logout')}
                     </Button>
                 </form>
             </div>
@@ -149,6 +154,7 @@ function MaterialsMobileNav({
     problemSubjects: ProblemSubject[];
 }) {
     const [open, setOpen] = useState(false);
+    const t = useTranslations('MaterialsShell');
 
     return (
         <Sheet open={open} onOpenChange={setOpen}>
@@ -160,12 +166,12 @@ function MaterialsMobileNav({
                     data-testid="materials-mobile-nav-trigger"
                 >
                     <Menu className="h-5 w-5" />
-                    <span className="sr-only">メニューを開く</span>
+                    <span className="sr-only">{t('openMenu')}</span>
                 </Button>
             </SheetTrigger>
             <SheetContent side="left" className="flex h-dvh w-[85vw] max-w-[320px] flex-col p-0">
                 <SheetHeader className="border-b px-4 py-4">
-                    <SheetTitle className="sr-only">問題作成者メニュー</SheetTitle>
+                    <SheetTitle className="sr-only">{t('menu')}</SheetTitle>
                     <div className="relative h-10 w-36">
                         <Image
                             src={SullivanLogo}
@@ -194,7 +200,7 @@ function MaterialsMobileNav({
                             data-testid="materials-mobile-logout-button"
                         >
                             <LogOut className="mr-2 h-4 w-4" />
-                            ログアウト
+                            {t('logout')}
                         </Button>
                     </form>
                 </div>
@@ -207,6 +213,7 @@ export function MaterialsShell({ children, problemSubjects }: MaterialsShellProp
     const pathname = usePathname();
     const searchParams = useSearchParams();
     const activeSubjectId = searchParams.get('subjectId');
+    const t = useTranslations('MaterialsShell');
 
     return (
         <div className="min-h-dvh bg-background">
@@ -236,7 +243,7 @@ export function MaterialsShell({ children, problemSubjects }: MaterialsShellProp
                             data-testid="materials-mobile-top-logout-button"
                         >
                             <LogOut className="h-5 w-5" />
-                            <span className="sr-only">ログアウト</span>
+                            <span className="sr-only">{t('logout')}</span>
                         </Button>
                     </form>
                 </div>
