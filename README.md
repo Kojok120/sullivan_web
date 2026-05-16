@@ -131,9 +131,9 @@ Sullivan が解いている中心課題は、次の悪循環です。
 pnpm install
 ```
 
-`postinstall` で Prisma Client は自動生成されます。スキーマ変更後に明示的に再生成したい場合は `pnpm prisma generate` を実行してください。
+`@sullivan/db-schema` の `postinstall` で Prisma Client は自動生成されます。スキーマ変更後に明示的に再生成したい場合は `pnpm run db:generate` を実行してください。
 
-Prisma schema の正本は `packages/db-schema/prisma/schema.prisma` に集約しています。
+Prisma schema・config・seed の正本は `packages/db-schema/` に集約しています（`prisma/schema.prisma` / `prisma.config.ts` / `prisma/seed.ts`）。
 
 ### 2. 環境変数を用意
 
@@ -200,8 +200,8 @@ NEXT_PUBLIC_GEMINI_MAX_TURN_MS="..."
 ### 3. DB をセットアップ
 
 ```bash
-pnpm prisma migrate dev
-pnpm prisma db seed
+pnpm run db:migrate:dev
+pnpm --filter @sullivan/db-schema exec prisma db seed
 ```
 
 ### 4. 開発サーバーを起動

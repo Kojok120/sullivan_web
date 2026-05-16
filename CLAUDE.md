@@ -174,19 +174,19 @@ scripts/           # 管理・メンテナンス用スクリプト
 ## 開発コマンド
 
 ```bash
-npm run dev           # Web 開発サーバー起動
-npm run dev:worker    # Worker 開発サーバー起動
-npm run build         # Web 本番ビルド
-npm run start         # Web 本番起動
-npm run start:worker  # Worker 本番起動
-npm run lint          # ESLint 実行
-npm run type-check    # TypeScript 型チェック
-npm test              # ユニットテスト
-npm run test:coverage # カバレッジ付きユニットテスト
-npm run test:e2e      # Playwright E2E テスト
-npx prisma generate   # Prisma クライアント再生成
-npx prisma migrate dev # Prisma マイグレーション実行（開発）
-npx prisma studio     # Prisma Studio
+pnpm run dev           # Web 開発サーバー起動
+pnpm run dev:worker    # Worker 開発サーバー起動
+pnpm run build         # Web 本番ビルド
+pnpm run start         # Web 本番起動
+pnpm run start:worker  # Worker 本番起動
+pnpm run lint          # ESLint 実行
+pnpm run type-check    # TypeScript 型チェック
+pnpm test              # ユニットテスト
+pnpm run test:coverage # カバレッジ付きユニットテスト
+pnpm run test:e2e      # Playwright E2E テスト
+pnpm run db:generate   # Prisma クライアント再生成 (= --filter @sullivan/db-schema)
+pnpm run db:migrate:dev # Prisma マイグレーション実行（開発）
+pnpm run db:studio     # Prisma Studio
 ```
 
 ## 環境変数

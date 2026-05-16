@@ -42,10 +42,8 @@ jobs:
           cache: pnpm
 
       - name: 依存関係インストール
+        # @sullivan/db-schema の postinstall (prisma generate) も同時に走る。
         run: pnpm install --frozen-lockfile
-
-      - name: Prisma クライアント生成
-        run: pnpm exec prisma generate
 
       - name: Playwright ブラウザインストール
         run: pnpm exec playwright install --with-deps chromium

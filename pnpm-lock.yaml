@@ -219,9 +219,6 @@ importers:
       jsdom:
         specifier: 28.0.0
         version: 28.0.0
-      prisma:
-        specifier: 7.4.1
-        version: 7.4.1(@types/react@19.2.14)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3)
       puppeteer:
         specifier: ^24.36.0
         version: 24.43.1(typescript@5.9.3)
@@ -300,10 +297,16 @@ importers:
       '@prisma/client':
         specifier: 7.4.1
         version: 7.4.1(prisma@7.4.1(@types/react@19.2.14)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3))(typescript@5.9.3)
+      dotenv:
+        specifier: ^17.2.4
+        version: 17.4.2
     devDependencies:
       prisma:
         specifier: 7.4.1
         version: 7.4.1(@types/react@19.2.14)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3)
+      tsx:
+        specifier: ^4.21.0
+        version: 4.22.0
 
   packages/ui-kit:
     dependencies:

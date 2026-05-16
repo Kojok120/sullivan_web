@@ -26,24 +26,25 @@ jobs:
       - name: チェックアウト
         uses: actions/checkout@v4
 
+      - name: pnpm セットアップ
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+
       - name: Node.js セットアップ
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
 
       - name: Prisma マイグレーション実行
-        # `prisma migrate deploy` は CLI のみで動くため、prod 用の依存全体をインストールせず
-        # package.json の prisma / dotenv バージョンをピンして必要最小限のみ追加インストールする。
-        # SemVer 接頭辞 (^, ~ 等) を剥がして範囲解決にならないよう exact pin する。
-        # npx の -p ではなく `npm install --no-save` で project の node_modules に置くのは、
-        # prisma.config.ts の `import "dotenv/config"` を Node の resolution が cwd から辿れるようにするため。
-        # postinstall (prisma generate) は migrate には不要なので --ignore-scripts でスキップする
+        # @sullivan/db-schema パッケージとその依存 (prisma CLI / dotenv 等) だけを
+        # install するため --filter を使う。app 全体の数百MB は不要。
+        # --ignore-scripts で db-schema の postinstall (prisma generate) はスキップ
+        # (migrate deploy 自体は生成済 client を必要としない)。
         run: |
-          PRISMA_VERSION="$(node -p "((require('./package.json').devDependencies.prisma) || (require('./package.json').dependencies.prisma)).replace(/^[\^~>=<]+/, '')")"
-          DOTENV_VERSION="$(node -p "((require('./package.json').dependencies.dotenv) || (require('./package.json').devDependencies.dotenv)).replace(/^[\^~>=<]+/, '')")"
-          npm install --no-save --no-audit --no-fund --ignore-scripts \
-            "prisma@${PRISMA_VERSION}" "dotenv@${DOTENV_VERSION}"
-          ./node_modules/.bin/prisma migrate deploy
+          pnpm install --filter @sullivan/db-schema... --frozen-lockfile --ignore-scripts
+          pnpm --filter @sullivan/db-schema run migrate:deploy
 
   deploy-grading-worker:
     name: Deploy Grading Worker (DEV)
