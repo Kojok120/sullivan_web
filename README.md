@@ -125,11 +125,15 @@ Sullivan が解いている中心課題は、次の悪循環です。
 
 ### 1. 依存関係をインストール
 
+本リポジトリは pnpm workspaces で管理しています。pnpm が未インストールなら `corepack enable && corepack prepare pnpm@10.11.0 --activate` で導入してください。
+
 ```bash
-npm install
+pnpm install
 ```
 
-`postinstall` で Prisma Client は自動生成されます。スキーマ変更後に明示的に再生成したい場合は `npx prisma generate` を実行してください。
+`postinstall` で Prisma Client は自動生成されます。スキーマ変更後に明示的に再生成したい場合は `pnpm prisma generate` を実行してください。
+
+Prisma schema の正本は `packages/db-schema/prisma/schema.prisma` に集約しています。
 
 ### 2. 環境変数を用意
 
@@ -196,8 +200,8 @@ NEXT_PUBLIC_GEMINI_MAX_TURN_MS="..."
 ### 3. DB をセットアップ
 
 ```bash
-npx prisma migrate dev
-npx prisma db seed
+pnpm prisma migrate dev
+pnpm prisma db seed
 ```
 
 ### 4. 開発サーバーを起動
@@ -205,13 +209,13 @@ npx prisma db seed
 Web:
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
 Worker:
 
 ```bash
-npm run dev:worker
+pnpm dev:worker
 ```
 
 デフォルトの待受先:
@@ -227,19 +231,35 @@ npm run dev:worker
 ## 主要コマンド
 
 ```bash
-npm run dev             # Web 開発サーバー
-npm run dev:worker      # Worker 開発サーバー
-npm run build           # Web 本番ビルド
-npm run start           # Web 本番起動
-npm run start:worker    # Worker 本番起動
-npm run lint            # ESLint
-npm run type-check      # TypeScript 型チェック
-npm run test            # Vitest
-npm run test:watch      # Vitest watch
-npm run test:coverage   # カバレッジ付き Vitest
-npm run test:e2e        # Playwright
-npm run test:e2e:ui     # Playwright UI
+pnpm dev                # Web 開発サーバー
+pnpm dev:worker         # Worker 開発サーバー
+pnpm build              # Web 本番ビルド
+pnpm start              # Web 本番起動
+pnpm start:worker       # Worker 本番起動
+pnpm lint               # ESLint
+pnpm type-check         # TypeScript 型チェック
+pnpm test               # Vitest
+pnpm test:watch         # Vitest watch
+pnpm test:coverage      # カバレッジ付き Vitest
+pnpm test:e2e           # Playwright
+pnpm test:e2e:ui        # Playwright UI
 ```
+
+## モノレポ構成（Phase 1 で導入）
+
+| ディレクトリ | 役割 |
+| --- | --- |
+| `packages/config` | 環境変数 schema、`DEFAULT_PROGRESSION_RULES` / `DEFAULT_PRINT_CONFIG` 等の定数 |
+| `packages/db-schema` | Prisma schema・migrations・PrismaClient エクスポート |
+| `packages/ai-clients` | Gemini / Cloud Tasks / Drive / Cloud Run scaling などの外部 SDK ラッパー |
+| `packages/user-platform` | 認証・ロール判定・教室サービス・`requirePackAccess`（pack-access） |
+| `packages/core-engine` | 採点・進行・印刷・構造化問題などの中核ロジック |
+| `packages/ui-kit` | SVG ヘルパー（座標平面 / 数直線 / 立体 / 解答表 等）・confetti などの UI 補助 |
+| `packages/content-schema` | `ContentPackDefinition` などの ContentPack 型（純粋型） |
+| `content/jp-juken/` | JP受験対策 ContentPack の宣言値（subjects, progressionRules, printConfig） |
+| `src/` | Next.js アプリ本体（ページ・Server Actions・JP 固有 lib／components） |
+
+Phase 1.7（`apps/sullivan-jp/` への集約）は別 PR で実施予定。現状は `src/` 直下がアプリのまま。
 
 ## 代表的な API / エンドポイント
 
