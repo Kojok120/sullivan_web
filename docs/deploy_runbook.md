@@ -248,12 +248,11 @@ gcloud secrets versions destroy <OLD_VERSION_NUMBER> --secret=internal-api-secre
 ## 4. DBマイグレーション
 Realtime用テーブル・GradingJob（冪等性）用テーブルが追加されているため、デプロイ後にマイグレーションが必要です。
 
-**注意:** Phase 1 で npm → pnpm に切替済。Phase 2 で Prisma schema は `packages/db-schema/prisma/schema.prisma` に移動済。  
-コマンドは `pnpm` 経由で実行する：
+**注意:** Phase 1 で npm → pnpm に切替済。Phase 2 で Prisma schema / config / seed は `packages/db-schema/` に完全移管した。Prisma CLI は **必ず `@sullivan/db-schema` パッケージ経由**で呼び、root から `pnpm exec prisma` で呼ばない（root に `prisma.config.ts` は無い）。
 
 ```bash
-pnpm prisma migrate deploy
-pnpm prisma generate
+pnpm run db:migrate:deploy  # = pnpm --filter @sullivan/db-schema run migrate:deploy
+pnpm run db:generate        # = pnpm --filter @sullivan/db-schema run generate
 ```
 
 ### 4.1 DEV/PRODUCTION それぞれの実行例（.env.* を読み込む）
@@ -262,13 +261,13 @@ Prismaは `.env` 以外を自動読み込みしないため、実行前に読み
 ```bash
 # DEV
 set -a; source .env.DEV; set +a
-npx prisma migrate deploy
-npx prisma db seed
+pnpm run db:migrate:deploy
+pnpm --filter @sullivan/db-schema exec prisma db seed
 
 # PRODUCTION
 set -a; source .env.PRODUCTION; set +a
-npx prisma migrate deploy
-npx prisma db seed
+pnpm run db:migrate:deploy
+pnpm --filter @sullivan/db-schema exec prisma db seed
 ```
 
 ### 4.2 マイグレーション再整備（新DB向け）
@@ -277,8 +276,8 @@ npx prisma db seed
 
 新しく作成したSupabase DBに対して、以下を実行してください。
 ```bash
-pnpm prisma migrate deploy
-pnpm prisma db seed
+pnpm run db:migrate:deploy
+pnpm --filter @sullivan/db-schema exec prisma db seed
 ```
 
 ### 4.3 ContentPack / packId バックフィル運用（Phase 2 移行後の初回のみ）
@@ -614,7 +613,7 @@ npx vitest run tests/discord-alert-relay.test.ts
 最低でも以下のタイミングで `./scripts/backup-production-db.sh` を実行する。
 
 - PRODUCTION デプロイ直前（`./deploy-web-PRODUCTION.sh` 実行前）
-- `npx prisma migrate deploy` を伴う作業前（CI から自動実行される場合も含めて意識する）
+- `pnpm run db:migrate:deploy` を伴う作業前（CI から自動実行される場合も含めて意識する）
 - 一括バックフィル / 一括削除 / 大規模データ操作の前
 - 月1回の定期取得（最低水準として）
 

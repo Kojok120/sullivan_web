@@ -9,15 +9,20 @@
     ".": "./src/index.ts"
   },
   "scripts": {
+    "postinstall": "prisma generate --schema=./prisma/schema.prisma",
     "generate": "prisma generate --schema=./prisma/schema.prisma",
     "migrate:dev": "prisma migrate dev --schema=./prisma/schema.prisma",
-    "migrate:deploy": "prisma migrate deploy --schema=./prisma/schema.prisma"
+    "migrate:deploy": "prisma migrate deploy --schema=./prisma/schema.prisma",
+    "migrate:reset": "prisma migrate reset --schema=./prisma/schema.prisma",
+    "studio": "prisma studio --schema=./prisma/schema.prisma"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.4.1",
-    "@prisma/client": "7.4.1"
+    "@prisma/client": "7.4.1",
+    "dotenv": "^17.2.4"
   },
   "devDependencies": {
-    "prisma": "7.4.1"
+    "prisma": "7.4.1",
+    "tsx": "^4.21.0"
   }
 }

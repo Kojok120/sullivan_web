@@ -38,12 +38,13 @@ jobs:
           cache: pnpm
 
       - name: Prisma マイグレーション実行
-        # pnpm workspace を解決する必要があるため、npm ではなく pnpm で依存解決する。
-        # --ignore-scripts で postinstall (prisma generate) はスキップ (migrate には不要)。
-        # prisma.config.ts の `import "dotenv/config"` は cwd の node_modules から解決される。
+        # @sullivan/db-schema パッケージとその依存 (prisma CLI / dotenv 等) だけを
+        # install するため --filter を使う。app 全体の数百MB は不要。
+        # --ignore-scripts で db-schema の postinstall (prisma generate) はスキップ
+        # (migrate deploy 自体は生成済 client を必要としない)。
         run: |
-          pnpm install --frozen-lockfile --ignore-scripts
-          pnpm exec prisma migrate deploy
+          pnpm install --filter @sullivan/db-schema... --frozen-lockfile --ignore-scripts
+          pnpm --filter @sullivan/db-schema run migrate:deploy
 
   deploy-grading-worker:
     name: Deploy Grading Worker (DEV)
