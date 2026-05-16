@@ -385,11 +385,12 @@ export async function getProblems(
 }
 
 export async function getProblemSubjects() {
-    await requireProblemAuthor();
+    const session = await requireProblemAuthor();
     const t = await getTranslations('AdminProblemActions');
 
     try {
         const subjects = await prisma.subject.findMany({
+            where: { packId: session.defaultPackId },
             orderBy: [{ order: 'asc' }, { name: 'asc' }],
             select: {
                 id: true,
@@ -416,11 +417,12 @@ export async function getProblemSubjects() {
 }
 
 export async function getProblemNavSubjects() {
-    await requireProblemAuthor();
+    const session = await requireProblemAuthor();
     const t = await getTranslations('AdminProblemActions');
 
     try {
         const subjects = await prisma.subject.findMany({
+            where: { packId: session.defaultPackId },
             orderBy: [{ order: 'asc' }, { name: 'asc' }],
             select: {
                 id: true,
@@ -440,10 +442,11 @@ export async function getProblemNavSubjects() {
 }
 
 export async function getProblemEditorContext(problemId?: string) {
-    await requireProblemAuthor();
+    const session = await requireProblemAuthor();
 
     const [subjects, coreProblems, problem] = await Promise.all([
         prisma.subject.findMany({
+            where: { packId: session.defaultPackId },
             orderBy: [{ order: 'asc' }, { name: 'asc' }],
             select: { id: true, name: true },
         }),

@@ -13,6 +13,7 @@ export default async function UnitFocusPage() {
 
     // 教科と CoreProblem を取得
     const subjectsRaw = await prisma.subject.findMany({
+        where: { packId: session.defaultPackId },
         orderBy: { order: 'asc' },
         include: {
             coreProblems: {

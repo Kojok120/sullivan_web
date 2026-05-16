@@ -13,7 +13,7 @@ export default async function AchievementsPage() {
 
     // Fetch all achievements
     const allAchievements = await prisma.achievement.findMany({
-        where: { isHidden: false },
+        where: { isHidden: false, packId: session.defaultPackId },
         orderBy: { xpReward: 'asc' }
     });
 

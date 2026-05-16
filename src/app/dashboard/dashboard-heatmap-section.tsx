@@ -12,10 +12,10 @@ type DashboardHeatmapTitles = {
 
 // ヒートマップ + 教科別進捗。dailyActivity は 365 日分とサイズが大きいので、
 // このセクションだけ Suspense 境界で stream し、上部 KPI の初回描画を妨げない。
-export async function DashboardHeatmapSection({ userId }: { userId: string }) {
+export async function DashboardHeatmapSection({ userId, packId }: { userId: string; packId: string }) {
     const [dailyActivity, subjectProgress, t, tHeatmap, tSubjectProgress] = await Promise.all([
         getDailyActivity(userId, 365),
-        getSubjectProgress(userId),
+        getSubjectProgress(userId, packId),
         getTranslations('DashboardHeatmap'),
         getTranslations('Heatmap'),
         getTranslations('SubjectProgressList'),

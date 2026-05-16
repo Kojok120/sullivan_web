@@ -1,5 +1,6 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 
+import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
 import { ProfileCard } from '../profile-card';
@@ -10,6 +11,8 @@ export default async function TeacherStudentProfilePage({
     params: Promise<{ userId: string }>;
 }) {
     const { userId } = await params;
+    const session = await getSession();
+    if (!session) redirect('/login');
 
     const [student, classrooms] = await Promise.all([
         prisma.user.findUnique({
@@ -26,6 +29,7 @@ export default async function TeacherStudentProfilePage({
             },
         }),
         prisma.classroom.findMany({
+            where: { packId: session.defaultPackId },
             orderBy: { createdAt: 'asc' },
             select: {
                 id: true,

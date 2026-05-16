@@ -125,7 +125,7 @@ export default async function DashboardPage() {
             </section>
 
             <Suspense fallback={<DashboardHeatmapSectionFallback titles={heatmapTitles} />}>
-                <DashboardHeatmapSection userId={session.userId} />
+                <DashboardHeatmapSection userId={session.userId} packId={session.defaultPackId} />
             </Suspense>
         </div>
     );

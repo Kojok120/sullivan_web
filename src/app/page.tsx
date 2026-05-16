@@ -20,7 +20,7 @@ export default async function Home() {
     if (session.role === 'TEACHER' || session.role === 'HEAD_TEACHER') redirect('/teacher');
 
     const [subjectProgress, goalData, stampData, unseenAchievements] = await Promise.all([
-        getSubjectProgress(session.userId),
+        getSubjectProgress(session.userId, session.defaultPackId),
         getGoalDailyViewPayload({ studentId: session.userId, daysBefore: 0, daysAfter: 1 }),
         getStampDataForUser(session.userId),
         getUnseenAchievementsForUser(session.userId),

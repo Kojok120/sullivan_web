@@ -35,8 +35,8 @@ export async function getClassroom(id: string) {
         throw new Error(t('forbidden'));
     }
 
-    return await prisma.classroom.findUnique({
-        where: { id },
+    return await prisma.classroom.findFirst({
+        where: { id, packId: session.defaultPackId },
         include: {
             users: {
                 orderBy: { name: 'asc' }, // loginIdではなく名前順で表示
@@ -72,6 +72,7 @@ export async function createClassroom(formData: FormData) {
                 name: name.trim(),
                 groups: groups,
                 plan,
+                packId: session.defaultPackId,
             },
         });
         revalidatePath('/admin/classrooms');

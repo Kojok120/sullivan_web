@@ -15,6 +15,7 @@ export default async function TeacherRankingPage() {
     const isAdmin = session.role === 'ADMIN';
     const classrooms = isAdmin
         ? await prisma.classroom.findMany({
+            where: { packId: session.defaultPackId },
             orderBy: { name: 'asc' },
             select: { id: true, name: true },
         })

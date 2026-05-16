@@ -269,10 +269,11 @@ export async function deleteUser(id: string) {
 }
 
 export async function getUserManagementMeta() {
-    await requireAdmin();
+    const session = await requireAdmin();
     const t = await getTranslations('AdminUserActions');
     try {
         const classrooms = await prisma.classroom.findMany({
+            where: { packId: session.defaultPackId },
             select: { id: true, name: true, plan: true, groups: true },
             orderBy: { name: 'asc' },
         });

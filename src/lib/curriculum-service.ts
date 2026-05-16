@@ -24,10 +24,12 @@ function shouldFallbackToCustomIdScan(error: unknown) {
     ].some((token) => normalizedMessage.includes(token));
 }
 
-export async function fetchSubjects(options?: { includeCoreProblems?: boolean }) {
+export async function fetchSubjects(options?: { includeCoreProblems?: boolean; packId?: string }) {
     const includeCoreProblems = options?.includeCoreProblems ?? false;
+    const packId = options?.packId ?? 'jp-juken';
 
     return await prisma.subject.findMany({
+        where: { packId },
         orderBy: { order: 'asc' },
         include: {
             coreProblems: includeCoreProblems ? {

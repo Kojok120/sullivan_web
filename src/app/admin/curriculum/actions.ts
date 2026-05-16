@@ -15,12 +15,12 @@ function revalidateCurriculumPaths() {
 
 // --- Subjects ---
 export async function getSubjects() {
-    await requireProblemAuthor();
+    const session = await requireProblemAuthor();
     const t = await getTranslations('AdminCurriculumActions');
     try {
         const { fetchSubjects } = await import('@/lib/curriculum-service');
         // Updated fetchSubjects should handle includeCoreProblems correctly without Units
-        const subjects = await fetchSubjects({ includeCoreProblems: true });
+        const subjects = await fetchSubjects({ includeCoreProblems: true, packId: session.defaultPackId });
         return { success: true, subjects };
     } catch (error) {
         console.error('Failed to fetch subjects:', error);

@@ -32,7 +32,7 @@ export default async function HistoryPage({
 
     const [history, subjects] = await Promise.all([
         getLearningHistory(session.userId, page, limit, filter, sort),
-        getAllSubjects()
+        getAllSubjects(session.defaultPackId)
     ]);
 
     // Pagination helper
