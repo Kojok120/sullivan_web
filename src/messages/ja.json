@@ -114,5 +114,57 @@
     "allCorrect": "全問正解！",
     "loading": "読み込み中...",
     "loadMore": "さらに読み込む"
+  },
+  "DashboardHistory": {
+    "title": "学習履歴",
+    "dateHeader": "日時",
+    "subjectUnitHeader": "科目・単元",
+    "problemHeader": "問題",
+    "evaluationHeader": "評価",
+    "feedbackHeader": "AIフィードバック",
+    "empty": "履歴が見つかりませんでした",
+    "unknown": "不明",
+    "noFeedback": "(フィードバックなし)",
+    "paginationRange": "全 {total} 件中 {start} - {end} 件を表示",
+    "previous": "前へ",
+    "next": "次へ"
+  },
+  "HistoryFilter": {
+    "subject": "科目",
+    "allSubjects": "全科目",
+    "sort": "並び順",
+    "newest": "新しい順",
+    "oldest": "古い順",
+    "startDate": "開始日",
+    "endDate": "終了日",
+    "search": "検索",
+    "clear": "クリア"
+  },
+  "SessionDetail": {
+    "historyMissing": "履歴が見つかりません",
+    "unknownSubject": "教科不明",
+    "resultTitle": "{subjectName} 採点結果",
+    "unknownCoreProblem": "単元不明",
+    "questionNumber": "問{number}",
+    "userAnswerLabel": "あなたの解答:",
+    "correctAnswerLabel": "正解:",
+    "noCorrectAnswer": "（正答なし）",
+    "aiFeedbackTitle": "AIフィードバック"
+  },
+  "DashboardAlerts": {
+    "unwatchedReviewTitle": "未視聴の解説動画があります",
+    "unwatchedReviewDescriptionBefore": "不正解問題のうち、まだ見ていない解説動画が",
+    "unwatchedReviewCount": "{count}件",
+    "unwatchedReviewDescriptionAfter": "あります。",
+    "startReviewFromHome": "ホームで復習を開始する",
+    "lectureRequiredTitle": "先に講義動画の視聴が必要です",
+    "lectureLinkSeparator": "→"
+  },
+  "DashboardHeatmap": {
+    "heatmapTitle": "学習ヒートマップ",
+    "subjectProgressTitle": "教科別進捗"
+  },
+  "ActivityChart": {
+    "problemCountTick": "{count}問"
   }
 }

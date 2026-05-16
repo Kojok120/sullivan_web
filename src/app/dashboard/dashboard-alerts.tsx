@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 import { AlertTriangle, PlayCircle } from 'lucide-react';
 
 import { getUnwatchedCount, getUnwatchedLectures } from '@/lib/analytics';
@@ -7,9 +8,10 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 // 上部アラート（未視聴解説動画 + 未視聴講義動画）。Suspense 境界の内側で fetch され
 // 上部 KPI / 目標パネルの初回描画をブロックしないようにする。
 export async function DashboardAlerts({ userId }: { userId: string }) {
-    const [unwatchedCount, unwatchedLectures] = await Promise.all([
+    const [unwatchedCount, unwatchedLectures, t] = await Promise.all([
         getUnwatchedCount(userId),
         getUnwatchedLectures(userId),
+        getTranslations('DashboardAlerts'),
     ]);
 
     if (unwatchedCount === 0 && unwatchedLectures.length === 0) {
@@ -21,13 +23,13 @@ export async function DashboardAlerts({ userId }: { userId: string }) {
             {unwatchedCount > 0 ? (
                 <Alert variant="destructive" className="border-red-200 bg-red-50 text-red-800">
                     <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>未視聴の解説動画があります</AlertTitle>
+                    <AlertTitle>{t('unwatchedReviewTitle')}</AlertTitle>
                     <AlertDescription className="mt-2 space-y-2">
                         <p>
-                            不正解問題のうち、まだ見ていない解説動画が <strong>{unwatchedCount}件</strong> あります。
+                            {t('unwatchedReviewDescriptionBefore')} <strong>{t('unwatchedReviewCount', { count: unwatchedCount })}</strong> {t('unwatchedReviewDescriptionAfter')}
                         </p>
                         <Link href="/" className="inline-flex items-center gap-1 text-sm font-semibold underline">
-                            ホームで復習を開始する
+                            {t('startReviewFromHome')}
                         </Link>
                     </AlertDescription>
                 </Alert>
@@ -36,7 +38,7 @@ export async function DashboardAlerts({ userId }: { userId: string }) {
             {unwatchedLectures.length > 0 ? (
                 <Alert className="border-amber-200 bg-amber-50 text-amber-900">
                     <PlayCircle className="h-4 w-4" />
-                    <AlertTitle>先に講義動画の視聴が必要です</AlertTitle>
+                    <AlertTitle>{t('lectureRequiredTitle')}</AlertTitle>
                     <AlertDescription className="mt-2">
                         <ul className="space-y-1">
                             {unwatchedLectures.map((lecture) => (
@@ -44,7 +46,7 @@ export async function DashboardAlerts({ userId }: { userId: string }) {
                                     <Link href={`/unit-focus/${lecture.coreProblemId}`} className="inline-flex items-center gap-1 text-sm hover:underline">
                                         <span className="font-semibold">{lecture.subjectName}</span>
                                         <span>{lecture.coreProblemName}</span>
-                                        <span>→</span>
+                                        <span>{t('lectureLinkSeparator')}</span>
                                     </Link>
                                 </li>
                             ))}

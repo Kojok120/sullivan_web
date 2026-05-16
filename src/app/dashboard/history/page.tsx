@@ -1,5 +1,6 @@
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { getLearningHistory, getAllSubjects, HistoryFilter as FilterType, HistorySort } from '@/lib/analytics';
 import { HistoryFilter } from './filter';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,7 @@ export default async function HistoryPage({
 }) {
     const session = await getSession();
     if (!session) redirect('/login');
+    const t = await getTranslations('DashboardHistory');
 
     const params = await searchParams;
     const page = Number(params.page) || 1;
@@ -56,7 +58,7 @@ export default async function HistoryPage({
                         <ChevronLeft className="h-4 w-4" />
                     </Button>
                 </Link>
-                <h1 className="text-3xl font-bold">学習履歴</h1>
+                <h1 className="text-3xl font-bold">{t('title')}</h1>
             </div>
 
             <HistoryFilter subjects={subjects} />
@@ -66,18 +68,18 @@ export default async function HistoryPage({
                     <table className="w-full text-sm text-left">
                         <thead className="bg-muted text-muted-foreground uppercase">
                             <tr>
-                                <th className="px-6 py-3">日時</th>
-                                <th className="px-6 py-3">科目・単元</th>
-                                <th className="px-6 py-3">問題</th>
-                                <th className="px-6 py-3">評価</th>
-                                <th className="px-6 py-3">AIフィードバック</th>
+                                <th className="px-6 py-3">{t('dateHeader')}</th>
+                                <th className="px-6 py-3">{t('subjectUnitHeader')}</th>
+                                <th className="px-6 py-3">{t('problemHeader')}</th>
+                                <th className="px-6 py-3">{t('evaluationHeader')}</th>
+                                <th className="px-6 py-3">{t('feedbackHeader')}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {history.items.length === 0 ? (
                                 <tr>
                                     <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">
-                                        履歴が見つかりませんでした
+                                        {t('empty')}
                                     </td>
                                 </tr>
                             ) : (
@@ -88,7 +90,7 @@ export default async function HistoryPage({
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="font-medium">
-                                                {item.problem.coreProblems[0]?.subject.name || '不明'}
+                                                {item.problem.coreProblems[0]?.subject.name || t('unknown')}
                                             </div>
                                             <div className="text-xs text-muted-foreground">
                                                 {item.problem.coreProblems.map(c => c.name).join(', ')}
@@ -111,7 +113,7 @@ export default async function HistoryPage({
                                         </td>
                                         <td className="px-6 py-4 max-w-md">
                                             <div className="text-xs text-muted-foreground line-clamp-3 hover:line-clamp-none cursor-pointer" title={item.feedback || ''}>
-                                                {item.feedback || '(フィードバックなし)'}
+                                                {item.feedback || t('noFeedback')}
                                             </div>
                                             {/* Causes display if C/D? */}
                                         </td>
@@ -125,17 +127,21 @@ export default async function HistoryPage({
                 {/* Pagination */}
                 <div className="p-4 flex items-center justify-between border-t bg-muted">
                     <div className="text-sm text-muted-foreground">
-                        全 {history.total} 件中 {(page - 1) * limit + 1} - {Math.min(page * limit, history.total)} 件を表示
+                        {t('paginationRange', {
+                            total: history.total,
+                            start: (page - 1) * limit + 1,
+                            end: Math.min(page * limit, history.total),
+                        })}
                     </div>
                     <div className="flex gap-2">
                         <Link href={hasPrev ? buildLink(page - 1) : '#'}>
                             <Button variant="outline" size="sm" disabled={!hasPrev}>
-                                <ChevronLeft className="h-4 w-4 mr-1" /> 前へ
+                                <ChevronLeft className="h-4 w-4 mr-1" /> {t('previous')}
                             </Button>
                         </Link>
                         <Link href={hasNext ? buildLink(page + 1) : '#'}>
                             <Button variant="outline" size="sm" disabled={!hasNext}>
-                                次へ <ChevronRight className="h-4 w-4 ml-1" />
+                                {t('next')} <ChevronRight className="h-4 w-4 ml-1" />
                             </Button>
                         </Link>
                     </div>

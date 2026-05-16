@@ -17,7 +17,14 @@ import { DashboardHeatmapSection, DashboardHeatmapSectionFallback } from './dash
 export default async function DashboardPage() {
     const session = await getSession();
     if (!session) redirect('/login');
-    const t = await getTranslations('Dashboard');
+    const [t, heatmapT] = await Promise.all([
+        getTranslations('Dashboard'),
+        getTranslations('DashboardHeatmap'),
+    ]);
+    const heatmapTitles = {
+        heatmapTitle: heatmapT('heatmapTitle'),
+        subjectProgressTitle: heatmapT('subjectProgressTitle'),
+    };
 
     // 上部 KPI と目標パネルは初回描画に必要なので同期取得する。
     // 重い fetch（heatmap = dailyActivity 365日分 + 教科別進捗）と、
@@ -117,7 +124,7 @@ export default async function DashboardPage() {
                 </Card>
             </section>
 
-            <Suspense fallback={<DashboardHeatmapSectionFallback />}>
+            <Suspense fallback={<DashboardHeatmapSectionFallback titles={heatmapTitles} />}>
                 <DashboardHeatmapSection userId={session.userId} />
             </Suspense>
         </div>

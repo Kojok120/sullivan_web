@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
 
 interface ActivityChartImplProps {
@@ -10,6 +11,8 @@ interface ActivityChartImplProps {
 }
 
 export function ActivityChartImpl({ data }: ActivityChartImplProps) {
+    const t = useTranslations('ActivityChart');
+
     return (
         <ResponsiveContainer width="100%" height={350}>
             <BarChart data={data}>
@@ -29,7 +32,7 @@ export function ActivityChartImpl({ data }: ActivityChartImplProps) {
                     fontSize={12}
                     tickLine={false}
                     axisLine={false}
-                    tickFormatter={(value) => `${value}問`}
+                    tickFormatter={(value) => t('problemCountTick', { count: value })}
                 />
                 <Tooltip
                     contentStyle={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0' }}
