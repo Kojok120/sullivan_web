@@ -74,6 +74,9 @@ importers:
       '@sullivan/db-schema':
         specifier: workspace:*
         version: link:packages/db-schema
+      '@sullivan/ui-kit':
+        specifier: workspace:*
+        version: link:packages/ui-kit
       '@sullivan/user-platform':
         specifier: workspace:*
         version: link:packages/user-platform
@@ -269,6 +272,15 @@ importers:
       prisma:
         specifier: 7.4.1
         version: 7.4.1(@types/react@19.2.14)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3)
+
+  packages/ui-kit:
+    dependencies:
+      '@prisma/client':
+        specifier: 7.4.1
+        version: 7.4.1(prisma@7.4.1(@types/react@19.2.14)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3))(typescript@5.9.3)
+      canvas-confetti:
+        specifier: ^1.9.4
+        version: 1.9.4
 
   packages/user-platform:
     dependencies:
