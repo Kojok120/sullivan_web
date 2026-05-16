@@ -27,6 +27,7 @@ RUN npm install -g pnpm@10.11.0
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json tsconfig.base.json ./
 COPY packages ./packages
+COPY content ./content
 COPY scripts/build-server.mjs ./scripts/build-server.mjs
 COPY worker ./worker
 COPY src ./src
