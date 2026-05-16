@@ -12,7 +12,8 @@
    - `src/` → `apps/sullivan-jp/src/`
    - `server.ts`, `middleware.ts`, `worker/`, `next.config.ts`, `postcss.config.mjs`, `components.json`, `next-env.d.ts` → `apps/sullivan-jp/`
    - `vitest.config.ts`, `vitest.setup.ts`, `playwright.config.ts`, `playwright.prod.config.ts`, `e2e/` → `apps/sullivan-jp/`
-   - `public/`, `instructions/`, `manual_*/`, `math_problems_originals/` → `apps/sullivan-jp/`
+   - `public/`, `instructions/`, `math_problems_originals/` → `apps/sullivan-jp/`
+   - `manual_admin/`, `manual_student/`, `manual_teacher/` → `apps/sullivan-jp/` (1.7.b1 で移動済)
 
 2. **Docker / CI 移動 (Phase 1.7.c)**
    - `Dockerfile` → `apps/sullivan-jp/Dockerfile.web`
