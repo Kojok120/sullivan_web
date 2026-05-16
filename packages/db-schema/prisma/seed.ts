@@ -18,7 +18,7 @@ import {
   type AnswerSpec,
   type PrintConfig,
   type StructuredProblemDocument,
-} from '../src/lib/structured-problem';
+} from '../../../src/lib/structured-problem';
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {

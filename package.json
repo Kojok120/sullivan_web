@@ -22,10 +22,11 @@
     "seed:math-prod": "tsx scripts/seed-math-problems-production.ts"
   },
   "prisma": {
-    "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
+    "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} packages/db-schema/prisma/seed.ts"
   },
   "dependencies": {
     "@sullivan/config": "workspace:*",
+    "@sullivan/db-schema": "workspace:*",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
