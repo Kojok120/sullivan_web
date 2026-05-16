@@ -262,5 +262,37 @@
     "printCardTitle": "問題を印刷する",
     "printCardDescription": "単元集中はいつでも印刷できます。アンロック判定は通常演習の採点結果で行われます。",
     "printThisUnit": "この単元を印刷する"
+  },
+  "Achievements": {
+    "title": "実績・トロフィー",
+    "unlockedAt": "獲得日: {date}",
+    "locked": "未獲得"
+  },
+  "StudentRanking": {
+    "heading": "教室ランキング",
+    "description": "同じ教室の生徒ランキングです。問題数・英単語スコア・正答率の上位10人を、今月・3ヶ月・1年・自由指定で表示します。"
+  },
+  "Ranking": {
+    "categoryProblemCount": "問題数",
+    "categoryVocabularyScore": "英単語スコア",
+    "categoryAccuracy": "正答率",
+    "periodThisMonth": "今月",
+    "periodThreeMonths": "3ヶ月",
+    "periodOneYear": "1年",
+    "periodCustom": "自由指定",
+    "unitProblemCount": "問",
+    "unitVocabularyScore": "pt",
+    "unitAccuracy": "%",
+    "validationMonthRequired": "開始月と終了月を選択してください。",
+    "validationMonthFormat": "開始月と終了月は YYYY-MM 形式で指定してください。",
+    "validationMonthOrder": "開始月は終了月以前を指定してください。",
+    "validationMaxMonths": "自由指定は最大{months}ヶ月までです。",
+    "fetchFailed": "ランキングの取得に失敗しました",
+    "invalidData": "ランキングデータの形式が不正です",
+    "classroomPlaceholder": "教室を選択",
+    "startMonth": "開始月",
+    "endMonth": "終了月",
+    "selectClassroomPrompt": "教室を選択するとランキングを表示します。",
+    "emptyData": "ランキングデータがありません。"
   }
 }

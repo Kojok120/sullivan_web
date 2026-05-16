@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -28,16 +29,16 @@ type RankingPageClientProps = {
 
 const DEFAULT_TIME_ZONE = 'Asia/Tokyo';
 const MONTH_KEY_REGEX = /^\d{4}-(0[1-9]|1[0-2])$/;
-const CATEGORY_OPTIONS: Array<{ key: RankingCategoryKey; label: string }> = [
-    { key: 'problemCount', label: '問題数' },
-    { key: 'vocabularyScore', label: '英単語スコア' },
-    { key: 'accuracy', label: '正答率' },
+const CATEGORY_OPTIONS: Array<{ key: RankingCategoryKey; labelKey: 'categoryProblemCount' | 'categoryVocabularyScore' | 'categoryAccuracy' }> = [
+    { key: 'problemCount', labelKey: 'categoryProblemCount' },
+    { key: 'vocabularyScore', labelKey: 'categoryVocabularyScore' },
+    { key: 'accuracy', labelKey: 'categoryAccuracy' },
 ];
-const PERIOD_OPTIONS: Array<{ key: RankingPeriodKey; label: string }> = [
-    { key: '1m', label: '今月' },
-    { key: '3m', label: '3ヶ月' },
-    { key: '12m', label: '1年' },
-    { key: 'custom', label: '自由指定' },
+const PERIOD_OPTIONS: Array<{ key: RankingPeriodKey; labelKey: 'periodThisMonth' | 'periodThreeMonths' | 'periodOneYear' | 'periodCustom' }> = [
+    { key: '1m', labelKey: 'periodThisMonth' },
+    { key: '3m', labelKey: 'periodThreeMonths' },
+    { key: '12m', labelKey: 'periodOneYear' },
+    { key: 'custom', labelKey: 'periodCustom' },
 ];
 
 const MEDAL_STYLES: Record<number, { bg: string; border: string; text: string; badge: string }> = {
@@ -60,12 +61,6 @@ const MEDAL_STYLES: Record<number, { bg: string; border: string; text: string; b
         badge: 'bg-orange-500 text-white',
     },
 };
-
-function getValueUnit(category: RankingCategoryKey): string {
-    if (category === 'problemCount') return '問';
-    if (category === 'vocabularyScore') return 'pt';
-    return '%';
-}
 
 function formatRankingValue(category: RankingCategoryKey, value: number): string {
     return category === 'accuracy' ? `${value}%` : String(value);
@@ -91,21 +86,30 @@ function countInclusiveMonths(startMonth: string, endMonth: string): number {
     return (endYear - startYear) * 12 + (endMonthNumber - startMonthNumber) + 1;
 }
 
-function getCustomRangeValidationMessage(startMonth: string, endMonth: string): string | null {
+function getCustomRangeValidationMessage(
+    startMonth: string,
+    endMonth: string,
+    messages: {
+        monthRequired: string;
+        monthFormat: string;
+        monthOrder: string;
+        maxMonths: string;
+    }
+): string | null {
     if (!startMonth || !endMonth) {
-        return '開始月と終了月を選択してください。';
+        return messages.monthRequired;
     }
 
     if (!MONTH_KEY_REGEX.test(startMonth) || !MONTH_KEY_REGEX.test(endMonth)) {
-        return '開始月と終了月は YYYY-MM 形式で指定してください。';
+        return messages.monthFormat;
     }
 
     if (startMonth > endMonth) {
-        return '開始月は終了月以前を指定してください。';
+        return messages.monthOrder;
     }
 
     if (countInclusiveMonths(startMonth, endMonth) > RANKING_CUSTOM_RANGE_MAX_MONTHS) {
-        return `自由指定は最大${RANKING_CUSTOM_RANGE_MAX_MONTHS}ヶ月までです。`;
+        return messages.maxMonths;
     }
 
     return null;
@@ -121,12 +125,12 @@ const PODIUM_ORDER: Record<number, string> = {
 /** 上位3名のポディアムカード */
 function PodiumCard({
     entry,
-    category,
     maxValue,
+    valueUnit,
 }: {
     entry: RankingEntry;
-    category: RankingCategoryKey;
     maxValue: number;
+    valueUnit: string;
 }) {
     const style = MEDAL_STYLES[entry.rank];
     if (!style) return null;
@@ -164,7 +168,7 @@ function PodiumCard({
             {/* 値 */}
             <p className={cn('mt-3 text-2xl font-bold tabular-nums', style.text)}>
                 {entry.value}
-                <span className="text-sm font-medium">{getValueUnit(category)}</span>
+                <span className="text-sm font-medium">{valueUnit}</span>
             </p>
 
             {/* プログレスバー */}
@@ -269,6 +273,7 @@ export function RankingPageClient({
     showClassroomSelector = false,
     classrooms = [],
 }: RankingPageClientProps) {
+    const t = useTranslations('Ranking');
     const [timeZone, setTimeZone] = useState(DEFAULT_TIME_ZONE);
     const [category, setCategory] = useState<RankingCategoryKey>('problemCount');
     const [periodKey, setPeriodKey] = useState<RankingPeriodKey>('1m');
@@ -291,8 +296,13 @@ export function RankingPageClient({
             return null;
         }
 
-        return getCustomRangeValidationMessage(customStartMonth, customEndMonth);
-    }, [customEndMonth, customStartMonth, periodKey]);
+        return getCustomRangeValidationMessage(customStartMonth, customEndMonth, {
+            monthRequired: t('validationMonthRequired'),
+            monthFormat: t('validationMonthFormat'),
+            monthOrder: t('validationMonthOrder'),
+            maxMonths: t('validationMaxMonths', { months: RANKING_CUSTOM_RANGE_MAX_MONTHS }),
+        });
+    }, [customEndMonth, customStartMonth, periodKey, t]);
 
     useEffect(() => {
         let cancelled = false;
@@ -337,12 +347,12 @@ export function RankingPageClient({
 
                 const payload: unknown = await response.json();
                 if (!response.ok) {
-                    throw new Error(getApiErrorMessage(payload) ?? 'ランキングの取得に失敗しました');
+                    throw new Error(getApiErrorMessage(payload) ?? t('fetchFailed'));
                 }
 
                 const parsedPayload = rankingResponseSchema.safeParse(payload);
                 if (!parsedPayload.success) {
-                    throw new Error('ランキングデータの形式が不正です');
+                    throw new Error(t('invalidData'));
                 }
 
                 if (!cancelled) {
@@ -350,7 +360,7 @@ export function RankingPageClient({
                 }
             } catch (error) {
                 if (!cancelled) {
-                    const message = error instanceof Error ? error.message : 'ランキングの取得に失敗しました';
+                    const message = error instanceof Error ? error.message : t('fetchFailed');
                     setErrorMessage(message);
                     setData(null);
                 }
@@ -374,6 +384,7 @@ export function RankingPageClient({
         periodKey,
         selectedClassroomId,
         showClassroomSelector,
+        t,
         timeZone,
     ]);
 
@@ -387,6 +398,11 @@ export function RankingPageClient({
     const maxValue = entries.length > 0 ? entries[0].value : 0;
 
     const periodLabel = data?.period.label;
+    const valueUnit = category === 'problemCount'
+        ? t('unitProblemCount')
+        : category === 'vocabularyScore'
+        ? t('unitVocabularyScore')
+        : t('unitAccuracy');
 
     return (
         <div className="space-y-6">
@@ -403,7 +419,7 @@ export function RankingPageClient({
                         <div className="w-full max-w-sm">
                             <Select value={selectedClassroomId} onValueChange={setSelectedClassroomId}>
                                 <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="教室を選択" />
+                                    <SelectValue placeholder={t('classroomPlaceholder')} />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {classrooms.map((classroom) => (
@@ -430,7 +446,7 @@ export function RankingPageClient({
                                 )}
                                 onClick={() => setCategory(option.key)}
                             >
-                                {option.label}
+                                {t(option.labelKey)}
                             </button>
                         ))}
                     </div>
@@ -445,7 +461,7 @@ export function RankingPageClient({
                                 size="sm"
                                 onClick={() => setPeriodKey(option.key)}
                             >
-                                {option.label}
+                                {t(option.labelKey)}
                             </Button>
                         ))}
                     </div>
@@ -454,7 +470,7 @@ export function RankingPageClient({
                     {periodKey === 'custom' ? (
                         <div className="grid max-w-md gap-4 sm:grid-cols-2">
                             <label className="space-y-1.5 text-sm">
-                                <span className="font-medium">開始月</span>
+                                <span className="font-medium">{t('startMonth')}</span>
                                 <Input
                                     type="month"
                                     value={customStartMonth}
@@ -462,7 +478,7 @@ export function RankingPageClient({
                                 />
                             </label>
                             <label className="space-y-1.5 text-sm">
-                                <span className="font-medium">終了月</span>
+                                <span className="font-medium">{t('endMonth')}</span>
                                 <Input
                                     type="month"
                                     value={customEndMonth}
@@ -492,7 +508,7 @@ export function RankingPageClient({
             {showClassroomSelector && !selectedClassroomId ? (
                 <Card>
                     <CardContent className="py-12 text-center text-sm text-muted-foreground">
-                        教室を選択するとランキングを表示します。
+                        {t('selectClassroomPrompt')}
                     </CardContent>
                 </Card>
             ) : periodKey === 'custom' && customRangeMessage ? (
@@ -512,7 +528,7 @@ export function RankingPageClient({
             ) : entries.length === 0 ? (
                 <Card>
                     <CardContent className="py-12 text-center text-sm text-muted-foreground">
-                        ランキングデータがありません。
+                        {t('emptyData')}
                     </CardContent>
                 </Card>
             ) : (
@@ -524,8 +540,8 @@ export function RankingPageClient({
                                 <PodiumCard
                                     key={entry.userId}
                                     entry={entry}
-                                    category={category}
                                     maxValue={maxValue}
+                                    valueUnit={valueUnit}
                                 />
                             ))}
                         </div>
