@@ -83,5 +83,36 @@
     "totalProblemCount": "問題数 {count}問",
     "totalCustomCount": "任意目標 {count}件",
     "selectedDateEmpty": "この日は目標が設定されていません"
+  },
+  "Dashboard": {
+    "title": "学習ダッシュボード",
+    "subtitle": "今日やることを先に確認してから学習を始めましょう",
+    "levelBadge": "Lv.{level}",
+    "todayGoalCount": "今日の目標 {count}件",
+    "currentXp": "XP {xp}",
+    "nextXp": "Next {xp}",
+    "totalProblemsTitle": "総学習数",
+    "problemCount": "{count}問",
+    "totalProblemsDescription": "これまでの累計",
+    "accuracyTitle": "正答率",
+    "accuracyDescription": "平均正答率",
+    "streakTitle": "連続学習",
+    "streakDays": "{days}日",
+    "streakDescription": "連続達成中",
+    "levelTitle": "レベル",
+    "nextLevelXp": "次レベルまで {xp} XP"
+  },
+  "SessionList": {
+    "emptyHistory": "まだ学習履歴がありません",
+    "pendingVideoReviewOnly": "解説動画未視聴のみ表示",
+    "pendingVideoReviewEmptyLine1": "解説動画未視聴のセッションはありません。",
+    "pendingVideoReviewEmptyLine2": "素晴らしい！",
+    "newBadge": "NEW",
+    "correctCount": "{correct} / {total} 問正解",
+    "unwatchedMistakes": "解説動画未視聴: {count}",
+    "reviewComplete": "復習完了！",
+    "allCorrect": "全問正解！",
+    "loading": "読み込み中...",
+    "loadMore": "さらに読み込む"
   }
 }

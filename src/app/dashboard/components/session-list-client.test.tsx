@@ -1,6 +1,9 @@
 import type { ReactNode } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { NextIntlClientProvider } from 'next-intl';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import jaMessages from '@/messages/ja.json';
 
 import { SessionListClient } from './session-list-client';
 
@@ -10,6 +13,14 @@ function createDeferred<T>() {
         resolve = res;
     });
     return { promise, resolve };
+}
+
+function renderWithIntl(ui: ReactNode) {
+    return render(
+        <NextIntlClientProvider locale="ja" messages={jaMessages}>
+            {ui}
+        </NextIntlClientProvider>
+    );
 }
 
 const { fetchUserSessionsMock, markSessionReviewedMock } = vi.hoisted(() => ({
@@ -113,7 +124,7 @@ describe('SessionListClient', () => {
     it('動画未視聴フィルタ文言と空状態文言を表示する', async () => {
         fetchUserSessionsMock.mockResolvedValueOnce([]);
 
-        render(
+        renderWithIntl(
             <SessionListClient
                 initialSessions={initialSessions}
                 userId="user-1"
@@ -133,7 +144,7 @@ describe('SessionListClient', () => {
     });
 
     it('セッションリンクのクリックでは既読 action を呼ばない', () => {
-        render(
+        renderWithIntl(
             <SessionListClient
                 initialSessions={initialSessions}
                 userId="user-1"
@@ -154,7 +165,7 @@ describe('SessionListClient', () => {
             .mockImplementationOnce(() => firstFetch.promise)
             .mockImplementationOnce(() => secondFetch.promise);
 
-        render(
+        renderWithIntl(
             <SessionListClient
                 initialSessions={initialSessions}
                 userId="user-1"
@@ -204,7 +215,7 @@ describe('SessionListClient', () => {
     it('フィルタ取得に失敗した場合はチェック状態を元に戻す', async () => {
         fetchUserSessionsMock.mockRejectedValueOnce(new Error('network error'));
 
-        render(
+        renderWithIntl(
             <SessionListClient
                 initialSessions={initialSessions}
                 userId="user-1"
@@ -225,7 +236,7 @@ describe('SessionListClient', () => {
     });
 
     it('初期表示が1ページ未満ならさらに読み込むを表示しない', () => {
-        render(
+        renderWithIntl(
             <SessionListClient
                 initialSessions={initialSessions}
                 userId="user-1"
