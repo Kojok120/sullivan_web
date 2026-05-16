@@ -44,6 +44,7 @@ interface ProblemManagerProps {
     showMasterNumber?: boolean;
     showBulkImport?: boolean;
     bulkImportLabel?: string;
+    bulkImportLabelKey?: string;
     bulkImportConfig?: {
         defaultSubjectId?: string;
         lockSubjectSelection?: boolean;
@@ -65,6 +66,7 @@ export function ProblemManager({
     showMasterNumber = true,
     showBulkImport,
     bulkImportLabel,
+    bulkImportLabelKey,
     bulkImportConfig,
 }: ProblemManagerProps) {
     const t = useTranslations('ProblemManager');
@@ -76,6 +78,7 @@ export function ProblemManager({
     const isAuthorView = viewMode === 'author';
     const resolvedShowBulkImport = showBulkImport ?? !isAuthorView;
     const resolvedBulkImportConfig = bulkImportConfig ?? { variant: 'default' as const };
+    const resolvedBulkImportLabel = bulkImportLabel ?? (bulkImportLabelKey ? t(bulkImportLabelKey) : t('bulkImport'));
 
     const buildParams = (updates: Record<string, string | undefined>) => {
         const params = new URLSearchParams(searchParams.toString());
@@ -211,7 +214,7 @@ export function ProblemManager({
                             <SelectContent>
                                 <SelectItem value="ALL">{t('allVideos')}</SelectItem>
                                 {VIDEO_STATUS_OPTIONS.map((option) => (
-                                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                                    <SelectItem key={option.value} value={option.value}>{t(option.labelKey)}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
@@ -222,7 +225,7 @@ export function ProblemManager({
                             <SelectContent>
                                 <SelectItem value="ALL">{t('allProblemTypes')}</SelectItem>
                                 {PROBLEM_TYPE_OPTIONS.map((option) => (
-                                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                                    <SelectItem key={option.value} value={option.value}>{t(option.labelKey)}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
@@ -233,7 +236,7 @@ export function ProblemManager({
                             <SelectContent>
                                 <SelectItem value="ALL">{t('allStatuses')}</SelectItem>
                                 {PROBLEM_STATUS_OPTIONS.map((option) => (
-                                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                                    <SelectItem key={option.value} value={option.value}>{t(option.labelKey)}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
@@ -243,7 +246,7 @@ export function ProblemManager({
                 <div className="flex gap-2">
                     {resolvedShowBulkImport && (
                         <Button onClick={() => setIsBulkDialogOpen(true)} variant="outline" className="min-h-11 flex-1 sm:min-h-10 sm:flex-none">
-                            {bulkImportLabel ?? t('bulkImport')}
+                            {resolvedBulkImportLabel}
                         </Button>
                     )}
                     <Button asChild className="min-h-11 flex-1 sm:min-h-10 sm:flex-none">

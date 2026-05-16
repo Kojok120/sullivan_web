@@ -175,7 +175,7 @@ function ProblemDialogForm({
                             </SelectTrigger>
                             <SelectContent>
                                 {VIDEO_STATUS_OPTIONS.map((option) => (
-                                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                                    <SelectItem key={option.value} value={option.value}>{t(option.labelKey)}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>

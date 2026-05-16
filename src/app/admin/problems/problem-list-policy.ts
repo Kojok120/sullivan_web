@@ -18,7 +18,7 @@ export type ProblemBulkImportConfig = {
 export type ProblemListUiPolicy = {
     showMasterNumber: boolean;
     showBulkImport: boolean;
-    bulkImportLabel: string;
+    bulkImportLabelKey: string;
     bulkImportConfig: ProblemBulkImportConfig;
 };
 
@@ -49,7 +49,7 @@ export function buildProblemListUiPolicy(
     return {
         showMasterNumber: shouldShowProblemMasterNumber(currentSubject.name),
         showBulkImport: viewMode === 'admin' || isEnglishSubject,
-        bulkImportLabel: isEnglishSubject ? '英語シート一括登録' : '一括登録',
+        bulkImportLabelKey: isEnglishSubject ? 'bulkImportEnglishSheet' : 'bulkImport',
         bulkImportConfig: isEnglishSubject
             ? {
                 defaultSubjectId: currentSubject.id,

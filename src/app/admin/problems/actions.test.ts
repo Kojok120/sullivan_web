@@ -90,6 +90,36 @@ vi.mock('next/cache', () => ({
     revalidatePath: revalidatePathMock,
 }));
 
+vi.mock('next-intl/server', async () => {
+    const messages = (await import('@/messages/ja.json')).default as Record<string, unknown>;
+
+    function readMessage(namespace: string, key: string): string {
+        const namespaceMessages = messages[namespace] as Record<string, unknown> | undefined;
+        const value = key.split('.').reduce<unknown>((current, segment) => {
+            if (current && typeof current === 'object' && segment in current) {
+                return (current as Record<string, unknown>)[segment];
+            }
+            return undefined;
+        }, namespaceMessages);
+
+        return typeof value === 'string' ? value : key;
+    }
+
+    return {
+        getTranslations: vi.fn(async (namespace: string) => {
+            return (key: string, values?: Record<string, string | number>) => {
+                const message = readMessage(namespace, key);
+                if (!values) return message;
+
+                return Object.entries(values).reduce(
+                    (current, [name, value]) => current.replaceAll(`{${name}}`, String(value)),
+                    message,
+                );
+            };
+        }),
+    };
+});
+
 vi.mock('@/lib/curriculum-service', () => ({
     getNextCustomId: getNextCustomIdMock,
 }));

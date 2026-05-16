@@ -82,7 +82,7 @@ export default async function ProblemsPage({
                 currentSubject={currentSubject}
                 showMasterNumber={policy.showMasterNumber}
                 showBulkImport={policy.showBulkImport}
-                bulkImportLabel={policy.bulkImportLabel}
+                bulkImportLabelKey={policy.bulkImportLabelKey}
                 bulkImportConfig={policy.bulkImportConfig}
             />
         </div>

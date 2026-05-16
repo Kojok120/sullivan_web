@@ -2,22 +2,22 @@ export type ProblemEditorViewMode = 'admin' | 'author';
 
 type Option<T extends string> = {
     value: T;
-    label: string;
-    description?: string;
+    labelKey: string;
+    descriptionKey?: string;
 };
 
 export const PROBLEM_TYPE_OPTIONS = [
-    { value: 'SHORT_TEXT', label: '短い記述', description: '語句や短文で答える問題です。' },
-    { value: 'GRAPH_DRAW', label: '関数・グラフ', description: '関数や座標平面のグラフを扱う問題です。' },
-    { value: 'GEOMETRY', label: '図形', description: '作図や図形の性質を扱う問題です。' },
+    { value: 'SHORT_TEXT', labelKey: 'problemType.SHORT_TEXT', descriptionKey: 'problemTypeDescription.SHORT_TEXT' },
+    { value: 'GRAPH_DRAW', labelKey: 'problemType.GRAPH_DRAW', descriptionKey: 'problemTypeDescription.GRAPH_DRAW' },
+    { value: 'GEOMETRY', labelKey: 'problemType.GEOMETRY', descriptionKey: 'problemTypeDescription.GEOMETRY' },
 ] as const satisfies ReadonlyArray<Option<string>>;
 
 export const PROBLEM_TYPE_VALUES = PROBLEM_TYPE_OPTIONS.map((option) => option.value);
 
 export const PROBLEM_STATUS_OPTIONS = [
-    { value: 'DRAFT', label: '下書き' },
-    { value: 'PUBLISHED', label: '公開中' },
-    { value: 'SENT_BACK', label: '差し戻し' },
+    { value: 'DRAFT', labelKey: 'status.DRAFT' },
+    { value: 'PUBLISHED', labelKey: 'status.PUBLISHED' },
+    { value: 'SENT_BACK', labelKey: 'status.SENT_BACK' },
 ] as const satisfies ReadonlyArray<Option<string>>;
 
 export const PROBLEM_STATUS_VALUES = PROBLEM_STATUS_OPTIONS.map((option) => option.value);
@@ -25,41 +25,41 @@ export const PROBLEM_STATUS_VALUES = PROBLEM_STATUS_OPTIONS.map((option) => opti
 export type ProblemStatusValue = (typeof PROBLEM_STATUS_OPTIONS)[number]['value'];
 
 export const PROBLEM_AUTHORING_TOOL_OPTIONS = [
-    { value: 'MANUAL', label: '手入力' },
-    { value: 'SVG', label: 'SVG図版' },
-    { value: 'UPLOAD', label: 'ファイル取込' },
+    { value: 'MANUAL', labelKey: 'authoringTool.MANUAL' },
+    { value: 'SVG', labelKey: 'authoringTool.SVG' },
+    { value: 'UPLOAD', labelKey: 'authoringTool.UPLOAD' },
 ] as const satisfies ReadonlyArray<Option<string>>;
 
 export const BLOCK_TYPE_OPTIONS = [
-    { value: 'paragraph', label: '説明文' },
-    { value: 'katexInline', label: '数式（文中）' },
-    { value: 'katexDisplay', label: '数式（独立）' },
-    { value: 'image', label: '図・画像' },
-    { value: 'svg', label: 'SVG図版' },
-    { value: 'table', label: '表' },
-    { value: 'choices', label: '選択肢' },
-    { value: 'blankGroup', label: '空欄' },
+    { value: 'paragraph', labelKey: 'blockType.paragraph' },
+    { value: 'katexInline', labelKey: 'blockType.katexInline' },
+    { value: 'katexDisplay', labelKey: 'blockType.katexDisplay' },
+    { value: 'image', labelKey: 'blockType.image' },
+    { value: 'svg', labelKey: 'blockType.svg' },
+    { value: 'table', labelKey: 'blockType.table' },
+    { value: 'choices', labelKey: 'blockType.choices' },
+    { value: 'blankGroup', labelKey: 'blockType.blankGroup' },
 ] as const satisfies ReadonlyArray<Option<string>>;
 
 export const ASSET_KIND_OPTIONS = [
-    { value: 'IMAGE', label: '画像' },
-    { value: 'SVG', label: 'SVG図版' },
-    { value: 'PDF', label: 'PDF' },
-    { value: 'JSON', label: 'JSON' },
-    { value: 'THUMBNAIL', label: 'サムネイル' },
+    { value: 'IMAGE', labelKey: 'assetKind.IMAGE' },
+    { value: 'SVG', labelKey: 'assetKind.SVG' },
+    { value: 'PDF', labelKey: 'assetKind.PDF' },
+    { value: 'JSON', labelKey: 'assetKind.JSON' },
+    { value: 'THUMBNAIL', labelKey: 'assetKind.THUMBNAIL' },
 ] as const satisfies ReadonlyArray<Option<string>>;
 
 export const ASSET_SOURCE_TOOL_OPTIONS = [
-    { value: 'MANUAL', label: '手入力' },
-    { value: 'SVG', label: 'SVG図版' },
-    { value: 'UPLOAD', label: 'ファイル取込' },
+    { value: 'MANUAL', labelKey: 'assetSourceTool.MANUAL' },
+    { value: 'SVG', labelKey: 'assetSourceTool.SVG' },
+    { value: 'UPLOAD', labelKey: 'assetSourceTool.UPLOAD' },
 ] as const satisfies ReadonlyArray<Option<string>>;
 
 export const VIDEO_STATUS_OPTIONS = [
-    { value: 'NONE', label: '-' },
-    { value: 'SHOT', label: '撮影完了' },
-    { value: 'UPLOADED', label: 'Drive完了' },
-    { value: 'CONFIGURED', label: '設定済み' },
+    { value: 'NONE', labelKey: 'videoStatus.NONE' },
+    { value: 'SHOT', labelKey: 'videoStatus.SHOT' },
+    { value: 'UPLOADED', labelKey: 'videoStatus.UPLOADED' },
+    { value: 'CONFIGURED', labelKey: 'videoStatus.CONFIGURED' },
 ] as const satisfies ReadonlyArray<Option<string>>;
 
 export const VIDEO_STATUS_VALUES = VIDEO_STATUS_OPTIONS.map((option) => option.value);
@@ -68,7 +68,7 @@ export type VideoStatusValue = (typeof VIDEO_STATUS_OPTIONS)[number]['value'];
 
 function getOptionLabel(options: ReadonlyArray<Option<string>>, value: string | null | undefined, fallback = '-'): string {
     if (!value) return fallback;
-    return options.find((option) => option.value === value)?.label ?? value;
+    return options.find((option) => option.value === value)?.labelKey ?? value;
 }
 
 export function getProblemTypeLabel(value: string | null | undefined) {

@@ -56,6 +56,9 @@ export default async function MaterialsProblemsPage({
         redirect(`/materials/problems?${nextParams.toString()}`);
     }
 
+    const policy = buildProblemListUiPolicy(currentSubject, 'author');
+    const normalizedSortBy = normalizeProblemSortBy(sortBy, currentSubject.name);
+
     const result = await getProblems(
         page,
         20,
@@ -68,7 +71,7 @@ export default async function MaterialsProblemsPage({
             problemType: params.problemType,
             status: isProblemStatusValue(params.status) ? params.status : undefined,
         },
-        normalizeProblemSortBy(sortBy, currentSubject.name),
+        normalizedSortBy,
         sortOrder,
     );
 
@@ -89,16 +92,16 @@ export default async function MaterialsProblemsPage({
                 totalCount={result.total || 0}
                 currentPage={page}
                 initialQuery={query}
-                sortBy={normalizeProblemSortBy(sortBy, currentSubject.name)}
+                sortBy={normalizedSortBy}
                 sortOrder={sortOrder}
                 subjects={subjects}
                 currentSubject={currentSubject}
                 routeBase="/materials/problems"
                 viewMode="author"
-                showMasterNumber={buildProblemListUiPolicy(currentSubject, 'author').showMasterNumber}
-                showBulkImport={buildProblemListUiPolicy(currentSubject, 'author').showBulkImport}
-                bulkImportLabel={buildProblemListUiPolicy(currentSubject, 'author').bulkImportLabel}
-                bulkImportConfig={buildProblemListUiPolicy(currentSubject, 'author').bulkImportConfig}
+                showMasterNumber={policy.showMasterNumber}
+                showBulkImport={policy.showBulkImport}
+                bulkImportLabelKey={policy.bulkImportLabelKey}
+                bulkImportConfig={policy.bulkImportConfig}
             />
         </div>
     );

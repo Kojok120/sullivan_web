@@ -965,11 +965,28 @@
     "statusPlaceholder": "公開状況",
     "allStatuses": "公開状況: 全件",
     "bulkImport": "一括登録",
+    "bulkImportEnglishSheet": "英語シート一括登録",
     "createNewAuthor": "新しい問題を作成",
     "create": "問題を作成",
     "totalCount": "全 {count} 件",
     "previous": "前へ",
-    "next": "次へ"
+    "next": "次へ",
+    "problemType": {
+      "SHORT_TEXT": "短い記述",
+      "GRAPH_DRAW": "関数・グラフ",
+      "GEOMETRY": "図形"
+    },
+    "status": {
+      "DRAFT": "下書き",
+      "PUBLISHED": "公開中",
+      "SENT_BACK": "差し戻し"
+    },
+    "videoStatus": {
+      "NONE": "-",
+      "SHOT": "撮影完了",
+      "UPLOADED": "Drive完了",
+      "CONFIGURED": "設定済み"
+    }
   },
   "AdminProblemsPage": {
     "title": "問題一覧",
@@ -1017,7 +1034,13 @@
     "videoUrlAutoStatus": "URL設定済みのため自動的に「設定済み」になります",
     "coreProblemsLabel": "紐付け（コア問題・単元）",
     "cancel": "キャンセル",
-    "save": "保存"
+    "save": "保存",
+    "videoStatus": {
+      "NONE": "-",
+      "SHOT": "撮影完了",
+      "UPLOADED": "Drive完了",
+      "CONFIGURED": "設定済み"
+    }
   },
   "ProblemList": {
     "publishSuccess": "公開しました",
@@ -1377,5 +1400,89 @@
         }
       }
     }
+  },
+  "ProblemBulkImport": {
+    "englishSheetTitle": "英語シート一括登録",
+    "defaultTitle": "問題の一括登録・更新",
+    "englishSheetDescription": "元の英語スプレッドシートからコピー＆ペーストで一括登録・更新できます。",
+    "defaultDescription": "Excelやスプレッドシートからコピー＆ペーストで一括登録・更新できます。",
+    "upsertHint": "マスタ内問題番号が既存の場合は更新、新規の場合は作成されます。",
+    "subjectLabelFixed": "ID採番用の科目（固定）",
+    "subjectLabelOptional": "ID採番用の科目（任意）",
+    "specifiedSubject": "指定科目",
+    "subjectDescriptionFixed": "{subject}で固定しています。CoreProblemから科目が判定できない行にのみ、この科目をID採番のフォールバックとして使います。",
+    "subjectDescriptionOptional": "CoreProblemから科目が判定できない行にのみ、この科目をID採番のフォールバックとして使います。",
+    "textareaPlaceholder": "例:\n1001\t中1\tbe動詞の文_肯定文\t私は新入生です I (A) a new student.\tA: am\t\thttps://youtube.com/...",
+    "problemRequiredError": "問題文は必須です",
+    "successToast": "{createdCount}件作成、{updatedCount}件更新しました",
+    "warningsToast": "{count}件の警告があります",
+    "fallbackError": "登録に失敗しました",
+    "formatTitle": "フォーマット",
+    "formatDescription": "タブ区切り: [マスタ内問題番号(任意)] [学年] [CoreProblem名] [問題文] [正解] [別解(任意)] [動画URL(任意)]",
+    "subjectPlaceholder": "科目を選択",
+    "autoSubject": "自動判定（CoreProblemから）",
+    "missingCoreProblemTitle": "CoreProblem未設定の行があります",
+    "missingCoreProblemDescription": "CoreProblem未解決の行が{count}件あります。これらの行は実行時に警告され、作成・更新対象から自動でスキップされます。",
+    "additionalLinkLabel": "追加の紐付け設定 (一括)",
+    "additionalLinkDescription": "ペーストしたデータのCoreProblem列から自動で紐付けされます。追加で紐付けしたい場合は下で選択してください。",
+    "autoDetectedCoreProblems": "自動検出されたコア問題: {count}件",
+    "collapseCoreProblems": "折りたたむ",
+    "showAllCoreProblems": "すべて表示 (+{count})",
+    "noAdditionalLinks": "追加の紐付けなし",
+    "coreProblemSelectorPlaceholder": "単元・コア問題を選択して追加",
+    "table": {
+      "status": "状態",
+      "type": "タイプ",
+      "masterNumber": "マスタNo",
+      "grade": "学年",
+      "coreProblem": "コア問題",
+      "question": "問題文",
+      "answer": "解答(任意)",
+      "acceptedAnswers": "別解",
+      "videoUrl": "動画URL"
+    },
+    "updateBadge": "更新",
+    "newBadge": "新規",
+    "previewButton": "プレビュー",
+    "backButton": "戻る",
+    "executeButton": "登録実行 ({count}件)",
+    "warningsTitle": "登録時の警告 ({count}件)",
+    "closeButton": "閉じる"
+  },
+  "AdminProblemActions": {
+    "subjectNotFound": "教科が見つかりません",
+    "coreProblemRequired": "CoreProblemは最低1件必要です",
+    "coreProblemMissing": "存在しないCoreProblemが含まれています",
+    "multipleSubjectCoreProblems": "複数教科のCoreProblemは紐付けできません",
+    "getProblemsFailed": "問題の取得に失敗しました",
+    "getSubjectsFailed": "科目一覧の取得に失敗しました",
+    "getNavSubjectsFailed": "科目ナビゲーションの取得に失敗しました",
+    "invalidRequest": "不正なリクエストです",
+    "questionRequired": "問題文を入力してください",
+    "createFailed": "問題の作成に失敗しました",
+    "problemNotFound": "問題が見つかりません",
+    "structuredContentEditBlocked": "構造化ブロックを含む問題はこの画面から編集できません。問題編集画面をご利用ください。",
+    "updateFailed": "問題の更新に失敗しました",
+    "structuredDraftSaveFailed": "構造化問題の保存に失敗しました",
+    "noPublishableDraft": "公開可能な下書きがありません",
+    "publishFailed": "問題の公開に失敗しました",
+    "assetIdentityRequired": "problemId と revisionId が必要です",
+    "fileOrInlineContentRequired": "ファイルまたは inlineContent が必要です",
+    "assetSaveFailed": "アセットの保存に失敗しました",
+    "assetNotFound": "アセットが見つかりません",
+    "assetDeleteFailed": "アセットの削除に失敗しました",
+    "invalidStatus": "不正なステータスです",
+    "useSendBack": "差し戻しは sendBackProblem を使ってください",
+    "statusUpdateFailed": "ステータスの更新に失敗しました",
+    "sendBackReasonRequired": "差し戻し理由を入力してください",
+    "sendBackReasonTooLong": "差し戻し理由は{max}文字以内で入力してください",
+    "sendBackFailed": "差し戻しに失敗しました",
+    "invalidVideoStatus": "不正な動画ステータスです",
+    "videoStatusUpdateFailed": "動画ステータスの更新に失敗しました",
+    "deleteFailed": "問題の削除に失敗しました",
+    "bulkDeleteFailed": "問題の一括削除に失敗しました",
+    "bulkSearchCoreProblemsFailed": "CoreProblemの一括検索に失敗しました",
+    "bulkUpsertFailed": "一括登録・更新に失敗しました",
+    "searchByMasterNumbersFailed": "既存問題の検索に失敗しました"
   }
 }
