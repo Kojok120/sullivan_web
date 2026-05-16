@@ -5,7 +5,7 @@ const { findManyMock, getReadyCoreProblemIdsMock } = vi.hoisted(() => ({
     getReadyCoreProblemIdsMock: vi.fn(),
 }));
 
-vi.mock('@/lib/prisma', () => ({
+vi.mock('@sullivan/db-schema', () => ({
     prisma: {
         problem: {
             findMany: findManyMock,
@@ -13,7 +13,7 @@ vi.mock('@/lib/prisma', () => ({
     },
 }));
 
-vi.mock('@/lib/progression', () => ({
+vi.mock('@sullivan/core-engine/progression', () => ({
     getReadyCoreProblemIds: getReadyCoreProblemIdsMock,
 }));
 

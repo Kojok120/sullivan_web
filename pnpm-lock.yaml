@@ -71,6 +71,9 @@ importers:
       '@sullivan/config':
         specifier: workspace:*
         version: link:packages/config
+      '@sullivan/core-engine':
+        specifier: workspace:*
+        version: link:packages/core-engine
       '@sullivan/db-schema':
         specifier: workspace:*
         version: link:packages/db-schema
@@ -256,6 +259,30 @@ importers:
 
   packages/config:
     dependencies:
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
+
+  packages/core-engine:
+    dependencies:
+      '@prisma/client':
+        specifier: 7.4.1
+        version: 7.4.1(prisma@7.4.1(@types/react@19.2.14)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3))(typescript@5.9.3)
+      '@sullivan/ai-clients':
+        specifier: workspace:*
+        version: link:../ai-clients
+      '@sullivan/config':
+        specifier: workspace:*
+        version: link:../config
+      '@sullivan/db-schema':
+        specifier: workspace:*
+        version: link:../db-schema
+      '@sullivan/ui-kit':
+        specifier: workspace:*
+        version: link:../ui-kit
+      katex:
+        specifier: ^0.16.44
+        version: 0.16.47
       zod:
         specifier: ^3.25.76
         version: 3.25.76

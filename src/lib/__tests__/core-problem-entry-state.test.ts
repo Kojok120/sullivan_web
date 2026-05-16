@@ -5,7 +5,7 @@ import {
     getEntryCoreProblemIds,
 } from '@/lib/core-problem-entry-state'
 
-vi.mock('@/lib/prisma', () => ({
+vi.mock('@sullivan/db-schema', () => ({
     prisma: {
         coreProblem: {
             findMany: vi.fn(),

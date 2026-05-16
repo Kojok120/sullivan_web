@@ -27,6 +27,7 @@
   "dependencies": {
     "@sullivan/ai-clients": "workspace:*",
     "@sullivan/config": "workspace:*",
+    "@sullivan/core-engine": "workspace:*",
     "@sullivan/db-schema": "workspace:*",
     "@sullivan/ui-kit": "workspace:*",
     "@sullivan/user-platform": "workspace:*",
