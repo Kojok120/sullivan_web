@@ -18,6 +18,7 @@ reviews:
     - "!.next/**"
     - "!prisma/migrations/**"
     - "!package-lock.json"
+    - "!pnpm-lock.yaml"
     - "!tsconfig.tsbuildinfo"
   path_instructions:
     - path: "src/**"
