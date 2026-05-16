@@ -294,5 +294,51 @@
     "endMonth": "終了月",
     "selectClassroomPrompt": "教室を選択するとランキングを表示します。",
     "emptyData": "ランキングデータがありません。"
+  },
+  "PrintAssist": {
+    "pdfPrepareFailed": "PDFの準備に失敗しました。",
+    "shareUnsupported": "この端末では共有メニューを開けません。PDFを開いて印刷してください。",
+    "shareFailed": "共有メニューを開けませんでした。",
+    "back": "戻る",
+    "title": "このプリントを印刷",
+    "descriptionShare": "ボタンを押すと共有メニューが開きます。「プリント」を選んでください。",
+    "descriptionFallback": "共有メニューが使えない場合は、下の「PDFを開く」から印刷してください。",
+    "preparing": "印刷メニューを準備中...",
+    "openPrintMenu": "印刷メニューを開く",
+    "openPdf": "PDFを開く"
+  },
+  "PdfPreview": {
+    "resolvingPrintMethod": "印刷方法を判定中です...",
+    "back": "戻る",
+    "assistTitle": "iPhone・iPad では印刷アシストを開いてください",
+    "assistDescription": "埋め込みプレビューでは印刷しづらいため、共有メニューを開ける専用画面へ移動します。",
+    "openAssist": "印刷アシストを開く",
+    "openPdf": "PDFを開く",
+    "print": "印刷する",
+    "previewReady": "プレビューを確認して「印刷する」を押してください。",
+    "loadingPdf": "PDFを読み込み中です...",
+    "openPdfInNewTab": "PDFを別タブで開く",
+    "previewTitle": "印刷プレビュー"
+  },
+  "FullScreenVideoPlayer": {
+    "back": "戻る",
+    "nextButton": "次の動画へ",
+    "closeButton": "閉じる",
+    "singleVideoDescription": "動画を見て理解を深めましょう。",
+    "unsupportedTrackedUrl": "この動画 URL では視聴完了を自動判定できません。管理者に YouTube URL の設定をご確認ください。",
+    "replay": "もう一度再生",
+    "showingControls": "操作を表示しています",
+    "progress": "再生進捗",
+    "progressAria": "動画の再生進捗",
+    "seekBackTenSeconds": "10秒戻す"
+  },
+  "VideoPlayerDialog": {
+    "fallbackTitle": "解説動画",
+    "review": "復習する",
+    "watchExplanation": "解説動画を見る"
+  },
+  "LectureVideoButton": {
+    "label": "講義動画",
+    "labelWithCount": "講義動画 ({count})"
   }
 }

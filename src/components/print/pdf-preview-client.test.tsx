@@ -1,7 +1,10 @@
+import type { ReactNode } from 'react'
 import { act, fireEvent, render, screen } from '@testing-library/react'
+import { NextIntlClientProvider } from 'next-intl'
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import { useRouter } from 'next/navigation'
 
+import jaMessages from '@/messages/ja.json'
 import { PdfPreviewClient } from './pdf-preview-client'
 
 const { getPreferredPrintViewMock } = vi.hoisted(() => ({
@@ -20,6 +23,22 @@ vi.mock('@/lib/print-view', async () => {
         getPreferredPrintView: getPreferredPrintViewMock,
     }
 })
+
+function renderWithIntl(ui: ReactNode) {
+    const result = render(
+        <NextIntlClientProvider locale="ja" messages={jaMessages}>
+            {ui}
+        </NextIntlClientProvider>
+    )
+    return {
+        ...result,
+        rerender: (nextUi: ReactNode) => result.rerender(
+            <NextIntlClientProvider locale="ja" messages={jaMessages}>
+                {nextUi}
+            </NextIntlClientProvider>
+        ),
+    }
+}
 
 describe('PDFプレビューの戻る動作', () => {
     let originalVisibilityStateDescriptor: PropertyDescriptor | undefined
@@ -97,7 +116,7 @@ describe('PDFプレビューの戻る動作', () => {
     })
 
     it('読み込み完了後も自動印刷を試みない', () => {
-        render(
+        renderWithIntl(
             <PdfPreviewClient
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1&seed=seed-1&cb=initial"
                 backFallbackPath="/dashboard"
@@ -123,7 +142,7 @@ describe('PDFプレビューの戻る動作', () => {
     })
 
     it('pageshow persisted=true のとき iframe を再読み込みする', () => {
-        render(
+        renderWithIntl(
             <PdfPreviewClient
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1&seed=seed-1&cb=initial"
                 backFallbackPath="/dashboard"
@@ -154,7 +173,7 @@ describe('PDFプレビューの戻る動作', () => {
     })
 
     it('visible に戻ったとき iframe を再読み込みする', () => {
-        render(
+        renderWithIntl(
             <PdfPreviewClient
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1&seed=seed-1&cb=initial"
                 backFallbackPath="/dashboard"
@@ -184,7 +203,7 @@ describe('PDFプレビューの戻る動作', () => {
     })
 
     it('pdfUrl が変わると iframe を新しい URL で再初期化する', () => {
-        const { rerender } = render(
+        const { rerender } = renderWithIntl(
             <PdfPreviewClient
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1&seed=seed-1&cb=initial"
                 backFallbackPath="/dashboard"
@@ -210,7 +229,7 @@ describe('PDFプレビューの戻る動作', () => {
     it('印刷アシスト優先時は専用導線を表示する', async () => {
         vi.useRealTimers()
 
-        render(
+        renderWithIntl(
             <PdfPreviewClient
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
                 assistViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=assist"
@@ -239,7 +258,7 @@ describe('PDFプレビューの戻る動作', () => {
             value: requestAnimationFrameMock,
         })
 
-        render(
+        renderWithIntl(
             <PdfPreviewClient
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
                 assistViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=assist"
@@ -256,7 +275,7 @@ describe('PDFプレビューの戻る動作', () => {
     })
 
     it('サーバー判定が未確定の間は PDF iframe を出さずにローディングを表示する', () => {
-        render(
+        renderWithIntl(
             <PdfPreviewClient
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
                 assistViewUrl="/dashboard/print?subjectId=subject-1&sets=1&view=assist"
@@ -279,7 +298,7 @@ describe('PDFプレビューの戻る動作', () => {
             value: { focus: openerFocus, closed: false },
         })
 
-        render(
+        renderWithIntl(
             <PdfPreviewClient
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
                 backFallbackPath="/dashboard"
@@ -297,7 +316,7 @@ describe('PDFプレビューの戻る動作', () => {
         const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
         vi.spyOn(window.history, 'length', 'get').mockReturnValue(1)
 
-        render(
+        renderWithIntl(
             <PdfPreviewClient
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
                 backFallbackPath="/dashboard"
@@ -318,7 +337,7 @@ describe('PDFプレビューの戻る動作', () => {
         const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
         vi.spyOn(window.history, 'length', 'get').mockReturnValue(2)
 
-        render(
+        renderWithIntl(
             <PdfPreviewClient
                 pdfUrl="/api/print/pdf?subjectId=subject-1&sets=1"
                 backFallbackPath="/dashboard"

@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { GraduationCap } from 'lucide-react';
 import type { VideoData } from './full-screen-video-player';
@@ -25,6 +26,7 @@ interface LectureVideoButtonProps {
 }
 
 export function LectureVideoButton({ videos, coreProblemName }: LectureVideoButtonProps) {
+    const t = useTranslations('LectureVideoButton');
     const [isOpen, setIsOpen] = useState(false);
 
     if (videos.length === 0) {
@@ -45,7 +47,7 @@ export function LectureVideoButton({ videos, coreProblemName }: LectureVideoButt
                 onClick={() => setIsOpen(true)}
             >
                 <GraduationCap className="h-4 w-4 mr-2" />
-                講義動画{videos.length > 1 ? ` (${videos.length})` : ''}
+                {videos.length > 1 ? t('labelWithCount', { count: videos.length }) : t('label')}
             </Button>
 
             {isOpen ? (

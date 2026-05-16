@@ -3,6 +3,7 @@
 
 import dynamic from "next/dynamic";
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { PlayCircle } from "lucide-react";
 import { markVideoWatched } from "@/app/actions";
@@ -37,6 +38,7 @@ export function VideoPlayerDialog({
     isRequired,
     playlist = [],
 }: VideoPlayerDialogProps) {
+    const t = useTranslations('VideoPlayerDialog');
     const [open, setOpen] = useState(false);
     const [watched, setWatched] = useState(initialIsWatched);
     const router = useRouter();
@@ -62,7 +64,7 @@ export function VideoPlayerDialog({
             id: p.historyId
         }))
         : [{
-            title: "解説動画",
+            title: t('fallbackTitle'),
             url: initialVideoUrl,
             id: initialHistoryId
         }];
@@ -93,7 +95,7 @@ export function VideoPlayerDialog({
                 onClick={() => setOpen(true)}
             >
                 <PlayCircle className="h-4 w-4" />
-                {watched ? "復習する" : "解説動画を見る"}
+                {watched ? t('review') : t('watchExplanation')}
             </Button>
 
             {open ? (

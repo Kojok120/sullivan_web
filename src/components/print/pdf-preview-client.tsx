@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { ArrowLeft, ExternalLink, Loader2, Printer } from 'lucide-react';
 
 import { appendCacheBust } from '@/components/print/cache-bust';
@@ -40,6 +41,7 @@ function PdfPreviewClientInner({
     backFallbackPath,
     serverPreferredPrintView = 'pdf',
 }: PdfPreviewClientProps) {
+    const t = useTranslations('PdfPreview');
     const iframeRef = useRef<HTMLIFrameElement | null>(null);
     const hasLoadedFrameRef = useRef(false);
     const lastReloadAtRef = useRef(0);
@@ -136,7 +138,7 @@ function PdfPreviewClientInner({
                     <div className="rounded-md bg-white p-5">
                         <div className="flex items-center gap-3 text-sm text-muted-foreground">
                             <Loader2 className="h-4 w-4 animate-spin" />
-                            印刷方法を判定中です...
+                            {t('resolvingPrintMethod')}
                         </div>
                     </div>
                 </div>
@@ -153,14 +155,14 @@ function PdfPreviewClientInner({
                             <div className="flex items-center gap-2">
                                 <Button variant="outline" onClick={handleBack}>
                                     <ArrowLeft className="mr-2 h-4 w-4" />
-                                    戻る
+                                    {t('back')}
                                 </Button>
                             </div>
 
                             <div className="space-y-2">
-                                <h1 className="text-lg font-semibold">iPhone・iPad では印刷アシストを開いてください</h1>
+                                <h1 className="text-lg font-semibold">{t('assistTitle')}</h1>
                                 <p className="text-sm text-muted-foreground">
-                                    埋め込みプレビューでは印刷しづらいため、共有メニューを開ける専用画面へ移動します。
+                                    {t('assistDescription')}
                                 </p>
                             </div>
 
@@ -168,13 +170,13 @@ function PdfPreviewClientInner({
                                 <Button asChild>
                                     <a href={assistViewUrl}>
                                         <Printer className="mr-2 h-4 w-4" />
-                                        印刷アシストを開く
+                                        {t('openAssist')}
                                     </a>
                                 </Button>
                                 <Button variant="ghost" asChild>
                                     <a href={frameUrl}>
                                         <ExternalLink className="mr-2 h-4 w-4" />
-                                        PDFを開く
+                                        {t('openPdf')}
                                     </a>
                                 </Button>
                             </div>
@@ -192,7 +194,7 @@ function PdfPreviewClientInner({
                     <div className="flex items-center gap-2">
                         <Button variant="outline" onClick={handleBack}>
                             <ArrowLeft className="mr-2 h-4 w-4" />
-                            戻る
+                            {t('back')}
                         </Button>
                         <Button
                             type="button"
@@ -205,15 +207,15 @@ function PdfPreviewClientInner({
                             disabled={!isFrameLoaded}
                         >
                             <Printer className="mr-2 h-4 w-4" />
-                            印刷する
+                            {t('print')}
                         </Button>
                     </div>
 
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         {!isFrameLoaded && <Loader2 className="h-4 w-4 animate-spin" />}
                         {isFrameLoaded
-                            ? 'プレビューを確認して「印刷する」を押してください。'
-                            : 'PDFを読み込み中です...'}
+                            ? t('previewReady')
+                            : t('loadingPdf')}
                     </div>
 
                     <Button
@@ -221,7 +223,7 @@ function PdfPreviewClientInner({
                         asChild
                     >
                         <a href={frameUrl} target="_blank" rel="noopener noreferrer">
-                            PDFを別タブで開く
+                            {t('openPdfInNewTab')}
                             <ExternalLink className="ml-2 h-4 w-4" />
                         </a>
                     </Button>
@@ -230,7 +232,7 @@ function PdfPreviewClientInner({
                 <div className="rounded-md border bg-white">
                     <iframe
                         ref={iframeRef}
-                        title="印刷プレビュー"
+                        title={t('previewTitle')}
                         src={frameUrl}
                         className="h-[calc(100vh-130px)] w-full rounded-md"
                         onLoad={() => {

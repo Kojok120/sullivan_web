@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { NextIntlClientProvider } from "next-intl";
 import { VideoPlayerDialog } from "../video-player-dialog";
 import type { MouseEventHandler, ReactNode } from "react";
+import jaMessages from "@/messages/ja.json";
 
 type ButtonProps = {
     children?: ReactNode;
@@ -65,6 +67,14 @@ vi.mock("../full-screen-video-player", () => ({
     ),
 }));
 
+function renderWithIntl(ui: ReactNode) {
+    return render(
+        <NextIntlClientProvider locale="ja" messages={jaMessages}>
+            {ui}
+        </NextIntlClientProvider>
+    );
+}
+
 describe("VideoPlayerDialog", () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -72,7 +82,7 @@ describe("VideoPlayerDialog", () => {
     });
 
     it("途中で閉じた場合は視聴済みにならない", async () => {
-        render(
+        renderWithIntl(
             <VideoPlayerDialog
                 videoUrl="https://example.com/video"
                 historyId="history-1"
@@ -95,7 +105,7 @@ describe("VideoPlayerDialog", () => {
     });
 
     it("動画終了時のみ視聴済みになり markVideoWatched を呼ぶ", async () => {
-        render(
+        renderWithIntl(
             <VideoPlayerDialog
                 videoUrl="https://example.com/video"
                 historyId="history-1"
@@ -114,7 +124,7 @@ describe("VideoPlayerDialog", () => {
     });
 
     it("プレイリストで別動画が終了しても対象動画の視聴状態は変わらない", async () => {
-        render(
+        renderWithIntl(
             <VideoPlayerDialog
                 videoUrl="https://example.com/video-2"
                 historyId="history-2"
