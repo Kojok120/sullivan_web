@@ -71,6 +71,9 @@ importers:
       '@sullivan/config':
         specifier: workspace:*
         version: link:packages/config
+      '@sullivan/content-schema':
+        specifier: workspace:*
+        version: link:packages/content-schema
       '@sullivan/core-engine':
         specifier: workspace:*
         version: link:packages/core-engine
@@ -262,6 +265,8 @@ importers:
       zod:
         specifier: ^3.25.76
         version: 3.25.76
+
+  packages/content-schema: {}
 
   packages/core-engine:
     dependencies:
