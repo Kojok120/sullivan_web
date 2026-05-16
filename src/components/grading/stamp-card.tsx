@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { Star } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 interface StampCardProps {
     totalStamps: number;
@@ -9,6 +10,7 @@ interface StampCardProps {
 }
 
 export function StampCard({ totalStamps, newStamps }: StampCardProps) {
+    const t = useTranslations('StampCard');
     // Grid of 10 stamps per card
     const STAMPS_PER_CARD = 10;
     const currentCardPage = Math.floor((totalStamps - 1) / STAMPS_PER_CARD);
@@ -27,10 +29,10 @@ export function StampCard({ totalStamps, newStamps }: StampCardProps) {
 
             <div className="text-center mb-6">
                 <h3 className="text-xl font-bold text-orange-800 tracking-wider border-b-2 border-orange-200 inline-block pb-1">
-                    がんばりスタンプ帳
+                    {t('title')}
                 </h3>
                 <p className="text-xs text-orange-600 mt-1">
-                    {currentCardPage + 1}枚目
+                    {t('page', { page: currentCardPage + 1 })}
                 </p>
             </div>
 
@@ -55,7 +57,7 @@ export function StampCard({ totalStamps, newStamps }: StampCardProps) {
 
             <div className="mt-6 text-center">
                 <p className="text-sm font-bold text-[#8c6b5d]">
-                    あと {STAMPS_PER_CARD - (totalStamps % STAMPS_PER_CARD)} 個でゴール！
+                    {t('remaining', { count: STAMPS_PER_CARD - (totalStamps % STAMPS_PER_CARD) })}
                 </p>
             </div>
         </div>

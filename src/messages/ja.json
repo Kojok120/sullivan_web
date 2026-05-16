@@ -164,6 +164,9 @@
     "heatmapTitle": "学習ヒートマップ",
     "subjectProgressTitle": "教科別進捗"
   },
+  "Heatmap": {
+    "problemCountUnit": "問"
+  },
   "ActivityChart": {
     "problemCountTick": "{count}問"
   },
@@ -340,5 +343,80 @@
   "LectureVideoButton": {
     "label": "講義動画",
     "labelWithCount": "講義動画 ({count})"
+  },
+  "SurveyModal": {
+    "submitFailed": "送信に失敗しました。もう一度お試しください。",
+    "title": "定期振り返りアンケート",
+    "descriptionLine1": "日頃の学習についての振り返りをお願いします。",
+    "descriptionLine2": "直感で「とてもあてはまる（5）」〜「まったくあてはまらない（1）」を選んでください。",
+    "scaleMinLine1": "まったく",
+    "scaleMinLine2": "あてはまらない",
+    "scaleMaxLine1": "とても",
+    "scaleMaxLine2": "あてはまる",
+    "submitting": "送信中...",
+    "submit": "回答を送信して結果を見る",
+    "incompleteNotice": "※ すべての質問に回答してください"
+  },
+  "AchievementOverlay": {
+    "close": "実績通知を閉じる",
+    "title": "実績解除！",
+    "confirm": "おめでとう！"
+  },
+  "LevelUpModal": {
+    "title": "Level Up!",
+    "descriptionLine1": "おめでとうございます！",
+    "descriptionLine2": "レベル {level} になりました！",
+    "xpGained": "今回の獲得XP:",
+    "confirm": "おめでとう！"
+  },
+  "StampCard": {
+    "title": "がんばりスタンプ帳",
+    "page": "{page}枚目",
+    "remaining": "あと {count} 個でゴール！"
+  },
+  "StampOverlay": {
+    "close": "スタンプ通知を閉じる",
+    "title": "提出えらい！",
+    "stampGained": "スタンプ {count}個 GET!!",
+    "collect": "あつめる！"
+  },
+  "SubjectProgressList": {
+    "emptyMessage": "まだ学習データがありません"
+  },
+  "PhoneTutorButton": {
+    "title": "AI先生に電話する",
+    "callStartFailed": "通話の開始に失敗しました",
+    "currentProblemHeading": "【生徒が現在解いている問題】",
+    "questionLabel": "問題",
+    "answerLabel": "正解",
+    "userAnswerLabel": "生徒の回答",
+    "explanationLabel": "解説",
+    "unset": "（未設定）",
+    "unanswered": "（未回答）",
+    "none": "（なし）",
+    "instructionAnswer": "家庭教師として、生徒の質問に答えてください。",
+    "instructionSpeed": "話すスピードは通常より少し速め（目安1.1倍）で、テンポよく話してください。",
+    "instructionFirst": "まずは「あなたのわからないところを教えて」と優しく問いかけてください。"
+  },
+  "CallOverlay": {
+    "disconnected": "通話が切断されました",
+    "connecting": "接続中...",
+    "error": "マイクまたは接続で問題が発生しました",
+    "micMuted": "マイクはオフです",
+    "talking": "お話し中...",
+    "listening": "聞き取り中...",
+    "title": "AI家庭教師と通話中",
+    "micOn": "マイクをオンにする",
+    "micOff": "マイクをオフにする",
+    "endCall": "通話を終了する"
+  },
+  "ChatTutorButton": {
+    "initialAssistantMessage": "あなたのわからないところを教えてください。",
+    "sendFailedMessage": "ごめんなさい、応答に失敗しました。もう一度送ってみてください。",
+    "title": "AI先生にチャットで相談する",
+    "dialogTitle": "AI家庭教師にチャット相談",
+    "thinking": "考え中...",
+    "placeholder": "わからないところを入力してください（Enterで送信、Shift+Enterで改行）",
+    "send": "メッセージを送信"
   }
 }

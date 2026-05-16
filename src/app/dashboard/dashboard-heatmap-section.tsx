@@ -13,10 +13,12 @@ type DashboardHeatmapTitles = {
 // ヒートマップ + 教科別進捗。dailyActivity は 365 日分とサイズが大きいので、
 // このセクションだけ Suspense 境界で stream し、上部 KPI の初回描画を妨げない。
 export async function DashboardHeatmapSection({ userId }: { userId: string }) {
-    const [dailyActivity, subjectProgress, t] = await Promise.all([
+    const [dailyActivity, subjectProgress, t, tHeatmap, tSubjectProgress] = await Promise.all([
         getDailyActivity(userId, 365),
         getSubjectProgress(userId),
         getTranslations('DashboardHeatmap'),
+        getTranslations('Heatmap'),
+        getTranslations('SubjectProgressList'),
     ]);
 
     return (
@@ -27,10 +29,17 @@ export async function DashboardHeatmapSection({ userId }: { userId: string }) {
                 </CardHeader>
                 <CardContent className="px-4 pb-5 sm:px-6">
                     <div className="sm:hidden">
-                        <Heatmap data={dailyActivity} days={90} />
+                        <Heatmap
+                            data={dailyActivity}
+                            days={90}
+                            problemCountUnit={tHeatmap('problemCountUnit')}
+                        />
                     </div>
                     <div className="hidden sm:block">
-                        <Heatmap data={dailyActivity} />
+                        <Heatmap
+                            data={dailyActivity}
+                            problemCountUnit={tHeatmap('problemCountUnit')}
+                        />
                     </div>
                 </CardContent>
             </Card>
@@ -41,7 +50,10 @@ export async function DashboardHeatmapSection({ userId }: { userId: string }) {
                         <CardTitle>{t('subjectProgressTitle')}</CardTitle>
                     </CardHeader>
                     <CardContent className="px-4 pb-5 sm:px-6">
-                        <SubjectProgressList items={subjectProgress} />
+                        <SubjectProgressList
+                            items={subjectProgress}
+                            emptyMessage={tSubjectProgress('emptyMessage')}
+                        />
                     </CardContent>
                 </Card>
             </div>

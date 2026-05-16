@@ -8,6 +8,7 @@ import { X } from 'lucide-react';
 import { type Achievement, type UserAchievement } from '@prisma/client';
 import { CelebrationOverlayShell } from '@/components/gamification/celebration-overlay-shell';
 import { CelebrationIntro } from '@/components/gamification/celebration-intro';
+import { useTranslations } from 'next-intl';
 
 type ExtendedUserAchievement = UserAchievement & {
     achievement: Achievement;
@@ -18,6 +19,7 @@ type AchievementOverlayProps = {
 };
 
 export function AchievementOverlay({ initialQueue }: AchievementOverlayProps) {
+    const t = useTranslations('AchievementOverlay');
     const [queue, setQueue] = useState<ExtendedUserAchievement[]>(() => initialQueue ?? []);
     const current = queue[0] || null;
 
@@ -57,12 +59,14 @@ export function AchievementOverlay({ initialQueue }: AchievementOverlayProps) {
                         size="icon"
                         className="absolute top-2 right-2 text-muted-foreground hover:bg-muted rounded-full"
                         onClick={handleClose}
+                        aria-label={t('close')}
+                        title={t('close')}
                     >
                         <X className="h-6 w-6" />
                     </Button>
 
                     <CelebrationIntro
-                        title="実績解除！"
+                        title={t('title')}
                         description={(
                             <>
                                 <h3 className="text-2xl font-bold text-foreground">
@@ -87,7 +91,7 @@ export function AchievementOverlay({ initialQueue }: AchievementOverlayProps) {
                             className="w-full font-bold text-lg"
                             onClick={handleClose}
                         >
-                            おめでとう！
+                            {t('confirm')}
                         </Button>
                     </motion.div>
                 </CelebrationOverlayShell>

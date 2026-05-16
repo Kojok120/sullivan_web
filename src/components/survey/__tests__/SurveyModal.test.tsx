@@ -1,9 +1,12 @@
+import type { ReactNode } from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { NextIntlClientProvider } from 'next-intl'
 import { SurveyModal } from '../SurveyModal'
 import * as surveyActions from '@/actions/survey'
 import { useRouter } from 'next/navigation'
 import { SurveyCategory } from '@prisma/client'
+import jaMessages from '@/messages/ja.json'
 
 // Mock Next.js router
 vi.mock('next/navigation', () => ({
@@ -15,6 +18,14 @@ vi.mock('@/actions/survey', () => ({
     fetchSurveyQuestions: vi.fn(),
     submitSurvey: vi.fn(),
 }))
+
+function renderSurvey(ui: ReactNode) {
+    return render(
+        <NextIntlClientProvider locale="ja" messages={jaMessages}>
+            {ui}
+        </NextIntlClientProvider>
+    )
+}
 
 describe('SurveyModal', () => {
     const mockRouter = {
@@ -33,7 +44,7 @@ describe('SurveyModal', () => {
     ]
 
     async function renderLoadedSurveyModal(props?: { onComplete?: () => void }) {
-        render(<SurveyModal userId="user1" {...props} />)
+        renderSurvey(<SurveyModal userId="user1" {...props} />)
         await waitFor(() => {
             expect(screen.getByText(mockQuestions[0].question)).toBeInTheDocument()
         })
@@ -71,7 +82,7 @@ describe('SurveyModal', () => {
                 () => new Promise(() => { }) // 永遠に解決しないPromise
             )
 
-            const { container } = render(<SurveyModal userId="user1" />)
+            const { container } = renderSurvey(<SurveyModal userId="user1" />)
 
             expect(container.firstChild).toBeNull()
         })
@@ -79,7 +90,7 @@ describe('SurveyModal', () => {
         it('質問が読み込まれたらモーダルを表示する', async () => {
             vi.mocked(surveyActions.fetchSurveyQuestions).mockResolvedValue(mockQuestions)
 
-            render(<SurveyModal userId="user1" />)
+            renderSurvey(<SurveyModal userId="user1" />)
 
             await waitFor(() => {
                 expect(screen.getByText('定期振り返りアンケート')).toBeInTheDocument()
@@ -89,7 +100,7 @@ describe('SurveyModal', () => {
         it('質問が空の場合、何も表示しない', async () => {
             vi.mocked(surveyActions.fetchSurveyQuestions).mockResolvedValue([])
 
-            const { container } = render(<SurveyModal userId="user1" />)
+            const { container } = renderSurvey(<SurveyModal userId="user1" />)
 
             await waitFor(() => {
                 expect(container.firstChild).toBeNull()
@@ -99,7 +110,7 @@ describe('SurveyModal', () => {
         it('説明文を表示する', async () => {
             vi.mocked(surveyActions.fetchSurveyQuestions).mockResolvedValue(mockQuestions)
 
-            render(<SurveyModal userId="user1" />)
+            renderSurvey(<SurveyModal userId="user1" />)
 
             await waitFor(() => {
                 expect(screen.getByText(/日頃の学習についての振り返りをお願いします/)).toBeInTheDocument()
@@ -109,7 +120,7 @@ describe('SurveyModal', () => {
         it('すべての質問を表示する', async () => {
             vi.mocked(surveyActions.fetchSurveyQuestions).mockResolvedValue(mockQuestions)
 
-            render(<SurveyModal userId="user1" />)
+            renderSurvey(<SurveyModal userId="user1" />)
 
             await waitFor(() => {
                 mockQuestions.forEach(q => {
@@ -121,7 +132,7 @@ describe('SurveyModal', () => {
         it('各質問に1-5の選択肢を表示する', async () => {
             vi.mocked(surveyActions.fetchSurveyQuestions).mockResolvedValue(mockQuestions)
 
-            render(<SurveyModal userId="user1" />)
+            renderSurvey(<SurveyModal userId="user1" />)
 
             await waitFor(() => {
                 const radios = screen.getAllByRole('radio')
@@ -135,7 +146,7 @@ describe('SurveyModal', () => {
         it('ラジオボタンを選択できる', async () => {
             vi.mocked(surveyActions.fetchSurveyQuestions).mockResolvedValue(mockQuestions)
 
-            render(<SurveyModal userId="user1" />)
+            renderSurvey(<SurveyModal userId="user1" />)
 
             await waitFor(() => {
                 expect(screen.getByText(mockQuestions[0].question)).toBeInTheDocument()
@@ -152,7 +163,7 @@ describe('SurveyModal', () => {
         it('複数の質問に回答できる', async () => {
             vi.mocked(surveyActions.fetchSurveyQuestions).mockResolvedValue(mockQuestions)
 
-            render(<SurveyModal userId="user1" />)
+            renderSurvey(<SurveyModal userId="user1" />)
 
             await waitFor(() => {
                 expect(screen.getByText(mockQuestions[0].question)).toBeInTheDocument()
@@ -173,7 +184,7 @@ describe('SurveyModal', () => {
         it('同じ質問内で選択を変更できる', async () => {
             vi.mocked(surveyActions.fetchSurveyQuestions).mockResolvedValue(mockQuestions)
 
-            render(<SurveyModal userId="user1" />)
+            renderSurvey(<SurveyModal userId="user1" />)
 
             await waitFor(() => {
                 expect(screen.getByText(mockQuestions[0].question)).toBeInTheDocument()
@@ -196,7 +207,7 @@ describe('SurveyModal', () => {
         it('初期状態では送信ボタンが無効である', async () => {
             vi.mocked(surveyActions.fetchSurveyQuestions).mockResolvedValue(mockQuestions)
 
-            render(<SurveyModal userId="user1" />)
+            renderSurvey(<SurveyModal userId="user1" />)
 
             await waitFor(() => {
                 const submitButton = screen.getByRole('button', { name: /回答を送信して結果を見る/ })
@@ -207,7 +218,7 @@ describe('SurveyModal', () => {
         it('すべての質問に回答すると送信ボタンが有効になる', async () => {
             vi.mocked(surveyActions.fetchSurveyQuestions).mockResolvedValue(mockQuestions)
 
-            render(<SurveyModal userId="user1" />)
+            renderSurvey(<SurveyModal userId="user1" />)
 
             await waitFor(() => {
                 expect(screen.getByText(mockQuestions[0].question)).toBeInTheDocument()
@@ -229,7 +240,7 @@ describe('SurveyModal', () => {
         it('一部の質問にのみ回答した場合、送信ボタンは無効のまま', async () => {
             vi.mocked(surveyActions.fetchSurveyQuestions).mockResolvedValue(mockQuestions)
 
-            render(<SurveyModal userId="user1" />)
+            renderSurvey(<SurveyModal userId="user1" />)
 
             await waitFor(() => {
                 expect(screen.getByText(mockQuestions[0].question)).toBeInTheDocument()
@@ -248,7 +259,7 @@ describe('SurveyModal', () => {
         it('未回答時に警告メッセージを表示する', async () => {
             vi.mocked(surveyActions.fetchSurveyQuestions).mockResolvedValue(mockQuestions)
 
-            render(<SurveyModal userId="user1" />)
+            renderSurvey(<SurveyModal userId="user1" />)
 
             await waitFor(() => {
                 expect(screen.getByText(/すべての質問に回答してください/)).toBeInTheDocument()
@@ -340,7 +351,7 @@ describe('SurveyModal', () => {
         it('各質問に番号を表示する', async () => {
             vi.mocked(surveyActions.fetchSurveyQuestions).mockResolvedValue(mockQuestions)
 
-            render(<SurveyModal userId="user1" />)
+            renderSurvey(<SurveyModal userId="user1" />)
 
             await waitFor(() => {
                 expect(screen.getByText('Q1.')).toBeInTheDocument()
@@ -354,7 +365,7 @@ describe('SurveyModal', () => {
         it('「まったくあてはまらない」「とてもあてはまる」のラベルを表示する', async () => {
             vi.mocked(surveyActions.fetchSurveyQuestions).mockResolvedValue(mockQuestions)
 
-            render(<SurveyModal userId="user1" />)
+            renderSurvey(<SurveyModal userId="user1" />)
 
             await waitFor(() => {
                 const labels = screen.getAllByText(/まったく.*あてはまらない/)
@@ -371,7 +382,7 @@ describe('SurveyModal', () => {
             const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { })
             vi.mocked(surveyActions.fetchSurveyQuestions).mockRejectedValue(new Error('Load failed'))
 
-            render(<SurveyModal userId="user1" />)
+            renderSurvey(<SurveyModal userId="user1" />)
 
             await waitFor(() => {
                 expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to load survey questions', expect.any(Error))
