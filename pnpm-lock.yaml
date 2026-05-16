@@ -74,6 +74,9 @@ importers:
       '@sullivan/db-schema':
         specifier: workspace:*
         version: link:packages/db-schema
+      '@sullivan/user-platform':
+        specifier: workspace:*
+        version: link:packages/user-platform
       '@supabase/ssr':
         specifier: ^0.8.0
         version: 0.8.0(@supabase/supabase-js@2.105.4)
@@ -266,6 +269,30 @@ importers:
       prisma:
         specifier: 7.4.1
         version: 7.4.1(@types/react@19.2.14)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3)
+
+  packages/user-platform:
+    dependencies:
+      '@prisma/client':
+        specifier: 7.4.1
+        version: 7.4.1(prisma@7.4.1(@types/react@19.2.14)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3))(typescript@5.9.3)
+      '@sullivan/db-schema':
+        specifier: workspace:*
+        version: link:../db-schema
+      '@supabase/ssr':
+        specifier: ^0.8.0
+        version: 0.8.0(@supabase/supabase-js@2.105.4)
+      '@supabase/supabase-js':
+        specifier: ^2.89.0
+        version: 2.105.4
+      next:
+        specifier: 16.0.3
+        version: 16.0.3(@babel/core@7.29.0)(@playwright/test@1.60.0)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
+      react:
+        specifier: 19.2.0
+        version: 19.2.0
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
 
 packages:
 

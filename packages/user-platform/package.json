@@ -1,0 +1,33 @@
+{
+  "name": "@sullivan/user-platform",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./auth": "./src/auth.ts",
+    "./auth-admin": "./src/auth-admin.ts",
+    "./auth-constants": "./src/auth-constants.ts",
+    "./auth-mobile": "./src/auth-mobile.ts",
+    "./authorization": "./src/authorization.ts",
+    "./classroom-service": "./src/classroom-service.ts",
+    "./internal-api-auth": "./src/internal-api-auth.ts",
+    "./password-service": "./src/password-service.ts",
+    "./user-service": "./src/user-service.ts",
+    "./supabase/admin": "./src/supabase/admin.ts",
+    "./supabase/client": "./src/supabase/client.ts",
+    "./supabase/middleware": "./src/supabase/middleware.ts",
+    "./supabase/server": "./src/supabase/server.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "7.4.1",
+    "@sullivan/db-schema": "workspace:*",
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.89.0",
+    "next": "16.0.3",
+    "react": "19.2.0",
+    "zod": "^3.25.76"
+  }
+}
