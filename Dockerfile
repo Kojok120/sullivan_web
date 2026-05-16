@@ -6,9 +6,14 @@ FROM base AS deps
 WORKDIR /app
 RUN npm install -g pnpm@10.11.0
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml prisma.config.ts ./
+COPY packages/ai-clients/package.json ./packages/ai-clients/package.json
 COPY packages/config/package.json ./packages/config/package.json
+COPY packages/content-schema/package.json ./packages/content-schema/package.json
+COPY packages/core-engine/package.json ./packages/core-engine/package.json
 COPY packages/db-schema/package.json ./packages/db-schema/package.json
 COPY packages/db-schema/prisma ./packages/db-schema/prisma
+COPY packages/ui-kit/package.json ./packages/ui-kit/package.json
+COPY packages/user-platform/package.json ./packages/user-platform/package.json
 RUN pnpm install --frozen-lockfile
 
 FROM base AS builder
