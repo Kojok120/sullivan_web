@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { Eye, EyeOff } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -27,6 +28,7 @@ export function PasswordInputField({
     inputClassName,
     toggleClassName,
 }: PasswordInputFieldProps) {
+    const t = useTranslations('PasswordInput');
     const [visible, setVisible] = useState(false);
 
     return (
@@ -45,7 +47,7 @@ export function PasswordInputField({
                 <button
                     type="button"
                     onClick={() => setVisible((prev) => !prev)}
-                    aria-label={visible ? 'パスワードを非表示' : 'パスワードを表示'}
+                    aria-label={visible ? t('hidePassword') : t('showPassword')}
                     aria-pressed={visible}
                     className={cn(
                         'absolute right-3 top-1/2 -translate-y-1/2 rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',

@@ -166,5 +166,58 @@
   },
   "ActivityChart": {
     "problemCountTick": "{count}問"
+  },
+  "Login": {
+    "subtitle": "アカウントにログインしてください",
+    "loginIdLabel": "ログインID",
+    "loginIdPlaceholder": "例: S0001",
+    "passwordLabel": "パスワード",
+    "showPassword": "パスワードを表示",
+    "hidePassword": "パスワードを非表示",
+    "submitting": "ログイン中...",
+    "submit": "ログイン",
+    "errors": {
+      "loginIdRequired": "IDを入力してください",
+      "passwordRequired": "パスワードを入力してください",
+      "invalidCredentials": "IDまたはパスワードが間違っています"
+    }
+  },
+  "PasswordInput": {
+    "showPassword": "パスワードを表示",
+    "hidePassword": "パスワードを非表示"
+  },
+  "PasswordErrors": {
+    "currentPasswordRequired": "現在のパスワードを入力してください",
+    "newPasswordTooShort": "新しいパスワードは8文字以上で入力してください",
+    "confirmPasswordRequired": "確認用パスワードを入力してください",
+    "passwordsMismatch": "新しいパスワードが一致しません",
+    "loginRequired": "ログインが必要です",
+    "permissionDenied": "権限がありません",
+    "passwordUpdateFailed": "パスワード更新に失敗しました",
+    "userLoadFailed": "ユーザー情報の取得に失敗しました。再ログインしてください。",
+    "currentPasswordIncorrect": "現在のパスワードが間違っています"
+  },
+  "Settings": {
+    "title": "アカウント設定",
+    "passwordCardTitle": "パスワード変更",
+    "passwordCardDescription": "新しいパスワードを設定します。8文字以上で入力してください。",
+    "currentPasswordLabel": "現在のパスワード",
+    "newPasswordLabel": "新しいパスワード",
+    "confirmPasswordLabel": "新しいパスワード（確認）",
+    "success": "パスワードを変更しました。次回ログイン時から新しいパスワードを使用してください。",
+    "submitting": "変更中...",
+    "submit": "パスワードを変更する"
+  },
+  "ForcePasswordChange": {
+    "title": "パスワードの変更が必要です",
+    "descriptionLine1": "セキュリティのため、初期パスワードを変更してください。",
+    "descriptionLine2": "変更するまで他の機能は利用できません。",
+    "cardTitle": "新しいパスワード設定",
+    "cardDescription": "8文字以上で、推測されにくいパスワードを設定してください。",
+    "newPasswordLabel": "新しいパスワード",
+    "confirmPasswordLabel": "新しいパスワード（確認）",
+    "submitting": "変更中...",
+    "submit": "パスワードを変更して利用開始",
+    "logout": "今はログアウトする"
   }
 }

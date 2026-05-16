@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
+import { useTranslations } from 'next-intl';
 import { forceUpdatePassword } from './actions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,6 +10,7 @@ import { LogOut } from 'lucide-react';
 import { PasswordInputField } from '@/components/auth/password-input-field';
 
 export default function ForcePasswordChangePage() {
+    const t = useTranslations('ForcePasswordChange');
     const [state, action, pending] = useActionState(forceUpdatePassword, undefined);
 
     return (
@@ -16,19 +18,19 @@ export default function ForcePasswordChangePage() {
             <div className="w-full max-w-md space-y-8">
                 <div className="text-center">
                     <h2 className="mt-6 text-3xl font-extrabold text-foreground">
-                        パスワードの変更が必要です
+                        {t('title')}
                     </h2>
                     <p className="mt-2 text-sm text-muted-foreground">
-                        セキュリティのため、初期パスワードを変更してください。<br />
-                        変更するまで他の機能は利用できません。
+                        {t('descriptionLine1')}<br />
+                        {t('descriptionLine2')}
                     </p>
                 </div>
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>新しいパスワード設定</CardTitle>
+                        <CardTitle>{t('cardTitle')}</CardTitle>
                         <CardDescription>
-                            8文字以上で、推測されにくいパスワードを設定してください。
+                            {t('cardDescription')}
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -36,7 +38,7 @@ export default function ForcePasswordChangePage() {
                             <PasswordInputField
                                 id="newPassword"
                                 name="newPassword"
-                                label="新しいパスワード"
+                                label={t('newPasswordLabel')}
                                 minLength={8}
                                 autoComplete="new-password"
                                 toggleClassName="text-muted-foreground hover:text-foreground focus-visible:ring-ring"
@@ -44,7 +46,7 @@ export default function ForcePasswordChangePage() {
                             <PasswordInputField
                                 id="confirmPassword"
                                 name="confirmPassword"
-                                label="新しいパスワード（確認）"
+                                label={t('confirmPasswordLabel')}
                                 minLength={8}
                                 autoComplete="new-password"
                                 toggleClassName="text-muted-foreground hover:text-foreground focus-visible:ring-ring"
@@ -55,7 +57,7 @@ export default function ForcePasswordChangePage() {
                             )}
 
                             <Button type="submit" className="w-full" disabled={pending}>
-                                {pending ? '変更中...' : 'パスワードを変更して利用開始'}
+                                {pending ? t('submitting') : t('submit')}
                             </Button>
                         </form>
                     </CardContent>
@@ -65,7 +67,7 @@ export default function ForcePasswordChangePage() {
                     <form action={logoutAction}>
                         <Button variant="ghost" className="text-sm text-muted-foreground hover:text-foreground">
                             <LogOut className="mr-2 h-4 w-4" />
-                            今はログアウトする
+                            {t('logout')}
                         </Button>
                     </form>
                 </div>
