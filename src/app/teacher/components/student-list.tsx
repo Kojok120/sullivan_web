@@ -16,6 +16,7 @@ import {
     DEFAULT_STUDENT_SORT_ORDER,
     STUDENT_SORT_OPTIONS,
 } from './student-list-sort';
+import { useTranslations } from 'next-intl';
 
 type StudentWithStats = User & {
     group: string | null;
@@ -44,11 +45,18 @@ export function StudentList({
     sortBy = null,
     sortOrder = 'asc',
 }: StudentListProps) {
+    const t = useTranslations('TeacherStudentList');
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
     const currentSortBy = enableSorting ? sortBy : null;
     const currentSortOrder = currentSortBy ? sortOrder : 'asc';
+    const sortLabels: Record<StudentSortKey, string> = {
+        loginId: t('sortLoginId'),
+        totalProblemsSolved: t('sortTotalProblemsSolved'),
+        currentStreak: t('sortCurrentStreak'),
+        lastActivity: t('sortLastActivity'),
+    };
 
     const handleNavigateToStudent = (studentId: string) => {
         router.push(`${linkPrefix}${studentId}`);
@@ -129,7 +137,7 @@ export function StudentList({
                     <SortIcon active={isActive} sortOrder={currentSortOrder} className="ml-1" />
                     {isActive && (
                         <span className="text-xs text-muted-foreground" aria-hidden="true">
-                            {currentSortOrder === 'asc' ? '昇' : '降'}
+                            {currentSortOrder === 'asc' ? t('sortShortAsc') : t('sortShortDesc')}
                         </span>
                     )}
                 </button>
@@ -139,7 +147,7 @@ export function StudentList({
 
     const renderEmpty = () => (
         <div className="rounded-md border py-8 text-center text-sm text-muted-foreground">
-            条件に一致する生徒が見つかりません
+            {t('empty')}
         </div>
     );
 
@@ -149,13 +157,13 @@ export function StudentList({
                 <div className="flex items-center gap-2 md:hidden">
                     <Select value={currentSortBy ?? 'default'} onValueChange={handleSortSelection}>
                         <SelectTrigger className="w-full bg-background">
-                            <SelectValue placeholder="並び順" />
+                            <SelectValue placeholder={t('sortPlaceholder')} />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="default">標準（現在の表示順）</SelectItem>
+                            <SelectItem value="default">{t('sortDefault')}</SelectItem>
                             {STUDENT_SORT_OPTIONS.map((option) => (
                                 <SelectItem key={option.value} value={option.value}>
-                                    {option.label}
+                                    {sortLabels[option.value]}
                                 </SelectItem>
                             ))}
                         </SelectContent>
@@ -168,7 +176,7 @@ export function StudentList({
                         onClick={toggleSortOrder}
                         disabled={!currentSortBy}
                     >
-                        {currentSortOrder === 'asc' ? '昇順' : '降順'}
+                        {currentSortOrder === 'asc' ? t('sortAsc') : t('sortDesc')}
                     </Button>
                 </div>
             )}
@@ -187,23 +195,23 @@ export function StudentList({
                             onKeyDown={showDetailButton ? undefined : (event) => handleInteractiveKeyDown(event, student.id)}
                         >
                             <div className="mb-3">
-                                <p className="text-base font-semibold">{student.name || '未設定'}</p>
+                                <p className="text-base font-semibold">{student.name || t('unset')}</p>
                             </div>
                             <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
                                 <div>
-                                    <p className="text-xs text-muted-foreground">生徒ID</p>
+                                    <p className="text-xs text-muted-foreground">{t('studentId')}</p>
                                     <p>{student.loginId}</p>
                                 </div>
                                 <div>
-                                    <p className="text-xs text-muted-foreground">グループ</p>
+                                    <p className="text-xs text-muted-foreground">{t('group')}</p>
                                     <p>{student.group || '-'}</p>
                                 </div>
                                 <div>
-                                    <p className="text-xs text-muted-foreground">総回答数</p>
-                                    <p>{student.stats.totalProblemsSolved}問</p>
+                                    <p className="text-xs text-muted-foreground">{t('totalProblemsSolved')}</p>
+                                    <p>{t('problemCount', { count: student.stats.totalProblemsSolved })}</p>
                                 </div>
                                 <div>
-                                    <p className="text-xs text-muted-foreground">正答率</p>
+                                    <p className="text-xs text-muted-foreground">{t('accuracy')}</p>
                                     <p className={
                                         student.stats.accuracy >= 80 ? 'font-semibold text-green-600' :
                                             student.stats.accuracy < 50 ? 'font-semibold text-red-500' : ''
@@ -212,11 +220,11 @@ export function StudentList({
                                     </p>
                                 </div>
                                 <div>
-                                    <p className="text-xs text-muted-foreground">連続学習</p>
-                                    <p>{student.stats.currentStreak}日</p>
+                                    <p className="text-xs text-muted-foreground">{t('currentStreak')}</p>
+                                    <p>{t('streakDays', { count: student.stats.currentStreak })}</p>
                                 </div>
                                 <div className="col-span-2">
-                                    <p className="text-xs text-muted-foreground">最終学習日</p>
+                                    <p className="text-xs text-muted-foreground">{t('lastActivity')}</p>
                                     <p>{student.stats.lastActivity ? <DateDisplay date={student.stats.lastActivity} /> : '-'}</p>
                                 </div>
                             </div>
@@ -224,7 +232,7 @@ export function StudentList({
                                 <div className="mt-3">
                                     <Button asChild variant="outline" size="sm" className="min-h-11 w-full">
                                         <Link href={`${linkPrefix}${student.id}`}>
-                                            詳細を見る
+                                            {t('viewDetail')}
                                         </Link>
                                     </Button>
                                 </div>
@@ -238,14 +246,14 @@ export function StudentList({
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>名前</TableHead>
-                            {renderSortableHead('生徒ID', 'loginId')}
-                            <TableHead>グループ</TableHead>
-                            {renderSortableHead('総回答数', 'totalProblemsSolved', 'right')}
-                            <TableHead className="text-right">正答率</TableHead>
-                            {renderSortableHead('連続学習', 'currentStreak', 'right')}
-                            {renderSortableHead('最終学習日', 'lastActivity', 'right')}
-                            {showDetailButton && <TableHead className="text-right">詳細</TableHead>}
+                            <TableHead>{t('name')}</TableHead>
+                            {renderSortableHead(t('studentId'), 'loginId')}
+                            <TableHead>{t('group')}</TableHead>
+                            {renderSortableHead(t('totalProblemsSolved'), 'totalProblemsSolved', 'right')}
+                            <TableHead className="text-right">{t('accuracy')}</TableHead>
+                            {renderSortableHead(t('currentStreak'), 'currentStreak', 'right')}
+                            {renderSortableHead(t('lastActivity'), 'lastActivity', 'right')}
+                            {showDetailButton && <TableHead className="text-right">{t('detail')}</TableHead>}
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -259,11 +267,11 @@ export function StudentList({
                                 onKeyDown={showDetailButton ? undefined : (event) => handleInteractiveKeyDown(event, student.id)}
                             >
                                 <TableCell className="font-medium">
-                                    {student.name || '未設定'}
+                                    {student.name || t('unset')}
                                 </TableCell>
                                 <TableCell>{student.loginId}</TableCell>
                                 <TableCell>{student.group || '-'}</TableCell>
-                                <TableCell className="text-right">{student.stats.totalProblemsSolved}問</TableCell>
+                                <TableCell className="text-right">{t('problemCount', { count: student.stats.totalProblemsSolved })}</TableCell>
                                 <TableCell className="text-right">
                                     <span className={
                                         student.stats.accuracy >= 80 ? 'text-green-600 font-bold' :
@@ -272,7 +280,7 @@ export function StudentList({
                                         {student.stats.accuracy}%
                                     </span>
                                 </TableCell>
-                                <TableCell className="text-right">{student.stats.currentStreak}日</TableCell>
+                                <TableCell className="text-right">{t('streakDays', { count: student.stats.currentStreak })}</TableCell>
                                 <TableCell className="text-right">
                                     {student.stats.lastActivity ? <DateDisplay date={student.stats.lastActivity} /> : '-'}
                                 </TableCell>
@@ -280,7 +288,7 @@ export function StudentList({
                                     <TableCell className="text-right">
                                         <Button asChild variant="outline" size="sm">
                                             <Link href={`${linkPrefix}${student.id}`}>
-                                                詳細を見る
+                                                {t('viewDetail')}
                                             </Link>
                                         </Button>
                                     </TableCell>
@@ -290,7 +298,7 @@ export function StudentList({
                         {students.length === 0 && (
                             <TableRow>
                                 <TableCell colSpan={showDetailButton ? 8 : 7} className="text-center py-8 text-muted-foreground">
-                                    条件に一致する生徒が見つかりません
+                                    {t('empty')}
                                 </TableCell>
                             </TableRow>
                         )}

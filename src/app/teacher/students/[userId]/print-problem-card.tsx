@@ -8,6 +8,7 @@ import { Printer, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { appendCacheBust } from '@/components/print/cache-bust';
 import { getPreferredPrintView } from '@/lib/print-view';
+import { useTranslations } from 'next-intl';
 
 interface Subject {
     id: string;
@@ -20,6 +21,7 @@ interface PrintProblemCardProps {
 }
 
 export function PrintProblemCard({ userId, subjects }: PrintProblemCardProps) {
+    const t = useTranslations('TeacherPrintProblemCard');
     const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
     const [selectedCoreProblemId, setSelectedCoreProblemId] = useState<string>('');
     const [sets, setSets] = useState<number>(1);
@@ -77,16 +79,16 @@ export function PrintProblemCard({ userId, subjects }: PrintProblemCardProps) {
     return (
         <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">問題印刷</CardTitle>
+                <CardTitle className="text-sm font-medium">{t('title')}</CardTitle>
                 <Printer className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="space-y-4">
                 <div className="space-y-3">
                     <div className="space-y-1">
-                        <label className="text-xs font-medium text-muted-foreground">科目</label>
+                        <label className="text-xs font-medium text-muted-foreground">{t('subjectLabel')}</label>
                         <Select value={selectedSubjectId} onValueChange={setSelectedSubjectId}>
                             <SelectTrigger>
-                                <SelectValue placeholder="科目を選択" />
+                                <SelectValue placeholder={t('subjectPlaceholder')} />
                             </SelectTrigger>
                             <SelectContent>
                                 {subjects.map((subject) => (
@@ -99,17 +101,17 @@ export function PrintProblemCard({ userId, subjects }: PrintProblemCardProps) {
                     </div>
 
                     <div className="space-y-1">
-                        <label className="text-xs font-medium text-muted-foreground">単元 (任意)</label>
+                        <label className="text-xs font-medium text-muted-foreground">{t('coreProblemLabel')}</label>
                         <Select
                             value={selectedCoreProblemId}
                             onValueChange={setSelectedCoreProblemId}
                             disabled={!selectedSubjectId || fetchingCoreProblems}
                         >
                             <SelectTrigger>
-                                <SelectValue placeholder={fetchingCoreProblems ? "読み込み中..." : "単元を選択 (指定なし)"} />
+                                <SelectValue placeholder={fetchingCoreProblems ? t('coreProblemLoading') : t('coreProblemPlaceholder')} />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">指定なし (全範囲)</SelectItem>
+                                <SelectItem value="all">{t('coreProblemAll')}</SelectItem>
                                 {coreProblems.map((cp) => (
                                     <SelectItem key={cp.id} value={cp.id}>
                                         {cp.name}
@@ -120,19 +122,19 @@ export function PrintProblemCard({ userId, subjects }: PrintProblemCardProps) {
                     </div>
 
                     <div className="space-y-1">
-                        <label className="text-xs font-medium text-muted-foreground">セット数 (1-10)</label>
+                        <label className="text-xs font-medium text-muted-foreground">{t('setsLabel')}</label>
                         <Select
                             value={sets.toString()}
                             onValueChange={(val) => setSets(parseInt(val))}
                             disabled={!selectedSubjectId}
                         >
                             <SelectTrigger>
-                                <SelectValue placeholder="セット数" />
+                                <SelectValue placeholder={t('setsPlaceholder')} />
                             </SelectTrigger>
                             <SelectContent>
                                 {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
                                     <SelectItem key={num} value={num.toString()}>
-                                        {num} セット ({num * 10}問)
+                                        {t('setOption', { sets: num, problems: num * 10 })}
                                     </SelectItem>
                                 ))}
                             </SelectContent>
@@ -145,11 +147,11 @@ export function PrintProblemCard({ userId, subjects }: PrintProblemCardProps) {
                         onClick={handlePrint}
                     >
                         {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        プレビュー作成
+                        {t('createPreview')}
                     </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                    選択した科目の復習問題を自動生成します
+                    {t('description')}
                 </p>
             </CardContent>
         </Card>
